@@ -1,0 +1,72 @@
+import logging
+
+from app.core import g
+from app.core.api import api_router
+from app.core.config import settings
+from app.modules.user.services import UserService
+from app.modules.user.utils import current_user_from_service
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
+logger = logging.getLogger(__name__)
+
+app = FastAPI(
+    title=settings.APP_NAME,
+    version=settings.APP_VERSION,
+    openapi_url="/docs/json",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    contact=settings.APP_CONTACT,
+)
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # React app URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+)
+
+app.include_router(api_router)
+
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    print("Performing cleanup before shutdown...")
+
+
+# @app.exception_handler(Exception)
+# async def exception_handler(request: Request, exc: Exception):
+#     return JSONResponse(
+#         status_code=500,
+#         content={"error": "An internal error occurred"},
+#     )
+
+
+@app.middleware("http")
+async def set_context(request: Request, call_next):
+    try:
+        # Check if route is public
+        # if any(request.url.path.startswith(route) for route in PUBLIC_ROUTES):
+        #     return await call_next(request)
+
+        # Extract the session cookie
+
+        # Initialize globals for this request
+
+        user = request.cookies.get("user")
+
+        g.set({"user": user})
+        response = await call_next(request)
+        return response
+
+    except Exception as e:
+        logger.error(f"Error setting context: {e}")

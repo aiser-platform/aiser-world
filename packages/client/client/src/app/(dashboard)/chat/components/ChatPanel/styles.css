@@ -1,0 +1,179 @@
+.ChatPanel {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+    width: 100%;
+    overflow: auto;
+    background-color: var(--background);
+}
+
+.ContainerMessage {
+    height: 100%;
+    width: 100%;
+    display: flex;
+    flex-direction: column-reverse;
+    padding: 16px;
+    overflow-y: scroll;
+}
+
+.ChatHeader {
+    z-index: 1;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    padding: 16px;
+    box-shadow: var(--box-shadow-base);
+}
+
+.ChatHeader .section {
+    margin: 0;
+}
+
+.ChatTitle {
+    font-size: 1.25rem;
+    font-weight: 500;
+}
+
+.ChatInput {
+    width: 100%;
+    display: flex;
+    align-items: flex-end;
+    padding: 8px 16px;
+    box-shadow: var(--box-shadow-reverse);
+}
+
+.ContainerMessageBox {
+    display: flex;
+    margin: 16px 0 0 0;
+}
+
+.ContainerMessageBox.justify-start {
+    justify-content: flex-start;
+}
+
+.ContainerMessageBox.justify-end {
+    justify-content: flex-end;
+}
+
+.ContainerMessageBox.disable-avatar {
+    margin: 8px 0 0 0;
+}
+
+.MessageBox {
+    width: 100%;
+    display: flex;
+    margin: 0 8px;
+}
+
+.MessageBox.justify-start {
+    justify-content: start;
+}
+
+.MessageBox.justify-end {
+    justify-content: end;
+}
+
+.Message {
+    max-width: 80%;
+    word-wrap: break-word;
+    padding: 8px 12px;
+    border-radius: 10px;
+    box-shadow: var(--box-shadow-base);
+}
+
+/* Add iframe container styles */
+.Message .iframe-container {
+    position: relative;
+    width: 100%;
+    height: 100%; /* Fixed height for charts */
+}
+
+.Message iframe {
+    width: 100%;
+    height: 500px;
+    border: none;
+}
+
+/* Adjust message box for iframes */
+.Message.has-iframe {
+    width: 100%;
+    min-width: 80%; /* Larger max-width for charts */
+}
+
+/* Media Queries */
+@media (min-width: 1280px) {
+    .Message {
+        max-width: 80%;
+    }
+}
+
+@media (min-width: 768px) {
+    .Message {
+        max-width: 90%;
+    }
+}
+
+@media (max-width: 640px) {
+    .Message {
+        max-width: 100%;
+    }
+}
+
+.Message .Error {
+    color: #dc2626;
+}
+
+.Message .Loading {
+    display: inline-block;
+    position: relative;
+}
+
+.Message .Loading:after {
+    content: '...';
+    position: absolute;
+    width: 24px;
+    text-align: left;
+    animation: dots 2s steps(4, end) infinite;
+}
+
+@keyframes dots {
+    0%,
+    20% {
+        content: '.';
+    }
+    40% {
+        content: '..';
+    }
+    60% {
+        content: '...';
+    }
+    80%,
+    100% {
+        content: '';
+    }
+}
+
+/* Ant Design Overrides */
+.ContainerMessageBox .ant-avatar {
+    opacity: 1;
+    background-color: #3b82f6;
+}
+
+.ContainerMessageBox.disable-avatar .ant-avatar {
+    opacity: 0;
+}
+
+.ContainerMessageBox.justify-start .ant-avatar {
+    background-color: #22c55e;
+}
+
+.ContainerMessageBox .ant-btn {
+    font-size: 1rem;
+    margin: 0;
+}
+
+.ContainerMessageBox .ant-btn:hover {
+    color: #3b82f6;
+}
