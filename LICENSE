@@ -1,0 +1,98 @@
+# Aiser Platform Licensing
+
+Aiser uses a dual-licensing model to support both open source development and commercial enterprise use.
+
+## Open Source Components (MIT License)
+
+The following components are licensed under the MIT License:
+
+- **Chat2Chart Core Engine** (`packages/chat2chart/`)
+  - AI-powered chart generation
+  - Basic authentication utilities
+  - File-based data connectors
+  - ECharts integration
+  - Natural language processing
+
+- **Shared Utilities** (`packages/shared/`)
+  - Common types and interfaces
+  - Basic utility functions
+  - API client utilities
+
+### MIT License Terms
+
+```
+MIT License
+
+Copyright (c) 2024 BigStack Analytics
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+## Enterprise Components (Commercial License)
+
+The following components require a commercial license for use:
+
+- **Enterprise Client** (`packages/client/`)
+  - Advanced UI/UX components
+  - Dashboard builder
+  - Real-time collaboration
+  - White-label customization
+
+- **Enterprise Authentication** (`packages/auth/`)
+  - SSO/SAML integration
+  - Multi-factor authentication
+  - Advanced RBAC
+  - Audit logging
+  - Compliance features
+
+- **Advanced Features**
+  - AntV MCP integration
+  - Database/warehouse connectors
+  - Predictive analytics
+  - Anomaly detection
+  - Enterprise governance
+
+### Commercial License Terms
+
+For commercial use of enterprise components, please contact:
+
+**BigStack Analytics**
+- Email: licensing@bigstack-analytics.com
+- Website: https://bigstack-analytics.com
+- Phone: [Contact Information]
+
+Commercial licenses include:
+- ✅ Production use rights
+- ✅ Technical support
+- ✅ Service level agreements
+- ✅ Professional services
+- ✅ Custom development
+- ✅ White-label licensing
+
+## Evaluation License
+
+Enterprise components may be used for evaluation purposes for up to 30 days without a commercial license. After the evaluation period, a commercial license is required for continued use.
+
+## Contributing
+
+Contributions to open source components are welcome under the MIT License. Contributors to enterprise components must sign a Contributor License Agreement (CLA).
+
+## Questions?
+
+For licensing questions, please contact licensing@bigstack-analytics.com

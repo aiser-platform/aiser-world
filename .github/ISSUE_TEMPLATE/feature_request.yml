@@ -1,0 +1,68 @@
+name: ✨ Feature Request
+description: Suggest a new feature for Aiser World
+title: "[Feature]: "
+labels: ["enhancement", "needs-triage"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a new feature! Please fill out the form below.
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which component should this feature be added to?
+      options:
+        - Chat2Chart (Open Source)
+        - Enterprise Client
+        - Authentication
+        - Shared Utilities
+        - Documentation
+        - New Component
+    validations:
+      required: true
+
+  - type: dropdown
+    id: license
+    attributes:
+      label: License Type
+      description: Should this be an open source or enterprise feature?
+      options:
+        - Open Source (MIT)
+        - Enterprise (Commercial)
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: What problem does this feature solve?
+      placeholder: Describe the problem this feature would solve...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: Describe the solution you'd like to see
+      placeholder: Describe your proposed solution...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Describe any alternative solutions you've considered
+      placeholder: What alternatives have you considered?
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Add any other context, mockups, or examples about the feature request here.

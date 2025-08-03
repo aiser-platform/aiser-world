@@ -1,0 +1,97 @@
+name: 💼 Enterprise Support
+description: Enterprise customer support request
+title: "[Enterprise]: "
+labels: ["enterprise", "support"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Enterprise Support Request**
+        
+        This template is for customers with enterprise licenses. If you're using the open source version, please use the bug report or feature request templates.
+
+  - type: input
+    id: license
+    attributes:
+      label: License Key
+      description: Please provide your enterprise license key (first 8 characters only)
+      placeholder: "XXXXXXXX-..."
+    validations:
+      required: true
+
+  - type: input
+    id: organization
+    attributes:
+      label: Organization
+      description: Your organization name
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: What's the priority of this request?
+      options:
+        - Low - General question or minor issue
+        - Medium - Feature request or moderate issue
+        - High - Significant issue affecting operations
+        - Critical - System down or security issue
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Enterprise Component
+      description: Which enterprise component is this related to?
+      options:
+        - Enterprise Client
+        - Enterprise Authentication (SSO/SAML/MFA)
+        - Database Connectors
+        - Advanced Analytics
+        - Collaboration Features
+        - Governance & Audit
+        - Professional Services
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Detailed description of your request or issue
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment Details
+      description: Please provide your deployment environment details
+      placeholder: |
+        - Deployment type: [Cloud/On-premise/Hybrid]
+        - Version: [e.g. 1.0.0]
+        - Infrastructure: [e.g. Kubernetes, Docker, VM]
+        - Database: [e.g. PostgreSQL 15]
+        - Users: [e.g. 100 active users]
+
+  - type: textarea
+    id: business_impact
+    attributes:
+      label: Business Impact
+      description: How is this affecting your business operations?
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        **Enterprise Support SLA:**
+        - Critical: 2 hours response time
+        - High: 4 hours response time  
+        - Medium: 1 business day response time
+        - Low: 2 business days response time
+        
+        For urgent issues, you can also contact: enterprise-support@bigstack-analytics.com
