@@ -222,7 +222,7 @@ Aiser uses a **dual-licensing model**:
 - **Advanced Features**: AntV MCP, database connectors, predictive analytics
 
 **Evaluation**: Enterprise features available for 30-day evaluation.  
-**Commercial Licensing**: Contact licensing@bigstack-analytics.com
+**Commercial Licensing**: Contact aiser-licensing@dataticon.com
 
 ### 📋 **Enterprise Documentation**
 - **[Enterprise License Agreement](ENTERPRISE-LICENSE-AGREEMENT.md)** - Complete legal terms
@@ -242,3 +242,4 @@ See the [LICENSE](LICENSE) file for complete details.
 
 
 **Built with ❤️ by DataTicon Team**
+
