@@ -1,0 +1,46 @@
+from datetime import datetime
+from typing import Any, Dict, Optional
+from uuid import UUID
+
+from app.common.schemas import BaseSchema
+from pydantic import UUID4, BaseModel, ConfigDict, Field
+
+
+# Base schema with common attributes
+class MessageBase(BaseModel):
+    query: Optional[str] = Field(
+        default=None, description="The input query text from the user"
+    )
+    answer: Optional[str] = Field(
+        default=None, description="The response text generated for the query"
+    )
+    error: Optional[str] = Field(
+        default=None, description="Error message if any occurred during processing"
+    )
+    status: Optional[str] = Field(
+        default=None,
+        description="Current status of the message (e.g., 'pending', 'completed', 'error')",
+    )
+    conversation_id: UUID = Field(
+        ..., description="UUID of the conversation this message belongs to"
+    )
+
+    model_config = ConfigDict(from_attributes=True, json_encoders={UUID: str})
+
+
+# Schema for creating a new message
+class MessageCreateSchema(MessageBase):
+    pass
+
+
+# Schema for updating a message
+class MessageUpdateSchema(BaseModel):
+    query: Optional[str] = Field(default=None, description="Updated query text")
+    answer: Optional[str] = Field(default=None, description="Updated response text")
+    error: Optional[str] = Field(default=None, description="Updated error message")
+    status: Optional[str] = Field(default=None, description="Updated status")
+
+
+# Schema for reading a message (includes id and timestamps)
+class MessageResponseSchema(MessageBase, BaseSchema):
+    pass

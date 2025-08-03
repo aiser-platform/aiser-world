@@ -1,0 +1,3 @@
+[submodule "server/packages/chat2chart"]
+	path = server/packages/chat2chart
+	url = git@github.com:bigstack-analytics/Aiser-Chat2Chart.git

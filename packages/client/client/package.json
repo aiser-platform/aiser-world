@@ -1,0 +1,44 @@
+{
+    "name": "aiser-client",
+    "version": "0.1.0",
+    "private": true,
+    "scripts": {
+        "dev": "dotenv -e .env next dev",
+        "build": "next build",
+        "start": "next start",
+        "lint": "next lint",
+        "format": "prettier --write ."
+    },
+    "dependencies": {
+        "@ant-design/icons": "^5.5.2",
+        "@ant-design/nextjs-registry": "^1.0.2",
+        "@types/shortid": "^2.2.0",
+        "ace-builds": "^1.37.4",
+        "antd": "^5.22.5",
+        "echarts": "^5.5.1",
+        "js-cookie": "^3.0.5",
+        "less": "^4.2.1",
+        "next": "14.2.20",
+        "react": "^18",
+        "react-ace": "^13.0.0",
+        "react-dom": "^18",
+        "react-markdown": "^9.0.3",
+        "rehype-raw": "^7.0.0",
+        "shortid": "^2.2.16"
+    },
+    "devDependencies": {
+        "@types/js-cookie": "^3.0.6",
+        "@types/node": "^20",
+        "@types/react": "^18",
+        "@types/react-dom": "^18",
+        "autoprefixer": "^10.4.20",
+        "dotenv-cli": "^8.0.0",
+        "eslint": "^8",
+        "eslint-config-next": "14.2.20",
+        "eslint-config-prettier": "^10.0.1",
+        "postcss": "^8.4.49",
+        "prettier": "^3.4.2",
+        "tailwindcss": "^3.4.17",
+        "typescript": "^5"
+    }
+}

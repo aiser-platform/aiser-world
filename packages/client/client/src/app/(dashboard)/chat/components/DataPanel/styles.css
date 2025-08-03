@@ -1,0 +1,87 @@
+.DataPanel {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+    width: 100%;
+    overflow: auto;
+    background-color: var(--background);
+}
+
+.DataHeader {
+    z-index: 1;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    padding: 16px;
+    box-shadow: var(--box-shadow-base);
+}
+
+.DataTitle {
+    font-size: 1.25rem;
+    font-weight: 500;
+}
+
+.DataContent {
+    height: 100%;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+    overflow-y: auto;
+}
+
+.DatabaseSelector {
+    display: flex;
+    gap: 24px;
+    width: 100%;
+}
+
+.DatabaseSelector.horizontal {
+    flex-direction: row;
+    width: auto;
+}
+
+.DatabaseSelector.vertical {
+    flex-direction: column;
+}
+
+.DatabaseSelector .refresh {
+    display: flex;
+    align-items: center;
+    width: 30px;
+    margin-left: 8px;
+    margin-top: 40px;
+}
+
+.DatabaseSelector .section {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+}
+
+.DatabaseSelector .select {
+    width: calc(100% - 38px);
+    flex: 1;
+}
+
+.DatabaseSelector > div {
+    margin: 8px 0;
+}
+
+.Label {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    margin-left: 6px;
+}
+
+.Label .backend {
+    overflow: visible;
+}
+
+.Label .name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}

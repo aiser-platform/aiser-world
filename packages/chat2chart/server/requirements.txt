@@ -1,0 +1,29 @@
+# API Framework
+fastapi==0.104.1
+uvicorn==0.24.0
+
+# Database
+alembic==1.13.0
+asyncpg>=0.30.0
+psycopg2-binary==2.9.9
+SQLAlchemy==2.0.23
+
+# Authentication & Security
+cryptography==41.0.7
+passlib==1.7.4
+python-jose==3.3.0
+
+# Data Validation
+email-validator==2.2.0
+pydantic==2.10.4
+pydantic-settings==2.7.0
+
+# AWS
+boto3==1.26.137
+
+# AI/ML
+openai==1.59.7
+
+# Utils
+colorama==0.4.6
+setuptools==65.5.0

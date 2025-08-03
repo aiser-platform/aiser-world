@@ -1,0 +1,55 @@
+import uuid
+from datetime import datetime
+
+from sqlalchemy import UUID, Boolean, Column, DateTime, Integer
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.sql import text
+
+Base = declarative_base()
+
+
+class BaseModel(Base):
+    """
+    Abstract base model that provides common fields for all database models.
+    """
+
+    __abstract__ = True
+
+    # Common columns for all models
+    id = Column(
+        UUID,
+        primary_key=True,
+        index=True,
+        doc="Primary key identifier",
+        server_default=text("uuid_generate_v4()"),
+        unique=True,
+    )
+
+    created_at = Column(
+        DateTime,
+        server_default=text("now()"),
+        nullable=False,
+        doc="Timestamp when the record was created",
+    )
+
+    updated_at = Column(
+        DateTime,
+        server_default=text("now()"),
+        onupdate=datetime.now(),
+        nullable=False,
+        doc="Timestamp when the record was last updated",
+    )
+
+    deleted_at = Column(
+        DateTime, nullable=True, doc="Timestamp when the record was deleted"
+    )
+
+    is_active = Column(
+        Boolean, default=True, doc="Flag indicating if the record is active"
+    )
+
+    is_deleted = Column(Boolean, server_default=text("false"), doc="Soft delete flag")
+
+    def __str__(self):
+        """Return string representation of the model."""
+        return str(self.id)

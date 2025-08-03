@@ -1,0 +1,24 @@
+from typing import Optional
+from pydantic import BaseModel, EmailStr, Field
+
+
+class UserBase(BaseModel):
+    username: str = Field(...)
+    email: EmailStr = Field(...)
+
+
+class UserCreate(UserBase):
+    password: str = Field(..., min_length=8, max_length=128)
+
+
+class UserUpdate(BaseModel):
+    email: Optional[EmailStr] = Field(None)
+    password: Optional[str] = Field(None, min_length=8, max_length=128)
+    is_verified: Optional[bool] = Field(None)
+
+
+class UserResponse(UserBase):
+    id: int
+
+    def __init__(self, **user):
+        super().__init__(**user)
