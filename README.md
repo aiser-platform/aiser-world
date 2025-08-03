@@ -1,6 +1,6 @@
 # Aiser World - AI-Powered Analytics Platform
 
-Aiser World is a world-class AI-powered alternative to PowerBI designed for individuals and enterprises, featuring an open source core with integrated GenAI tooling and deep AntV MCP integration.
+Aiser World is a world-class AI-powered alternative to BI Tools designed for individuals and enterprises, featuring an open source core with integrated GenAI tooling and deep AntV MCP integration.
 
 ## 🏗️ Architecture Overview
 
@@ -239,5 +239,6 @@ See the [LICENSE](LICENSE) file for complete details.
 - **Discussions**: Join community discussions
 
 ---
+
 
 **Built with ❤️ by DataTicon Team**
