@@ -1,0 +1,112 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: aiser-postgres-prod
+    environment:
+      POSTGRES_DB: aiser_world
+      POSTGRES_USER: aiser
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aiser -d aiser_world"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: aiser-redis-prod
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_prod_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Authentication Service
+  auth-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.auth.prod
+      target: production
+    container_name: aiser-auth-prod
+    ports:
+      - "5000:5000"
+    environment:
+      - POSTGRES_SERVER=postgres
+      - POSTGRES_DB=aiser_world
+      - POSTGRES_USER=aiser
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_PORT=5432
+      - SECRET_KEY=${SECRET_KEY}
+      - DEBUG=false
+      - ENVIRONMENT=production
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Chat2Chart Server
+  chat2chart-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.chat2chart.prod
+      target: production
+    container_name: aiser-chat2chart-prod
+    ports:
+      - "8000:8000"
+    environment:
+      - POSTGRES_SERVER=postgres
+      - POSTGRES_DB=aiser_world
+      - POSTGRES_USER=aiser
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_PORT=5432
+      - REDIS_URL=redis://redis:6379
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL_ID=gpt-4o-mini
+      - SECRET_KEY=${SECRET_KEY}
+      - ENVIRONMENT=production
+      - DEBUG=false
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Chat2Chart Client
+  chat2chart-client:
+    build:
+      context: .
+      dockerfile: Dockerfile.client.prod
+      target: production
+    container_name: aiser-client-prod
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_AUTH_URL=http://localhost:5000
+    depends_on:
+      - chat2chart-server
+      - auth-service
+    restart: unless-stopped
+
+volumes:
+  postgres_prod_data:
+  redis_prod_data:
+
+networks:
+  default:
+    name: aiser-prod-network

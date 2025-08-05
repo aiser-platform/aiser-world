@@ -18,8 +18,8 @@ class Settings(BaseSettings):
 
     APP_VERSION: str = os.getenv("APP_VERSION", "0.0.1")
     APP_CONTACT: Dict[str, str] = {
-        "name": "Kimseng Duong",
-        "email": "kimseng.duong@dataticon.com",
+        "name": "Dataticon Team",
+        "email": "support@dataticon.com",
     }
     DEBUG: bool = os.getenv("DEBUG", "True").lower() == "true"
 

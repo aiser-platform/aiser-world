@@ -37,7 +37,7 @@ from app.modules.temporary_token.constants import TokenType
 from app.modules.temporary_token.repository import TokenRepository
 from app.modules.user.models import User
 from app.modules.user.repository import UserRepository
-from app.modules.user.schemas import UserCreate, UserResponse, UserUpdate
+from app.modules.user.schemas import UserCreate, UserCreateInternal, UserResponse, UserUpdate
 
 logger = logging.getLogger(__name__)
 
@@ -65,8 +65,8 @@ class UserService(BaseService):
         # Hash the password
         hashed_password = self.auth.hash_password(user_in.password)
 
-        # Create user object
-        user = UserCreate(
+        # Create user object with hashed password
+        user = UserCreateInternal(
             email=user_in.email,
             username=user_in.username,
             password=hashed_password,

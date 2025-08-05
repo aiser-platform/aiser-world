@@ -1,0 +1,104 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: aiser-postgres
+    environment:
+      POSTGRES_DB: aiser_world
+      POSTGRES_USER: aiser
+      POSTGRES_PASSWORD: aiser_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aiser -d aiser_world"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: aiser-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Authentication Service
+  auth-service:
+    image: python:3.11-slim
+    container_name: aiser-auth
+    working_dir: /app
+    ports:
+      - "5000:5000"
+    environment:
+      - POSTGRES_SERVER=postgres
+      - POSTGRES_DB=aiser_world
+      - POSTGRES_USER=aiser
+      - POSTGRES_PASSWORD=aiser_password
+      - POSTGRES_PORT=5432
+      - SECRET_KEY=dev-secret-key
+      - DEBUG=True
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./packages/auth:/app
+      - auth_poetry_cache:/root/.cache/pypoetry
+    command: >
+      bash -c "
+        apt-get update && apt-get install -y build-essential libpq-dev libjpeg-dev libpng-dev libfreetype6-dev libtiff5-dev libwebp-dev libopenjp2-7-dev zlib1g-dev curl &&
+        pip install poetry &&
+        poetry install &&
+        poetry run uvicorn src.app.main:app --host 0.0.0.0 --port 5000 --reload
+      "
+
+  # Chat2Chart Server
+  chat2chart-server:
+    image: python:3.11-slim
+    container_name: aiser-chat2chart
+    working_dir: /app
+    ports:
+      - "8000:8000"
+    environment:
+      - POSTGRES_SERVER=postgres
+      - POSTGRES_DB=aiser_world
+      - POSTGRES_USER=aiser
+      - POSTGRES_PASSWORD=aiser_password
+      - POSTGRES_PORT=5432
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-your-openai-key}
+      - OPENAI_MODEL_ID=gpt-4o-mini
+      - SECRET_KEY=dev-secret-key
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./packages/chat2chart/server:/app
+      - chat2chart_poetry_cache:/root/.cache/pypoetry
+    command: >
+      bash -c "
+        apt-get update && apt-get install -y build-essential libpq-dev libjpeg-dev libpng-dev libfreetype6-dev libtiff5-dev libwebp-dev libopenjp2-7-dev zlib1g-dev curl &&
+        pip install poetry &&
+        poetry install &&
+        poetry run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+      "
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  default:
+    name: aiser-network

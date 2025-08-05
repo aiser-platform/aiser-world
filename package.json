@@ -1,7 +1,7 @@
 {
   "name": "aiser-world",
   "version": "1.0.0",
-  "description": "AI-powered alternative to PowerBI with open source core",
+  "description": "AI-powered alternative to BI Tools with open source core chat2chart",
   "private": true,
   "workspaces": [
     "packages/*"
@@ -34,7 +34,7 @@
     "visualization",
     "open-source"
   ],
-  "author": "BigStack Analytics",
+  "author": "DataTicon Team",
   "license": "SEE LICENSE IN LICENSE",
   "devDependencies": {
     "@types/node": "^20.0.0",

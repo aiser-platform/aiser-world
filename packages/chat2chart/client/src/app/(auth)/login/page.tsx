@@ -9,13 +9,16 @@ export default function LoginPage() {
     const [email, setEmail] = useState('');
     const [isCapsLockOn, setIsCapsLockOn] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [isSignUp, setIsSignUp] = useState(false);
 
-    const { login, loginError } = useAuth();
+    const { login, signup, loginError, setLoginError } = useAuth();
     const [form] = Form.useForm();
 
     interface FormValues {
         account: string;
         password: string;
+        username?: string;
+        confirmPassword?: string;
     }
 
     // Add this function to handle Caps Lock detection
@@ -43,7 +46,11 @@ export default function LoginPage() {
 
     const handleSubmit = async (values: FormValues) => {
         setLoading(true);
-        login(values.account, values.password);
+        if (isSignUp) {
+            signup(values.account, values.username!, values.password);
+        } else {
+            login(values.account, values.password);
+        }
         setLoading(false);
     };
 
@@ -52,7 +59,7 @@ export default function LoginPage() {
             {/* Left side - Illustration and text */}
             <div className="flex-col justify-between hidden w-1/2 p-12 lg:flex bg-primary text-primary-foreground">
                 <div>
-                    <h1 className="mb-2 text-4xl font-bold">Aiser</h1>
+                    <h1 className="mb-2 text-4xl font-bold">Aiser Platform</h1>
                     <p className="text-xl">AI-powered data insights</p>
                 </div>
                 <div className="space-y-6">
@@ -64,7 +71,7 @@ export default function LoginPage() {
               />
             </div> */}
                     <h2 className="text-3xl font-bold">
-                        Aiser is your instant data insights tool.
+                        Aiser Platform is your instant data insights tool.
                     </h2>
                     <p className="text-xl">
                         Unlock the power of your data with AI-driven analysis
@@ -72,7 +79,7 @@ export default function LoginPage() {
                     </p>
                 </div>
                 <div>
-                    <p>&copy; 2024 Aiser. All rights reserved.</p>
+                    <p>&copy; 2024 Dataticon Team. All rights reserved.</p>
                 </div>
             </div>
 
@@ -80,9 +87,14 @@ export default function LoginPage() {
             <div className="flex flex-col justify-center w-full p-8 lg:w-1/2 lg:p-12">
                 <div className="w-full max-w-sm mx-auto space-y-6">
                     <div className="space-y-2 text-center">
-                        <h1 className="text-3xl font-bold">Log in to Aiser</h1>
+                        <h1 className="text-3xl font-bold">
+                            {isSignUp ? 'Sign up for Aiser Platform' : 'Log in to Aiser Platform'}
+                        </h1>
                         <p className="text-muted-foreground">
-                            Enter your email to sign in to your account
+                            {isSignUp 
+                                ? 'Create your account to get started' 
+                                : 'Enter your email to sign in to your account'
+                            }
                         </p>
                     </div>
                     <Form
@@ -101,6 +113,10 @@ export default function LoginPage() {
                                     required: true,
                                     message: 'Please input your email!',
                                 },
+                                {
+                                    type: 'email',
+                                    message: 'Please enter a valid email!',
+                                },
                             ]}
                         >
                             <Input
@@ -112,6 +128,30 @@ export default function LoginPage() {
                                 onChange={(e) => setEmail(e.target.value)}
                             />
                         </Form.Item>
+                        
+                        {isSignUp && (
+                            <Form.Item
+                                className="space-y-2 text-white"
+                                label="Username"
+                                name="username"
+                                rules={[
+                                    {
+                                        required: true,
+                                        message: 'Please input your username!',
+                                    },
+                                    {
+                                        min: 3,
+                                        message: 'Username must be at least 3 characters!',
+                                    },
+                                ]}
+                            >
+                                <Input
+                                    id="username"
+                                    placeholder="Enter your username"
+                                    required
+                                />
+                            </Form.Item>
+                        )}
                         <Form.Item
                             className="space-y-2"
                             label="Password"
@@ -121,6 +161,10 @@ export default function LoginPage() {
                                     required: true,
                                     message: 'Please input your password!',
                                 },
+                                ...(isSignUp ? [{
+                                    min: 8,
+                                    message: 'Password must be at least 8 characters!',
+                                }] : []),
                             ]}
                         >
                             <Input.Password
@@ -134,6 +178,35 @@ export default function LoginPage() {
                                 </div>
                             )}
                         </Form.Item>
+                        
+                        {isSignUp && (
+                            <Form.Item
+                                className="space-y-2"
+                                label="Confirm Password"
+                                name="confirmPassword"
+                                dependencies={['password']}
+                                rules={[
+                                    {
+                                        required: true,
+                                        message: 'Please confirm your password!',
+                                    },
+                                    ({ getFieldValue }) => ({
+                                        validator(_, value) {
+                                            if (!value || getFieldValue('password') === value) {
+                                                return Promise.resolve();
+                                            }
+                                            return Promise.reject(new Error('Passwords do not match!'));
+                                        },
+                                    }),
+                                ]}
+                            >
+                                <Input.Password
+                                    id="confirmPassword"
+                                    required
+                                    placeholder="Confirm your password"
+                                />
+                            </Form.Item>
+                        )}
                         {loginError && (
                             <Form.Item>
                                 <div className="flex items-center text-red-500 text-sm">
@@ -147,11 +220,29 @@ export default function LoginPage() {
                                 type="primary"
                                 className="w-full"
                                 htmlType="submit"
+                                loading={loading}
                             >
-                                Sign In
+                                {isSignUp ? 'Sign Up' : 'Sign In'}
                             </Button>
                         </Form.Item>
                     </Form>
+                    
+                    <div className="text-center">
+                        <p className="text-sm text-muted-foreground">
+                            {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
+                            <button
+                                type="button"
+                                className="text-primary hover:underline font-medium"
+                                onClick={() => {
+                                    setIsSignUp(!isSignUp);
+                                    form.resetFields();
+                                    setLoginError(null);
+                                }}
+                            >
+                                {isSignUp ? 'Sign In' : 'Sign Up'}
+                            </button>
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>

@@ -1,6 +1,6 @@
 # AISER PRICING AND LICENSING GUIDE
 
-**Last Updated: January 1, 2024**
+**Last Updated: January 1, 2025**
 
 ## 🆓 **Open Source (Free Forever)**
 

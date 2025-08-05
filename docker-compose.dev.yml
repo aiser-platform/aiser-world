@@ -1,0 +1,123 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: aiser-postgres-dev
+    environment:
+      POSTGRES_DB: aiser_world
+      POSTGRES_USER: aiser
+      POSTGRES_PASSWORD: aiser_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aiser -d aiser_world"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: aiser-redis-dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_dev_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Authentication Service
+  auth-service:
+    image: python:3.11-slim
+    container_name: aiser-auth-dev
+    working_dir: /app
+    ports:
+      - "5000:5000"
+    environment:
+      - POSTGRES_SERVER=postgres
+      - POSTGRES_DB=aiser_world
+      - POSTGRES_USER=aiser
+      - POSTGRES_PASSWORD=aiser_password
+      - POSTGRES_PORT=5432
+      - SECRET_KEY=980a731d35aca422c93179d49e7956ce880335cdbb8741906d881c6aa9755d36
+      - DEBUG=True
+      - ENVIRONMENT=development
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./packages/auth:/app
+      - ./scripts/start-auth.sh:/start.sh
+      - auth_poetry_cache:/root/.cache/pypoetry
+    command: ["bash", "/start.sh"]
+    restart: unless-stopped
+
+  # Chat2Chart Server
+  chat2chart-server:
+    image: python:3.11-slim
+    container_name: aiser-chat2chart-dev
+    working_dir: /app
+    ports:
+      - "8000:8000"
+    environment:
+      - POSTGRES_SERVER=postgres
+      - POSTGRES_DB=aiser_world
+      - POSTGRES_USER=aiser
+      - POSTGRES_PASSWORD=aiser_password
+      - POSTGRES_PORT=5432
+      - REDIS_URL=redis://redis:6379
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-your-openai-key-here}
+      - OPENAI_MODEL_ID=gpt-4o-mini
+      - SECRET_KEY=980a731d35aca422c93179d49e7956ce880335cdbb8741906d881c6aa9755d36
+      - ENVIRONMENT=development
+      - DEBUG=True
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./packages/chat2chart/server:/app
+      - ./scripts/start-chat2chart.sh:/start.sh
+      - chat2chart_poetry_cache:/root/.cache/pypoetry
+    command: ["bash", "/start.sh"]
+    restart: unless-stopped
+
+  # Chat2Chart Client (Next.js)
+  chat2chart-client:
+    image: node:18-alpine
+    container_name: aiser-client-dev
+    working_dir: /app
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_AUTH_URL=http://localhost:5000
+    volumes:
+      - ./packages/chat2chart/client:/app
+      - ./packages/shared:/shared
+      - ./scripts/start-client.sh:/start.sh
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - chat2chart-server
+      - auth-service
+    command: ["sh", "/start.sh"]
+    restart: unless-stopped
+
+volumes:
+  postgres_dev_data:
+  redis_dev_data:
+  auth_poetry_cache:
+  chat2chart_poetry_cache:
+
+networks:
+  default:
+    name: aiser-dev-network

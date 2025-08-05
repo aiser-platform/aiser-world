@@ -82,3 +82,19 @@ jspm_packages/
 
 # TernJS port file
 .tern-port
+
+# Confidential/Internal Strategy Documents
+docs/repository-strategy-recommendation.md
+docs/licensing-strategy-evaluation.md
+docs/competitive-strategy.md
+docs/enterprise-legal-framework.md
+docs/dual-licensing-implementation.md
+docs/task-reorganization-summary.md
+docs/updated-task-priorities.md
+
+# Internal development logs and temporary files
+dev.log
+INITIAL_COMMIT_MESSAGE.md
+
+# Kiro IDE settings (may contain sensitive project info)
+.kiro/settings/

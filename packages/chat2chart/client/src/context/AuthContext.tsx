@@ -13,7 +13,9 @@ interface AuthContextType {
     loading: boolean;
     loginError: string | null;
     login: (account: string, password: string) => void;
+    signup: (email: string, username: string, password: string) => void;
     logout: () => void;
+    setLoginError: (error: string | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -22,7 +24,9 @@ const AuthContext = createContext<AuthContextType>({
     loading: true,
     loginError: null,
     login: () => null,
+    signup: () => null,
     logout: () => null,
+    setLoginError: () => null,
 });
 
 const AUTH_COOKIE_KEYS = ['access_token', 'refresh_token', 'user'];
@@ -36,11 +40,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     useEffect(() => {
         async function loadUserFromCookies() {
+            console.log('Loading user from cookies...');
             const userInfo = Cookies.get(AUTH_COOKIE_KEYS[2]);
+            console.log('User info from cookies:', userInfo);
             if (userInfo) {
                 setUser(JSON.parse(userInfo));
             }
             setLoading(false);
+            console.log('Auth loading complete');
         }
         loadUserFromCookies();
     }, []);
@@ -48,12 +55,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const login = async (account: string, password: string): Promise<void> => {
         try {
             setLoginError(null);
-            const response = await fetchApi('users/sign-in', {
+            const response = await fetchApi('users/signin', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ account, password }),
+                body: JSON.stringify({ username: account, password }),
             });
             const data = await response.json();
 
@@ -69,6 +76,42 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 path: '/',
             });
             // setLoading(false);
+            setUser(data);
+            setLoginError(null);
+            router.push('/');
+        } catch (error) {
+            setLoginError(
+                error instanceof Error
+                    ? error.message
+                    : 'An unexpected error occurred'
+            );
+            return Promise.reject(error);
+        }
+    };
+
+    const signup = async (email: string, username: string, password: string): Promise<void> => {
+        try {
+            setLoginError(null);
+            const response = await fetchApi('users/signup', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ email, username, password }),
+            });
+            const data = await response.json();
+
+            if (!response.ok) {
+                const errorMessage = data.detail || 'Failed to sign up';
+                console.log('Signup error:', data);
+                setLoginError(errorMessage);
+                return;
+            }
+
+            const userInfo = JSON.stringify(data);
+            Cookies.set(AUTH_COOKIE_KEYS[2], userInfo, {
+                path: '/',
+            });
             setUser(data);
             setLoginError(null);
             router.push('/');
@@ -112,7 +155,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 loading,
                 loginError,
                 login,
+                signup,
                 logout,
+                setLoginError,
             }}
         >
             {children}
@@ -167,6 +212,7 @@ export const DefaultRoute = ({ children }: { children: ReactNode }) => {
     const pathname = usePathname();
 
     const { isAuthenticated, loading } = useAuth();
+    const [timeoutReached, setTimeoutReached] = useState(false);
 
     useEffect(() => {
         if (!loading && pathname === '/') {
@@ -174,7 +220,20 @@ export const DefaultRoute = ({ children }: { children: ReactNode }) => {
         }
     }, [loading, isAuthenticated, router, pathname]);
 
-    if (loading || pathname === '/') {
+    // Add timeout fallback
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (loading && pathname === '/') {
+                console.log('Auth timeout reached, redirecting to login');
+                setTimeoutReached(true);
+                router.push('/login');
+            }
+        }, 5000); // 5 second timeout
+
+        return () => clearTimeout(timer);
+    }, [loading, pathname, router]);
+
+    if ((loading && !timeoutReached) || pathname === '/') {
         return <LoadingScreen />;
     }
     return children;
