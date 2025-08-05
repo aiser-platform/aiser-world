@@ -63,8 +63,10 @@ class Auth:
             algorithm=self.JWT_ALGORITHM,
         )
 
+        # Convert hex string to bytes for A256GCM encryption
+        secret_bytes = bytes.fromhex(self.SECRET)
         jwe_token = jwe.encrypt(
-            refresh_jwt, self.SECRET, algorithm="dir", encryption="A256GCM"
+            refresh_jwt, secret_bytes, algorithm="dir", encryption="A256GCM"
         )
 
         return jwe_token
@@ -91,7 +93,9 @@ class Auth:
 
     def decodeRefreshJWE(self, token: str) -> dict:
         try:
-            decoded_token = jwe.decrypt(token, self.SECRET)
+            # Convert hex string to bytes for A256GCM decryption
+            secret_bytes = bytes.fromhex(self.SECRET)
+            decoded_token = jwe.decrypt(token, secret_bytes)
             return decoded_token
         except:
             logger.error("Error decoding JWE token")

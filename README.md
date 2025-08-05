@@ -1,10 +1,10 @@
-# Aiser World - AI-Powered Analytics Platform
+# Aiser Platform - AI-Powered Analytics Platform
 
-Aiser World is a world-class AI-powered alternative to BI Tools designed for individuals and enterprises, featuring an open source core with integrated GenAI tooling and deep AntV MCP integration.
+Aiser Platform is a world-class AI-powered alternative to BI Tools designed for individuals and enterprises, featuring an open source core with integrated GenAI tooling and deep AntV MCP integration.
 
 ## 🏗️ Architecture Overview
 
-Aiser World consists of multiple interconnected components in a unified monorepo:
+Aiser Platform consists of multiple interconnected components in a unified monorepo:
 
 - **🤖 Chat2Chart**: Core AI-powered chart generation engine (Open Source)
 - **💼 Client**: Enterprise frontend application with advanced features
@@ -15,7 +15,7 @@ Aiser World consists of multiple interconnected components in a unified monorepo
 ## 📁 Project Structure
 
 ```
-aiser-world/
+aiser-platform/
 ├── packages/
 │   ├── chat2chart/          # AI chart generation (Next.js + FastAPI)
 │   │   ├── client/          # Next.js frontend
@@ -45,7 +45,7 @@ aiser-world/
 ```bash
 # Clone the repository
 git clone <repository-url>
-cd aiser
+cd aiser-platform
 
 # Install all dependencies
 npm install
@@ -62,14 +62,38 @@ cp packages/chat2chart/server/.env.example packages/chat2chart/server/.env
 ### Development
 
 ```bash
-# Start all services
-./scripts/dev.sh all
+# Start all services with Docker
+./scripts/dev.sh docker
 
 # Or start individual services
 ./scripts/dev.sh chat2chart  # AI chart generation
 ./scripts/dev.sh client      # Enterprise client
 ./scripts/dev.sh auth        # Authentication service
+
+# Check service status
+./scripts/dev.sh status
 ```
+
+### Test User Credentials
+
+For development and testing, you can create a test user:
+
+```bash
+# Create test user
+./scripts/create-test-user.sh
+```
+
+**Test User Credentials:**
+- **Email**: `test@dataticon.com`
+- **Username**: `testuser`
+- **Password**: `testpassword123`
+
+**Service URLs:**
+- 📊 Chat2Chart Frontend: http://localhost:3000
+- 🔌 Chat2Chart API: http://localhost:8000
+- 🔐 Auth API: http://localhost:5000
+- 🗄️ PostgreSQL: localhost:5432
+- 🔴 Redis: localhost:6379
 
 ### Available Scripts
 
@@ -222,7 +246,7 @@ Aiser uses a **dual-licensing model**:
 - **Advanced Features**: AntV MCP, database connectors, predictive analytics
 
 **Evaluation**: Enterprise features available for 30-day evaluation.  
-**Commercial Licensing**: Contact aiser-licensing@dataticon.com
+**Commercial Licensing**: Contact support@dataticon.com
 
 ### 📋 **Enterprise Documentation**
 - **[Enterprise License Agreement](ENTERPRISE-LICENSE-AGREEMENT.md)** - Complete legal terms
@@ -236,6 +260,7 @@ See the [LICENSE](LICENSE) file for complete details.
 
 - **Documentation**: Check the `docs/` directory
 - **Issues**: Report bugs and request features via GitHub Issues
+- **Email Support**: support@dataticon.com
 - **Discussions**: Join community discussions
 
 ---

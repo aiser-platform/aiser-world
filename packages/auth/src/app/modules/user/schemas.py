@@ -11,6 +11,10 @@ class UserCreate(UserBase):
     password: str = Field(..., min_length=8, max_length=128)
 
 
+class UserCreateInternal(UserBase):
+    password: str = Field(...)  # For hashed passwords - no length validation
+
+
 class UserUpdate(BaseModel):
     email: Optional[EmailStr] = Field(None)
     password: Optional[str] = Field(None, min_length=8, max_length=128)

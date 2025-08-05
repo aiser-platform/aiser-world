@@ -6,12 +6,12 @@ from sqlalchemy import select
 
 from app.common.repository import BaseRepository
 from app.modules.user.models import User
-from app.modules.user.schemas import UserCreate, UserUpdate
+from app.modules.user.schemas import UserCreate, UserCreateInternal, UserUpdate
 
 logger = logging.getLogger(__name__)
 
 
-class UserRepository(BaseRepository[User, UserCreate, UserUpdate]):
+class UserRepository(BaseRepository[User, UserCreate | UserCreateInternal, UserUpdate]):
     def __init__(self):
         super().__init__(User)
 

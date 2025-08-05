@@ -1,0 +1,119 @@
+# Multi-stage Dockerfile for Next.js clients
+FROM node:18-alpine AS base
+
+# Install dependencies only when needed
+FROM base AS deps
+RUN apk add --no-cache libc6-compat
+WORKDIR /app
+
+# Copy package files and tools
+COPY package*.json ./
+COPY tsconfig.json ./
+COPY packages/shared/package*.json ./packages/shared/
+COPY packages/chat2chart/client/package*.json ./packages/chat2chart/client/
+COPY packages/client/client/package*.json ./packages/client/client/
+COPY tools/ ./tools/
+
+# Install dependencies without running postinstall scripts
+RUN npm ci --ignore-scripts
+
+# Copy shared package source
+COPY packages/shared/ ./packages/shared/
+
+# Create a standalone tsconfig for Docker build to avoid dependency on root tsconfig
+RUN cd packages/shared && cat > tsconfig.build.json << 'EOF'
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": false,
+    "esModuleInterop": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["dist", "node_modules", "**/*.test.ts", "**/*.spec.ts"]
+}
+EOF
+
+# Build using the standalone tsconfig
+RUN cd packages/shared && npx tsc -p tsconfig.build.json
+
+# Development stage
+FROM base AS development
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/packages/shared ./packages/shared
+COPY --from=deps /app/tools ./tools
+COPY . .
+
+# Default to Chat2Chart client for development
+WORKDIR /app/packages/chat2chart/client
+
+EXPOSE 3000
+CMD ["npm", "run", "dev"]
+
+# Rebuild the source code only when needed
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/packages/shared ./packages/shared
+COPY --from=deps /app/tools ./tools
+COPY . .
+
+# Build Next.js applications
+RUN cd packages/chat2chart/client && npm run build
+RUN cd packages/client/client && npm run build
+
+# Production image for Chat2Chart client
+FROM base AS chat2chart-client
+WORKDIR /app
+
+ENV NODE_ENV production
+
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+COPY --from=builder /app/packages/chat2chart/client/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/packages/chat2chart/client/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/packages/chat2chart/client/.next/static ./.next/static
+
+USER nextjs
+
+EXPOSE 3000
+ENV PORT 3000
+
+CMD ["node", "server.js"]
+
+# Production image for Enterprise client
+FROM base AS enterprise-client
+WORKDIR /app
+
+ENV NODE_ENV production
+
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+COPY --from=builder /app/packages/client/client/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/packages/client/client/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/packages/client/client/.next/static ./.next/static
+
+USER nextjs
+
+EXPOSE 3001
+ENV PORT 3001
+
+CMD ["node", "server.js"]
