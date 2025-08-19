@@ -17,14 +17,5 @@
     "id": "local-dev",
     "title": "Local Dev",
     "sidebar_label": "Local Dev"
-  },
-  "sidebar": "docs",
-  "previous": {
-    "title": "Developer Index",
-    "permalink": "/docs/developer/"
-  },
-  "next": {
-    "title": "Architecture",
-    "permalink": "/docs/developer/architecture"
   }
 }

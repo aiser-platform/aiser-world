@@ -17,14 +17,5 @@
     "id": "config-reference",
     "title": "Config Reference",
     "sidebar_label": "Config Reference"
-  },
-  "sidebar": "docs",
-  "previous": {
-    "title": "Docker Compose",
-    "permalink": "/docs/self-host/docker-compose"
-  },
-  "next": {
-    "title": "Ssl Certificates",
-    "permalink": "/docs/self-host/ssl-certificates"
   }
 }

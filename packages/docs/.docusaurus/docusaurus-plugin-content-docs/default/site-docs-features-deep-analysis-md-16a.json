@@ -17,14 +17,5 @@
     "id": "deep-analysis",
     "title": "Deep Analysis",
     "sidebar_label": "Deep Analysis"
-  },
-  "sidebar": "docs",
-  "previous": {
-    "title": "Echarts Integration",
-    "permalink": "/docs/features/echarts-integration"
-  },
-  "next": {
-    "title": "Data Sources Overview",
-    "permalink": "/docs/features/data-sources-overview"
   }
 }

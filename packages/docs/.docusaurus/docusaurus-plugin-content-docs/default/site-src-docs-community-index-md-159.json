@@ -1,0 +1,31 @@
+{
+  "id": "community/community-index",
+  "title": "Community & Contributing",
+  "description": "Join the Aiser Platform community, contribute to development, and participate in shaping the future of AI-powered analytics",
+  "source": "@site/src/docs/community/index.md",
+  "sourceDirName": "community",
+  "slug": "/community/",
+  "permalink": "/docs/community/",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/community/index.md",
+  "tags": [],
+  "version": "current",
+  "lastUpdatedAt": 1755570184,
+  "formattedLastUpdatedAt": "Aug 19, 2025",
+  "frontMatter": {
+    "id": "community-index",
+    "title": "Community & Contributing",
+    "sidebar_label": "Community",
+    "description": "Join the Aiser Platform community, contribute to development, and participate in shaping the future of AI-powered analytics"
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "Developer Guide",
+    "permalink": "/docs/developer/"
+  },
+  "next": {
+    "title": "API Reference",
+    "permalink": "/docs/reference/api-reference"
+  }
+}

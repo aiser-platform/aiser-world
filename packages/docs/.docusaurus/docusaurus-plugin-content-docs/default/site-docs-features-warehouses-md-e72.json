@@ -17,14 +17,5 @@
     "id": "warehouses",
     "title": "Warehouses",
     "sidebar_label": "Warehouses"
-  },
-  "sidebar": "docs",
-  "previous": {
-    "title": "Databases",
-    "permalink": "/docs/features/databases"
-  },
-  "next": {
-    "title": "Real Time Streams",
-    "permalink": "/docs/features/real-time-streams"
   }
 }

@@ -17,14 +17,5 @@
     "id": "what-if-simulations",
     "title": "What If Simulations",
     "sidebar_label": "What If Simulations"
-  },
-  "sidebar": "docs",
-  "previous": {
-    "title": "Conversation Memory",
-    "permalink": "/docs/features/conversation-memory"
-  },
-  "next": {
-    "title": "Custom Prompts",
-    "permalink": "/docs/features/custom-prompts"
   }
 }

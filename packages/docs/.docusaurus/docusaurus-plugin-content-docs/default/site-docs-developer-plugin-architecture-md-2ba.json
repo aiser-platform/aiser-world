@@ -17,14 +17,5 @@
     "id": "plugin-architecture",
     "title": "Plugin Architecture",
     "sidebar_label": "Plugin Architecture"
-  },
-  "sidebar": "docs",
-  "previous": {
-    "title": "Writing Tests",
-    "permalink": "/docs/developer/writing-tests"
-  },
-  "next": {
-    "title": "Release Process",
-    "permalink": "/docs/developer/release-process"
   }
 }

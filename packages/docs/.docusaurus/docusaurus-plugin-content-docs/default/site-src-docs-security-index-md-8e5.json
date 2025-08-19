@@ -1,0 +1,29 @@
+{
+  "id": "security/security-overview",
+  "title": "Security Overview",
+  "description": "Comprehensive security features, compliance, and best practices for Aiser Platform",
+  "source": "@site/src/docs/security/index.md",
+  "sourceDirName": "security",
+  "slug": "/security/",
+  "permalink": "/docs/security/",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/security/index.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {
+    "id": "security-overview",
+    "title": "Security Overview",
+    "sidebar_label": "Security Overview",
+    "description": "Comprehensive security features, compliance, and best practices for Aiser Platform"
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "Docker Compose",
+    "permalink": "/docs/self-host/docker-compose"
+  },
+  "next": {
+    "title": "Performance Overview",
+    "permalink": "/docs/performance/"
+  }
+}

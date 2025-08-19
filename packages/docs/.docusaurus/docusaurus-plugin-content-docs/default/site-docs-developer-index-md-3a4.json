@@ -20,11 +20,11 @@
   },
   "sidebar": "docs",
   "previous": {
-    "title": "Real Time Streams",
-    "permalink": "/docs/features/real-time-streams"
+    "title": "Ai Overview",
+    "permalink": "/docs/features/ai-overview"
   },
   "next": {
-    "title": "Local Dev",
-    "permalink": "/docs/developer/local-dev"
+    "title": "Community Index",
+    "permalink": "/docs/community/"
   }
 }

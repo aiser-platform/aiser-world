@@ -17,14 +17,5 @@
     "id": "ssl-certificates",
     "title": "Ssl Certificates",
     "sidebar_label": "Ssl Certificates"
-  },
-  "sidebar": "docs",
-  "previous": {
-    "title": "Config Reference",
-    "permalink": "/docs/self-host/config-reference"
-  },
-  "next": {
-    "title": "Backups",
-    "permalink": "/docs/self-host/backups"
   }
 }

@@ -1,0 +1,21 @@
+{
+  "id": "developer/release-process",
+  "title": "Release Process",
+  "description": "Overview",
+  "source": "@site/src/docs/developer/release-process.md",
+  "sourceDirName": "developer",
+  "slug": "/developer/release-process",
+  "permalink": "/docs/developer/release-process",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/developer/release-process.md",
+  "tags": [],
+  "version": "current",
+  "lastUpdatedAt": 1755570184,
+  "formattedLastUpdatedAt": "Aug 19, 2025",
+  "frontMatter": {
+    "id": "release-process",
+    "title": "Release Process",
+    "sidebar_label": "Release Process"
+  }
+}

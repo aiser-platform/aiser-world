@@ -12,18 +12,15 @@
           "docs": [
             {
               "id": "community/ambassador-program",
-              "path": "/docs/community/ambassador-program",
-              "sidebar": "docs"
+              "path": "/docs/community/ambassador-program"
             },
             {
               "id": "community/bi-weekly-calls",
-              "path": "/docs/community/bi-weekly-calls",
-              "sidebar": "docs"
+              "path": "/docs/community/bi-weekly-calls"
             },
             {
               "id": "community/code-of-conduct",
-              "path": "/docs/community/code-of-conduct",
-              "sidebar": "docs"
+              "path": "/docs/community/code-of-conduct"
             },
             {
               "id": "community/community-index",
@@ -32,18 +29,15 @@
             },
             {
               "id": "community/contributing",
-              "path": "/docs/community/contributing",
-              "sidebar": "docs"
+              "path": "/docs/community/contributing"
             },
             {
               "id": "community/roadmap",
-              "path": "/docs/community/roadmap",
-              "sidebar": "docs"
+              "path": "/docs/community/roadmap"
             },
             {
               "id": "developer/architecture",
-              "path": "/docs/developer/architecture",
-              "sidebar": "docs"
+              "path": "/docs/developer/architecture"
             },
             {
               "id": "developer/developer-index",
@@ -52,28 +46,23 @@
             },
             {
               "id": "developer/local-dev",
-              "path": "/docs/developer/local-dev",
-              "sidebar": "docs"
+              "path": "/docs/developer/local-dev"
             },
             {
               "id": "developer/plugin-architecture",
-              "path": "/docs/developer/plugin-architecture",
-              "sidebar": "docs"
+              "path": "/docs/developer/plugin-architecture"
             },
             {
               "id": "developer/release-process",
-              "path": "/docs/developer/release-process",
-              "sidebar": "docs"
+              "path": "/docs/developer/release-process"
             },
             {
               "id": "developer/writing-tests",
-              "path": "/docs/developer/writing-tests",
-              "sidebar": "docs"
+              "path": "/docs/developer/writing-tests"
             },
             {
               "id": "features/agents",
-              "path": "/docs/features/agents",
-              "sidebar": "docs"
+              "path": "/docs/features/agents"
             },
             {
               "id": "features/ai-overview",
@@ -82,78 +71,63 @@
             },
             {
               "id": "features/bar-charts",
-              "path": "/docs/features/bar-charts",
-              "sidebar": "docs"
+              "path": "/docs/features/bar-charts"
             },
             {
               "id": "features/charts-overview",
-              "path": "/docs/features/charts-overview",
-              "sidebar": "docs"
+              "path": "/docs/features/charts-overview"
             },
             {
               "id": "features/conversation-memory",
-              "path": "/docs/features/conversation-memory",
-              "sidebar": "docs"
+              "path": "/docs/features/conversation-memory"
             },
             {
               "id": "features/csv-excel",
-              "path": "/docs/features/csv-excel",
-              "sidebar": "docs"
+              "path": "/docs/features/csv-excel"
             },
             {
               "id": "features/custom-prompts",
-              "path": "/docs/features/custom-prompts",
-              "sidebar": "docs"
+              "path": "/docs/features/custom-prompts"
             },
             {
               "id": "features/data-sources-overview",
-              "path": "/docs/features/data-sources-overview",
-              "sidebar": "docs"
+              "path": "/docs/features/data-sources-overview"
             },
             {
               "id": "features/databases",
-              "path": "/docs/features/databases",
-              "sidebar": "docs"
+              "path": "/docs/features/databases"
             },
             {
               "id": "features/deep-analysis",
-              "path": "/docs/features/deep-analysis",
-              "sidebar": "docs"
+              "path": "/docs/features/deep-analysis"
             },
             {
               "id": "features/echarts-integration",
-              "path": "/docs/features/echarts-integration",
-              "sidebar": "docs"
+              "path": "/docs/features/echarts-integration"
             },
             {
               "id": "features/heatmaps",
-              "path": "/docs/features/heatmaps",
-              "sidebar": "docs"
+              "path": "/docs/features/heatmaps"
             },
             {
               "id": "features/line-charts",
-              "path": "/docs/features/line-charts",
-              "sidebar": "docs"
+              "path": "/docs/features/line-charts"
             },
             {
               "id": "features/natural-language-queries",
-              "path": "/docs/features/natural-language-queries",
-              "sidebar": "docs"
+              "path": "/docs/features/natural-language-queries"
             },
             {
               "id": "features/real-time-streams",
-              "path": "/docs/features/real-time-streams",
-              "sidebar": "docs"
+              "path": "/docs/features/real-time-streams"
             },
             {
               "id": "features/warehouses",
-              "path": "/docs/features/warehouses",
-              "sidebar": "docs"
+              "path": "/docs/features/warehouses"
             },
             {
               "id": "features/what-if-simulations",
-              "path": "/docs/features/what-if-simulations",
-              "sidebar": "docs"
+              "path": "/docs/features/what-if-simulations"
             },
             {
               "id": "getting-started/demo-walkthrough",
@@ -181,6 +155,11 @@
               "sidebar": "docs"
             },
             {
+              "id": "performance/performance-overview",
+              "path": "/docs/performance/",
+              "sidebar": "docs"
+            },
+            {
               "id": "reference/api-reference",
               "path": "/docs/reference/api-reference",
               "sidebar": "docs"
@@ -191,14 +170,17 @@
               "sidebar": "docs"
             },
             {
-              "id": "self-host/backups",
-              "path": "/docs/self-host/backups",
+              "id": "security/security-overview",
+              "path": "/docs/security/",
               "sidebar": "docs"
             },
             {
+              "id": "self-host/backups",
+              "path": "/docs/self-host/backups"
+            },
+            {
               "id": "self-host/config-reference",
-              "path": "/docs/self-host/config-reference",
-              "sidebar": "docs"
+              "path": "/docs/self-host/config-reference"
             },
             {
               "id": "self-host/docker-compose",
@@ -212,7 +194,11 @@
             },
             {
               "id": "self-host/ssl-certificates",
-              "path": "/docs/self-host/ssl-certificates",
+              "path": "/docs/self-host/ssl-certificates"
+            },
+            {
+              "id": "troubleshooting/troubleshooting-overview",
+              "path": "/docs/troubleshooting/",
               "sidebar": "docs"
             }
           ],
@@ -221,7 +207,7 @@
             "docs": {
               "link": {
                 "path": "/docs/getting-started/",
-                "label": " Getting Started"
+                "label": "getting-started/getting-started-index"
               }
             }
           }

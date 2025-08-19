@@ -17,14 +17,5 @@
     "id": "echarts-integration",
     "title": "Echarts Integration",
     "sidebar_label": "Echarts Integration"
-  },
-  "sidebar": "docs",
-  "previous": {
-    "title": "Heatmaps",
-    "permalink": "/docs/features/heatmaps"
-  },
-  "next": {
-    "title": "Deep Analysis",
-    "permalink": "/docs/features/deep-analysis"
   }
 }

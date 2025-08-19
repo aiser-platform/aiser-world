@@ -17,14 +17,5 @@
     "id": "natural-language-queries",
     "title": "Natural Language Queries",
     "sidebar_label": "Natural Language Queries"
-  },
-  "sidebar": "docs",
-  "previous": {
-    "title": "Ai Overview",
-    "permalink": "/docs/features/ai-overview"
-  },
-  "next": {
-    "title": "Agents",
-    "permalink": "/docs/features/agents"
   }
 }

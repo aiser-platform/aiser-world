@@ -7,13 +7,13 @@ export default {
   "title": "Aiser Platform Documentation",
   "tagline": "AI-Powered Analytics Platform",
   "favicon": "img/favicon.ico",
-  "url": "https://docs.aiser.dataticon.com",
+  "url": "https://aiser-docs.dataticon.com",
   "baseUrl": "/",
   "deploymentBranch": "gh-pages",
   "organizationName": "Aiser",
   "projectName": "aiser-world",
   "customFields": {
-    "port": 3001
+    "port": 3005
   },
   "i18n": {
     "defaultLocale": "en",
@@ -28,6 +28,7 @@ export default {
       "classic",
       {
         "docs": {
+          "path": "src/docs",
           "sidebarPath": "/home/sv/project/aiser-world/packages/docs/sidebars.js",
           "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/",
           "showLastUpdateTime": true
@@ -43,13 +44,13 @@ export default {
       }
     ]
   ],
+  "onBrokenLinks": "warn",
   "themeConfig": {
     "image": "img/aiser-docs-social-card.jpg",
     "navbar": {
-      "title": "Aiser Docs",
       "logo": {
-        "alt": "Aiser Logo",
-        "src": "img/logo.svg"
+        "alt": "Aiser Platform",
+        "src": "img/logo.jpg"
       },
       "items": [
         {
@@ -64,7 +65,7 @@ export default {
           "position": "right"
         },
         {
-          "href": "https://aiser.com",
+          "href": "https://aiser-platform.vercel.app/",
           "label": "Website",
           "position": "right"
         }
@@ -97,6 +98,10 @@ export default {
             {
               "label": "GitHub",
               "href": "https://github.com/bigstack-analytics/aiser-world"
+            },
+            {
+              "label": "Telegram (Aisertics)",
+              "href": "https://t.me/dataticon_ai"
             },
             {
               "label": "Discussions",
@@ -293,7 +298,6 @@ export default {
     }
   },
   "baseUrlIssueBanner": true,
-  "onBrokenLinks": "throw",
   "onBrokenAnchors": "warn",
   "onBrokenMarkdownLinks": "warn",
   "onDuplicateRoutes": "warn",

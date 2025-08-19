@@ -1,0 +1,21 @@
+{
+  "id": "community/code-of-conduct",
+  "title": "Code Of Conduct",
+  "description": "Overview",
+  "source": "@site/src/docs/community/code-of-conduct.md",
+  "sourceDirName": "community",
+  "slug": "/community/code-of-conduct",
+  "permalink": "/docs/community/code-of-conduct",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/community/code-of-conduct.md",
+  "tags": [],
+  "version": "current",
+  "lastUpdatedAt": 1755570184,
+  "formattedLastUpdatedAt": "Aug 19, 2025",
+  "frontMatter": {
+    "id": "code-of-conduct",
+    "title": "Code Of Conduct",
+    "sidebar_label": "Code Of Conduct"
+  }
+}

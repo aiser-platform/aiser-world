@@ -1,0 +1,21 @@
+{
+  "id": "features/heatmaps",
+  "title": "Heatmaps",
+  "description": "Overview",
+  "source": "@site/src/docs/features/heatmaps.md",
+  "sourceDirName": "features",
+  "slug": "/features/heatmaps",
+  "permalink": "/docs/features/heatmaps",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/features/heatmaps.md",
+  "tags": [],
+  "version": "current",
+  "lastUpdatedAt": 1755570184,
+  "formattedLastUpdatedAt": "Aug 19, 2025",
+  "frontMatter": {
+    "id": "heatmaps",
+    "title": "Heatmaps",
+    "sidebar_label": "Heatmaps"
+  }
+}

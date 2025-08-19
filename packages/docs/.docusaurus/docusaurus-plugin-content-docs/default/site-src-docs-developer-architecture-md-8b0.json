@@ -1,0 +1,21 @@
+{
+  "id": "developer/architecture",
+  "title": "Architecture",
+  "description": "Overview",
+  "source": "@site/src/docs/developer/architecture.md",
+  "sourceDirName": "developer",
+  "slug": "/developer/architecture",
+  "permalink": "/docs/developer/architecture",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/developer/architecture.md",
+  "tags": [],
+  "version": "current",
+  "lastUpdatedAt": 1755570184,
+  "formattedLastUpdatedAt": "Aug 19, 2025",
+  "frontMatter": {
+    "id": "architecture",
+    "title": "Architecture",
+    "sidebar_label": "Architecture"
+  }
+}

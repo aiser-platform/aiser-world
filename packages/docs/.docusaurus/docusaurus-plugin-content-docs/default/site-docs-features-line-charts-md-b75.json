@@ -17,14 +17,5 @@
     "id": "line-charts",
     "title": "Line Charts",
     "sidebar_label": "Line Charts"
-  },
-  "sidebar": "docs",
-  "previous": {
-    "title": "Charts Overview",
-    "permalink": "/docs/features/charts-overview"
-  },
-  "next": {
-    "title": "Bar Charts",
-    "permalink": "/docs/features/bar-charts"
   }
 }

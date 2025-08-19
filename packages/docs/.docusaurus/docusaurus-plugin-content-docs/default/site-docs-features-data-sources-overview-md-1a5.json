@@ -17,14 +17,5 @@
     "id": "data-sources-overview",
     "title": "Data Sources Overview",
     "sidebar_label": "Data Sources Overview"
-  },
-  "sidebar": "docs",
-  "previous": {
-    "title": "Deep Analysis",
-    "permalink": "/docs/features/deep-analysis"
-  },
-  "next": {
-    "title": "Csv Excel",
-    "permalink": "/docs/features/csv-excel"
   }
 }

@@ -1,0 +1,27 @@
+{
+  "id": "getting-started/getting-started-index",
+  "title": "Welcome to Aiser Platform",
+  "description": "Get started with Aiser Platform - the AI-first business intelligence platform that transforms how you interact with data",
+  "source": "@site/src/docs/getting-started/index.md",
+  "sourceDirName": "getting-started",
+  "slug": "/getting-started/",
+  "permalink": "/docs/getting-started/",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/getting-started/index.md",
+  "tags": [],
+  "version": "current",
+  "lastUpdatedAt": 1755570184,
+  "formattedLastUpdatedAt": "Aug 19, 2025",
+  "frontMatter": {
+    "id": "getting-started-index",
+    "title": "Welcome to Aiser Platform",
+    "sidebar_label": "Getting Started",
+    "description": "Get started with Aiser Platform - the AI-first business intelligence platform that transforms how you interact with data"
+  },
+  "sidebar": "docs",
+  "next": {
+    "title": "Docker Quick Start",
+    "permalink": "/docs/getting-started/quick-start-docker"
+  }
+}

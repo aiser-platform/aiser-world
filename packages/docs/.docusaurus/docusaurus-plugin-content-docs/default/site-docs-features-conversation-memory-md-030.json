@@ -17,14 +17,5 @@
     "id": "conversation-memory",
     "title": "Conversation Memory",
     "sidebar_label": "Conversation Memory"
-  },
-  "sidebar": "docs",
-  "previous": {
-    "title": "Agents",
-    "permalink": "/docs/features/agents"
-  },
-  "next": {
-    "title": "What If Simulations",
-    "permalink": "/docs/features/what-if-simulations"
   }
 }

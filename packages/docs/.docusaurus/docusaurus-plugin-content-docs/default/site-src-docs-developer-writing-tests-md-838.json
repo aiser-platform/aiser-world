@@ -1,0 +1,21 @@
+{
+  "id": "developer/writing-tests",
+  "title": "Writing Tests",
+  "description": "Overview",
+  "source": "@site/src/docs/developer/writing-tests.md",
+  "sourceDirName": "developer",
+  "slug": "/developer/writing-tests",
+  "permalink": "/docs/developer/writing-tests",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/developer/writing-tests.md",
+  "tags": [],
+  "version": "current",
+  "lastUpdatedAt": 1755570184,
+  "formattedLastUpdatedAt": "Aug 19, 2025",
+  "frontMatter": {
+    "id": "writing-tests",
+    "title": "Writing Tests",
+    "sidebar_label": "Writing Tests"
+  }
+}

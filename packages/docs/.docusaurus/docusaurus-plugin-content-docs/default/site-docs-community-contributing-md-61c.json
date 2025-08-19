@@ -17,14 +17,5 @@
     "id": "contributing",
     "title": "Contributing",
     "sidebar_label": "Contributing"
-  },
-  "sidebar": "docs",
-  "previous": {
-    "title": "Roadmap",
-    "permalink": "/docs/community/roadmap"
-  },
-  "next": {
-    "title": "Code Of Conduct",
-    "permalink": "/docs/community/code-of-conduct"
   }
 }

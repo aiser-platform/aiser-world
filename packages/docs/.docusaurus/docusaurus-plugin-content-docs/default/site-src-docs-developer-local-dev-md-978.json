@@ -1,0 +1,21 @@
+{
+  "id": "developer/local-dev",
+  "title": "Local Dev",
+  "description": "Overview",
+  "source": "@site/src/docs/developer/local-dev.md",
+  "sourceDirName": "developer",
+  "slug": "/developer/local-dev",
+  "permalink": "/docs/developer/local-dev",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/developer/local-dev.md",
+  "tags": [],
+  "version": "current",
+  "lastUpdatedAt": 1755570184,
+  "formattedLastUpdatedAt": "Aug 19, 2025",
+  "frontMatter": {
+    "id": "local-dev",
+    "title": "Local Dev",
+    "sidebar_label": "Local Dev"
+  }
+}

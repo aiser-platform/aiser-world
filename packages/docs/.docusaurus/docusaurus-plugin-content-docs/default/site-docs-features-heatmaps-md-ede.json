@@ -17,14 +17,5 @@
     "id": "heatmaps",
     "title": "Heatmaps",
     "sidebar_label": "Heatmaps"
-  },
-  "sidebar": "docs",
-  "previous": {
-    "title": "Bar Charts",
-    "permalink": "/docs/features/bar-charts"
-  },
-  "next": {
-    "title": "Echarts Integration",
-    "permalink": "/docs/features/echarts-integration"
   }
 }

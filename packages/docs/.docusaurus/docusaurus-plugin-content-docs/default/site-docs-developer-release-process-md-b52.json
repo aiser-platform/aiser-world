@@ -17,14 +17,5 @@
     "id": "release-process",
     "title": "Release Process",
     "sidebar_label": "Release Process"
-  },
-  "sidebar": "docs",
-  "previous": {
-    "title": "Plugin Architecture",
-    "permalink": "/docs/developer/plugin-architecture"
-  },
-  "next": {
-    "title": "Community Index",
-    "permalink": "/docs/community/"
   }
 }

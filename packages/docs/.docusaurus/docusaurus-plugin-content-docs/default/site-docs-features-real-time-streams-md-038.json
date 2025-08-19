@@ -17,14 +17,5 @@
     "id": "real-time-streams",
     "title": "Real Time Streams",
     "sidebar_label": "Real Time Streams"
-  },
-  "sidebar": "docs",
-  "previous": {
-    "title": "Warehouses",
-    "permalink": "/docs/features/warehouses"
-  },
-  "next": {
-    "title": "Developer Index",
-    "permalink": "/docs/developer/"
   }
 }

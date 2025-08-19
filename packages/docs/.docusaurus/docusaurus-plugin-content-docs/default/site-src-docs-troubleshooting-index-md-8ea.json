@@ -1,0 +1,29 @@
+{
+  "id": "troubleshooting/troubleshooting-overview",
+  "title": "Troubleshooting Guide",
+  "description": "Common issues, error resolution, and debugging techniques for Aiser Platform",
+  "source": "@site/src/docs/troubleshooting/index.md",
+  "sourceDirName": "troubleshooting",
+  "slug": "/troubleshooting/",
+  "permalink": "/docs/troubleshooting/",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/troubleshooting/index.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {
+    "id": "troubleshooting-overview",
+    "title": "Troubleshooting Guide",
+    "sidebar_label": "Troubleshooting Overview",
+    "description": "Common issues, error resolution, and debugging techniques for Aiser Platform"
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "Performance Overview",
+    "permalink": "/docs/performance/"
+  },
+  "next": {
+    "title": "AI Overview",
+    "permalink": "/docs/features/ai-overview"
+  }
+}

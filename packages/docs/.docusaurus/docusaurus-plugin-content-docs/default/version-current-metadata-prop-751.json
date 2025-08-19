@@ -11,12 +11,19 @@
     "docs": [
       {
         "type": "category",
-        "label": " Getting Started",
+        "label": "🚀 Getting Started",
         "collapsed": false,
         "items": [
           {
             "type": "link",
-            "label": "Quick Start Docker",
+            "label": "Getting Started",
+            "href": "/docs/getting-started/",
+            "docId": "getting-started/getting-started-index",
+            "unlisted": false
+          },
+          {
+            "type": "link",
+            "label": "Docker Quick Start",
             "href": "/docs/getting-started/quick-start-docker",
             "docId": "getting-started/quick-start-docker",
             "unlisted": false
@@ -37,236 +44,102 @@
           },
           {
             "type": "link",
-            "label": "Faq",
+            "label": "FAQ",
             "href": "/docs/getting-started/faq",
             "docId": "getting-started/faq",
             "unlisted": false
           }
         ],
-        "collapsible": true,
-        "href": "/docs/getting-started/"
+        "collapsible": true
       },
       {
         "type": "category",
         "label": "🏠 Self-Host & Enterprise",
         "items": [
           {
-            "type": "category",
-            "label": " Deployment Recipes",
-            "items": [
-              {
-                "type": "link",
-                "label": "Docker Compose",
-                "href": "/docs/self-host/docker-compose",
-                "docId": "self-host/docker-compose",
-                "unlisted": false
-              }
-            ],
-            "collapsed": true,
-            "collapsible": true
+            "type": "link",
+            "label": "Self-Host & Enterprise",
+            "href": "/docs/self-host/",
+            "docId": "self-host/self-host-index",
+            "unlisted": false
           },
           {
-            "type": "category",
-            "label": "⚙️ Configuration",
-            "items": [
-              {
-                "type": "link",
-                "label": "Config Reference",
-                "href": "/docs/self-host/config-reference",
-                "docId": "self-host/config-reference",
-                "unlisted": false
-              },
-              {
-                "type": "link",
-                "label": "Ssl Certificates",
-                "href": "/docs/self-host/ssl-certificates",
-                "docId": "self-host/ssl-certificates",
-                "unlisted": false
-              },
-              {
-                "type": "link",
-                "label": "Backups",
-                "href": "/docs/self-host/backups",
-                "docId": "self-host/backups",
-                "unlisted": false
-              }
-            ],
-            "collapsed": true,
-            "collapsible": true
+            "type": "link",
+            "label": "Docker Compose",
+            "href": "/docs/self-host/docker-compose",
+            "docId": "self-host/docker-compose",
+            "unlisted": false
           }
         ],
         "collapsed": true,
-        "collapsible": true,
-        "href": "/docs/self-host/"
+        "collapsible": true
       },
       {
         "type": "category",
-        "label": "🤖 Agentic AI & Analytics",
+        "label": "🔒 Security & Performance",
+        "collapsed": true,
         "items": [
           {
             "type": "link",
-            "label": "Natural Language Queries",
-            "href": "/docs/features/natural-language-queries",
-            "docId": "features/natural-language-queries",
+            "label": "Security Overview",
+            "href": "/docs/security/",
+            "docId": "security/security-overview",
             "unlisted": false
           },
           {
             "type": "link",
-            "label": "Agents",
-            "href": "/docs/features/agents",
-            "docId": "features/agents",
-            "unlisted": false
-          },
-          {
-            "type": "link",
-            "label": "Conversation Memory",
-            "href": "/docs/features/conversation-memory",
-            "docId": "features/conversation-memory",
-            "unlisted": false
-          },
-          {
-            "type": "link",
-            "label": "What If Simulations",
-            "href": "/docs/features/what-if-simulations",
-            "docId": "features/what-if-simulations",
-            "unlisted": false
-          },
-          {
-            "type": "link",
-            "label": "Custom Prompts",
-            "href": "/docs/features/custom-prompts",
-            "docId": "features/custom-prompts",
+            "label": "Performance Overview",
+            "href": "/docs/performance/",
+            "docId": "performance/performance-overview",
             "unlisted": false
           }
         ],
-        "collapsed": true,
-        "collapsible": true,
-        "href": "/docs/features/ai-overview"
+        "collapsible": true
       },
       {
         "type": "category",
-        "label": "📊 Charts & Visuals",
+        "label": "🛠️ Troubleshooting",
+        "collapsed": true,
         "items": [
           {
             "type": "link",
-            "label": "Line Charts",
-            "href": "/docs/features/line-charts",
-            "docId": "features/line-charts",
-            "unlisted": false
-          },
-          {
-            "type": "link",
-            "label": "Bar Charts",
-            "href": "/docs/features/bar-charts",
-            "docId": "features/bar-charts",
-            "unlisted": false
-          },
-          {
-            "type": "link",
-            "label": "Heatmaps",
-            "href": "/docs/features/heatmaps",
-            "docId": "features/heatmaps",
-            "unlisted": false
-          },
-          {
-            "type": "link",
-            "label": "Echarts Integration",
-            "href": "/docs/features/echarts-integration",
-            "docId": "features/echarts-integration",
-            "unlisted": false
-          },
-          {
-            "type": "link",
-            "label": "Deep Analysis",
-            "href": "/docs/features/deep-analysis",
-            "docId": "features/deep-analysis",
+            "label": "Troubleshooting Overview",
+            "href": "/docs/troubleshooting/",
+            "docId": "troubleshooting/troubleshooting-overview",
             "unlisted": false
           }
         ],
-        "collapsed": true,
-        "collapsible": true,
-        "href": "/docs/features/charts-overview"
+        "collapsible": true
       },
       {
         "type": "category",
-        "label": "🔌 Data Sources",
+        "label": "🤖 Features",
         "items": [
           {
             "type": "link",
-            "label": "Csv Excel",
-            "href": "/docs/features/csv-excel",
-            "docId": "features/csv-excel",
-            "unlisted": false
-          },
-          {
-            "type": "link",
-            "label": "Databases",
-            "href": "/docs/features/databases",
-            "docId": "features/databases",
-            "unlisted": false
-          },
-          {
-            "type": "link",
-            "label": "Warehouses",
-            "href": "/docs/features/warehouses",
-            "docId": "features/warehouses",
-            "unlisted": false
-          },
-          {
-            "type": "link",
-            "label": "Real Time Streams",
-            "href": "/docs/features/real-time-streams",
-            "docId": "features/real-time-streams",
+            "label": "AI Overview",
+            "href": "/docs/features/ai-overview",
+            "docId": "features/ai-overview",
             "unlisted": false
           }
         ],
         "collapsed": true,
-        "collapsible": true,
-        "href": "/docs/features/data-sources-overview"
+        "collapsible": true
       },
       {
         "type": "category",
-        "label": "️ Developer",
+        "label": "🛠️ Developer",
         "items": [
           {
             "type": "link",
-            "label": "Local Dev",
-            "href": "/docs/developer/local-dev",
-            "docId": "developer/local-dev",
-            "unlisted": false
-          },
-          {
-            "type": "link",
-            "label": "Architecture",
-            "href": "/docs/developer/architecture",
-            "docId": "developer/architecture",
-            "unlisted": false
-          },
-          {
-            "type": "link",
-            "label": "Writing Tests",
-            "href": "/docs/developer/writing-tests",
-            "docId": "developer/writing-tests",
-            "unlisted": false
-          },
-          {
-            "type": "link",
-            "label": "Plugin Architecture",
-            "href": "/docs/developer/plugin-architecture",
-            "docId": "developer/plugin-architecture",
-            "unlisted": false
-          },
-          {
-            "type": "link",
-            "label": "Release Process",
-            "href": "/docs/developer/release-process",
-            "docId": "developer/release-process",
+            "label": "Developer Guide",
+            "href": "/docs/developer/",
+            "docId": "developer/developer-index",
             "unlisted": false
           }
         ],
         "collapsed": true,
-        "collapsible": true,
-        "href": "/docs/developer/"
+        "collapsible": true
       },
       {
         "type": "category",
@@ -274,43 +147,14 @@
         "items": [
           {
             "type": "link",
-            "label": "Roadmap",
-            "href": "/docs/community/roadmap",
-            "docId": "community/roadmap",
-            "unlisted": false
-          },
-          {
-            "type": "link",
-            "label": "Contributing",
-            "href": "/docs/community/contributing",
-            "docId": "community/contributing",
-            "unlisted": false
-          },
-          {
-            "type": "link",
-            "label": "Code Of Conduct",
-            "href": "/docs/community/code-of-conduct",
-            "docId": "community/code-of-conduct",
-            "unlisted": false
-          },
-          {
-            "type": "link",
-            "label": "Bi Weekly Calls",
-            "href": "/docs/community/bi-weekly-calls",
-            "docId": "community/bi-weekly-calls",
-            "unlisted": false
-          },
-          {
-            "type": "link",
-            "label": "Ambassador Program",
-            "href": "/docs/community/ambassador-program",
-            "docId": "community/ambassador-program",
+            "label": "Community",
+            "href": "/docs/community/",
+            "docId": "community/community-index",
             "unlisted": false
           }
         ],
         "collapsed": true,
-        "collapsible": true,
-        "href": "/docs/community/"
+        "collapsible": true
       },
       {
         "type": "category",
@@ -319,30 +163,20 @@
         "items": [
           {
             "type": "link",
-            "label": "Api Reference",
+            "label": "API Reference",
             "href": "/docs/reference/api-reference",
             "docId": "reference/api-reference",
             "unlisted": false
           },
           {
             "type": "link",
-            "label": "Config Reference",
+            "label": "Configuration",
             "href": "/docs/reference/config-reference",
             "docId": "reference/config-reference",
             "unlisted": false
           }
         ],
         "collapsible": true
-      },
-      {
-        "type": "link",
-        "label": "License (MIT) + Enterprise License",
-        "href": "https://github.com/aiser-platform/aiser-world/blob/main/LICENSE"
-      },
-      {
-        "type": "link",
-        "label": "Privacy Policy",
-        "href": "https://aiser.com/privacy"
       }
     ]
   },
@@ -350,247 +184,236 @@
     "community/ambassador-program": {
       "id": "community/ambassador-program",
       "title": "Ambassador Program",
-      "description": "Overview",
-      "sidebar": "docs"
+      "description": "Overview"
     },
     "community/bi-weekly-calls": {
       "id": "community/bi-weekly-calls",
       "title": "Bi Weekly Calls",
-      "description": "Overview",
-      "sidebar": "docs"
+      "description": "Overview"
     },
     "community/code-of-conduct": {
       "id": "community/code-of-conduct",
       "title": "Code Of Conduct",
-      "description": "Overview",
-      "sidebar": "docs"
+      "description": "Overview"
     },
     "community/community-index": {
       "id": "community/community-index",
-      "title": "Community Index",
-      "description": "Welcome to the Community Index section of Aiser Platform documentation.",
+      "title": "Community & Contributing",
+      "description": "Join the Aiser Platform community, contribute to development, and participate in shaping the future of AI-powered analytics",
       "sidebar": "docs"
     },
     "community/contributing": {
       "id": "community/contributing",
       "title": "Contributing",
-      "description": "Overview",
-      "sidebar": "docs"
+      "description": "Overview"
     },
     "community/roadmap": {
       "id": "community/roadmap",
       "title": "Roadmap",
-      "description": "Overview",
-      "sidebar": "docs"
+      "description": "Overview"
     },
     "developer/architecture": {
       "id": "developer/architecture",
       "title": "Architecture",
-      "description": "Overview",
-      "sidebar": "docs"
+      "description": "Overview"
     },
     "developer/developer-index": {
       "id": "developer/developer-index",
-      "title": "Developer Index",
-      "description": "Welcome to the Developer Index section of Aiser Platform documentation.",
+      "title": "Developer Guide",
+      "description": "Contribute to Aiser Platform development, understand the architecture, and build custom extensions",
       "sidebar": "docs"
     },
     "developer/local-dev": {
       "id": "developer/local-dev",
       "title": "Local Dev",
-      "description": "Overview",
-      "sidebar": "docs"
+      "description": "Overview"
     },
     "developer/plugin-architecture": {
       "id": "developer/plugin-architecture",
       "title": "Plugin Architecture",
-      "description": "Overview",
-      "sidebar": "docs"
+      "description": "Overview"
     },
     "developer/release-process": {
       "id": "developer/release-process",
       "title": "Release Process",
-      "description": "Overview",
-      "sidebar": "docs"
+      "description": "Overview"
     },
     "developer/writing-tests": {
       "id": "developer/writing-tests",
       "title": "Writing Tests",
-      "description": "Overview",
-      "sidebar": "docs"
+      "description": "Overview"
     },
     "features/agents": {
       "id": "features/agents",
       "title": "Agents",
-      "description": "Overview",
-      "sidebar": "docs"
+      "description": "Overview"
     },
     "features/ai-overview": {
       "id": "features/ai-overview",
-      "title": "Ai Overview",
-      "description": "Overview",
+      "title": "AI Overview",
+      "description": "Overview of AI-powered features in Aiser Platform",
       "sidebar": "docs"
     },
     "features/bar-charts": {
       "id": "features/bar-charts",
       "title": "Bar Charts",
-      "description": "Overview",
-      "sidebar": "docs"
+      "description": "Overview"
     },
     "features/charts-overview": {
       "id": "features/charts-overview",
       "title": "Charts Overview",
-      "description": "Overview",
-      "sidebar": "docs"
+      "description": "Overview"
     },
     "features/conversation-memory": {
       "id": "features/conversation-memory",
       "title": "Conversation Memory",
-      "description": "Overview",
-      "sidebar": "docs"
+      "description": "Overview"
     },
     "features/csv-excel": {
       "id": "features/csv-excel",
       "title": "Csv Excel",
-      "description": "Overview",
-      "sidebar": "docs"
+      "description": "Overview"
     },
     "features/custom-prompts": {
       "id": "features/custom-prompts",
       "title": "Custom Prompts",
-      "description": "Overview",
-      "sidebar": "docs"
+      "description": "Overview"
     },
     "features/data-sources-overview": {
       "id": "features/data-sources-overview",
       "title": "Data Sources Overview",
-      "description": "Overview",
-      "sidebar": "docs"
+      "description": "Overview"
     },
     "features/databases": {
       "id": "features/databases",
       "title": "Databases",
-      "description": "Overview",
-      "sidebar": "docs"
+      "description": "Overview"
     },
     "features/deep-analysis": {
       "id": "features/deep-analysis",
       "title": "Deep Analysis",
-      "description": "Overview",
-      "sidebar": "docs"
+      "description": "Overview"
     },
     "features/echarts-integration": {
       "id": "features/echarts-integration",
       "title": "Echarts Integration",
-      "description": "Overview",
-      "sidebar": "docs"
+      "description": "Overview"
     },
     "features/heatmaps": {
       "id": "features/heatmaps",
       "title": "Heatmaps",
-      "description": "Overview",
-      "sidebar": "docs"
+      "description": "Overview"
     },
     "features/line-charts": {
       "id": "features/line-charts",
       "title": "Line Charts",
-      "description": "Overview",
-      "sidebar": "docs"
+      "description": "Overview"
     },
     "features/natural-language-queries": {
       "id": "features/natural-language-queries",
       "title": "Natural Language Queries",
-      "description": "Overview",
-      "sidebar": "docs"
+      "description": "Overview"
     },
     "features/real-time-streams": {
       "id": "features/real-time-streams",
       "title": "Real Time Streams",
-      "description": "Overview",
-      "sidebar": "docs"
+      "description": "Overview"
     },
     "features/warehouses": {
       "id": "features/warehouses",
       "title": "Warehouses",
-      "description": "Overview",
-      "sidebar": "docs"
+      "description": "Overview"
     },
     "features/what-if-simulations": {
       "id": "features/what-if-simulations",
       "title": "What If Simulations",
-      "description": "Overview",
-      "sidebar": "docs"
+      "description": "Overview"
     },
     "getting-started/demo-walkthrough": {
       "id": "getting-started/demo-walkthrough",
       "title": "Demo Walkthrough",
-      "description": "Overview",
+      "description": "Follow along with our interactive demo to see Aiser Platform's AI-powered analytics in action",
       "sidebar": "docs"
     },
     "getting-started/faq": {
       "id": "getting-started/faq",
-      "title": "Faq",
-      "description": "Overview",
+      "title": "Frequently Asked Questions",
+      "description": "Find answers to common questions about Aiser Platform - from getting started to enterprise deployment",
       "sidebar": "docs"
     },
     "getting-started/first-chart": {
       "id": "getting-started/first-chart",
-      "title": "First Chart",
-      "description": "Overview",
+      "title": "Create Your First Chart",
+      "description": "Experience the power of AI-powered analytics by creating your first chart in just 2 minutes",
       "sidebar": "docs"
     },
     "getting-started/getting-started-index": {
       "id": "getting-started/getting-started-index",
-      "title": "Getting Started Index",
-      "description": "Welcome to the Getting Started Index section of Aiser Platform documentation.",
+      "title": "Welcome to Aiser Platform",
+      "description": "Get started with Aiser Platform - the AI-first business intelligence platform that transforms how you interact with data",
       "sidebar": "docs"
     },
     "getting-started/quick-start-docker": {
       "id": "getting-started/quick-start-docker",
-      "title": "Quick Start Docker",
-      "description": "Overview",
+      "title": "Quick Start with Docker",
+      "description": "Get Aiser Platform running in 5 minutes with Docker - the fastest way to experience AI-powered analytics",
+      "sidebar": "docs"
+    },
+    "performance/performance-overview": {
+      "id": "performance/performance-overview",
+      "title": "Performance & Optimization",
+      "description": "Performance optimization, scaling strategies, and monitoring for Aiser Platform",
       "sidebar": "docs"
     },
     "reference/api-reference": {
       "id": "reference/api-reference",
-      "title": "Api Reference",
-      "description": "Overview",
+      "title": "API Reference",
+      "description": "Complete API documentation for Aiser Platform - integrate AI-powered analytics into your applications",
       "sidebar": "docs"
     },
     "reference/config-reference": {
       "id": "reference/config-reference",
-      "title": "Config Reference",
-      "description": "Overview",
+      "title": "Configuration Reference",
+      "description": "Complete configuration reference for Aiser Platform - environment variables, settings, and customization options",
+      "sidebar": "docs"
+    },
+    "security/security-overview": {
+      "id": "security/security-overview",
+      "title": "Security Overview",
+      "description": "Comprehensive security features, compliance, and best practices for Aiser Platform",
       "sidebar": "docs"
     },
     "self-host/backups": {
       "id": "self-host/backups",
       "title": "Backups",
-      "description": "Overview",
-      "sidebar": "docs"
+      "description": "Overview"
     },
     "self-host/config-reference": {
       "id": "self-host/config-reference",
       "title": "Config Reference",
-      "description": "Overview",
-      "sidebar": "docs"
+      "description": "Overview"
     },
     "self-host/docker-compose": {
       "id": "self-host/docker-compose",
-      "title": "Docker Compose",
-      "description": "Overview",
+      "title": "Docker Compose Deployment",
+      "description": "Deploy Aiser Platform with Docker Compose for production-ready, scalable analytics infrastructure",
       "sidebar": "docs"
     },
     "self-host/self-host-index": {
       "id": "self-host/self-host-index",
-      "title": "Self Host Index",
-      "description": "Welcome to the Self Host Index section of Aiser Platform documentation.",
+      "title": "Self-Host & Enterprise Deployment",
+      "description": "Deploy Aiser Platform in your own infrastructure with enterprise-grade security, scalability, and customization options",
       "sidebar": "docs"
     },
     "self-host/ssl-certificates": {
       "id": "self-host/ssl-certificates",
       "title": "Ssl Certificates",
-      "description": "Overview",
+      "description": "Overview"
+    },
+    "troubleshooting/troubleshooting-overview": {
+      "id": "troubleshooting/troubleshooting-overview",
+      "title": "Troubleshooting Guide",
+      "description": "Common issues, error resolution, and debugging techniques for Aiser Platform",
       "sidebar": "docs"
     }
   }

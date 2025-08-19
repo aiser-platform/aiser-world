@@ -17,14 +17,5 @@
     "id": "backups",
     "title": "Backups",
     "sidebar_label": "Backups"
-  },
-  "sidebar": "docs",
-  "previous": {
-    "title": "Ssl Certificates",
-    "permalink": "/docs/self-host/ssl-certificates"
-  },
-  "next": {
-    "title": "Ai Overview",
-    "permalink": "/docs/features/ai-overview"
   }
 }

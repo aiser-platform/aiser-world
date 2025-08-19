@@ -1,0 +1,21 @@
+{
+  "id": "features/warehouses",
+  "title": "Warehouses",
+  "description": "Overview",
+  "source": "@site/src/docs/features/warehouses.md",
+  "sourceDirName": "features",
+  "slug": "/features/warehouses",
+  "permalink": "/docs/features/warehouses",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/features/warehouses.md",
+  "tags": [],
+  "version": "current",
+  "lastUpdatedAt": 1755570184,
+  "formattedLastUpdatedAt": "Aug 19, 2025",
+  "frontMatter": {
+    "id": "warehouses",
+    "title": "Warehouses",
+    "sidebar_label": "Warehouses"
+  }
+}
