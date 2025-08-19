@@ -25,11 +25,6 @@ jobs:
           cache: 'npm'
           cache-dependency-path: packages/docs/package-lock.json
           
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-          
       - name: Install dependencies
         working-directory: packages/docs
         run: npm ci
