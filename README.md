@@ -27,8 +27,7 @@ aiser-platform/
 │   └── shared/              # Shared utilities and types
 ├── docs/                    # Documentation and analysis
 ├── scripts/                 # Development scripts
-├── tools/                   # Build and setup tools
-└── .kiro/                   # Kiro specs and configurations
+└── tools/                   # Build and setup tools
 ```
 
 ## 🚀 Quick Start
@@ -267,4 +266,5 @@ See the [LICENSE](LICENSE) file for complete details.
 
 
 **Built with ❤️ by DataTicon Team**
+
 
