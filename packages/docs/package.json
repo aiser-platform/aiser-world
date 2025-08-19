@@ -13,8 +13,7 @@
     "serve": "npx docusaurus serve --port 3005",
     "write-translations": "npx docusaurus write-translations",
     "write-heading-ids": "npx docusaurus write-heading-ids",
-    "typecheck": "tsc",
-    "generate-docs": "python3 scripts/generate_docs.py"
+    "typecheck": "tsc"
   },
   "dependencies": {
     "@docusaurus/core": "3.1.1",
