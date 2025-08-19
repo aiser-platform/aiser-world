@@ -27,8 +27,7 @@ aiser-platform/
 │   └── shared/              # Shared utilities and types
 ├── docs/                    # Documentation and analysis
 ├── scripts/                 # Development scripts
-├── tools/                   # Build and setup tools
-└── .kiro/                   # Kiro specs and configurations
+└── tools/                   # Build and setup tools
 ```
 
 ## 🚀 Quick Start
@@ -258,7 +257,7 @@ See the [LICENSE](LICENSE) file for complete details.
 
 ## 🆘 Support
 
-- **Documentation**: Check the `docs/` directory
+- **Documentation**: Check the `packages/docs/` directory
 - **Issues**: Report bugs and request features via GitHub Issues
 - **Email Support**: support@dataticon.com
 - **Discussions**: Join community discussions
@@ -267,4 +266,6 @@ See the [LICENSE](LICENSE) file for complete details.
 
 
 **Built with ❤️ by DataTicon Team**
+
+
 
