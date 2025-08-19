@@ -6,9 +6,9 @@ services:
     image: postgres:15-alpine
     container_name: aiser-postgres
     environment:
-      POSTGRES_DB: aiser_world
-      POSTGRES_USER: aiser
-      POSTGRES_PASSWORD: aiser_password
+      POSTGRES_DB: ${POSTGRES_DB:-aiser_world}
+      POSTGRES_USER: ${POSTGRES_USER:-aiser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aiser_password}
     ports:
       - "5432:5432"
     volumes:
@@ -43,12 +43,12 @@ services:
       - "5000:5000"
     environment:
       - POSTGRES_SERVER=postgres
-      - POSTGRES_DB=aiser_world
-      - POSTGRES_USER=aiser
-      - POSTGRES_PASSWORD=aiser_password
-      - POSTGRES_PORT=5432
-      - SECRET_KEY=dev-secret-key
-      - DEBUG=True
+      - POSTGRES_DB=${POSTGRES_DB:-aiser_world}
+      - POSTGRES_USER=${POSTGRES_USER:-aiser}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-aiser_password}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-key}
+      - DEBUG=${DEBUG:-True}
     depends_on:
       postgres:
         condition: service_healthy
@@ -71,24 +71,24 @@ services:
     ports:
       - "4000:4000"
     environment:
-      - NODE_ENV=development
-      - CUBE_DB_TYPE=postgres
-      - CUBE_DB_HOST=postgres
-      - CUBE_DB_PORT=5432
-      - CUBE_DB_NAME=aiser_world
-      - CUBE_DB_USER=aiser
-      - CUBE_DB_PASS=aiser_password
-      - CUBE_DB_SCHEMA=public
-      - CUBE_DB_SSL=false
-      - CUBE_DB_POOL_MIN=2
-      - CUBE_DB_POOL_MAX=10
-      - CUBE_REDIS_URL=redis://redis:6379
-      - CUBE_API_SECRET=dev-cube-secret-key
-      - CUBE_DEV_MODE=true
-      - CUBE_LOG_LEVEL=info
-      - CUBEJS_EXTERNAL_DEFAULT=true
-      - CUBEJS_SCHEDULED_REFRESH_DEFAULT=true
-      - CUBEJS_SKIP_NATIVE_EXTENSIONS=true
+      - NODE_ENV=${NODE_ENV:-development}
+      - CUBE_DB_TYPE=${CUBE_DB_TYPE:-postgres}
+      - CUBE_DB_HOST=${CUBE_DB_HOST:-postgres}
+      - CUBE_DB_PORT=${CUBE_DB_PORT:-5432}
+      - CUBE_DB_NAME=${POSTGRES_DB:-aiser_world}
+      - CUBE_DB_USER=${POSTGRES_USER:-aiser}
+      - CUBE_DB_PASS=${POSTGRES_PASSWORD:-aiser_password}
+      - CUBE_DB_SCHEMA=${CUBE_DB_SCHEMA:-public}
+      - CUBE_DB_SSL=${CUBE_DB_SSL:-false}
+      - CUBE_DB_POOL_MIN=${CUBE_DB_POOL_MIN:-2}
+      - CUBE_DB_POOL_MAX=${CUBE_DB_POOL_MAX:-10}
+      - CUBE_REDIS_URL=${CUBE_REDIS_URL:-redis://redis:6379}
+      - CUBE_API_SECRET=${CUBE_API_SECRET:-dev-cube-secret-key}
+      - CUBE_DEV_MODE=${CUBE_DEV_MODE:-true}
+      - CUBE_LOG_LEVEL=${CUBE_LOG_LEVEL:-info}
+      - CUBEJS_EXTERNAL_DEFAULT=${CUBEJS_EXTERNAL_DEFAULT:-true}
+      - CUBEJS_SCHEDULED_REFRESH_DEFAULT=${CUBEJS_SCHEDULED_REFRESH_DEFAULT:-true}
+      - CUBEJS_SKIP_NATIVE_EXTENSIONS=${CUBEJS_SKIP_NATIVE_EXTENSIONS:-true}
     depends_on:
       postgres:
         condition: service_healthy
@@ -117,19 +117,19 @@ services:
       - "8000:8000"
     environment:
       - POSTGRES_SERVER=postgres
-      - POSTGRES_DB=aiser_world
-      - POSTGRES_USER=aiser
-      - POSTGRES_PASSWORD=aiser_password
-      - POSTGRES_PORT=5432
-      - AZURE_OPENAI_API_KEY=35rWswdPyyyisuGwl2tgrlxFtfLhjD0cFDQaJi44YzBx91Rz3nINJQQJ99BEACHYHv6XJ3w3AAABACOGbUlA
-      - AZURE_OPENAI_ENDPOINT=https://ateybot-eastus2-123-nut.openai.azure.com/
-      - AZURE_OPENAI_API_VERSION=2025-04-01-preview
-      - AZURE_OPENAI_DEPLOYMENT_NAME=gpt-5-mini
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-your-openai-key}
-      - OPENAI_MODEL_ID=gpt-4o-mini
-      - SECRET_KEY=dev-secret-key
+      - POSTGRES_DB=${POSTGRES_DB:-aiser_world}
+      - POSTGRES_USER=${POSTGRES_USER:-aiser}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-aiser_password}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY}
+      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
+      - AZURE_OPENAI_API_VERSION=${AZURE_OPENAI_API_VERSION:-2025-04-01-preview}
+      - AZURE_OPENAI_DEPLOYMENT_NAME=${AZURE_OPENAI_DEPLOYMENT_NAME:-gpt-5-mini}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL_ID=${OPENAI_MODEL_ID:-gpt-4o-mini}
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-key}
       - CUBE_API_URL=http://cube-server:4000/cubejs-api/v1
-      - CUBE_API_SECRET=dev-cube-secret-key
+      - CUBE_API_SECRET=${CUBE_API_SECRET:-dev-cube-secret-key}
     depends_on:
       postgres:
         condition: service_healthy
