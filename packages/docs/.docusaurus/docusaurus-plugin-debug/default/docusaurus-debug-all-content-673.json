@@ -1,0 +1,1516 @@
+{
+  "docusaurus-plugin-content-docs": {
+    "default": {
+      "loadedVersions": [
+        {
+          "versionName": "current",
+          "label": "Next",
+          "banner": null,
+          "badge": false,
+          "noIndex": false,
+          "className": "docs-version-current",
+          "path": "/docs",
+          "tagsPath": "/docs/tags",
+          "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs",
+          "editUrlLocalized": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/i18n/en/docusaurus-plugin-content-docs/current",
+          "isLast": true,
+          "routePriority": -1,
+          "sidebarFilePath": "/home/sv/project/aiser-world/packages/docs/sidebars.js",
+          "contentPath": "/home/sv/project/aiser-world/packages/docs/docs",
+          "contentPathLocalized": "/home/sv/project/aiser-world/packages/docs/i18n/en/docusaurus-plugin-content-docs/current",
+          "docs": [
+            {
+              "id": "community/ambassador-program",
+              "title": "Ambassador Program",
+              "description": "Overview",
+              "source": "@site/docs/community/ambassador-program.md",
+              "sourceDirName": "community",
+              "slug": "/community/ambassador-program",
+              "permalink": "/docs/community/ambassador-program",
+              "draft": false,
+              "unlisted": false,
+              "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/community/ambassador-program.md",
+              "tags": [],
+              "version": "current",
+              "lastUpdatedAt": 1539502055,
+              "formattedLastUpdatedAt": "Oct 14, 2018",
+              "frontMatter": {
+                "id": "ambassador-program",
+                "title": "Ambassador Program",
+                "sidebar_label": "Ambassador Program"
+              },
+              "sidebar": "docs",
+              "previous": {
+                "title": "Bi Weekly Calls",
+                "permalink": "/docs/community/bi-weekly-calls"
+              },
+              "next": {
+                "title": "Api Reference",
+                "permalink": "/docs/reference/api-reference"
+              }
+            },
+            {
+              "id": "community/bi-weekly-calls",
+              "title": "Bi Weekly Calls",
+              "description": "Overview",
+              "source": "@site/docs/community/bi-weekly-calls.md",
+              "sourceDirName": "community",
+              "slug": "/community/bi-weekly-calls",
+              "permalink": "/docs/community/bi-weekly-calls",
+              "draft": false,
+              "unlisted": false,
+              "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/community/bi-weekly-calls.md",
+              "tags": [],
+              "version": "current",
+              "lastUpdatedAt": 1539502055,
+              "formattedLastUpdatedAt": "Oct 14, 2018",
+              "frontMatter": {
+                "id": "bi-weekly-calls",
+                "title": "Bi Weekly Calls",
+                "sidebar_label": "Bi Weekly Calls"
+              },
+              "sidebar": "docs",
+              "previous": {
+                "title": "Code Of Conduct",
+                "permalink": "/docs/community/code-of-conduct"
+              },
+              "next": {
+                "title": "Ambassador Program",
+                "permalink": "/docs/community/ambassador-program"
+              }
+            },
+            {
+              "id": "community/code-of-conduct",
+              "title": "Code Of Conduct",
+              "description": "Overview",
+              "source": "@site/docs/community/code-of-conduct.md",
+              "sourceDirName": "community",
+              "slug": "/community/code-of-conduct",
+              "permalink": "/docs/community/code-of-conduct",
+              "draft": false,
+              "unlisted": false,
+              "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/community/code-of-conduct.md",
+              "tags": [],
+              "version": "current",
+              "lastUpdatedAt": 1539502055,
+              "formattedLastUpdatedAt": "Oct 14, 2018",
+              "frontMatter": {
+                "id": "code-of-conduct",
+                "title": "Code Of Conduct",
+                "sidebar_label": "Code Of Conduct"
+              },
+              "sidebar": "docs",
+              "previous": {
+                "title": "Contributing",
+                "permalink": "/docs/community/contributing"
+              },
+              "next": {
+                "title": "Bi Weekly Calls",
+                "permalink": "/docs/community/bi-weekly-calls"
+              }
+            },
+            {
+              "id": "community/community-index",
+              "title": "Community Index",
+              "description": "Welcome to the Community Index section of Aiser Platform documentation.",
+              "source": "@site/docs/community/index.md",
+              "sourceDirName": "community",
+              "slug": "/community/",
+              "permalink": "/docs/community/",
+              "draft": false,
+              "unlisted": false,
+              "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/community/index.md",
+              "tags": [],
+              "version": "current",
+              "lastUpdatedAt": 1539502055,
+              "formattedLastUpdatedAt": "Oct 14, 2018",
+              "frontMatter": {
+                "id": "community-index",
+                "title": "Community Index",
+                "sidebar_label": "Community Index"
+              },
+              "sidebar": "docs",
+              "previous": {
+                "title": "Release Process",
+                "permalink": "/docs/developer/release-process"
+              },
+              "next": {
+                "title": "Roadmap",
+                "permalink": "/docs/community/roadmap"
+              }
+            },
+            {
+              "id": "community/contributing",
+              "title": "Contributing",
+              "description": "Overview",
+              "source": "@site/docs/community/contributing.md",
+              "sourceDirName": "community",
+              "slug": "/community/contributing",
+              "permalink": "/docs/community/contributing",
+              "draft": false,
+              "unlisted": false,
+              "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/community/contributing.md",
+              "tags": [],
+              "version": "current",
+              "lastUpdatedAt": 1539502055,
+              "formattedLastUpdatedAt": "Oct 14, 2018",
+              "frontMatter": {
+                "id": "contributing",
+                "title": "Contributing",
+                "sidebar_label": "Contributing"
+              },
+              "sidebar": "docs",
+              "previous": {
+                "title": "Roadmap",
+                "permalink": "/docs/community/roadmap"
+              },
+              "next": {
+                "title": "Code Of Conduct",
+                "permalink": "/docs/community/code-of-conduct"
+              }
+            },
+            {
+              "id": "community/roadmap",
+              "title": "Roadmap",
+              "description": "Overview",
+              "source": "@site/docs/community/roadmap.md",
+              "sourceDirName": "community",
+              "slug": "/community/roadmap",
+              "permalink": "/docs/community/roadmap",
+              "draft": false,
+              "unlisted": false,
+              "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/community/roadmap.md",
+              "tags": [],
+              "version": "current",
+              "lastUpdatedAt": 1539502055,
+              "formattedLastUpdatedAt": "Oct 14, 2018",
+              "frontMatter": {
+                "id": "roadmap",
+                "title": "Roadmap",
+                "sidebar_label": "Roadmap"
+              },
+              "sidebar": "docs",
+              "previous": {
+                "title": "Community Index",
+                "permalink": "/docs/community/"
+              },
+              "next": {
+                "title": "Contributing",
+                "permalink": "/docs/community/contributing"
+              }
+            },
+            {
+              "id": "developer/architecture",
+              "title": "Architecture",
+              "description": "Overview",
+              "source": "@site/docs/developer/architecture.md",
+              "sourceDirName": "developer",
+              "slug": "/developer/architecture",
+              "permalink": "/docs/developer/architecture",
+              "draft": false,
+              "unlisted": false,
+              "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/developer/architecture.md",
+              "tags": [],
+              "version": "current",
+              "lastUpdatedAt": 1539502055,
+              "formattedLastUpdatedAt": "Oct 14, 2018",
+              "frontMatter": {
+                "id": "architecture",
+                "title": "Architecture",
+                "sidebar_label": "Architecture"
+              },
+              "sidebar": "docs",
+              "previous": {
+                "title": "Local Dev",
+                "permalink": "/docs/developer/local-dev"
+              },
+              "next": {
+                "title": "Writing Tests",
+                "permalink": "/docs/developer/writing-tests"
+              }
+            },
+            {
+              "id": "developer/developer-index",
+              "title": "Developer Index",
+              "description": "Welcome to the Developer Index section of Aiser Platform documentation.",
+              "source": "@site/docs/developer/index.md",
+              "sourceDirName": "developer",
+              "slug": "/developer/",
+              "permalink": "/docs/developer/",
+              "draft": false,
+              "unlisted": false,
+              "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/developer/index.md",
+              "tags": [],
+              "version": "current",
+              "lastUpdatedAt": 1539502055,
+              "formattedLastUpdatedAt": "Oct 14, 2018",
+              "frontMatter": {
+                "id": "developer-index",
+                "title": "Developer Index",
+                "sidebar_label": "Developer Index"
+              },
+              "sidebar": "docs",
+              "previous": {
+                "title": "Real Time Streams",
+                "permalink": "/docs/features/real-time-streams"
+              },
+              "next": {
+                "title": "Local Dev",
+                "permalink": "/docs/developer/local-dev"
+              }
+            },
+            {
+              "id": "developer/local-dev",
+              "title": "Local Dev",
+              "description": "Overview",
+              "source": "@site/docs/developer/local-dev.md",
+              "sourceDirName": "developer",
+              "slug": "/developer/local-dev",
+              "permalink": "/docs/developer/local-dev",
+              "draft": false,
+              "unlisted": false,
+              "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/developer/local-dev.md",
+              "tags": [],
+              "version": "current",
+              "lastUpdatedAt": 1539502055,
+              "formattedLastUpdatedAt": "Oct 14, 2018",
+              "frontMatter": {
+                "id": "local-dev",
+                "title": "Local Dev",
+                "sidebar_label": "Local Dev"
+              },
+              "sidebar": "docs",
+              "previous": {
+                "title": "Developer Index",
+                "permalink": "/docs/developer/"
+              },
+              "next": {
+                "title": "Architecture",
+                "permalink": "/docs/developer/architecture"
+              }
+            },
+            {
+              "id": "developer/plugin-architecture",
+              "title": "Plugin Architecture",
+              "description": "Overview",
+              "source": "@site/docs/developer/plugin-architecture.md",
+              "sourceDirName": "developer",
+              "slug": "/developer/plugin-architecture",
+              "permalink": "/docs/developer/plugin-architecture",
+              "draft": false,
+              "unlisted": false,
+              "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/developer/plugin-architecture.md",
+              "tags": [],
+              "version": "current",
+              "lastUpdatedAt": 1539502055,
+              "formattedLastUpdatedAt": "Oct 14, 2018",
+              "frontMatter": {
+                "id": "plugin-architecture",
+                "title": "Plugin Architecture",
+                "sidebar_label": "Plugin Architecture"
+              },
+              "sidebar": "docs",
+              "previous": {
+                "title": "Writing Tests",
+                "permalink": "/docs/developer/writing-tests"
+              },
+              "next": {
+                "title": "Release Process",
+                "permalink": "/docs/developer/release-process"
+              }
+            },
+            {
+              "id": "developer/release-process",
+              "title": "Release Process",
+              "description": "Overview",
+              "source": "@site/docs/developer/release-process.md",
+              "sourceDirName": "developer",
+              "slug": "/developer/release-process",
+              "permalink": "/docs/developer/release-process",
+              "draft": false,
+              "unlisted": false,
+              "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/developer/release-process.md",
+              "tags": [],
+              "version": "current",
+              "lastUpdatedAt": 1539502055,
+              "formattedLastUpdatedAt": "Oct 14, 2018",
+              "frontMatter": {
+                "id": "release-process",
+                "title": "Release Process",
+                "sidebar_label": "Release Process"
+              },
+              "sidebar": "docs",
+              "previous": {
+                "title": "Plugin Architecture",
+                "permalink": "/docs/developer/plugin-architecture"
+              },
+              "next": {
+                "title": "Community Index",
+                "permalink": "/docs/community/"
+              }
+            },
+            {
+              "id": "developer/writing-tests",
+              "title": "Writing Tests",
+              "description": "Overview",
+              "source": "@site/docs/developer/writing-tests.md",
+              "sourceDirName": "developer",
+              "slug": "/developer/writing-tests",
+              "permalink": "/docs/developer/writing-tests",
+              "draft": false,
+              "unlisted": false,
+              "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/developer/writing-tests.md",
+              "tags": [],
+              "version": "current",
+              "lastUpdatedAt": 1539502055,
+              "formattedLastUpdatedAt": "Oct 14, 2018",
+              "frontMatter": {
+                "id": "writing-tests",
+                "title": "Writing Tests",
+                "sidebar_label": "Writing Tests"
+              },
+              "sidebar": "docs",
+              "previous": {
+                "title": "Architecture",
+                "permalink": "/docs/developer/architecture"
+              },
+              "next": {
+                "title": "Plugin Architecture",
+                "permalink": "/docs/developer/plugin-architecture"
+              }
+            },
+            {
+              "id": "features/agents",
+              "title": "Agents",
+              "description": "Overview",
+              "source": "@site/docs/features/agents.md",
+              "sourceDirName": "features",
+              "slug": "/features/agents",
+              "permalink": "/docs/features/agents",
+              "draft": false,
+              "unlisted": false,
+              "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/features/agents.md",
+              "tags": [],
+              "version": "current",
+              "lastUpdatedAt": 1539502055,
+              "formattedLastUpdatedAt": "Oct 14, 2018",
+              "frontMatter": {
+                "id": "agents",
+                "title": "Agents",
+                "sidebar_label": "Agents"
+              },
+              "sidebar": "docs",
+              "previous": {
+                "title": "Natural Language Queries",
+                "permalink": "/docs/features/natural-language-queries"
+              },
+              "next": {
+                "title": "Conversation Memory",
+                "permalink": "/docs/features/conversation-memory"
+              }
+            },
+            {
+              "id": "features/ai-overview",
+              "title": "Ai Overview",
+              "description": "Overview",
+              "source": "@site/docs/features/ai-overview.md",
+              "sourceDirName": "features",
+              "slug": "/features/ai-overview",
+              "permalink": "/docs/features/ai-overview",
+              "draft": false,
+              "unlisted": false,
+              "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/features/ai-overview.md",
+              "tags": [],
+              "version": "current",
+              "lastUpdatedAt": 1539502055,
+              "formattedLastUpdatedAt": "Oct 14, 2018",
+              "frontMatter": {
+                "id": "ai-overview",
+                "title": "Ai Overview",
+                "sidebar_label": "Ai Overview"
+              },
+              "sidebar": "docs",
+              "previous": {
+                "title": "Backups",
+                "permalink": "/docs/self-host/backups"
+              },
+              "next": {
+                "title": "Natural Language Queries",
+                "permalink": "/docs/features/natural-language-queries"
+              }
+            },
+            {
+              "id": "features/bar-charts",
+              "title": "Bar Charts",
+              "description": "Overview",
+              "source": "@site/docs/features/bar-charts.md",
+              "sourceDirName": "features",
+              "slug": "/features/bar-charts",
+              "permalink": "/docs/features/bar-charts",
+              "draft": false,
+              "unlisted": false,
+              "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/features/bar-charts.md",
+              "tags": [],
+              "version": "current",
+              "lastUpdatedAt": 1539502055,
+              "formattedLastUpdatedAt": "Oct 14, 2018",
+              "frontMatter": {
+                "id": "bar-charts",
+                "title": "Bar Charts",
+                "sidebar_label": "Bar Charts"
+              },
+              "sidebar": "docs",
+              "previous": {
+                "title": "Line Charts",
+                "permalink": "/docs/features/line-charts"
+              },
+              "next": {
+                "title": "Heatmaps",
+                "permalink": "/docs/features/heatmaps"
+              }
+            },
+            {
+              "id": "features/charts-overview",
+              "title": "Charts Overview",
+              "description": "Overview",
+              "source": "@site/docs/features/charts-overview.md",
+              "sourceDirName": "features",
+              "slug": "/features/charts-overview",
+              "permalink": "/docs/features/charts-overview",
+              "draft": false,
+              "unlisted": false,
+              "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/features/charts-overview.md",
+              "tags": [],
+              "version": "current",
+              "lastUpdatedAt": 1539502055,
+              "formattedLastUpdatedAt": "Oct 14, 2018",
+              "frontMatter": {
+                "id": "charts-overview",
+                "title": "Charts Overview",
+                "sidebar_label": "Charts Overview"
+              },
+              "sidebar": "docs",
+              "previous": {
+                "title": "Custom Prompts",
+                "permalink": "/docs/features/custom-prompts"
+              },
+              "next": {
+                "title": "Line Charts",
+                "permalink": "/docs/features/line-charts"
+              }
+            },
+            {
+              "id": "features/conversation-memory",
+              "title": "Conversation Memory",
+              "description": "Overview",
+              "source": "@site/docs/features/conversation-memory.md",
+              "sourceDirName": "features",
+              "slug": "/features/conversation-memory",
+              "permalink": "/docs/features/conversation-memory",
+              "draft": false,
+              "unlisted": false,
+              "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/features/conversation-memory.md",
+              "tags": [],
+              "version": "current",
+              "lastUpdatedAt": 1539502055,
+              "formattedLastUpdatedAt": "Oct 14, 2018",
+              "frontMatter": {
+                "id": "conversation-memory",
+                "title": "Conversation Memory",
+                "sidebar_label": "Conversation Memory"
+              },
+              "sidebar": "docs",
+              "previous": {
+                "title": "Agents",
+                "permalink": "/docs/features/agents"
+              },
+              "next": {
+                "title": "What If Simulations",
+                "permalink": "/docs/features/what-if-simulations"
+              }
+            },
+            {
+              "id": "features/csv-excel",
+              "title": "Csv Excel",
+              "description": "Overview",
+              "source": "@site/docs/features/csv-excel.md",
+              "sourceDirName": "features",
+              "slug": "/features/csv-excel",
+              "permalink": "/docs/features/csv-excel",
+              "draft": false,
+              "unlisted": false,
+              "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/features/csv-excel.md",
+              "tags": [],
+              "version": "current",
+              "lastUpdatedAt": 1539502055,
+              "formattedLastUpdatedAt": "Oct 14, 2018",
+              "frontMatter": {
+                "id": "csv-excel",
+                "title": "Csv Excel",
+                "sidebar_label": "Csv Excel"
+              },
+              "sidebar": "docs",
+              "previous": {
+                "title": "Data Sources Overview",
+                "permalink": "/docs/features/data-sources-overview"
+              },
+              "next": {
+                "title": "Databases",
+                "permalink": "/docs/features/databases"
+              }
+            },
+            {
+              "id": "features/custom-prompts",
+              "title": "Custom Prompts",
+              "description": "Overview",
+              "source": "@site/docs/features/custom-prompts.md",
+              "sourceDirName": "features",
+              "slug": "/features/custom-prompts",
+              "permalink": "/docs/features/custom-prompts",
+              "draft": false,
+              "unlisted": false,
+              "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/features/custom-prompts.md",
+              "tags": [],
+              "version": "current",
+              "lastUpdatedAt": 1539502055,
+              "formattedLastUpdatedAt": "Oct 14, 2018",
+              "frontMatter": {
+                "id": "custom-prompts",
+                "title": "Custom Prompts",
+                "sidebar_label": "Custom Prompts"
+              },
+              "sidebar": "docs",
+              "previous": {
+                "title": "What If Simulations",
+                "permalink": "/docs/features/what-if-simulations"
+              },
+              "next": {
+                "title": "Charts Overview",
+                "permalink": "/docs/features/charts-overview"
+              }
+            },
+            {
+              "id": "features/data-sources-overview",
+              "title": "Data Sources Overview",
+              "description": "Overview",
+              "source": "@site/docs/features/data-sources-overview.md",
+              "sourceDirName": "features",
+              "slug": "/features/data-sources-overview",
+              "permalink": "/docs/features/data-sources-overview",
+              "draft": false,
+              "unlisted": false,
+              "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/features/data-sources-overview.md",
+              "tags": [],
+              "version": "current",
+              "lastUpdatedAt": 1539502055,
+              "formattedLastUpdatedAt": "Oct 14, 2018",
+              "frontMatter": {
+                "id": "data-sources-overview",
+                "title": "Data Sources Overview",
+                "sidebar_label": "Data Sources Overview"
+              },
+              "sidebar": "docs",
+              "previous": {
+                "title": "Deep Analysis",
+                "permalink": "/docs/features/deep-analysis"
+              },
+              "next": {
+                "title": "Csv Excel",
+                "permalink": "/docs/features/csv-excel"
+              }
+            },
+            {
+              "id": "features/databases",
+              "title": "Databases",
+              "description": "Overview",
+              "source": "@site/docs/features/databases.md",
+              "sourceDirName": "features",
+              "slug": "/features/databases",
+              "permalink": "/docs/features/databases",
+              "draft": false,
+              "unlisted": false,
+              "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/features/databases.md",
+              "tags": [],
+              "version": "current",
+              "lastUpdatedAt": 1539502055,
+              "formattedLastUpdatedAt": "Oct 14, 2018",
+              "frontMatter": {
+                "id": "databases",
+                "title": "Databases",
+                "sidebar_label": "Databases"
+              },
+              "sidebar": "docs",
+              "previous": {
+                "title": "Csv Excel",
+                "permalink": "/docs/features/csv-excel"
+              },
+              "next": {
+                "title": "Warehouses",
+                "permalink": "/docs/features/warehouses"
+              }
+            },
+            {
+              "id": "features/deep-analysis",
+              "title": "Deep Analysis",
+              "description": "Overview",
+              "source": "@site/docs/features/deep-analysis.md",
+              "sourceDirName": "features",
+              "slug": "/features/deep-analysis",
+              "permalink": "/docs/features/deep-analysis",
+              "draft": false,
+              "unlisted": false,
+              "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/features/deep-analysis.md",
+              "tags": [],
+              "version": "current",
+              "lastUpdatedAt": 1539502055,
+              "formattedLastUpdatedAt": "Oct 14, 2018",
+              "frontMatter": {
+                "id": "deep-analysis",
+                "title": "Deep Analysis",
+                "sidebar_label": "Deep Analysis"
+              },
+              "sidebar": "docs",
+              "previous": {
+                "title": "Echarts Integration",
+                "permalink": "/docs/features/echarts-integration"
+              },
+              "next": {
+                "title": "Data Sources Overview",
+                "permalink": "/docs/features/data-sources-overview"
+              }
+            },
+            {
+              "id": "features/echarts-integration",
+              "title": "Echarts Integration",
+              "description": "Overview",
+              "source": "@site/docs/features/echarts-integration.md",
+              "sourceDirName": "features",
+              "slug": "/features/echarts-integration",
+              "permalink": "/docs/features/echarts-integration",
+              "draft": false,
+              "unlisted": false,
+              "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/features/echarts-integration.md",
+              "tags": [],
+              "version": "current",
+              "lastUpdatedAt": 1539502055,
+              "formattedLastUpdatedAt": "Oct 14, 2018",
+              "frontMatter": {
+                "id": "echarts-integration",
+                "title": "Echarts Integration",
+                "sidebar_label": "Echarts Integration"
+              },
+              "sidebar": "docs",
+              "previous": {
+                "title": "Heatmaps",
+                "permalink": "/docs/features/heatmaps"
+              },
+              "next": {
+                "title": "Deep Analysis",
+                "permalink": "/docs/features/deep-analysis"
+              }
+            },
+            {
+              "id": "features/heatmaps",
+              "title": "Heatmaps",
+              "description": "Overview",
+              "source": "@site/docs/features/heatmaps.md",
+              "sourceDirName": "features",
+              "slug": "/features/heatmaps",
+              "permalink": "/docs/features/heatmaps",
+              "draft": false,
+              "unlisted": false,
+              "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/features/heatmaps.md",
+              "tags": [],
+              "version": "current",
+              "lastUpdatedAt": 1539502055,
+              "formattedLastUpdatedAt": "Oct 14, 2018",
+              "frontMatter": {
+                "id": "heatmaps",
+                "title": "Heatmaps",
+                "sidebar_label": "Heatmaps"
+              },
+              "sidebar": "docs",
+              "previous": {
+                "title": "Bar Charts",
+                "permalink": "/docs/features/bar-charts"
+              },
+              "next": {
+                "title": "Echarts Integration",
+                "permalink": "/docs/features/echarts-integration"
+              }
+            },
+            {
+              "id": "features/line-charts",
+              "title": "Line Charts",
+              "description": "Overview",
+              "source": "@site/docs/features/line-charts.md",
+              "sourceDirName": "features",
+              "slug": "/features/line-charts",
+              "permalink": "/docs/features/line-charts",
+              "draft": false,
+              "unlisted": false,
+              "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/features/line-charts.md",
+              "tags": [],
+              "version": "current",
+              "lastUpdatedAt": 1539502055,
+              "formattedLastUpdatedAt": "Oct 14, 2018",
+              "frontMatter": {
+                "id": "line-charts",
+                "title": "Line Charts",
+                "sidebar_label": "Line Charts"
+              },
+              "sidebar": "docs",
+              "previous": {
+                "title": "Charts Overview",
+                "permalink": "/docs/features/charts-overview"
+              },
+              "next": {
+                "title": "Bar Charts",
+                "permalink": "/docs/features/bar-charts"
+              }
+            },
+            {
+              "id": "features/natural-language-queries",
+              "title": "Natural Language Queries",
+              "description": "Overview",
+              "source": "@site/docs/features/natural-language-queries.md",
+              "sourceDirName": "features",
+              "slug": "/features/natural-language-queries",
+              "permalink": "/docs/features/natural-language-queries",
+              "draft": false,
+              "unlisted": false,
+              "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/features/natural-language-queries.md",
+              "tags": [],
+              "version": "current",
+              "lastUpdatedAt": 1539502055,
+              "formattedLastUpdatedAt": "Oct 14, 2018",
+              "frontMatter": {
+                "id": "natural-language-queries",
+                "title": "Natural Language Queries",
+                "sidebar_label": "Natural Language Queries"
+              },
+              "sidebar": "docs",
+              "previous": {
+                "title": "Ai Overview",
+                "permalink": "/docs/features/ai-overview"
+              },
+              "next": {
+                "title": "Agents",
+                "permalink": "/docs/features/agents"
+              }
+            },
+            {
+              "id": "features/real-time-streams",
+              "title": "Real Time Streams",
+              "description": "Overview",
+              "source": "@site/docs/features/real-time-streams.md",
+              "sourceDirName": "features",
+              "slug": "/features/real-time-streams",
+              "permalink": "/docs/features/real-time-streams",
+              "draft": false,
+              "unlisted": false,
+              "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/features/real-time-streams.md",
+              "tags": [],
+              "version": "current",
+              "lastUpdatedAt": 1539502055,
+              "formattedLastUpdatedAt": "Oct 14, 2018",
+              "frontMatter": {
+                "id": "real-time-streams",
+                "title": "Real Time Streams",
+                "sidebar_label": "Real Time Streams"
+              },
+              "sidebar": "docs",
+              "previous": {
+                "title": "Warehouses",
+                "permalink": "/docs/features/warehouses"
+              },
+              "next": {
+                "title": "Developer Index",
+                "permalink": "/docs/developer/"
+              }
+            },
+            {
+              "id": "features/warehouses",
+              "title": "Warehouses",
+              "description": "Overview",
+              "source": "@site/docs/features/warehouses.md",
+              "sourceDirName": "features",
+              "slug": "/features/warehouses",
+              "permalink": "/docs/features/warehouses",
+              "draft": false,
+              "unlisted": false,
+              "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/features/warehouses.md",
+              "tags": [],
+              "version": "current",
+              "lastUpdatedAt": 1539502055,
+              "formattedLastUpdatedAt": "Oct 14, 2018",
+              "frontMatter": {
+                "id": "warehouses",
+                "title": "Warehouses",
+                "sidebar_label": "Warehouses"
+              },
+              "sidebar": "docs",
+              "previous": {
+                "title": "Databases",
+                "permalink": "/docs/features/databases"
+              },
+              "next": {
+                "title": "Real Time Streams",
+                "permalink": "/docs/features/real-time-streams"
+              }
+            },
+            {
+              "id": "features/what-if-simulations",
+              "title": "What If Simulations",
+              "description": "Overview",
+              "source": "@site/docs/features/what-if-simulations.md",
+              "sourceDirName": "features",
+              "slug": "/features/what-if-simulations",
+              "permalink": "/docs/features/what-if-simulations",
+              "draft": false,
+              "unlisted": false,
+              "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/features/what-if-simulations.md",
+              "tags": [],
+              "version": "current",
+              "lastUpdatedAt": 1539502055,
+              "formattedLastUpdatedAt": "Oct 14, 2018",
+              "frontMatter": {
+                "id": "what-if-simulations",
+                "title": "What If Simulations",
+                "sidebar_label": "What If Simulations"
+              },
+              "sidebar": "docs",
+              "previous": {
+                "title": "Conversation Memory",
+                "permalink": "/docs/features/conversation-memory"
+              },
+              "next": {
+                "title": "Custom Prompts",
+                "permalink": "/docs/features/custom-prompts"
+              }
+            },
+            {
+              "id": "getting-started/demo-walkthrough",
+              "title": "Demo Walkthrough",
+              "description": "Overview",
+              "source": "@site/docs/getting-started/demo-walkthrough.md",
+              "sourceDirName": "getting-started",
+              "slug": "/getting-started/demo-walkthrough",
+              "permalink": "/docs/getting-started/demo-walkthrough",
+              "draft": false,
+              "unlisted": false,
+              "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/getting-started/demo-walkthrough.md",
+              "tags": [],
+              "version": "current",
+              "lastUpdatedAt": 1539502055,
+              "formattedLastUpdatedAt": "Oct 14, 2018",
+              "frontMatter": {
+                "id": "demo-walkthrough",
+                "title": "Demo Walkthrough",
+                "sidebar_label": "Demo Walkthrough"
+              },
+              "sidebar": "docs",
+              "previous": {
+                "title": "First Chart",
+                "permalink": "/docs/getting-started/first-chart"
+              },
+              "next": {
+                "title": "Faq",
+                "permalink": "/docs/getting-started/faq"
+              }
+            },
+            {
+              "id": "getting-started/faq",
+              "title": "Faq",
+              "description": "Overview",
+              "source": "@site/docs/getting-started/faq.md",
+              "sourceDirName": "getting-started",
+              "slug": "/getting-started/faq",
+              "permalink": "/docs/getting-started/faq",
+              "draft": false,
+              "unlisted": false,
+              "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/getting-started/faq.md",
+              "tags": [],
+              "version": "current",
+              "lastUpdatedAt": 1539502055,
+              "formattedLastUpdatedAt": "Oct 14, 2018",
+              "frontMatter": {
+                "id": "faq",
+                "title": "Faq",
+                "sidebar_label": "Faq"
+              },
+              "sidebar": "docs",
+              "previous": {
+                "title": "Demo Walkthrough",
+                "permalink": "/docs/getting-started/demo-walkthrough"
+              },
+              "next": {
+                "title": "Self Host Index",
+                "permalink": "/docs/self-host/"
+              }
+            },
+            {
+              "id": "getting-started/first-chart",
+              "title": "First Chart",
+              "description": "Overview",
+              "source": "@site/docs/getting-started/first-chart.md",
+              "sourceDirName": "getting-started",
+              "slug": "/getting-started/first-chart",
+              "permalink": "/docs/getting-started/first-chart",
+              "draft": false,
+              "unlisted": false,
+              "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/getting-started/first-chart.md",
+              "tags": [],
+              "version": "current",
+              "lastUpdatedAt": 1539502055,
+              "formattedLastUpdatedAt": "Oct 14, 2018",
+              "frontMatter": {
+                "id": "first-chart",
+                "title": "First Chart",
+                "sidebar_label": "First Chart"
+              },
+              "sidebar": "docs",
+              "previous": {
+                "title": "Quick Start Docker",
+                "permalink": "/docs/getting-started/quick-start-docker"
+              },
+              "next": {
+                "title": "Demo Walkthrough",
+                "permalink": "/docs/getting-started/demo-walkthrough"
+              }
+            },
+            {
+              "id": "getting-started/getting-started-index",
+              "title": "Getting Started Index",
+              "description": "Welcome to the Getting Started Index section of Aiser Platform documentation.",
+              "source": "@site/docs/getting-started/index.md",
+              "sourceDirName": "getting-started",
+              "slug": "/getting-started/",
+              "permalink": "/docs/getting-started/",
+              "draft": false,
+              "unlisted": false,
+              "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/getting-started/index.md",
+              "tags": [],
+              "version": "current",
+              "lastUpdatedAt": 1539502055,
+              "formattedLastUpdatedAt": "Oct 14, 2018",
+              "frontMatter": {
+                "id": "getting-started-index",
+                "title": "Getting Started Index",
+                "sidebar_label": "Getting Started Index"
+              },
+              "sidebar": "docs",
+              "next": {
+                "title": "Quick Start Docker",
+                "permalink": "/docs/getting-started/quick-start-docker"
+              }
+            },
+            {
+              "id": "getting-started/quick-start-docker",
+              "title": "Quick Start Docker",
+              "description": "Overview",
+              "source": "@site/docs/getting-started/quick-start-docker.md",
+              "sourceDirName": "getting-started",
+              "slug": "/getting-started/quick-start-docker",
+              "permalink": "/docs/getting-started/quick-start-docker",
+              "draft": false,
+              "unlisted": false,
+              "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/getting-started/quick-start-docker.md",
+              "tags": [],
+              "version": "current",
+              "lastUpdatedAt": 1539502055,
+              "formattedLastUpdatedAt": "Oct 14, 2018",
+              "frontMatter": {
+                "id": "quick-start-docker",
+                "title": "Quick Start Docker",
+                "sidebar_label": "Quick Start Docker"
+              },
+              "sidebar": "docs",
+              "previous": {
+                "title": "Getting Started Index",
+                "permalink": "/docs/getting-started/"
+              },
+              "next": {
+                "title": "First Chart",
+                "permalink": "/docs/getting-started/first-chart"
+              }
+            },
+            {
+              "id": "reference/api-reference",
+              "title": "Api Reference",
+              "description": "Overview",
+              "source": "@site/docs/reference/api-reference.md",
+              "sourceDirName": "reference",
+              "slug": "/reference/api-reference",
+              "permalink": "/docs/reference/api-reference",
+              "draft": false,
+              "unlisted": false,
+              "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/reference/api-reference.md",
+              "tags": [],
+              "version": "current",
+              "lastUpdatedAt": 1539502055,
+              "formattedLastUpdatedAt": "Oct 14, 2018",
+              "frontMatter": {
+                "id": "api-reference",
+                "title": "Api Reference",
+                "sidebar_label": "Api Reference"
+              },
+              "sidebar": "docs",
+              "previous": {
+                "title": "Ambassador Program",
+                "permalink": "/docs/community/ambassador-program"
+              },
+              "next": {
+                "title": "Config Reference",
+                "permalink": "/docs/reference/config-reference"
+              }
+            },
+            {
+              "id": "reference/config-reference",
+              "title": "Config Reference",
+              "description": "Overview",
+              "source": "@site/docs/reference/config-reference.md",
+              "sourceDirName": "reference",
+              "slug": "/reference/config-reference",
+              "permalink": "/docs/reference/config-reference",
+              "draft": false,
+              "unlisted": false,
+              "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/reference/config-reference.md",
+              "tags": [],
+              "version": "current",
+              "lastUpdatedAt": 1539502055,
+              "formattedLastUpdatedAt": "Oct 14, 2018",
+              "frontMatter": {
+                "id": "config-reference",
+                "title": "Config Reference",
+                "sidebar_label": "Config Reference"
+              },
+              "sidebar": "docs",
+              "previous": {
+                "title": "Api Reference",
+                "permalink": "/docs/reference/api-reference"
+              }
+            },
+            {
+              "id": "self-host/backups",
+              "title": "Backups",
+              "description": "Overview",
+              "source": "@site/docs/self-host/backups.md",
+              "sourceDirName": "self-host",
+              "slug": "/self-host/backups",
+              "permalink": "/docs/self-host/backups",
+              "draft": false,
+              "unlisted": false,
+              "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/self-host/backups.md",
+              "tags": [],
+              "version": "current",
+              "lastUpdatedAt": 1539502055,
+              "formattedLastUpdatedAt": "Oct 14, 2018",
+              "frontMatter": {
+                "id": "backups",
+                "title": "Backups",
+                "sidebar_label": "Backups"
+              },
+              "sidebar": "docs",
+              "previous": {
+                "title": "Ssl Certificates",
+                "permalink": "/docs/self-host/ssl-certificates"
+              },
+              "next": {
+                "title": "Ai Overview",
+                "permalink": "/docs/features/ai-overview"
+              }
+            },
+            {
+              "id": "self-host/config-reference",
+              "title": "Config Reference",
+              "description": "Overview",
+              "source": "@site/docs/self-host/config-reference.md",
+              "sourceDirName": "self-host",
+              "slug": "/self-host/config-reference",
+              "permalink": "/docs/self-host/config-reference",
+              "draft": false,
+              "unlisted": false,
+              "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/self-host/config-reference.md",
+              "tags": [],
+              "version": "current",
+              "lastUpdatedAt": 1539502055,
+              "formattedLastUpdatedAt": "Oct 14, 2018",
+              "frontMatter": {
+                "id": "config-reference",
+                "title": "Config Reference",
+                "sidebar_label": "Config Reference"
+              },
+              "sidebar": "docs",
+              "previous": {
+                "title": "Docker Compose",
+                "permalink": "/docs/self-host/docker-compose"
+              },
+              "next": {
+                "title": "Ssl Certificates",
+                "permalink": "/docs/self-host/ssl-certificates"
+              }
+            },
+            {
+              "id": "self-host/docker-compose",
+              "title": "Docker Compose",
+              "description": "Overview",
+              "source": "@site/docs/self-host/docker-compose.md",
+              "sourceDirName": "self-host",
+              "slug": "/self-host/docker-compose",
+              "permalink": "/docs/self-host/docker-compose",
+              "draft": false,
+              "unlisted": false,
+              "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/self-host/docker-compose.md",
+              "tags": [],
+              "version": "current",
+              "lastUpdatedAt": 1539502055,
+              "formattedLastUpdatedAt": "Oct 14, 2018",
+              "frontMatter": {
+                "id": "docker-compose",
+                "title": "Docker Compose",
+                "sidebar_label": "Docker Compose"
+              },
+              "sidebar": "docs",
+              "previous": {
+                "title": "Self Host Index",
+                "permalink": "/docs/self-host/"
+              },
+              "next": {
+                "title": "Config Reference",
+                "permalink": "/docs/self-host/config-reference"
+              }
+            },
+            {
+              "id": "self-host/self-host-index",
+              "title": "Self Host Index",
+              "description": "Welcome to the Self Host Index section of Aiser Platform documentation.",
+              "source": "@site/docs/self-host/index.md",
+              "sourceDirName": "self-host",
+              "slug": "/self-host/",
+              "permalink": "/docs/self-host/",
+              "draft": false,
+              "unlisted": false,
+              "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/self-host/index.md",
+              "tags": [],
+              "version": "current",
+              "lastUpdatedAt": 1539502055,
+              "formattedLastUpdatedAt": "Oct 14, 2018",
+              "frontMatter": {
+                "id": "self-host-index",
+                "title": "Self Host Index",
+                "sidebar_label": "Self Host Index"
+              },
+              "sidebar": "docs",
+              "previous": {
+                "title": "Faq",
+                "permalink": "/docs/getting-started/faq"
+              },
+              "next": {
+                "title": "Docker Compose",
+                "permalink": "/docs/self-host/docker-compose"
+              }
+            },
+            {
+              "id": "self-host/ssl-certificates",
+              "title": "Ssl Certificates",
+              "description": "Overview",
+              "source": "@site/docs/self-host/ssl-certificates.md",
+              "sourceDirName": "self-host",
+              "slug": "/self-host/ssl-certificates",
+              "permalink": "/docs/self-host/ssl-certificates",
+              "draft": false,
+              "unlisted": false,
+              "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/self-host/ssl-certificates.md",
+              "tags": [],
+              "version": "current",
+              "lastUpdatedAt": 1539502055,
+              "formattedLastUpdatedAt": "Oct 14, 2018",
+              "frontMatter": {
+                "id": "ssl-certificates",
+                "title": "Ssl Certificates",
+                "sidebar_label": "Ssl Certificates"
+              },
+              "sidebar": "docs",
+              "previous": {
+                "title": "Config Reference",
+                "permalink": "/docs/self-host/config-reference"
+              },
+              "next": {
+                "title": "Backups",
+                "permalink": "/docs/self-host/backups"
+              }
+            }
+          ],
+          "drafts": [],
+          "sidebars": {
+            "docs": [
+              {
+                "type": "category",
+                "label": " Getting Started",
+                "collapsed": false,
+                "link": {
+                  "type": "doc",
+                  "id": "getting-started/getting-started-index"
+                },
+                "items": [
+                  {
+                    "type": "doc",
+                    "id": "getting-started/quick-start-docker"
+                  },
+                  {
+                    "type": "doc",
+                    "id": "getting-started/first-chart"
+                  },
+                  {
+                    "type": "doc",
+                    "id": "getting-started/demo-walkthrough"
+                  },
+                  {
+                    "type": "doc",
+                    "id": "getting-started/faq"
+                  }
+                ],
+                "collapsible": true
+              },
+              {
+                "type": "category",
+                "label": "🏠 Self-Host & Enterprise",
+                "link": {
+                  "type": "doc",
+                  "id": "self-host/self-host-index"
+                },
+                "items": [
+                  {
+                    "type": "category",
+                    "label": " Deployment Recipes",
+                    "items": [
+                      {
+                        "type": "doc",
+                        "id": "self-host/docker-compose"
+                      }
+                    ],
+                    "collapsed": true,
+                    "collapsible": true
+                  },
+                  {
+                    "type": "category",
+                    "label": "⚙️ Configuration",
+                    "items": [
+                      {
+                        "type": "doc",
+                        "id": "self-host/config-reference"
+                      },
+                      {
+                        "type": "doc",
+                        "id": "self-host/ssl-certificates"
+                      },
+                      {
+                        "type": "doc",
+                        "id": "self-host/backups"
+                      }
+                    ],
+                    "collapsed": true,
+                    "collapsible": true
+                  }
+                ],
+                "collapsed": true,
+                "collapsible": true
+              },
+              {
+                "type": "category",
+                "label": "🤖 Agentic AI & Analytics",
+                "link": {
+                  "type": "doc",
+                  "id": "features/ai-overview"
+                },
+                "items": [
+                  {
+                    "type": "doc",
+                    "id": "features/natural-language-queries"
+                  },
+                  {
+                    "type": "doc",
+                    "id": "features/agents"
+                  },
+                  {
+                    "type": "doc",
+                    "id": "features/conversation-memory"
+                  },
+                  {
+                    "type": "doc",
+                    "id": "features/what-if-simulations"
+                  },
+                  {
+                    "type": "doc",
+                    "id": "features/custom-prompts"
+                  }
+                ],
+                "collapsed": true,
+                "collapsible": true
+              },
+              {
+                "type": "category",
+                "label": "📊 Charts & Visuals",
+                "link": {
+                  "type": "doc",
+                  "id": "features/charts-overview"
+                },
+                "items": [
+                  {
+                    "type": "doc",
+                    "id": "features/line-charts"
+                  },
+                  {
+                    "type": "doc",
+                    "id": "features/bar-charts"
+                  },
+                  {
+                    "type": "doc",
+                    "id": "features/heatmaps"
+                  },
+                  {
+                    "type": "doc",
+                    "id": "features/echarts-integration"
+                  },
+                  {
+                    "type": "doc",
+                    "id": "features/deep-analysis"
+                  }
+                ],
+                "collapsed": true,
+                "collapsible": true
+              },
+              {
+                "type": "category",
+                "label": "🔌 Data Sources",
+                "link": {
+                  "type": "doc",
+                  "id": "features/data-sources-overview"
+                },
+                "items": [
+                  {
+                    "type": "doc",
+                    "id": "features/csv-excel"
+                  },
+                  {
+                    "type": "doc",
+                    "id": "features/databases"
+                  },
+                  {
+                    "type": "doc",
+                    "id": "features/warehouses"
+                  },
+                  {
+                    "type": "doc",
+                    "id": "features/real-time-streams"
+                  }
+                ],
+                "collapsed": true,
+                "collapsible": true
+              },
+              {
+                "type": "category",
+                "label": "️ Developer",
+                "link": {
+                  "type": "doc",
+                  "id": "developer/developer-index"
+                },
+                "items": [
+                  {
+                    "type": "doc",
+                    "id": "developer/local-dev"
+                  },
+                  {
+                    "type": "doc",
+                    "id": "developer/architecture"
+                  },
+                  {
+                    "type": "doc",
+                    "id": "developer/writing-tests"
+                  },
+                  {
+                    "type": "doc",
+                    "id": "developer/plugin-architecture"
+                  },
+                  {
+                    "type": "doc",
+                    "id": "developer/release-process"
+                  }
+                ],
+                "collapsed": true,
+                "collapsible": true
+              },
+              {
+                "type": "category",
+                "label": "🌍 Community",
+                "link": {
+                  "type": "doc",
+                  "id": "community/community-index"
+                },
+                "items": [
+                  {
+                    "type": "doc",
+                    "id": "community/roadmap"
+                  },
+                  {
+                    "type": "doc",
+                    "id": "community/contributing"
+                  },
+                  {
+                    "type": "doc",
+                    "id": "community/code-of-conduct"
+                  },
+                  {
+                    "type": "doc",
+                    "id": "community/bi-weekly-calls"
+                  },
+                  {
+                    "type": "doc",
+                    "id": "community/ambassador-program"
+                  }
+                ],
+                "collapsed": true,
+                "collapsible": true
+              },
+              {
+                "type": "category",
+                "label": "📖 Reference",
+                "collapsed": true,
+                "items": [
+                  {
+                    "type": "doc",
+                    "id": "reference/api-reference"
+                  },
+                  {
+                    "type": "doc",
+                    "id": "reference/config-reference"
+                  }
+                ],
+                "collapsible": true
+              },
+              {
+                "type": "link",
+                "label": "License (MIT) + Enterprise License",
+                "href": "https://github.com/aiser-platform/aiser-world/blob/main/LICENSE"
+              },
+              {
+                "type": "link",
+                "label": "Privacy Policy",
+                "href": "https://aiser.com/privacy"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "docusaurus-plugin-content-pages": {
+    "default": null
+  },
+  "docusaurus-plugin-debug": {},
+  "docusaurus-theme-classic": {},
+  "docusaurus-theme-search-algolia": {},
+  "docusaurus-bootstrap-plugin": {},
+  "docusaurus-mdx-fallback-plugin": {}
+}

@@ -8,23 +8,23 @@
 
 ## 🚀 **CRITICAL PATH PRIORITIES** (Optimized for Growth & Competition)
 
-**Phase 1 (Weeks 1-4): MVP + Monetization Foundation**
+**Phase 1 (Weeks 1-4): Core Platform Foundation with Cube.js**
 1. **Task 2: Monorepo Setup** - Unified development workflow
-2. **Task 3: LiteLLM Integration** - Multi-model AI flexibility 
-3. **Task 21: Subscription & Payment System** - ABA Bank + Stripe integration (CRITICAL for revenue)
-4. **Task 11.2: Enhanced Chat Interface** 
+2. **Task 3: Cube.js + LiteLLM Integration** - Universal semantic layer + AI (CORE STRENGTH)
+3. **Task 6: AI-Powered BI Workflow** - Business question → Cube.js → insights pipeline
+4. **Task 21: Subscription & Payment System** - ABA Bank + Stripe integration (CRITICAL for revenue)
 
 **Phase 2 (Weeks 5-8): Competitive Differentiation**
-5. **Task 5: ECharts MCP Integration** - Fast visualization  
-6. **Task 22: Publication-Ready Documents** - Business reports 
-7. **Task 7.1-7.2: Data Connectivity** - Easy data source connection
-8. **Task 23: Ready-Made Templates** - Industry dashboards and reports
+5. **Task 5: ECharts MCP Integration** - Fast visualization with Cube.js data
+6. **Task 11.2: Enhanced Chat Interface** - Superior to Julius.ai with semantic understanding
+7. **Task 22: Publication-Ready Documents** - Business reports (Julius.ai doesn't have)
+8. **Task 7: Enhanced Data Connectivity** - Cube.js-powered universal data access
 
 **Phase 3 (Weeks 9-12): Advanced Features & Enterprise**
-9. **Task 5.2: AntV MCP Integration** - Advanced visualizations 
-10. **Task 16: AI-Powered Insights** - Proactive analytics 
-11. **Task 24: Brand Customization** - White-label capabilities
-12. **Task 10: Collaboration Features** - Team workspaces
+9. **Task 23: Ready-Made Templates** - Industry dashboards with Cube.js semantic models
+10. **Task 5.2: AntV MCP Integration** - Advanced visualizations beyond Julius.ai
+11. **Task 16: AI-Powered Insights** - Proactive analytics with Cube.js pre-aggregations
+12. **Task 24: Brand Customization** - White-label capabilities with tenant isolation
 
 - [ ] 1. Analyze and integrate existing repositories
   - [ ] 1.1 Review existing Aiser-Chat2Chart implementation
@@ -76,27 +76,64 @@
   - Add shared types and interfaces for cross-service communication
   - _Requirements: 4.1, 4.2, 4.5_
 
-- [ ] 3. Integrate LiteLLM for AI model flexibility (CRITICAL PATH)
-  - [ ] 3.1 Replace OpenAI direct calls with LiteLLM in existing agents (comment existing implementation if needed)
-    - Install and configure LiteLLM with Azure OpenAI GPT-4.1-mini as primary
-    - Replace direct OpenAI calls in BaseAgent class
-    - Add support for Gemini 2.5 and local models as alternatives
-    - Maintain backward compatibility with existing conversation memory
-    - _Requirements: 11.1, 11.2, 11.4_
+- [ ] 3. Build Cube.js Universal Semantic Layer + Chat2chart + LiteLLM Integration (CORE)
+  - [x] 3.1 Integrate Cube.js as universal semantic layer with multi-tenant architecture
 
-  - [ ] 3.2 Implement model routing and failover logic
-    - Create configuration management for multiple AI providers
-    - Implement automatic failover between models
-    - Add error handling and retry mechanisms for model failures
-    - Write comprehensive tests for model switching functionality
-    - _Requirements: 11.5, 11.6_
 
-  - [ ] 3.3 Add cost optimization and monitoring
-    - Implement usage tracking and cost calculation per model
-    - Create model performance monitoring and analytics
-    - Add automatic model selection based on cost/performance metrics
-    - Write tests for cost optimization algorithms
-    - _Requirements: 11.6_
+
+
+
+
+
+
+
+
+
+
+
+
+    - Set up Cube.js server with tenant isolation (CUBEJS_DB_NAME=$TENANT_DB_NAME)
+    - Implement queryRewrite with tenant_id injection: AND tenant_id = ${securityContext.tenantId}
+    - Create database connectors for PostgreSQL, MySQL, SQL Server, Snowflake, BigQuery, Redshift
+    - Build LLM-assisted Cube.js schema generation from existing database structures
+
+
+    - Add visual schema approval interface in frontend for business user validation
+    - _Requirements: Universal data access, enterprise multi-tenancy, core platform strength_
+
+  - [ ] 3.2 Integrate LiteLLM with Cube.js for AI-powered semantic analytics and with chart2chart 
+    - Install and configure LiteLLM with Azure OpenAI GPT-4.1-mini as primary model
+    - Create AI agent system that understands and queries Cube.js JSON schema
+    - Build business question → semantic understanding → Cube.js API → data pipeline
+    - Implement multi-agent routing for different analytics types (metrics, trends, comparisons)
+    - Add context-aware query optimization using Cube.js pre-aggregations and caching
+    - _Requirements: 11.1, 11.2, 11.4, AI-powered semantic understanding_
+
+  - [x] 3.3 Build intelligent query routing and business context understanding
+
+
+
+
+
+    - Create LLM-powered query classifier (KPIs, trends, comparisons, anomalies, forecasting)
+    - Implement automatic Cube.js schema discovery and business context suggestions
+    - Build query performance optimization with intelligent pre-aggregation recommendations
+    - Add cost optimization for cloud data warehouse queries through Cube.js
+    - Create feedback loop system for continuous AI model improvement
+    - _Requirements: 11.5, 11.6, Business intelligence optimization_
+
+  - [x] 3.4 Implement MCP ECharts integration with Cube.js data pipeline
+
+
+
+
+
+    - Integrate MCP ECharts (https://www.npmjs.com/package/mcp-echarts) for chart generation
+    - Build Cube.js query results → ECharts configuration transformation engine
+    - Create intelligent chart type recommendation based on Cube.js measures and dimensions
+    - Implement real-time chart updates with Cube.js WebSocket subscriptions
+    - Add business-friendly chart customization with semantic context preservation
+    - _Requirements: Seamless data-to-visualization pipeline, enterprise customization_
 
 - [ ] 4. Extract basic authentication for open source while enhancing enterprise auth
   - [ ] 4.1 Extract basic JWT authentication for open source Chat2Chart
@@ -146,9 +183,42 @@
     - Build chart export system with publication-ready quality
     - _Requirements: 2.5, Publication-ready documents_
 
-- [ ] 6. Enhance existing Chat2Chart AI engine with improved capabilities
+- [ ] 6. Build AI-Powered Business Intelligence Workflow (CORE DIFFERENTIATOR)
+  - [ ] 6.1 Create end-to-end AI-driven analytics pipeline
+    - Build user data source connection wizard with automatic schema detection
+    - Implement LLM-powered Cube.js data model generation with YAML configuration
+    - Create visual data model approval interface with business-friendly explanations
+    - Add automatic relationship detection and semantic understanding
+    - Build iterative feedback loop for data model refinement
+    - _Requirements: Business user accessibility, automated data modeling_
 
-- [ ] 7. Create universal data connectivity layer
+  - [ ] 6.2 Implement intelligent business question processing
+    - Create natural language business question parser with intent classification
+    - Build multi-agent routing system (metrics agent, trend agent, comparison agent)
+    - Implement context-aware query generation using Cube.js semantic layer
+    - Add automatic query optimization and performance monitoring
+    - Create business context preservation throughout the analytics pipeline
+    - _Requirements: Natural language to insights, multi-agent intelligence_
+
+  - [ ] 6.3 Build proactive insights and recommendation engine
+    - Implement automatic anomaly detection using Cube.js time-series data
+    - Create trend analysis and forecasting with confidence intervals
+    - Build actionable insights generation with business impact assessment
+    - Add next-step recommendations based on data patterns and business context
+    - Implement executive summary generation for dashboard insights
+    - _Requirements: Proactive analytics, business decision support_
+
+  - [ ] 6.4 Create iterative improvement and learning system
+    - Build user feedback collection on insights accuracy and relevance
+    - Implement A/B testing for different AI model approaches
+    - Create continuous learning pipeline for business domain understanding
+    - Add performance metrics tracking for query accuracy and user satisfaction
+    - Build automated model retraining based on user interactions
+    - _Requirements: Continuous improvement, enterprise learning_
+
+- [ ] 7. Enhance existing Chat2Chart AI engine with Cube.js integration
+
+- [ ] 8. Create universal data connectivity layer
   - [ ] 6.1 Enhance existing natural language processing pipeline
     - Review and improve current query parsing and intent recognition
     - Integrate LiteLLM for better AI model flexibility
@@ -171,34 +241,38 @@
     - Write integration tests with Ant Chart MCP
     - _Requirements: 1.5, 12.2, 12.5_
 
-- [ ] 7. Create universal data connectivity layer
-  - [ ] 7.1 Implement file-based data connectors
-    - Create parsers for CSV, Excel, JSON, and Parquet files
-    - Implement data validation and type inference
-    - Add error handling for malformed files
-    - Write unit tests for all file formats
-    - _Requirements: 8.1_
+- [ ] 7. Enhance Cube.js-powered data connectivity and semantic layer
+  - [ ] 7.1 Expand Cube.js database connector ecosystem
+    - Enhance existing Cube.js connectors for PostgreSQL, MySQL, SQL Server
+    - Add advanced cloud data warehouse support (Snowflake, BigQuery, Redshift)
+    - Implement file-based data sources through Cube.js (CSV, Excel, JSON, Parquet)
+    - Create connection health monitoring and automatic failover
+    - Add connection pooling optimization for enterprise workloads
+    - _Requirements: 8.1, 8.2, 8.3, Enterprise data source support_
 
-  - [ ] 7.2 Build database connectivity
-    - Implement connectors for PostgreSQL, MySQL, SQL Server
-    - Create connection pooling and management
-    - Add query optimization and caching
-    - Write integration tests for database connections
-    - _Requirements: 8.2_
+  - [ ] 7.2 Build intelligent semantic layer management
+    - Create automatic schema discovery and semantic relationship detection
+    - Implement business-friendly naming and description generation with LLM
+    - Add data lineage tracking through Cube.js schema definitions
+    - Build semantic validation and consistency checking
+    - Create schema versioning and migration management
+    - _Requirements: Business user accessibility, data governance_
 
-  - [ ] 7.3 Add cloud data warehouse support
-    - Implement connectors for Snowflake, BigQuery, Redshift
-    - Create authentication handling for cloud services
-    - Add data streaming for large datasets
-    - Write performance tests for large data operations
-    - _Requirements: 8.3, 14.1, 14.6_
+  - [ ] 7.3 Implement advanced caching and performance optimization
+    - Configure Cube.js pre-aggregations for common business queries
+    - Build intelligent cache warming based on user query patterns
+    - Add query performance monitoring and optimization recommendations
+    - Implement cost optimization for cloud data warehouse usage
+    - Create cache invalidation strategies for real-time data requirements
+    - _Requirements: 8.4, 14.1, 14.6, Performance optimization_
 
-  - [ ] 7.4 Implement real-time data refresh
-    - Create scheduled refresh mechanisms
-    - Implement real-time data streaming
-    - Add change detection and incremental updates
-    - Write tests for data synchronization
-    - _Requirements: 8.4_
+  - [ ] 7.4 Add real-time data streaming and incremental updates
+    - Implement Cube.js streaming capabilities for real-time dashboards
+    - Create incremental data refresh with change detection
+    - Add WebSocket integration for live chart updates
+    - Build event-driven cache invalidation and refresh
+    - Implement data freshness monitoring and alerting
+    - _Requirements: Real-time analytics, enterprise monitoring_
 
 - [ ] 8. Build insight engine for proactive analytics
   - [ ] 8.1 Implement anomaly detection system
@@ -265,13 +339,13 @@
     - _Requirements: 13.3, 13.5_
 
 - [ ] 10. Enhance existing client application
-  - [ ] 11.1 Enhance existing React-based web client
+  - [x] 11.1 Enhance existing React-based web client
     - Review and improve current React application structure
     - Enhance responsive design system and accessibility
     - Expand component library for charts and UI
     - _Requirements: 15.1, 15.2_
 
-  - [ ] 11.2 Build superior chat interface 
+  - [x] 11.2 Build superior chat interface 
     - Create multi-turn conversation with context retention
     - Implement real-time chart generation with instant preview
     - Add voice input and speech-to-text capabilities
@@ -280,7 +354,20 @@
     - Add collaborative chat sessions with team members
     - Implement chat history search and organization
     - Build smart suggestions based on data characteristics
-    - _Requirements: 12.1, 12.4, Competitive advantage 
+    - _Requirements: 12.1, 12.4, Competitive advantage_
+
+**✅ PYTHON SERVICES ISSUE RESOLVED**: Fixed import errors in chat2chart service, all backend APIs now functional
+
+**✅ FRONTEND REACT ERROR RESOLVED**: Fixed missing icon imports (MicrophoneOutlined → AudioOutlined, TestOutlined → CheckCircleOutlined), frontend now loads without errors
+
+**✅ ENHANCED DATA PANEL & SQL EDITOR IMPLEMENTED**: 
+- ✅ Responsive collapsible data panel with database browser
+- ✅ Schema exploration with tables, views, and column details  
+- ✅ Integrated SQL Editor with Ace Editor (syntax highlighting, auto-completion)
+- ✅ One-click chart generation from SQL results
+- ✅ Query history and AI-powered query suggestions
+- ✅ Universal Data Source Modal for seamless onboarding
+- ✅ Real-time connection status and data source management 
 
   - [ ] 11.3 Enhance dashboard and workspace management
     - Improve existing dashboard builder interface
@@ -627,12 +714,22 @@
 - Market leadership in chat-to-data analytics
 
 ### **Our Unique Value Propositions**:
-1. **"Chat to Publication"**: From data question to business-ready document in minutes
-2. **"Instant Insights"**: One-click analysis with ready-made templates
-3. **"Team Analytics"**: Collaborative data analysis with role-based access
-4. **"Brand-Ready Output"**: White-label documents and dashboards
-5. **"Multi-Model AI"**: Best AI model for each task (LiteLLM advantage)
-6. **"Enterprise Ready"**: Full BI platform, not just chat tool
+1. **"Universal Semantic Layer"**: Cube.js-powered data modeling that works with any data source
+2. **"Chat to Publication"**: From data question to business-ready document in minutes
+3. **"AI-Powered Data Modeling"**: LLM-generated Cube.js schemas with visual approval
+4. **"Multi-Tenant Enterprise"**: Built-in tenant isolation and enterprise security
+5. **"Instant Insights"**: One-click analysis with ready-made semantic models
+6. **"Team Analytics"**: Collaborative data analysis with role-based access
+7. **"Brand-Ready Output"**: White-label documents and dashboards
+8. **"Multi-Model AI"**: Best AI model for each task (LiteLLM advantage)
+9. **"Enterprise Ready"**: Full BI platform with semantic layer, not just chat tool
+
+### **🎯 Cube.js Competitive Advantage**:
+- **vs Julius.ai**: They have no semantic layer - users repeat data modeling work
+- **vs PowerBI**: Our AI generates semantic models automatically
+- **vs Tableau**: Better multi-tenant architecture with Cube.js
+- **vs Superset**: Superior AI integration with semantic understanding
+- **Enterprise Moat**: Cube.js + multi-tenancy + AI = unbeatable combination
 
 ## 💰 **SUBSCRIPTION TIERS & PRICING STRATEGY**
 

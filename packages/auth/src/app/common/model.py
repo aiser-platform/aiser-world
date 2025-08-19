@@ -16,12 +16,11 @@ class BaseModel(Base):
 
     # Common columns for all models
     id = Column(
-        UUID,
+        Integer,
         primary_key=True,
         index=True,
         doc="Primary key identifier",
-        default=uuid.uuid4,
-        unique=True,
+        autoincrement=True,
     )
 
     created_at = Column(

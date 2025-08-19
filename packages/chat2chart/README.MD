@@ -73,7 +73,7 @@ The platform consists of:
 ```
 ├── app/                  # Next.js pages and routes
 ├── components/          # React components
-├── backend/            # Flask backend
+├── backend/            # FastAPI backend
 │   ├── routes/        # API routes
 │   ├── services/      # Business logic
 │   └── utils/         # Utilities

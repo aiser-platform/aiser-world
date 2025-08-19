@@ -1,0 +1,30 @@
+{
+  "id": "community/community-index",
+  "title": "Community Index",
+  "description": "Welcome to the Community Index section of Aiser Platform documentation.",
+  "source": "@site/docs/community/index.md",
+  "sourceDirName": "community",
+  "slug": "/community/",
+  "permalink": "/docs/community/",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/community/index.md",
+  "tags": [],
+  "version": "current",
+  "lastUpdatedAt": 1539502055,
+  "formattedLastUpdatedAt": "Oct 14, 2018",
+  "frontMatter": {
+    "id": "community-index",
+    "title": "Community Index",
+    "sidebar_label": "Community Index"
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "Release Process",
+    "permalink": "/docs/developer/release-process"
+  },
+  "next": {
+    "title": "Roadmap",
+    "permalink": "/docs/community/roadmap"
+  }
+}

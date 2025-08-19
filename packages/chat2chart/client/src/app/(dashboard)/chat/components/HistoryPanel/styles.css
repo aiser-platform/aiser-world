@@ -73,3 +73,73 @@
 .ChatHistoryItem--selected .ant-btn {
     background-color: rgb(from var(--primary-color) r g b / 20%);
 }
+/* Collapsible History Panel Styles */
+.collapsible-history-panel {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: var(--background, #fafafa);
+    transition: all 0.3s ease;
+}
+
+.history-panel-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid #f0f0f0;
+    background: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.history-panel-content {
+    flex: 1;
+    overflow: hidden;
+}
+
+.history-panel-collapsed {
+    width: 50px;
+    height: 100%;
+    background: var(--background, #fafafa);
+    border-right: 1px solid #f0f0f0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px 8px;
+    transition: all 0.3s ease;
+}
+
+.collapsed-controls {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+
+/* Dark mode support for history panel */
+@media (prefers-color-scheme: dark) {
+    .collapsible-history-panel {
+        background: #141414;
+        color: #ffffff;
+    }
+    
+    .history-panel-header {
+        background: #1f1f1f;
+        border-bottom-color: #303030;
+    }
+    
+    .history-panel-collapsed {
+        background: #141414;
+        border-right-color: #303030;
+    }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .history-panel-collapsed {
+        width: 40px;
+        padding: 12px 4px;
+    }
+    
+    .history-panel-header {
+        padding: 8px 12px;
+    }
+}

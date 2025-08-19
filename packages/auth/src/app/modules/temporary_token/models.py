@@ -2,6 +2,7 @@ from datetime import datetime
 
 import sqlalchemy
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy.orm import relationship
 
 from app.common.model import BaseModel
 from app.modules.temporary_token.constants import TokenType
@@ -18,3 +19,6 @@ class TemporaryToken(BaseModel):
     used_at = Column(DateTime, nullable=True)
     is_valid = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    user = relationship("User", back_populates="temporary_tokens")

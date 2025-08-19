@@ -6,6 +6,7 @@ from typing import List, Optional
 import colorama
 from fastapi import HTTPException, status
 from passlib.context import CryptContext
+from sqlalchemy.orm import Session
 
 from app.common.service import BaseService
 from app.core.config import settings
@@ -52,14 +53,14 @@ class UserService(BaseService):
         self.token_repo = TokenRepository()
         super().__init__(repository)
 
-    async def create_user(self, user_in: UserCreate) -> User:
+    def create_user(self, user_in: UserCreate, db: Session) -> User:
         """Create new user with hashed password"""
-        # Check if email exists - add await
-        if await self.repository.get_by_email(user_in.email):
+        # Check if email exists
+        if self.repository.get_by_email(user_in.email, db):
             raise ValueError("Email already registered")
 
-        # Check if username exists - add await
-        if await self.repository.get_by_username(user_in.username):
+        # Check if username exists
+        if self.repository.get_by_username(user_in.username, db):
             raise ValueError("Username already registered")
 
         # Hash the password
@@ -72,47 +73,44 @@ class UserService(BaseService):
             password=hashed_password,
         )
 
-        # Save and return the created user - add await
-        created_user = await self.repository.create(user)
+        # Save and return the created user
+        created_user = self.repository.create(user, db)
         return created_user
 
-    async def authenticate(self, identifier: str, password: str) -> Optional[User]:
+    def authenticate(self, identifier: str, password: str, db: Session) -> Optional[User]:
         """Authenticate user by email or username and password"""
-        user = await self.repository.get_by_email(
-            identifier
-        ) or await self.repository.get_by_username(identifier)
+        user = self.repository.get_by_email(identifier, db) or self.repository.get_by_username(identifier, db)
 
         if not user or not self.auth.verify_password(password, user.password):
             return None
         return user
 
-    async def get_user(self, user_id: int) -> Optional[User]:
+    def get_user(self, user_id: int, db: Session) -> Optional[User]:
         """Get user by ID"""
-        user = await self.repository.get_by_id(user_id)
-
+        user = self.repository.get_by_id(user_id, db)
         return UserResponse(**user.__dict__) if user else None
 
-    async def update_user(self, user_id: int, user_in: UserUpdate) -> User:
+    def update_user(self, user_id: int, user_in: UserUpdate, db: Session) -> User:
         """Update user profile"""
-        current_user = self.repository.get_by_id(user_id)
+        current_user = self.repository.get_by_id(user_id, db)
         if not current_user:
             raise ValueError("User not found")
 
-        return await self.repository.update(current_user, user_in)
+        return self.repository.update(user_id, user_in, db)
 
-    async def get_active_users(
-        self, offset: int = 0, limit: int = 100
+    def get_active_users(
+        self, db: Session, offset: int = 0, limit: int = 100
     ) -> List[UserResponse]:
         """Get list of active users"""
-        users = await self.repository.get_active_users(offset=offset, limit=limit)
+        users = self.repository.get_active_users(db, offset=offset, limit=limit)
         return [UserResponse(**user.__dict__) for user in users]
 
     # Authentication related functions
     async def signin(
-        self, credentials: SignInRequest, device_info: DeviceInfo
+        self, credentials: SignInRequest, device_info: DeviceInfo, db: Session
     ) -> SignInResponse:
         """Authenticate user and generate JWT token"""
-        user = await self.authenticate(credentials.username, credentials.password)
+        user = self.authenticate(credentials.identifier, credentials.password, db)
         if not user:
             raise HTTPException(status_code=401, detail="Invalid credentials")
 
@@ -128,7 +126,7 @@ class UserService(BaseService):
                     )
 
                     # Update verification attempt
-                    await self.repository.update_verification_attempt(user)
+                    self.repository.update_verification_attempt(user, db)
 
                     # Send new verification email
                     verification_url = f"{settings.APP_URL}/verify-email"
@@ -147,7 +145,7 @@ class UserService(BaseService):
             # Generate new verification token
             verification_token = self.auth.create_email_verification_token(user.email)
 
-            await self.repository.update_verification_attempt(user)
+            self.repository.update_verification_attempt(user, db)
 
             verification_url = f"{settings.APP_URL}/verify-email"
             send_verification_email(user.email, verification_token, verification_url)
@@ -165,27 +163,41 @@ class UserService(BaseService):
             user_id=user.id, email=user.email, device_id=str(device_id)
         )
 
+        # TODO: Fix device session creation - temporarily disabled
         # Create device session
-        await self.device_repo.create(
-            DeviceSessionCreate(
-                user_id=user.id,
-                device_id=device_id,
-                is_active=True,
-                device_name=device_info.device_name,
-                device_type=device_info.device_type,
-                ip_address=device_info.ip_address,
-                user_agent=device_info.user_agent,
-                refresh_token=tokens.get("refresh_token"),
-            )
+        # await self.device_repo.create(
+        #     DeviceSessionCreate(
+        #         user_id=user.id,
+        #         device_id=device_id,
+        #         is_active=True,
+        #         device_name=device_info.device_name,
+        #         device_type=device_info.device_type,
+        #         ip_address=device_info.ip_address,
+        #         user_agent=device_info.user_agent,
+        #         refresh_token=tokens.get("refresh_token"),
+        #     )
+        # )
+
+        # Return tokens and user information
+        return SignInResponse(
+            access_token=tokens.get("access_token"),
+            refresh_token=tokens.get("refresh_token"),
+            expires_in=tokens.get("expires_in"),
+            user={
+                "id": user.id,
+                "email": user.email,
+                "username": user.username,
+                "is_verified": user.is_verified,
+                "created_at": user.created_at.isoformat() if user.created_at else None,
+                "updated_at": user.updated_at.isoformat() if user.updated_at else None
+            }
         )
 
-        return SignInResponse(**tokens)
-
-    async def signup(self, sign_up_payload: SignUpRequest) -> SignInResponse:
+    def signup(self, sign_up_payload: SignUpRequest, db: Session) -> SignUpResponse:
         """Register new user and return JWT token"""
         try:
             # Create unverified user
-            user = await self.create_user(sign_up_payload)
+            user = self.create_user(sign_up_payload, db)
             logger.info(f"User created: {user}")
 
             # Generate verification token
@@ -195,7 +207,7 @@ class UserService(BaseService):
             expires_at = datetime.utcnow() + timedelta(
                 minutes=settings.JWT_EMAIL_EXP_TIME_MINUTES
             )
-            await self.token_repo.create_token(
+            self.token_repo.create_token(
                 user_id=user.id,
                 token=verification_token,
                 token_type=TokenType.EMAIL_VERIFICATION.value,
@@ -206,7 +218,7 @@ class UserService(BaseService):
             # Send verification email
             verification_url = sign_up_payload.verification_url or settings.APP_URL
             try:
-                await self.repository.update_verification_attempt(user)
+                self.repository.update_verification_attempt(user, db)
                 send_verification_email(
                     user.email, verification_token, verification_url
                 )
@@ -229,7 +241,7 @@ class UserService(BaseService):
             logger.error(f"Error signing up user: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
-    async def refresh_token(self, request: RefreshTokenRequest) -> RefreshTokenResponse:
+    def refresh_token(self, request: RefreshTokenRequest) -> RefreshTokenResponse:
         """
         Refresh access token using refresh token
         """
@@ -252,7 +264,7 @@ class UserService(BaseService):
             logger.error(f"Error refreshing token: {e}")
             raise HTTPException(status_code=401, detail=str(e))
 
-    async def get_me(self, token: str) -> User:
+    def get_me(self, token: str) -> User:
         """
         Get current user details from token
         """
@@ -261,7 +273,7 @@ class UserService(BaseService):
             if not decoded_token:
                 raise HTTPException(status_code=401, detail="Invalid token")
 
-            user = await self.get_user(decoded_token["user_id"])
+            user = self.get_user(decoded_token["user_id"])
             if not user:
                 raise HTTPException(status_code=404, detail="User not found")
 
@@ -270,10 +282,10 @@ class UserService(BaseService):
             logger.error(f"Error getting user: {e}")
             raise HTTPException(status_code=401, detail=str(e))
 
-    async def verify_email(self, verify_email_payload: VerifyEmailRequest):
+    def verify_email(self, verify_email_payload: VerifyEmailRequest):
         """Verify user email with token and sign in"""
         # Verify token in database first
-        stored_token = await self.token_repo.get_by_token(verify_email_payload.token)
+        stored_token = self.token_repo.get_by_token(verify_email_payload.token)
         if (
             not stored_token
             or not stored_token.is_valid
@@ -288,20 +300,20 @@ class UserService(BaseService):
             raise HTTPException(status_code=400, detail="Invalid verification token")
 
         # Update user verification status
-        user = await self.repository.get_by_email(email)
+        user = self.repository.get_by_email(email)
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
 
         # Update verification status
         user.is_verified = True
 
-        await self.repository.update(
+        self.repository.update(
             user.id,
             UserUpdate(username=user.username, is_verified=True, email=user.email),
         )
 
         # Invalidate token after successful verification
-        await self.token_repo.invalidate_token(verify_email_payload.token)
+        self.token_repo.invalidate_token(verify_email_payload.token)
 
         # Generate auth tokens
         tokens = self.auth.signJWT(user_id=user.id, email=user.email)
@@ -313,9 +325,9 @@ class UserService(BaseService):
             **tokens,
         )
 
-    async def resend_verification_email(self, request: ResendVerificationRequest):
+    def resend_verification_email(self, request: ResendVerificationRequest):
         """Resend verification email with rate limiting"""
-        user = await self.repository.get_by_email(request.email)
+        user = self.repository.get_by_email(request.email)
 
         if not user:
             raise HTTPException(status_code=404, detail="Email not registered")
@@ -336,7 +348,7 @@ class UserService(BaseService):
 
         # Generate new token and update tracking
         verification_token = self.auth.create_email_verification_token(user.email)
-        await self.repository.update_verification_attempt(user)
+        self.repository.update_verification_attempt(user)
 
         # Send verification email
         verification_url = (
@@ -355,11 +367,11 @@ class UserService(BaseService):
             message="Verification email sent successfully"
         )
 
-    async def forgot_password(
+    def forgot_password(
         self, request: ForgotPasswordRequest
     ) -> ForgotPasswordResponse:
         """Handle forgot password request"""
-        user = await self.repository.get_by_email(request.email)
+        user = self.repository.get_by_email(request.email)
         if not user:
             # Return success even if email not found to prevent email enumeration
             return ForgotPasswordResponse(
@@ -374,7 +386,7 @@ class UserService(BaseService):
             expires_at = datetime.utcnow() + timedelta(
                 minutes=settings.JWT_EMAIL_EXP_TIME_MINUTES
             )
-            await self.token_repo.create_token(
+            self.token_repo.create_token(
                 user_id=user.id,
                 token=reset_token,
                 token_type=TokenType.PASSWORD_RESET.value,
@@ -384,7 +396,7 @@ class UserService(BaseService):
 
             # Send reset password email
             reset_url = f"{request.reset_url or settings.APP_URL}/reset-password?token={reset_token}"
-            await send_reset_password_email(user.email, reset_token, reset_url)
+            send_reset_password_email(user.email, reset_token, reset_url)
 
             return ForgotPasswordResponse(
                 message="Password reset instructions have been sent to your email."
@@ -396,13 +408,13 @@ class UserService(BaseService):
                 status_code=500, detail="Failed to send password reset email"
             )
 
-    async def reset_password(
+    def reset_password(
         self, request: ResetPasswordRequest
     ) -> ResetPasswordResponse:
         """Reset user password with token"""
         try:
             # First verify token in database
-            stored_token = await self.token_repo.get_by_token(request.token)
+            stored_token = self.token_repo.get_by_token(request.token)
             if (
                 not stored_token
                 or not stored_token.is_valid
@@ -419,13 +431,13 @@ class UserService(BaseService):
                     status_code=400, detail="Invalid or expired password reset token"
                 )
 
-            user = await self.repository.get_by_email(email)
+            user = self.repository.get_by_email(email)
             if not user:
                 raise HTTPException(status_code=404, detail="User not found")
 
             # Update password
             hashed_password = self.auth.hash_password(request.new_password)
-            await self.repository.update(
+            self.repository.update(
                 user.id,
                 UserUpdate(
                     username=user.username,
@@ -436,7 +448,7 @@ class UserService(BaseService):
             )
 
             # Invalidate the token after successful password reset
-            await self.token_repo.invalidate_token(request.token)
+            self.token_repo.invalidate_token(request.token)
             logger.info(f"Password reset token invalidated for user {user.id}")
 
             return ResetPasswordResponse(message="Password has been reset successfully")
@@ -447,7 +459,7 @@ class UserService(BaseService):
             logger.error(f"Error resetting password: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail="Failed to reset password")
 
-    async def signout(self, token: str) -> dict:
+    def signout(self, token: str) -> dict:
         """Handle user signout and clean up device session"""
         try:
             # Decode token to get user info
@@ -458,7 +470,7 @@ class UserService(BaseService):
             # Get device session and deactivate it
             device_id = decoded_token.get("device_id")
             if device_id:
-                await self.device_repo.deactivate_session(device_id)
+                self.device_repo.deactivate_session(device_id)
                 logger.info(f"Device session {device_id} deactivated")
 
             return {"message": "Successfully signed out", "status": "success"}

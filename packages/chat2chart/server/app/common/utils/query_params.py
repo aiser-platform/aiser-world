@@ -1,23 +1,54 @@
-from typing import List, Optional
+"""
+Query parameter utilities for API endpoints
+"""
 
-from fastapi import Query
+from typing import Optional
 from pydantic import BaseModel, Field
 
-
-def get_search_columns(
-    search_columns: List[str] = Query(
-        description="Columns to search in", default_factory=list
-    )
-) -> Optional[List[str]]:
-    return search_columns
-
-
 class BaseFilterParams(BaseModel):
-    offset: int = Field(default=0, ge=0, description="Number of records to skip")
-    limit: int = Field(
-        default=100, ge=1, description="Maximum number of records to return"
-    )
-    sort_by: str = Field(default="created_at", description="Column to sort by")
-    sort_order: str = Field(default="desc", description="Sort direction (asc/desc)")
-    search: Optional[str] = Field(None, description="Search query")
-    search_columns: List[str] = Query(get_search_columns())
+    """Base class for filter parameters"""
+    page: Optional[int] = Field(default=1, ge=1, description="Page number")
+    page_size: Optional[int] = Field(default=10, ge=1, le=100, description="Items per page")
+    search: Optional[str] = Field(default=None, description="Search query")
+    sort_by: Optional[str] = Field(default=None, description="Field to sort by")
+    sort_order: Optional[str] = Field(default="asc", description="Sort order (asc/desc)")
+    
+    @property
+    def offset(self) -> int:
+        """Calculate offset for pagination"""
+        return (self.page - 1) * self.page_size
+    
+    @property
+    def limit(self) -> int:
+        """Get limit for pagination"""
+        return self.page_size
+
+class UserFilterParams(BaseFilterParams):
+    """Filter parameters for user endpoints"""
+    email: Optional[str] = Field(default=None, description="Filter by email")
+    is_active: Optional[bool] = Field(default=None, description="Filter by active status")
+    role: Optional[str] = Field(default=None, description="Filter by role")
+
+class OrganizationFilterParams(BaseFilterParams):
+    """Filter parameters for organization endpoints"""
+    name: Optional[str] = Field(default=None, description="Filter by organization name")
+    plan_type: Optional[str] = Field(default=None, description="Filter by plan type")
+    is_active: Optional[bool] = Field(default=None, description="Filter by active status")
+
+class ProjectFilterParams(BaseFilterParams):
+    """Filter parameters for project endpoints"""
+    name: Optional[str] = Field(default=None, description="Filter by project name")
+    organization_id: Optional[int] = Field(default=None, description="Filter by organization ID")
+    status: Optional[str] = Field(default=None, description="Filter by project status")
+
+class DataSourceFilterParams(BaseFilterParams):
+    """Filter parameters for data source endpoints"""
+    name: Optional[str] = Field(default=None, description="Filter by data source name")
+    type: Optional[str] = Field(default=None, description="Filter by data source type")
+    is_active: Optional[bool] = Field(default=None, description="Filter by active status")
+
+class ChatFilterParams(BaseFilterParams):
+    """Filter parameters for chat endpoints"""
+    title: Optional[str] = Field(default=None, description="Filter by chat title")
+    user_id: Optional[int] = Field(default=None, description="Filter by user ID")
+    is_active: Optional[bool] = Field(default=None, description="Filter by active status")

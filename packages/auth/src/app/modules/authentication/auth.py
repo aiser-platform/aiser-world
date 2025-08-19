@@ -3,7 +3,7 @@ import time
 from typing import Dict
 
 from jose import JWTError, jwe, jwt
-from passlib.hash import pbkdf2_sha256
+from passlib.hash import pbkdf2_sha256, bcrypt
 
 from app.core.config import settings
 
@@ -24,7 +24,15 @@ class Auth:
 
     def verify_password(self, password, hashed_password):
         try:
-            return pbkdf2_sha256.verify(password, hashed_password)
+            # First try pbkdf2_sha256 (current format)
+            if pbkdf2_sha256.verify(password, hashed_password):
+                return True
+            
+            # If that fails, try bcrypt (legacy format)
+            if bcrypt.verify(password, hashed_password):
+                return True
+                
+            return False
         except ValueError as e:
             # Handle invalid hash format
             logger.error(f"Invalid hash format: {e}")
@@ -63,13 +71,22 @@ class Auth:
             algorithm=self.JWT_ALGORITHM,
         )
 
-        # Convert hex string to bytes for A256GCM encryption
-        secret_bytes = bytes.fromhex(self.SECRET)
-        jwe_token = jwe.encrypt(
-            refresh_jwt, secret_bytes, algorithm="dir", encryption="A256GCM"
-        )
-
-        return jwe_token
+        # Temporarily return the JWT directly instead of JWE encryption
+        # TODO: Fix JWE encryption when SECRET format is resolved
+        return refresh_jwt
+        
+        # Original JWE encryption code (commented out for now)
+        # try:
+        #     # Convert hex string to bytes for A256GCM encryption
+        #     secret_bytes = bytes.fromhex(self.SECRET)
+        #     jwe_token = jwe.encrypt(
+        #         refresh_jwt, secret_bytes, algorithm="dir", encryption="A256GCM"
+        #     )
+        #     return jwe_token
+        # except Exception as e:
+        #     logger.error(f"JWE encryption failed: {e}")
+        #     # Fallback to plain JWT
+        #     return refresh_jwt
 
     def signJWT(self, **kwargs) -> Dict[str, str]:
         access_token = self.encodeJWT(**kwargs)

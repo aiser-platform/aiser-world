@@ -1,0 +1,30 @@
+{
+  "id": "features/ai-overview",
+  "title": "Ai Overview",
+  "description": "Overview",
+  "source": "@site/docs/features/ai-overview.md",
+  "sourceDirName": "features",
+  "slug": "/features/ai-overview",
+  "permalink": "/docs/features/ai-overview",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/features/ai-overview.md",
+  "tags": [],
+  "version": "current",
+  "lastUpdatedAt": 1539502055,
+  "formattedLastUpdatedAt": "Oct 14, 2018",
+  "frontMatter": {
+    "id": "ai-overview",
+    "title": "Ai Overview",
+    "sidebar_label": "Ai Overview"
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "Backups",
+    "permalink": "/docs/self-host/backups"
+  },
+  "next": {
+    "title": "Natural Language Queries",
+    "permalink": "/docs/features/natural-language-queries"
+  }
+}

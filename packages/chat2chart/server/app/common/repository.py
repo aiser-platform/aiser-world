@@ -1,21 +1,17 @@
 import logging
-from typing import Generic, List, Optional, TypeVar
-
-from app.common.schemas import PaginationSchema
-from app.db.session import db
-from app.utils.pagination import paginate
-from fastapi.encoders import jsonable_encoder
+from typing import Any, Dict, Generic, List, Optional, Type, TypeVar, Union
+from sqlalchemy import select, func, desc, asc
+from sqlalchemy.orm import Query
 from pydantic import BaseModel
-from sqlalchemy import func, select
-from sqlalchemy.ext.declarative import DeclarativeMeta
-from sqlalchemy import or_
+from sqlalchemy.orm import Session
 
-ModelType = TypeVar("ModelType", bound=DeclarativeMeta)
-CreateSchemaType = TypeVar("CreateSchemaType", bound=BaseModel)
-UpdateSchemaType = TypeVar("UpdateSchemaType", bound=BaseModel)
+from app.db.session import get_db
 
 logger = logging.getLogger(__name__)
 
+ModelType = TypeVar("ModelType")
+CreateSchemaType = TypeVar("CreateSchemaType", bound=BaseModel)
+UpdateSchemaType = TypeVar("UpdateSchemaType", bound=BaseModel)
 
 class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
     """
@@ -34,68 +30,85 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         users = await user_repo.get_all(limit=10)
     """
 
-    def __init__(self, model: ModelType):
-        """
-        Initialize repository with SQLAlchemy model class.
-
-        Args:
-            model (ModelType): SQLAlchemy model class to use for operations
-        """
+    def __init__(self, model: Type[ModelType]):
         self.model = model
-        self.db = db
+        self.db = get_db()
 
-    async def get(self, id: str) -> Optional[ModelType]:
-        """
-        Retrieve single record by primary key.
+    def _build_base_query(self) -> Query:
+        """Build base query for the model"""
+        return select(self.model)
 
-        Args:
-            id (int): Primary key of record to retrieve
+    def _apply_exact_filters(self, query: Query, filter_query: Optional[Dict[str, Any]]) -> Query:
+        """Apply exact match filters to query"""
+        if not filter_query:
+            return query
 
-        Returns:
-            Optional[ModelType]: Model instance if found, None otherwise
+        for field, value in filter_query.items():
+            if hasattr(self.model, field) and value is not None:
+                if isinstance(value, list):
+                    query = query.where(getattr(self.model, field).in_(value))
+                else:
+                    query = query.where(getattr(self.model, field) == value)
 
-        Raises:
-            Exception: If database operation fails
-        """
+        return query
+
+    def _apply_search_filters(self, query: Query, search_query: Optional[str]) -> Query:
+        """Apply search filters to query"""
+        if not search_query:
+            return query
+
+        # Simple search across string fields
+        search_conditions = []
+        for column in self.model.__table__.columns:
+            if column.type.python_type == str:
+                search_conditions.append(column.ilike(f"%{search_query}%"))
+
+        if search_conditions:
+            from sqlalchemy import or_
+            query = query.where(or_(*search_conditions))
+
+        return query
+
+    def _apply_sorting(self, query: Query, sort_by: Optional[str], sort_order: Optional[str]) -> Query:
+        """Apply sorting to query"""
+        if not sort_by or not hasattr(self.model, sort_by):
+            return query
+
+        if sort_order == "desc":
+            query = query.order_by(desc(getattr(self.model, sort_by)))
+        else:
+            query = query.order_by(asc(getattr(self.model, sort_by)))
+
+        return query
+
+    def _apply_pagination(self, query: Query, offset: Optional[int], limit: Optional[int]) -> Query:
+        """Apply pagination to query"""
+        if offset is not None:
+            query = query.offset(offset)
+        if limit is not None:
+            query = query.limit(limit)
+
+        return query
+
+    async def get(self, id: int) -> Optional[ModelType]:
+        """Get a single record by ID"""
         try:
             query = self._build_base_query().where(self.model.id == id)
-            result = await self.db._session.execute(query)
+            result = await self.db.execute(query)
             return result.scalar_one_or_none()
         except Exception as e:
-            await self.db._session.rollback()
             raise e
 
     async def get_all(
         self,
-        offset: int = 0,
-        limit: int = 100,
+        offset: Optional[int] = None,
+        limit: Optional[int] = None,
+        filter_query: Optional[Dict[str, Any]] = None,
+        search_query: Optional[str] = None,
         sort_by: Optional[str] = None,
-        sort_order: str = "asc",
-        search_query: Optional[dict] = None,
-        filter_query: Optional[dict] = None,
+        sort_order: Optional[str] = "asc"
     ) -> List[ModelType]:
-        """
-        Retrieve multiple records with pagination, sorting and filtering.
-
-        Args:
-            offset: Number of records to skip
-            limit: Maximum records to return
-            sort_by: Column name to sort by
-            sort_order: Sort direction ('asc' or 'desc')
-            search_query: Search filters for partial matches
-            filter_query: Filters for exact matches
-
-        Returns:
-            List of model instances matching criteria
-
-        Raises:
-            Exception: If database operation fails
-        """
-        logger.debug(
-            f"Fetching records for {self.model.__name__} with "
-            f"offset={offset}, limit={limit}, sort={sort_by}"
-        )
-
+        """Get all records with optional filtering, searching, sorting and pagination"""
         try:
             query = self._build_base_query()
             query = self._apply_exact_filters(query, filter_query)
@@ -104,51 +117,23 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             query = self._apply_pagination(query, offset, limit)
 
             result = await self._execute_and_fetch_all(query)
-            # result = await self.db._session.execute(query)
             return result
         except Exception as e:
             logger.error(f"Error fetching records: {str(e)}")
-            await self.db._session.rollback()
             raise
 
     async def create(self, obj_in: CreateSchemaType) -> ModelType:
-        """
-        Creates a new database record from the input schema.
-
-        Args:
-            obj_in (CreateSchemaType): Pydantic schema containing creation data
-
-        Returns:
-            ModelType: Created database model instance
-
-        Raises:
-            Exception: If database operation fails
-        """
+        """Create a new record"""
         try:
+            from app.common.utils import jsonable_encoder
             obj_in_data = jsonable_encoder(obj_in)
             db_obj = self.model(**obj_in_data)
-            self.db._session.add(db_obj)
-            await self.db._session.commit()
-            await self.db._session.refresh(db_obj)
-            return db_obj
+            return await self.db.add(db_obj)
         except Exception as e:
-            await self.db._session.rollback()
             raise e
 
-    async def update(self, id: str, obj_in: UpdateSchemaType) -> Optional[ModelType]:
-        """
-        Updates existing database record with new values.
-
-        Args:
-            id (int): Primary key of record to update
-            obj_in (UpdateSchemaType): Pydantic schema containing update data
-
-        Returns:
-            Optional[ModelType]: Updated model instance or None if not found
-
-        Raises:
-            Exception: If database operation fails
-        """
+    async def update(self, id: int, obj_in: UpdateSchemaType) -> Optional[ModelType]:
+        """Update an existing record"""
         try:
             db_obj = await self.get(id)
             if not db_obj:
@@ -158,54 +143,31 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             for field, value in update_data.items():
                 setattr(db_obj, field, value)
 
-            self.db._session.add(db_obj)
-            await self.db._session.commit()
-            await self.db._session.refresh(db_obj)
-            return db_obj
+            return await self.db.add(db_obj)
         except Exception as e:
-            await self.db._session.rollback()
             raise e
 
-    async def delete(self, id: str) -> bool:
-        """
-        Deletes record from database by ID.
-
-        Args:
-            id (int): Primary key of record to delete
-
-        Returns:
-            bool: True if deleted successfully, False if not found
-
-        Raises:
-            Exception: If database operation fails
-        """
+    async def delete(self, id: int) -> bool:
+        """Delete a record by ID"""
         try:
             db_obj = await self.get(id)
             if not db_obj:
                 return False
 
-            await self.db._session.delete(db_obj)
-            await self.db._session.commit()
+            # Use the new async database session
+            async with self.db.get_session() as session:
+                await session.delete(db_obj)
+                await session.commit()
             return True
         except Exception as e:
-            await self.db._session.rollback()
             raise e
 
     async def count(
         self,
-        search_query: dict = {},
-        filter_query: dict = {},
+        filter_query: Optional[Dict[str, Any]] = None,
+        search_query: Optional[str] = None
     ) -> int:
-        """
-        Gets total count of records with optional filtering.
-
-        Args:
-            search_query: Search filters for partial matches
-            filter_query: Filters for exact matches
-
-        Returns:
-            Total number of records matching criteria
-        """
+        """Get total count of records with optional filtering"""
         try:
             query = select(func.count(func.distinct(self.model.id))).select_from(
                 self.model
@@ -213,7 +175,7 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             query = self._apply_search_filters(query, search_query)
             query = self._apply_exact_filters(query, filter_query)
 
-            result = await self.db._session.execute(query)
+            result = await self.db.execute(query)
             count = result.scalar()
 
             logger.debug(f"Count for {self.model.__name__}: {count}")
@@ -221,137 +183,113 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
         except Exception as e:
             logger.error(f"Count error for {self.model.__name__}: {e}")
-            await self.db._session.rollback()
             raise
 
     async def get_pagination_info(
         self,
-        offset: int = 0,
-        limit: int = 100,
-        search_query: dict = None,
-        filter_query: dict = None,
-    ) -> PaginationSchema:
-        """
-        Get pagination metadata without fetching actual records.
-
-        Args:
-            offset (int): Number of records to skip
-            limit (int): Maximum records to return
-            sort_by (str): Column name to sort by
-            sort_order (str): Sort direction ('asc' or 'desc')
-            search_query (dict): Search filters to apply
-
-        Returns:
-            dict: Pagination metadata including page, limit, total pages and total records
-        """
+        page: int = 1,
+        page_size: int = 10,
+        filter_query: Optional[Dict[str, Any]] = None,
+        search_query: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Get pagination information"""
         try:
-            # Get total count using existing count method
-            total_count = await self.count(search_query, filter_query)
+            total_count = await self.count(filter_query, search_query)
+            total_pages = (total_count + page_size - 1) // page_size
+            offset = (page - 1) * page_size
 
-            # Calculate pagination values
-            total_pages = (total_count + limit - 1) // limit if total_count > 0 else 0
-            current_page = (offset // limit) + 1 if total_count > 0 else 0
-
-            return PaginationSchema(
-                total=total_count,
-                offset=offset,
-                limit=limit,
-                has_more=total_count > (offset + limit),
-                total_pages=total_pages,
-                current_page=current_page,
-            )
+            return {
+                "total_count": total_count,
+                "total_pages": total_pages,
+                "current_page": page,
+                "page_size": page_size,
+                "offset": offset
+            }
         except Exception as e:
-            await self.db._session.rollback()
             raise
 
-    def _apply_exact_filters(self, query, filter_query: dict):
-        """
-        Applies exact match filters to the query.
-
-        Args:
-            query: The SQLAlchemy query to filter
-            filter_query (dict): Dictionary containing field names and exact values
-
-        Returns:
-            Modified query with exact match filters applied
-        """
-        if not filter_query:
-            return query
-
-        for field, value in filter_query.items():
-            if hasattr(self.model, field):
-                query = query.filter(getattr(self.model, field) == value)
-        logger.debug(f"Applied exact filters: {filter_query}")
-        return query
-
     async def _execute_and_fetch_all(self, query):
-        result = await self.db._session.execute(query)
+        result = await self.db.execute(query)
         return result.scalars().all()
 
-    def _build_base_query(self):
-        """
-        Creates the base SELECT query for the model.
+    async def exists(self, id: int) -> bool:
+        """Check if a record exists by ID"""
+        try:
+            query = select(func.count()).select_from(self.model).where(self.model.id == id)
+            result = await self.db.execute(query)
+            return result.scalar() > 0
+        except Exception as e:
+            logger.error(f"Exists check error for {self.model.__name__}: {e}")
+            raise
 
-        Returns:
-            SQLAlchemy select query object initialized with the model
-        """
-        return select(self.model)
+    async def get_by_field(self, field: str, value: Any) -> Optional[ModelType]:
+        """Get a record by a specific field value"""
+        try:
+            if not hasattr(self.model, field):
+                raise ValueError(f"Field '{field}' does not exist in model {self.model.__name__}")
 
-    def _apply_search_filters(self, query, search_query: dict):
-        """
-        Applies search filters to the query based on the search_query dictionary.
-        Uses OR conditions between different search terms.
+            query = self._build_base_query().where(getattr(self.model, field) == value)
+            result = await self.db.execute(query)
+            return result.scalar_one_or_none()
+        except Exception as e:
+            raise e
 
-        Args:
-            query: The base SQLAlchemy query to filter
-            search_query (dict): Dictionary containing field names and search values
+    async def bulk_create(self, objects: List[CreateSchemaType]) -> List[ModelType]:
+        """Create multiple records in bulk"""
+        try:
+            from app.common.utils import jsonable_encoder
+            db_objects = []
+            
+            for obj_in in objects:
+                obj_in_data = jsonable_encoder(obj_in)
+                db_obj = self.model(**obj_in_data)
+                db_objects.append(db_obj)
 
-        Returns:
-            Modified query with ILIKE filters applied for matching fields using OR
-        """
-        if not search_query:
-            return query
+            # Use the new async database session for bulk operations
+            async with self.db.get_session() as session:
+                session.add_all(db_objects)
+                await session.commit()
+                
+                # Refresh all objects to get their IDs
+                for obj in db_objects:
+                    await session.refresh(obj)
+                
+                return db_objects
+        except Exception as e:
+            raise e
 
-        search_conditions = []
-        for field, value in search_query.items():
-            if hasattr(self.model, field):
-                search_conditions.append(getattr(self.model, field).ilike(f"%{value}%"))
+    async def bulk_update(self, updates: List[Dict[str, Any]]) -> bool:
+        """Update multiple records in bulk"""
+        try:
+            # Use the new async database session for bulk operations
+            async with self.db.get_session() as session:
+                for update_data in updates:
+                    record_id = update_data.pop('id', None)
+                    if record_id is None:
+                        continue
+                    
+                    record = await session.get(self.model, record_id)
+                    if record:
+                        for field, value in update_data.items():
+                            if hasattr(record, field):
+                                setattr(record, field, value)
+                
+                await session.commit()
+                return True
+        except Exception as e:
+            raise e
 
-        if search_conditions:
-            query = query.filter(or_(*search_conditions))
-
-        return query
-
-    def _apply_sorting(self, query, sort_by: str, sort_order: str):
-        """
-        Applies sorting to the query based on column name and order.
-
-        Args:
-            query: The SQLAlchemy query to sort
-            sort_by (str): Name of the column to sort by
-            sort_order (str): Direction of sort ('asc' or 'desc')
-
-        Returns:
-            Query with ORDER BY clause applied
-        """
-        if not (isinstance(sort_by, str) and sort_by and hasattr(self.model, sort_by)):
-            return query
-
-        order_column = getattr(self.model, sort_by)
-        return query.order_by(
-            order_column.desc() if sort_order.lower() == "desc" else order_column.asc()
-        )
-
-    def _apply_pagination(self, query, offset: int, limit: int):
-        """
-        Applies pagination to the query using offset and limit.
-
-        Args:
-            query: The SQLAlchemy query to paginate
-            offset (int): Number of records to skip
-            limit (int): Maximum number of records to return
-
-        Returns:
-            Query with OFFSET and LIMIT applied
-        """
-        return query.offset(offset).limit(limit)
+    async def bulk_delete(self, ids: List[int]) -> bool:
+        """Delete multiple records by IDs"""
+        try:
+            # Use the new async database session for bulk operations
+            async with self.db.get_session() as session:
+                for record_id in ids:
+                    record = await session.get(self.model, record_id)
+                    if record:
+                        await session.delete(record)
+                
+                await session.commit()
+                return True
+        except Exception as e:
+            raise e

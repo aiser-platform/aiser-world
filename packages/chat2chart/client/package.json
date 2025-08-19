@@ -12,10 +12,12 @@
     "dependencies": {
         "@ant-design/icons": "^5.5.2",
         "@ant-design/nextjs-registry": "^1.0.2",
+        "@types/echarts": "^5.0.0",
         "@types/shortid": "^2.2.0",
         "ace-builds": "^1.37.4",
         "antd": "^5.22.5",
-        "echarts": "^5.5.1",
+        "dayjs": "^1.11.13",
+        "echarts": "^5.6.0",
         "js-cookie": "^3.0.5",
         "less": "^4.2.1",
         "next": "14.2.20",

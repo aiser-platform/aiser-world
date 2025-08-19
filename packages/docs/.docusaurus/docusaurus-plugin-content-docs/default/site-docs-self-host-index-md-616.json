@@ -1,0 +1,30 @@
+{
+  "id": "self-host/self-host-index",
+  "title": "Self Host Index",
+  "description": "Welcome to the Self Host Index section of Aiser Platform documentation.",
+  "source": "@site/docs/self-host/index.md",
+  "sourceDirName": "self-host",
+  "slug": "/self-host/",
+  "permalink": "/docs/self-host/",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/self-host/index.md",
+  "tags": [],
+  "version": "current",
+  "lastUpdatedAt": 1539502055,
+  "formattedLastUpdatedAt": "Oct 14, 2018",
+  "frontMatter": {
+    "id": "self-host-index",
+    "title": "Self Host Index",
+    "sidebar_label": "Self Host Index"
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "Faq",
+    "permalink": "/docs/getting-started/faq"
+  },
+  "next": {
+    "title": "Docker Compose",
+    "permalink": "/docs/self-host/docker-compose"
+  }
+}

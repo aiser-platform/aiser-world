@@ -1,9 +1,11 @@
 from typing import Optional
 from fastapi import Depends, Request, HTTPException
+from sqlalchemy.orm import Session
 from app.modules.authentication.deps.auth_bearer import JWTCookie
 from app.modules.authentication.auth import Auth
 from app.modules.user.repository import UserRepository
 from app.modules.user.schemas import UserResponse
+from app.db.session import get_db
 
 
 class CurrentUser:
@@ -22,7 +24,7 @@ class CurrentUser:
         return self._email
 
     @classmethod
-    async def from_token(cls, token: str = Depends(JWTCookie())):
+    async def from_token(cls, token: str = Depends(JWTCookie()), db: Session = Depends(get_db)):
         """Create CurrentUser instance from JWT token"""
         instance = cls()
 
@@ -43,9 +45,9 @@ class CurrentUser:
         except Exception as e:
             raise HTTPException(status_code=401, detail=str(e))
 
-    async def get_user(self) -> UserResponse:
+    async def get_user(self, db: Session) -> UserResponse:
         """Get full user object from database"""
-        user = await self.repository.get_by_id(self.user_id)
+        user = self.repository.get_by_id(self.user_id, db)
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
         return UserResponse(**user.__dict__)

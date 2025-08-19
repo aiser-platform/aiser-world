@@ -19,7 +19,7 @@ class SignUpResponse(BaseModel):
 
 
 class SignInRequest(BaseModel):
-    username: str
+    identifier: str = Field(..., description="User email or username")
     password: str
     fallback_url: Optional[str] = None
 
@@ -30,6 +30,7 @@ class SignInResponse(BaseModel):
     expires_in: Optional[int] = None
     fallback_url: Optional[str] = None
     message: Optional[str] = None
+    user: Optional[dict] = None  # Add user information
 
 
 class VerifyEmailRequest(BaseModel):

@@ -1,0 +1,597 @@
+{
+  "pluginId": "default",
+  "version": "current",
+  "label": "Next",
+  "banner": null,
+  "badge": false,
+  "noIndex": false,
+  "className": "docs-version-current",
+  "isLast": true,
+  "docsSidebars": {
+    "docs": [
+      {
+        "type": "category",
+        "label": " Getting Started",
+        "collapsed": false,
+        "items": [
+          {
+            "type": "link",
+            "label": "Quick Start Docker",
+            "href": "/docs/getting-started/quick-start-docker",
+            "docId": "getting-started/quick-start-docker",
+            "unlisted": false
+          },
+          {
+            "type": "link",
+            "label": "First Chart",
+            "href": "/docs/getting-started/first-chart",
+            "docId": "getting-started/first-chart",
+            "unlisted": false
+          },
+          {
+            "type": "link",
+            "label": "Demo Walkthrough",
+            "href": "/docs/getting-started/demo-walkthrough",
+            "docId": "getting-started/demo-walkthrough",
+            "unlisted": false
+          },
+          {
+            "type": "link",
+            "label": "Faq",
+            "href": "/docs/getting-started/faq",
+            "docId": "getting-started/faq",
+            "unlisted": false
+          }
+        ],
+        "collapsible": true,
+        "href": "/docs/getting-started/"
+      },
+      {
+        "type": "category",
+        "label": "🏠 Self-Host & Enterprise",
+        "items": [
+          {
+            "type": "category",
+            "label": " Deployment Recipes",
+            "items": [
+              {
+                "type": "link",
+                "label": "Docker Compose",
+                "href": "/docs/self-host/docker-compose",
+                "docId": "self-host/docker-compose",
+                "unlisted": false
+              }
+            ],
+            "collapsed": true,
+            "collapsible": true
+          },
+          {
+            "type": "category",
+            "label": "⚙️ Configuration",
+            "items": [
+              {
+                "type": "link",
+                "label": "Config Reference",
+                "href": "/docs/self-host/config-reference",
+                "docId": "self-host/config-reference",
+                "unlisted": false
+              },
+              {
+                "type": "link",
+                "label": "Ssl Certificates",
+                "href": "/docs/self-host/ssl-certificates",
+                "docId": "self-host/ssl-certificates",
+                "unlisted": false
+              },
+              {
+                "type": "link",
+                "label": "Backups",
+                "href": "/docs/self-host/backups",
+                "docId": "self-host/backups",
+                "unlisted": false
+              }
+            ],
+            "collapsed": true,
+            "collapsible": true
+          }
+        ],
+        "collapsed": true,
+        "collapsible": true,
+        "href": "/docs/self-host/"
+      },
+      {
+        "type": "category",
+        "label": "🤖 Agentic AI & Analytics",
+        "items": [
+          {
+            "type": "link",
+            "label": "Natural Language Queries",
+            "href": "/docs/features/natural-language-queries",
+            "docId": "features/natural-language-queries",
+            "unlisted": false
+          },
+          {
+            "type": "link",
+            "label": "Agents",
+            "href": "/docs/features/agents",
+            "docId": "features/agents",
+            "unlisted": false
+          },
+          {
+            "type": "link",
+            "label": "Conversation Memory",
+            "href": "/docs/features/conversation-memory",
+            "docId": "features/conversation-memory",
+            "unlisted": false
+          },
+          {
+            "type": "link",
+            "label": "What If Simulations",
+            "href": "/docs/features/what-if-simulations",
+            "docId": "features/what-if-simulations",
+            "unlisted": false
+          },
+          {
+            "type": "link",
+            "label": "Custom Prompts",
+            "href": "/docs/features/custom-prompts",
+            "docId": "features/custom-prompts",
+            "unlisted": false
+          }
+        ],
+        "collapsed": true,
+        "collapsible": true,
+        "href": "/docs/features/ai-overview"
+      },
+      {
+        "type": "category",
+        "label": "📊 Charts & Visuals",
+        "items": [
+          {
+            "type": "link",
+            "label": "Line Charts",
+            "href": "/docs/features/line-charts",
+            "docId": "features/line-charts",
+            "unlisted": false
+          },
+          {
+            "type": "link",
+            "label": "Bar Charts",
+            "href": "/docs/features/bar-charts",
+            "docId": "features/bar-charts",
+            "unlisted": false
+          },
+          {
+            "type": "link",
+            "label": "Heatmaps",
+            "href": "/docs/features/heatmaps",
+            "docId": "features/heatmaps",
+            "unlisted": false
+          },
+          {
+            "type": "link",
+            "label": "Echarts Integration",
+            "href": "/docs/features/echarts-integration",
+            "docId": "features/echarts-integration",
+            "unlisted": false
+          },
+          {
+            "type": "link",
+            "label": "Deep Analysis",
+            "href": "/docs/features/deep-analysis",
+            "docId": "features/deep-analysis",
+            "unlisted": false
+          }
+        ],
+        "collapsed": true,
+        "collapsible": true,
+        "href": "/docs/features/charts-overview"
+      },
+      {
+        "type": "category",
+        "label": "🔌 Data Sources",
+        "items": [
+          {
+            "type": "link",
+            "label": "Csv Excel",
+            "href": "/docs/features/csv-excel",
+            "docId": "features/csv-excel",
+            "unlisted": false
+          },
+          {
+            "type": "link",
+            "label": "Databases",
+            "href": "/docs/features/databases",
+            "docId": "features/databases",
+            "unlisted": false
+          },
+          {
+            "type": "link",
+            "label": "Warehouses",
+            "href": "/docs/features/warehouses",
+            "docId": "features/warehouses",
+            "unlisted": false
+          },
+          {
+            "type": "link",
+            "label": "Real Time Streams",
+            "href": "/docs/features/real-time-streams",
+            "docId": "features/real-time-streams",
+            "unlisted": false
+          }
+        ],
+        "collapsed": true,
+        "collapsible": true,
+        "href": "/docs/features/data-sources-overview"
+      },
+      {
+        "type": "category",
+        "label": "️ Developer",
+        "items": [
+          {
+            "type": "link",
+            "label": "Local Dev",
+            "href": "/docs/developer/local-dev",
+            "docId": "developer/local-dev",
+            "unlisted": false
+          },
+          {
+            "type": "link",
+            "label": "Architecture",
+            "href": "/docs/developer/architecture",
+            "docId": "developer/architecture",
+            "unlisted": false
+          },
+          {
+            "type": "link",
+            "label": "Writing Tests",
+            "href": "/docs/developer/writing-tests",
+            "docId": "developer/writing-tests",
+            "unlisted": false
+          },
+          {
+            "type": "link",
+            "label": "Plugin Architecture",
+            "href": "/docs/developer/plugin-architecture",
+            "docId": "developer/plugin-architecture",
+            "unlisted": false
+          },
+          {
+            "type": "link",
+            "label": "Release Process",
+            "href": "/docs/developer/release-process",
+            "docId": "developer/release-process",
+            "unlisted": false
+          }
+        ],
+        "collapsed": true,
+        "collapsible": true,
+        "href": "/docs/developer/"
+      },
+      {
+        "type": "category",
+        "label": "🌍 Community",
+        "items": [
+          {
+            "type": "link",
+            "label": "Roadmap",
+            "href": "/docs/community/roadmap",
+            "docId": "community/roadmap",
+            "unlisted": false
+          },
+          {
+            "type": "link",
+            "label": "Contributing",
+            "href": "/docs/community/contributing",
+            "docId": "community/contributing",
+            "unlisted": false
+          },
+          {
+            "type": "link",
+            "label": "Code Of Conduct",
+            "href": "/docs/community/code-of-conduct",
+            "docId": "community/code-of-conduct",
+            "unlisted": false
+          },
+          {
+            "type": "link",
+            "label": "Bi Weekly Calls",
+            "href": "/docs/community/bi-weekly-calls",
+            "docId": "community/bi-weekly-calls",
+            "unlisted": false
+          },
+          {
+            "type": "link",
+            "label": "Ambassador Program",
+            "href": "/docs/community/ambassador-program",
+            "docId": "community/ambassador-program",
+            "unlisted": false
+          }
+        ],
+        "collapsed": true,
+        "collapsible": true,
+        "href": "/docs/community/"
+      },
+      {
+        "type": "category",
+        "label": "📖 Reference",
+        "collapsed": true,
+        "items": [
+          {
+            "type": "link",
+            "label": "Api Reference",
+            "href": "/docs/reference/api-reference",
+            "docId": "reference/api-reference",
+            "unlisted": false
+          },
+          {
+            "type": "link",
+            "label": "Config Reference",
+            "href": "/docs/reference/config-reference",
+            "docId": "reference/config-reference",
+            "unlisted": false
+          }
+        ],
+        "collapsible": true
+      },
+      {
+        "type": "link",
+        "label": "License (MIT) + Enterprise License",
+        "href": "https://github.com/aiser-platform/aiser-world/blob/main/LICENSE"
+      },
+      {
+        "type": "link",
+        "label": "Privacy Policy",
+        "href": "https://aiser.com/privacy"
+      }
+    ]
+  },
+  "docs": {
+    "community/ambassador-program": {
+      "id": "community/ambassador-program",
+      "title": "Ambassador Program",
+      "description": "Overview",
+      "sidebar": "docs"
+    },
+    "community/bi-weekly-calls": {
+      "id": "community/bi-weekly-calls",
+      "title": "Bi Weekly Calls",
+      "description": "Overview",
+      "sidebar": "docs"
+    },
+    "community/code-of-conduct": {
+      "id": "community/code-of-conduct",
+      "title": "Code Of Conduct",
+      "description": "Overview",
+      "sidebar": "docs"
+    },
+    "community/community-index": {
+      "id": "community/community-index",
+      "title": "Community Index",
+      "description": "Welcome to the Community Index section of Aiser Platform documentation.",
+      "sidebar": "docs"
+    },
+    "community/contributing": {
+      "id": "community/contributing",
+      "title": "Contributing",
+      "description": "Overview",
+      "sidebar": "docs"
+    },
+    "community/roadmap": {
+      "id": "community/roadmap",
+      "title": "Roadmap",
+      "description": "Overview",
+      "sidebar": "docs"
+    },
+    "developer/architecture": {
+      "id": "developer/architecture",
+      "title": "Architecture",
+      "description": "Overview",
+      "sidebar": "docs"
+    },
+    "developer/developer-index": {
+      "id": "developer/developer-index",
+      "title": "Developer Index",
+      "description": "Welcome to the Developer Index section of Aiser Platform documentation.",
+      "sidebar": "docs"
+    },
+    "developer/local-dev": {
+      "id": "developer/local-dev",
+      "title": "Local Dev",
+      "description": "Overview",
+      "sidebar": "docs"
+    },
+    "developer/plugin-architecture": {
+      "id": "developer/plugin-architecture",
+      "title": "Plugin Architecture",
+      "description": "Overview",
+      "sidebar": "docs"
+    },
+    "developer/release-process": {
+      "id": "developer/release-process",
+      "title": "Release Process",
+      "description": "Overview",
+      "sidebar": "docs"
+    },
+    "developer/writing-tests": {
+      "id": "developer/writing-tests",
+      "title": "Writing Tests",
+      "description": "Overview",
+      "sidebar": "docs"
+    },
+    "features/agents": {
+      "id": "features/agents",
+      "title": "Agents",
+      "description": "Overview",
+      "sidebar": "docs"
+    },
+    "features/ai-overview": {
+      "id": "features/ai-overview",
+      "title": "Ai Overview",
+      "description": "Overview",
+      "sidebar": "docs"
+    },
+    "features/bar-charts": {
+      "id": "features/bar-charts",
+      "title": "Bar Charts",
+      "description": "Overview",
+      "sidebar": "docs"
+    },
+    "features/charts-overview": {
+      "id": "features/charts-overview",
+      "title": "Charts Overview",
+      "description": "Overview",
+      "sidebar": "docs"
+    },
+    "features/conversation-memory": {
+      "id": "features/conversation-memory",
+      "title": "Conversation Memory",
+      "description": "Overview",
+      "sidebar": "docs"
+    },
+    "features/csv-excel": {
+      "id": "features/csv-excel",
+      "title": "Csv Excel",
+      "description": "Overview",
+      "sidebar": "docs"
+    },
+    "features/custom-prompts": {
+      "id": "features/custom-prompts",
+      "title": "Custom Prompts",
+      "description": "Overview",
+      "sidebar": "docs"
+    },
+    "features/data-sources-overview": {
+      "id": "features/data-sources-overview",
+      "title": "Data Sources Overview",
+      "description": "Overview",
+      "sidebar": "docs"
+    },
+    "features/databases": {
+      "id": "features/databases",
+      "title": "Databases",
+      "description": "Overview",
+      "sidebar": "docs"
+    },
+    "features/deep-analysis": {
+      "id": "features/deep-analysis",
+      "title": "Deep Analysis",
+      "description": "Overview",
+      "sidebar": "docs"
+    },
+    "features/echarts-integration": {
+      "id": "features/echarts-integration",
+      "title": "Echarts Integration",
+      "description": "Overview",
+      "sidebar": "docs"
+    },
+    "features/heatmaps": {
+      "id": "features/heatmaps",
+      "title": "Heatmaps",
+      "description": "Overview",
+      "sidebar": "docs"
+    },
+    "features/line-charts": {
+      "id": "features/line-charts",
+      "title": "Line Charts",
+      "description": "Overview",
+      "sidebar": "docs"
+    },
+    "features/natural-language-queries": {
+      "id": "features/natural-language-queries",
+      "title": "Natural Language Queries",
+      "description": "Overview",
+      "sidebar": "docs"
+    },
+    "features/real-time-streams": {
+      "id": "features/real-time-streams",
+      "title": "Real Time Streams",
+      "description": "Overview",
+      "sidebar": "docs"
+    },
+    "features/warehouses": {
+      "id": "features/warehouses",
+      "title": "Warehouses",
+      "description": "Overview",
+      "sidebar": "docs"
+    },
+    "features/what-if-simulations": {
+      "id": "features/what-if-simulations",
+      "title": "What If Simulations",
+      "description": "Overview",
+      "sidebar": "docs"
+    },
+    "getting-started/demo-walkthrough": {
+      "id": "getting-started/demo-walkthrough",
+      "title": "Demo Walkthrough",
+      "description": "Overview",
+      "sidebar": "docs"
+    },
+    "getting-started/faq": {
+      "id": "getting-started/faq",
+      "title": "Faq",
+      "description": "Overview",
+      "sidebar": "docs"
+    },
+    "getting-started/first-chart": {
+      "id": "getting-started/first-chart",
+      "title": "First Chart",
+      "description": "Overview",
+      "sidebar": "docs"
+    },
+    "getting-started/getting-started-index": {
+      "id": "getting-started/getting-started-index",
+      "title": "Getting Started Index",
+      "description": "Welcome to the Getting Started Index section of Aiser Platform documentation.",
+      "sidebar": "docs"
+    },
+    "getting-started/quick-start-docker": {
+      "id": "getting-started/quick-start-docker",
+      "title": "Quick Start Docker",
+      "description": "Overview",
+      "sidebar": "docs"
+    },
+    "reference/api-reference": {
+      "id": "reference/api-reference",
+      "title": "Api Reference",
+      "description": "Overview",
+      "sidebar": "docs"
+    },
+    "reference/config-reference": {
+      "id": "reference/config-reference",
+      "title": "Config Reference",
+      "description": "Overview",
+      "sidebar": "docs"
+    },
+    "self-host/backups": {
+      "id": "self-host/backups",
+      "title": "Backups",
+      "description": "Overview",
+      "sidebar": "docs"
+    },
+    "self-host/config-reference": {
+      "id": "self-host/config-reference",
+      "title": "Config Reference",
+      "description": "Overview",
+      "sidebar": "docs"
+    },
+    "self-host/docker-compose": {
+      "id": "self-host/docker-compose",
+      "title": "Docker Compose",
+      "description": "Overview",
+      "sidebar": "docs"
+    },
+    "self-host/self-host-index": {
+      "id": "self-host/self-host-index",
+      "title": "Self Host Index",
+      "description": "Welcome to the Self Host Index section of Aiser Platform documentation.",
+      "sidebar": "docs"
+    },
+    "self-host/ssl-certificates": {
+      "id": "self-host/ssl-certificates",
+      "title": "Ssl Certificates",
+      "description": "Overview",
+      "sidebar": "docs"
+    }
+  }
+}

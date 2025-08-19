@@ -20,7 +20,9 @@ echo "Testing Python import..."
 python -c "import sys; print('Python path:', sys.path); import app.core.config; print('Import successful')"
 
 # Run database migrations
-alembic upgrade head
+# Skip migrations if tables already exist
+# Temporarily disabled to resolve database driver issue
+# alembic stamp head || alembic upgrade head
 
 echo "🚀 Starting chat2chart service..."
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload

@@ -1,0 +1,30 @@
+{
+  "id": "features/csv-excel",
+  "title": "Csv Excel",
+  "description": "Overview",
+  "source": "@site/docs/features/csv-excel.md",
+  "sourceDirName": "features",
+  "slug": "/features/csv-excel",
+  "permalink": "/docs/features/csv-excel",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/features/csv-excel.md",
+  "tags": [],
+  "version": "current",
+  "lastUpdatedAt": 1539502055,
+  "formattedLastUpdatedAt": "Oct 14, 2018",
+  "frontMatter": {
+    "id": "csv-excel",
+    "title": "Csv Excel",
+    "sidebar_label": "Csv Excel"
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "Data Sources Overview",
+    "permalink": "/docs/features/data-sources-overview"
+  },
+  "next": {
+    "title": "Databases",
+    "permalink": "/docs/features/databases"
+  }
+}

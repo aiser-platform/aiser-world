@@ -1,0 +1,233 @@
+{
+  "docusaurus-plugin-content-docs": {
+    "default": {
+      "path": "/docs",
+      "versions": [
+        {
+          "name": "current",
+          "label": "Next",
+          "isLast": true,
+          "path": "/docs",
+          "mainDocId": "getting-started/getting-started-index",
+          "docs": [
+            {
+              "id": "community/ambassador-program",
+              "path": "/docs/community/ambassador-program",
+              "sidebar": "docs"
+            },
+            {
+              "id": "community/bi-weekly-calls",
+              "path": "/docs/community/bi-weekly-calls",
+              "sidebar": "docs"
+            },
+            {
+              "id": "community/code-of-conduct",
+              "path": "/docs/community/code-of-conduct",
+              "sidebar": "docs"
+            },
+            {
+              "id": "community/community-index",
+              "path": "/docs/community/",
+              "sidebar": "docs"
+            },
+            {
+              "id": "community/contributing",
+              "path": "/docs/community/contributing",
+              "sidebar": "docs"
+            },
+            {
+              "id": "community/roadmap",
+              "path": "/docs/community/roadmap",
+              "sidebar": "docs"
+            },
+            {
+              "id": "developer/architecture",
+              "path": "/docs/developer/architecture",
+              "sidebar": "docs"
+            },
+            {
+              "id": "developer/developer-index",
+              "path": "/docs/developer/",
+              "sidebar": "docs"
+            },
+            {
+              "id": "developer/local-dev",
+              "path": "/docs/developer/local-dev",
+              "sidebar": "docs"
+            },
+            {
+              "id": "developer/plugin-architecture",
+              "path": "/docs/developer/plugin-architecture",
+              "sidebar": "docs"
+            },
+            {
+              "id": "developer/release-process",
+              "path": "/docs/developer/release-process",
+              "sidebar": "docs"
+            },
+            {
+              "id": "developer/writing-tests",
+              "path": "/docs/developer/writing-tests",
+              "sidebar": "docs"
+            },
+            {
+              "id": "features/agents",
+              "path": "/docs/features/agents",
+              "sidebar": "docs"
+            },
+            {
+              "id": "features/ai-overview",
+              "path": "/docs/features/ai-overview",
+              "sidebar": "docs"
+            },
+            {
+              "id": "features/bar-charts",
+              "path": "/docs/features/bar-charts",
+              "sidebar": "docs"
+            },
+            {
+              "id": "features/charts-overview",
+              "path": "/docs/features/charts-overview",
+              "sidebar": "docs"
+            },
+            {
+              "id": "features/conversation-memory",
+              "path": "/docs/features/conversation-memory",
+              "sidebar": "docs"
+            },
+            {
+              "id": "features/csv-excel",
+              "path": "/docs/features/csv-excel",
+              "sidebar": "docs"
+            },
+            {
+              "id": "features/custom-prompts",
+              "path": "/docs/features/custom-prompts",
+              "sidebar": "docs"
+            },
+            {
+              "id": "features/data-sources-overview",
+              "path": "/docs/features/data-sources-overview",
+              "sidebar": "docs"
+            },
+            {
+              "id": "features/databases",
+              "path": "/docs/features/databases",
+              "sidebar": "docs"
+            },
+            {
+              "id": "features/deep-analysis",
+              "path": "/docs/features/deep-analysis",
+              "sidebar": "docs"
+            },
+            {
+              "id": "features/echarts-integration",
+              "path": "/docs/features/echarts-integration",
+              "sidebar": "docs"
+            },
+            {
+              "id": "features/heatmaps",
+              "path": "/docs/features/heatmaps",
+              "sidebar": "docs"
+            },
+            {
+              "id": "features/line-charts",
+              "path": "/docs/features/line-charts",
+              "sidebar": "docs"
+            },
+            {
+              "id": "features/natural-language-queries",
+              "path": "/docs/features/natural-language-queries",
+              "sidebar": "docs"
+            },
+            {
+              "id": "features/real-time-streams",
+              "path": "/docs/features/real-time-streams",
+              "sidebar": "docs"
+            },
+            {
+              "id": "features/warehouses",
+              "path": "/docs/features/warehouses",
+              "sidebar": "docs"
+            },
+            {
+              "id": "features/what-if-simulations",
+              "path": "/docs/features/what-if-simulations",
+              "sidebar": "docs"
+            },
+            {
+              "id": "getting-started/demo-walkthrough",
+              "path": "/docs/getting-started/demo-walkthrough",
+              "sidebar": "docs"
+            },
+            {
+              "id": "getting-started/faq",
+              "path": "/docs/getting-started/faq",
+              "sidebar": "docs"
+            },
+            {
+              "id": "getting-started/first-chart",
+              "path": "/docs/getting-started/first-chart",
+              "sidebar": "docs"
+            },
+            {
+              "id": "getting-started/getting-started-index",
+              "path": "/docs/getting-started/",
+              "sidebar": "docs"
+            },
+            {
+              "id": "getting-started/quick-start-docker",
+              "path": "/docs/getting-started/quick-start-docker",
+              "sidebar": "docs"
+            },
+            {
+              "id": "reference/api-reference",
+              "path": "/docs/reference/api-reference",
+              "sidebar": "docs"
+            },
+            {
+              "id": "reference/config-reference",
+              "path": "/docs/reference/config-reference",
+              "sidebar": "docs"
+            },
+            {
+              "id": "self-host/backups",
+              "path": "/docs/self-host/backups",
+              "sidebar": "docs"
+            },
+            {
+              "id": "self-host/config-reference",
+              "path": "/docs/self-host/config-reference",
+              "sidebar": "docs"
+            },
+            {
+              "id": "self-host/docker-compose",
+              "path": "/docs/self-host/docker-compose",
+              "sidebar": "docs"
+            },
+            {
+              "id": "self-host/self-host-index",
+              "path": "/docs/self-host/",
+              "sidebar": "docs"
+            },
+            {
+              "id": "self-host/ssl-certificates",
+              "path": "/docs/self-host/ssl-certificates",
+              "sidebar": "docs"
+            }
+          ],
+          "draftIds": [],
+          "sidebars": {
+            "docs": {
+              "link": {
+                "path": "/docs/getting-started/",
+                "label": " Getting Started"
+              }
+            }
+          }
+        }
+      ],
+      "breadcrumbs": true
+    }
+  }
+}

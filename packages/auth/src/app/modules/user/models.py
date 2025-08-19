@@ -18,3 +18,11 @@ class User(BaseModel, UserAuthentication):
         Integer, default=0, nullable=False, server_default="0"
     )
     verification_sent_at = Column(DateTime, nullable=True, default=None)
+
+    # Relationships - these will be populated when the models are imported
+    user_organizations = relationship("UserOrganization", back_populates="user", lazy="dynamic")
+    user_projects = relationship("UserProject", back_populates="user", lazy="dynamic")
+    billing_transactions = relationship("BillingTransaction", back_populates="user", lazy="dynamic")
+    ai_usage_logs = relationship("AIUsageLog", back_populates="user", lazy="dynamic")
+    device_sessions = relationship("DeviceSession", back_populates="user", lazy="dynamic")
+    temporary_tokens = relationship("TemporaryToken", back_populates="user", lazy="dynamic")

@@ -24,15 +24,15 @@ class Settings(BaseSettings):
     DEBUG: bool = os.getenv("DEBUG", "True").lower() == "true"
 
     # Database Settings
-    POSTGRES_USER: str = os.getenv("POSTGRES_USER", "postgres")
-    POSTGRES_PASSWORD: str = os.getenv("POSTGRES_PASSWORD", "postgres")
+    POSTGRES_USER: str = os.getenv("POSTGRES_USER", "aiser")
+    POSTGRES_PASSWORD: str = os.getenv("POSTGRES_PASSWORD", "aiser_password")
     POSTGRES_SERVER: str = os.getenv("POSTGRES_SERVER", "localhost")
-    POSTGRES_DB: str = os.getenv("POSTGRES_DB", "fastapi-boilerplate")
+    POSTGRES_DB: str = os.getenv("POSTGRES_DB", "aiser_world")
     POSTGRES_PORT: int = int(os.getenv("POSTGRES_PORT", "5432"))
 
     @property
     def SQLALCHEMY_DATABASE_URI(self) -> str:
-        return f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+        return f"postgresql+psycopg2://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
 
     # Security Settings
     SECRET_KEY: str = os.getenv(

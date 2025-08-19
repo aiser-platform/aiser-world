@@ -1,0 +1,163 @@
+# Enterprise Configuration for Aiser Platform
+deployment_mode: "cloud"  # cloud, on_premise, hybrid, airgapped
+organization_name: "Aiser Enterprise"
+admin_email: "admin@aiser.com"
+license_key: null
+
+# Security Configuration
+security:
+  enable_encryption_at_rest: true
+  enable_encryption_in_transit: true
+  require_mfa: false
+  session_timeout_minutes: 480  # 8 hours
+  password_policy:
+    min_length: 12
+    require_uppercase: true
+    require_lowercase: true
+    require_numbers: true
+    require_special_chars: true
+    max_age_days: 90
+    history_count: 12
+  allowed_origins:
+    - "http://localhost:3000"
+    - "http://127.0.0.1:3000"
+  rate_limiting:
+    enabled: true
+    requests_per_minute: 100
+    burst_size: 200
+  audit_logging: true
+  data_retention_days: 2555  # 7 years
+
+# Database Configuration
+database:
+  type: "postgresql"
+  host: "localhost"
+  port: 5432
+  database: "aiser_enterprise"
+  username: "aiser"
+  password: ""
+  ssl_mode: "require"
+  connection_pool_size: 20
+  max_overflow: 30
+  pool_timeout: 30
+  backup_enabled: true
+  backup_schedule: "0 2 * * *"  # Daily at 2 AM
+  high_availability: false
+  read_replicas: []
+
+# Authentication Configuration
+auth:
+  mode: "internal"  # internal, keycloak, azure_ad, okta, ldap, saml
+  keycloak_server_url: null
+  keycloak_realm: null
+  keycloak_client_id: null
+  keycloak_client_secret: null
+  azure_tenant_id: null
+  azure_client_id: null
+  azure_client_secret: null
+  okta_domain: null
+  okta_client_id: null
+  okta_client_secret: null
+  ldap_server: null
+  ldap_bind_dn: null
+  ldap_bind_password: null
+  ldap_user_search_base: null
+  saml_metadata_url: null
+  saml_entity_id: null
+  jwt_secret_key: "your-super-secret-jwt-key-change-this-in-production"
+  jwt_algorithm: "HS256"
+  jwt_expiration_hours: 24
+  enable_sso: false
+  auto_provision_users: true
+  default_user_role: "member"
+
+# Scaling Configuration
+scaling:
+  enable_horizontal_scaling: false
+  min_replicas: 1
+  max_replicas: 10
+  cpu_threshold: 70
+  memory_threshold: 80
+  enable_caching: true
+  redis_cluster: false
+  redis_nodes: []
+  cdn_enabled: false
+  cdn_url: null
+  load_balancer_type: "nginx"
+
+# Monitoring Configuration
+monitoring:
+  enable_metrics: true
+  metrics_endpoint: "/metrics"
+  enable_tracing: true
+  jaeger_endpoint: null
+  enable_logging: true
+  log_level: "INFO"
+  log_format: "json"
+  enable_health_checks: true
+  health_check_interval: 30
+  enable_alerts: true
+  alert_webhook_url: null
+  prometheus_enabled: true
+  grafana_enabled: true
+
+# AI Configuration
+ai:
+  enable_local_models: false
+  local_model_path: null
+  openai_api_key: null
+  azure_openai_endpoint: null
+  azure_openai_api_key: null
+  custom_model_endpoints: []
+  enable_model_caching: true
+  model_cache_ttl: 3600  # 1 hour
+  max_tokens_per_request: 4000
+  rate_limit_per_user: 100  # requests per hour
+  enable_content_filtering: true
+  data_privacy_mode: false
+
+# Compliance Configuration
+compliance:
+  gdpr_enabled: false
+  hipaa_enabled: false
+  sox_enabled: false
+  pci_enabled: false
+  enable_data_classification: false
+  enable_data_masking: false
+  enable_right_to_be_forgotten: false
+  data_residency_region: null
+  audit_trail_immutable: false
+  encryption_key_rotation_days: 90
+
+# Custom Branding
+custom_branding:
+  logo_url: null
+  primary_color: "#1f2937"
+  secondary_color: "#3b82f6"
+  company_name: "Aiser"
+  support_email: "support@aiser.com"
+  support_url: "https://support.aiser.com"
+
+# Custom Features
+custom_features:
+  enable_white_labeling: false
+  enable_custom_domains: false
+  enable_api_access: true
+  enable_webhooks: true
+  enable_integrations: true
+
+# Integrations
+integrations:
+  slack:
+    enabled: false
+    webhook_url: null
+  teams:
+    enabled: false
+    webhook_url: null
+  email:
+    provider: "smtp"
+    smtp_host: null
+    smtp_port: 587
+    smtp_username: null
+    smtp_password: null
+    from_email: "noreply@aiser.com"

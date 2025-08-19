@@ -1,24 +1,30 @@
 import { InboxOutlined } from '@ant-design/icons';
 import { message, Upload, UploadProps } from 'antd';
-import { IFileUpload } from './types';
+import { IFileUpload, IDataSource } from './types';
 
 const { Dragger } = Upload;
 
 export interface UploadDraggerProps {
-    onUpload: (fileData?: IFileUpload) => void;
+    onUpload: (dataSource?: IDataSource) => void;
     validFileTypes?: string[];
+    includePreview?: boolean;
+    sheetName?: string;
+    delimiter?: string;
 }
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-const UPLOAD_API_URL = 'http://localhost:8000/files/upload';
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB (matching backend)
+const UPLOAD_API_URL = 'http://localhost:8000/api/v1/data/upload';
 
 const UploadDragger: React.FC<UploadDraggerProps> = ({
     onUpload,
-    validFileTypes = [],
+    validFileTypes = ['csv', 'xlsx', 'xls', 'json', 'tsv'],
+    includePreview = true,
+    sheetName,
+    delimiter = ',',
 }) => {
     const handleFileSizeValidation = (file: File): boolean => {
         if (file.size > MAX_FILE_SIZE) {
-            message.error('File must be smaller than 10MB!');
+            message.error('File must be smaller than 50MB!');
             return false;
         }
         return true;
@@ -39,8 +45,23 @@ const UploadDragger: React.FC<UploadDraggerProps> = ({
         return true;
     };
 
-    const handleUploadSuccess = (response: IFileUpload): void => {
-        onUpload(response);
+    const handleUploadSuccess = (response: any): void => {
+        if (response.success && response.data_source) {
+            const dataSource: IDataSource = {
+                id: response.data_source.id,
+                name: response.data_source.name,
+                type: response.data_source.type,
+                format: response.data_source.format,
+                size: response.data_source.size,
+                rowCount: response.data_source.row_count,
+                schema: response.data_source.schema,
+                preview: response.preview,
+                uploadedAt: response.data_source.uploaded_at
+            };
+            onUpload(dataSource);
+        } else {
+            message.error(response.error || 'Upload failed');
+        }
     };
 
     const uploadProps: UploadProps = {
@@ -49,6 +70,11 @@ const UploadDragger: React.FC<UploadDraggerProps> = ({
         method: 'POST',
         showUploadList: false,
         accept: validFileTypes.map((type) => `.${type}`).join(','),
+        data: {
+            include_preview: includePreview,
+            sheet_name: sheetName,
+            delimiter: delimiter
+        },
 
         openFileDialogOnClick: true,
 
@@ -68,23 +94,19 @@ const UploadDragger: React.FC<UploadDraggerProps> = ({
         onChange: (info) => {
             const { status, response } = info.file;
 
-            if (status === 'done') {
+            if (status === 'uploading') {
+                message.loading(`Uploading ${info.file.name}...`, 0);
+            } else if (status === 'done') {
+                message.destroy(); // Clear loading message
                 if (response) {
-                    const uploadResponse = new IFileUpload(
-                        response.file?.filename,
-                        response.file?.content_type,
-                        response.file?.storage_type,
-                        response.file?.file_size,
-                        response.file?.uuid_filename
+                    handleUploadSuccess(response);
+                    message.success(
+                        `${info.file.name} processed successfully! ${response.data_source?.row_count || 0} rows loaded.`
                     );
-
-                    handleUploadSuccess(uploadResponse);
                 }
-                message.success(
-                    `${info.file.name} file uploaded successfully.`
-                );
             } else if (status === 'error') {
-                message.error(`${info.file.name} file upload failed.`);
+                message.destroy(); // Clear loading message
+                message.error(`${info.file.name} file upload failed: ${response?.error || 'Unknown error'}`);
             }
         },
     };

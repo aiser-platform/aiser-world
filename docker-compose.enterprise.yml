@@ -1,0 +1,123 @@
+# Docker Compose override for Enterprise deployment
+# Usage: docker-compose -f docker-compose.dev.yml -f docker-compose.enterprise.yml up
+
+version: '3.8'
+
+services:
+  auth-service:
+    environment:
+      # Enterprise configuration
+      - AISER_DEPLOYMENT_MODE=on_premise
+      - AISER_ORG_NAME=Aiser Enterprise
+      - AISER_ADMIN_EMAIL=admin@company.com
+      - AUTH_MODE=internal
+      - JWT_SECRET_KEY=your-super-secret-jwt-key-change-this-in-production
+      - REQUIRE_MFA=false
+      - AUDIT_LOGGING=true
+      - DATA_PRIVACY_MODE=true
+      # Database configuration
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=aiser_world
+      - DB_USER=aiser
+      - DB_PASSWORD=aiser123
+    volumes:
+      # Mount enterprise config if available
+      - ./packages/auth/enterprise-config.example.yml:/etc/aiser/config.yml:ro
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - aiser-network
+
+  # Redis for caching and session management
+  redis:
+    image: redis:7-alpine
+    container_name: aiser-redis-enterprise
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --requirepass aiser123
+    networks:
+      - aiser-network
+
+  # Keycloak for enterprise SSO (optional)
+  keycloak:
+    image: quay.io/keycloak/keycloak:23.0
+    container_name: aiser-keycloak
+    environment:
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin123
+      - KC_DB=postgres
+      - KC_DB_URL=jdbc:postgresql://postgres:5432/keycloak
+      - KC_DB_USERNAME=aiser
+      - KC_DB_PASSWORD=aiser123
+      - KC_HOSTNAME=localhost
+      - KC_HTTP_ENABLED=true
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+    command: start-dev
+    networks:
+      - aiser-network
+
+  # Prometheus for monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: aiser-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - aiser-network
+
+  # Grafana for dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: aiser-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    networks:
+      - aiser-network
+
+  # Nginx reverse proxy
+  nginx:
+    image: nginx:alpine
+    container_name: aiser-nginx-enterprise
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - auth-service
+      - keycloak
+    networks:
+      - aiser-network
+
+volumes:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  aiser-network:
+    driver: bridge

@@ -67,26 +67,71 @@ services:
       - "8000:8000"
     environment:
       - POSTGRES_SERVER=postgres
-      - POSTGRES_DB=aiser_world
+      - POSTGRES_DB=aiser_chat2chart
       - POSTGRES_USER=aiser
       - POSTGRES_PASSWORD=aiser_password
       - POSTGRES_PORT=5432
-      - REDIS_URL=redis://redis:6379
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-your-openai-key-here}
-      - OPENAI_MODEL_ID=gpt-4o-mini
+      - DATABASE_URL=postgresql+asyncpg://aiser:aiser_password@postgres:5432/aiser_chat2chart
       - SECRET_KEY=980a731d35aca422c93179d49e7956ce880335cdbb8741906d881c6aa9755d36
       - ENVIRONMENT=development
       - DEBUG=True
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      cube-server:
+        condition: service_started
+    volumes:
+      - ./packages/chat2chart/server:/app
+      - ./scripts/start-chat2chart.sh:/start.sh
+      - chat2chart_poetry_cache:/root/.cache/pypoetry
+    command: ["bash", "/start.sh"]
+    restart: unless-stopped
+
+  # Cube.js Universal Semantic Layer
+  cube-server:
+    image: node:18-alpine
+    container_name: aiser-cube-dev
+    working_dir: /app
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=development
+      - CUBE_DB_TYPE=postgres
+      - CUBE_DB_HOST=postgres
+      - CUBE_DB_PORT=5432
+      - CUBE_DB_NAME=aiser_world
+      - CUBE_DB_USER=aiser
+      - CUBE_DB_PASS=aiser_password
+      - CUBE_DB_SCHEMA=public
+      - CUBE_DB_SSL=false
+      - CUBE_DB_POOL_MIN=2
+      - CUBE_DB_POOL_MAX=10
+      - CUBE_REDIS_URL=redis://redis:6379
+      - CUBE_API_SECRET=dev-cube-secret-key
+      - CUBE_DEV_MODE=true
+      - CUBE_LOG_LEVEL=info
+      - CUBEJS_EXTERNAL_DEFAULT=true
+      - CUBEJS_SCHEDULED_REFRESH_DEFAULT=true
+      - CUBEJS_SKIP_NATIVE_EXTENSIONS=true
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     volumes:
-      - ./packages/chat2chart/server:/app
-      - ./scripts/start-chat2chart.sh:/start.sh
-      - chat2chart_poetry_cache:/root/.cache/pypoetry
-    command: ["bash", "/start.sh"]
+      - ./packages/cube:/app
+      - cube_node_modules:/app/node_modules
+    command: >
+      sh -c "
+        npm install &&
+        npm run dev
+      "
     restart: unless-stopped
 
   # Chat2Chart Client (Next.js)
@@ -100,6 +145,7 @@ services:
       - NODE_ENV=development
       - NEXT_PUBLIC_API_URL=http://localhost:8000
       - NEXT_PUBLIC_AUTH_URL=http://localhost:5000
+      - NEXT_PUBLIC_CUBE_URL=http://localhost:4000
     volumes:
       - ./packages/chat2chart/client:/app
       - ./packages/shared:/shared
@@ -109,6 +155,7 @@ services:
     depends_on:
       - chat2chart-server
       - auth-service
+      - cube-server
     command: ["sh", "/start.sh"]
     restart: unless-stopped
 
@@ -117,6 +164,7 @@ volumes:
   redis_dev_data:
   auth_poetry_cache:
   chat2chart_poetry_cache:
+  cube_node_modules:
 
 networks:
   default:

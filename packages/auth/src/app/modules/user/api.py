@@ -1,13 +1,16 @@
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.database import get_db
 from app.modules.authentication import (
     RefreshTokenRequest,
     RefreshTokenResponse,
     SignInRequest,
     SignInResponse,
+    SignUpResponse,
 )
 from app.modules.authentication.decoractors.auth_cookies import handle_auth_cookies
 from app.modules.authentication.deps.auth_bearer import CookieTokenDep, JWTCookie
@@ -92,10 +95,10 @@ async def delete_user(user_id: str):
 
 
 @router.get("/me/")
-async def get_me(current_user: CurrentUser = Depends(CurrentUser.from_token)):
+async def get_me(current_user: CurrentUser = Depends(CurrentUser.from_token), db: Session = Depends(get_db)):
     """Get current user profile"""
     try:
-        user = await current_user.get_user()
+        user = await current_user.get_user(db)
         return user
     except HTTPException as e:
         raise e
@@ -111,6 +114,7 @@ async def sign_in(
     credentials: SignInRequest,
     request: Request,
     response: Response,
+    db: Session = Depends(get_db),
 ) -> SignInResponse:
     """Sign in user and set auth cookies"""
     # Get device info
@@ -122,15 +126,15 @@ async def sign_in(
     )
 
     # Get sign in response
-    sign_in_response = await service.signin(credentials, device_info)
+    sign_in_response = await service.signin(credentials, device_info, db)
 
     return sign_in_response
 
 
-@router.post("/signup", response_model=SignInResponse)
-async def sign_up(user_in: SignUpRequest):
+@router.post("/signup", response_model=SignUpResponse)
+async def sign_up(user_in: SignUpRequest, db: Session = Depends(get_db)):
     try:
-        return await service.signup(user_in)
+        return service.signup(user_in, db)  # Remove await since signup is not async
     except ValueError as e:
         raise e
     except Exception as e:

@@ -4,6 +4,9 @@ from app.modules.chats.api import router as chat_router
 from app.modules.chats.conversations.api import router as conversation_router
 from app.modules.files import file_router
 from app.modules.user import user_router
+from app.modules.data.api import router as data_router
+from app.modules.ai.api import router as ai_router
+from app.modules.cube.api import router as cube_router
 from fastapi import APIRouter
 
 api_router = APIRouter()
@@ -50,5 +53,26 @@ api_router.include_router(
     router=chart_router,
     prefix="/charts",
     tags=["charts"],
+    responses={404: {"description": "Not found"}},
+)
+
+api_router.include_router(
+    router=data_router,
+    prefix="/data",
+    tags=["data"],
+    responses={404: {"description": "Not found"}},
+)
+
+api_router.include_router(
+    router=ai_router,
+    prefix="",
+    tags=["ai"],
+    responses={404: {"description": "Not found"}},
+)
+
+api_router.include_router(
+    router=cube_router,
+    prefix="/cube",
+    tags=["cube", "schema", "analytics"],
     responses={404: {"description": "Not found"}},
 )

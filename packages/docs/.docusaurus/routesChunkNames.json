@@ -1,0 +1,228 @@
+{
+  "/__docusaurus/debug-107": {
+    "__comp": "__comp---theme-debug-config-23-a-2ff",
+    "__context": {
+      "plugin": "plugin---docusaurus-debug-9-e-0-ea8"
+    }
+  },
+  "/__docusaurus/debug/config-c27": {
+    "__comp": "__comp---theme-debug-config-23-a-2ff",
+    "__context": {
+      "plugin": "plugin---docusaurus-debug-9-e-0-ea8"
+    }
+  },
+  "/__docusaurus/debug/content-ac9": {
+    "__comp": "__comp---theme-debug-contentba-8-ce7",
+    "__context": {
+      "plugin": "plugin---docusaurus-debug-9-e-0-ea8"
+    },
+    "allContent": "allContent---docusaurus-debug-content-246-9aa"
+  },
+  "/__docusaurus/debug/globalData-e4c": {
+    "__comp": "__comp---theme-debug-global-dataede-0fa",
+    "__context": {
+      "plugin": "plugin---docusaurus-debug-9-e-0-ea8"
+    }
+  },
+  "/__docusaurus/debug/metadata-96d": {
+    "__comp": "__comp---theme-debug-site-metadata-68-e-3d4",
+    "__context": {
+      "plugin": "plugin---docusaurus-debug-9-e-0-ea8"
+    }
+  },
+  "/__docusaurus/debug/registry-5ba": {
+    "__comp": "__comp---theme-debug-registry-679-501",
+    "__context": {
+      "plugin": "plugin---docusaurus-debug-9-e-0-ea8"
+    }
+  },
+  "/__docusaurus/debug/routes-379": {
+    "__comp": "__comp---theme-debug-routes-946-699",
+    "__context": {
+      "plugin": "plugin---docusaurus-debug-9-e-0-ea8"
+    }
+  },
+  "/search-4d6": {
+    "__comp": "__comp---theme-search-page-1-a-4-d6f",
+    "__context": {
+      "plugin": "plugin---search-482-1c0"
+    }
+  },
+  "/docs-dc6": {
+    "__comp": "__comp---theme-docs-root-5-e-9-0b6",
+    "__context": {
+      "plugin": "plugin---docsf-4-b-2bd"
+    }
+  },
+  "/docs-5d2": {
+    "__comp": "__comp---theme-doc-version-roota-7-b-5de",
+    "version": "version---docs-935-398"
+  },
+  "/docs-f6c": {
+    "__comp": "__comp---theme-doc-roota-94-67a"
+  },
+  "/docs/community/-2ea": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-community-3-fa-ce5"
+  },
+  "/docs/community/ambassador-program-b72": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-community-ambassador-programa-53-97a"
+  },
+  "/docs/community/bi-weekly-calls-4aa": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-community-bi-weekly-calls-154-0e3"
+  },
+  "/docs/community/code-of-conduct-7b2": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-community-code-of-conduct-5-c-2-fdf"
+  },
+  "/docs/community/contributing-734": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-community-contributing-61-c-6c6"
+  },
+  "/docs/community/roadmap-8cf": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-community-roadmap-5-cd-3b8"
+  },
+  "/docs/developer/-b88": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-developer-3-a-4-383"
+  },
+  "/docs/developer/architecture-c48": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-developer-architecture-319-a02"
+  },
+  "/docs/developer/local-dev-06e": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-developer-local-devfd-0-d1b"
+  },
+  "/docs/developer/plugin-architecture-16f": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-developer-plugin-architecture-2-ba-958"
+  },
+  "/docs/developer/release-process-a0a": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-developer-release-processb-52-440"
+  },
+  "/docs/developer/writing-tests-f74": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-developer-writing-testsfdf-8a6"
+  },
+  "/docs/features/agents-f2a": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-features-agents-918-ec5"
+  },
+  "/docs/features/ai-overview-417": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-features-ai-overview-8-c-7-b7b"
+  },
+  "/docs/features/bar-charts-475": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-features-bar-charts-860-dea"
+  },
+  "/docs/features/charts-overview-8da": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-features-charts-overview-17-f-c8a"
+  },
+  "/docs/features/conversation-memory-5d6": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-features-conversation-memory-030-cd1"
+  },
+  "/docs/features/csv-excel-f29": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-features-csv-excel-36-f-d46"
+  },
+  "/docs/features/custom-prompts-76e": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-features-custom-prompts-702-f38"
+  },
+  "/docs/features/data-sources-overview-4bb": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-features-data-sources-overview-1-a-5-1fc"
+  },
+  "/docs/features/databases-704": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-features-databasesbe-9-dfa"
+  },
+  "/docs/features/deep-analysis-de9": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-features-deep-analysis-16-a-a87"
+  },
+  "/docs/features/echarts-integration-984": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-features-echarts-integration-346-869"
+  },
+  "/docs/features/heatmaps-71a": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-features-heatmapsede-fd8"
+  },
+  "/docs/features/line-charts-c48": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-features-line-chartsb-75-f7f"
+  },
+  "/docs/features/natural-language-queries-02c": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-features-natural-language-queriesa-47-e82"
+  },
+  "/docs/features/real-time-streams-bf0": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-features-real-time-streams-038-23a"
+  },
+  "/docs/features/warehouses-3c2": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-features-warehousese-72-1e2"
+  },
+  "/docs/features/what-if-simulations-522": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-features-what-if-simulations-845-664"
+  },
+  "/docs/getting-started/-3c7": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-getting-started-54-c-251"
+  },
+  "/docs/getting-started/demo-walkthrough-d41": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-getting-started-demo-walkthrough-5-c-8-5f0"
+  },
+  "/docs/getting-started/faq-c23": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-getting-started-faq-6-dd-908"
+  },
+  "/docs/getting-started/first-chart-25e": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-getting-started-first-chart-1-b-2-e99"
+  },
+  "/docs/getting-started/quick-start-docker-609": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-getting-started-quick-start-docker-063-2f4"
+  },
+  "/docs/reference/api-reference-879": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-reference-api-referencea-18-e92"
+  },
+  "/docs/reference/config-reference-722": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-reference-config-reference-8-ef-75a"
+  },
+  "/docs/self-host/-bb9": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-self-host-616-e0a"
+  },
+  "/docs/self-host/backups-b55": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-self-host-backups-49-a-d53"
+  },
+  "/docs/self-host/config-reference-d88": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-self-host-config-reference-653-613"
+  },
+  "/docs/self-host/docker-compose-f84": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-self-host-docker-compose-188-4c3"
+  },
+  "/docs/self-host/ssl-certificates-327": {
+    "__comp": "__comp---theme-doc-item-178-a40",
+    "content": "content---docs-self-host-ssl-certificatescc-6-e2f"
+  }
+}

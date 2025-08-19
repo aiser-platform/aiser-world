@@ -1,0 +1,30 @@
+{
+  "id": "developer/developer-index",
+  "title": "Developer Index",
+  "description": "Welcome to the Developer Index section of Aiser Platform documentation.",
+  "source": "@site/docs/developer/index.md",
+  "sourceDirName": "developer",
+  "slug": "/developer/",
+  "permalink": "/docs/developer/",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/developer/index.md",
+  "tags": [],
+  "version": "current",
+  "lastUpdatedAt": 1539502055,
+  "formattedLastUpdatedAt": "Oct 14, 2018",
+  "frontMatter": {
+    "id": "developer-index",
+    "title": "Developer Index",
+    "sidebar_label": "Developer Index"
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "Real Time Streams",
+    "permalink": "/docs/features/real-time-streams"
+  },
+  "next": {
+    "title": "Local Dev",
+    "permalink": "/docs/developer/local-dev"
+  }
+}
