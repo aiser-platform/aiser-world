@@ -1,19 +1,15 @@
-// sidebars.js — (single source of truth)
-// 1️⃣ Top-level order is intentional — matches the user journey
-// 2️⃣ "collapsed" defaults to TRUE except for "Getting Started"
-// 3️⃣ Emoji + text = screen-reader friendly (tested with NVDA)
+// sidebars.js — Complete version with all custom sections
+// Includes our comprehensive security, performance, and troubleshooting guides
 
 const sidebars = {
   docs: [
-    // ---------------------------------
-    // 0️⃣ On-ramp (3 clicks to first chart)
-    // ---------------------------------
+    // Getting Started
     {
       type: 'category',
-      label: ' Getting Started',
+      label: '🚀 Getting Started',
       collapsed: false,
-      link: { type: 'doc', id: 'getting-started/getting-started-index' },
       items: [
+        'getting-started/getting-started-index',
         'getting-started/quick-start-docker',
         'getting-started/first-chart',
         'getting-started/demo-walkthrough',
@@ -21,107 +17,65 @@ const sidebars = {
       ]
     },
 
-    // ---------------------------------
-    // 1️⃣ Self-host (copy-paste one command)
-    // ---------------------------------
+    // Self-Host
     {
       type: 'category',
       label: '🏠 Self-Host & Enterprise',
-      link: { type: 'doc', id: 'self-host/self-host-index' },
       items: [
-        {
-          type: 'category',
-          label: ' Deployment Recipes',
-          items: [
-            'self-host/docker-compose'
-          ]
-        },
-        {
-          type: 'category',
-          label: '⚙️ Configuration',
-          items: [
-            'self-host/config-reference',
-            'self-host/ssl-certificates',
-            'self-host/backups'
-          ]
-        }
+        'self-host/self-host-index',
+        'self-host/docker-compose'
       ]
     },
 
-    // ---------------------------------
-    // 2️⃣ Features (ordered by frequency of use)
-    // ---------------------------------
+    // Security & Performance (Our custom comprehensive guides)
     {
       type: 'category',
-      label: '🤖 Agentic AI & Analytics',
-      link: { type: 'doc', id: 'features/ai-overview' },
+      label: '🔒 Security & Performance',
+      collapsed: true,
       items: [
-        'features/natural-language-queries',
-        'features/agents',
-        'features/conversation-memory',
-        'features/what-if-simulations',
-        'features/custom-prompts'
-      ]
-    },
-    {
-      type: 'category',
-      label: '📊 Charts & Visuals',
-      link: { type: 'doc', id: 'features/charts-overview' },
-      items: [
-        'features/line-charts',
-        'features/bar-charts',
-        'features/heatmaps',
-        'features/echarts-integration',
-        'features/deep-analysis'
-      ]
-    },
-    {
-      type: 'category',
-      label: '🔌 Data Sources',
-      link: { type: 'doc', id: 'features/data-sources-overview' },
-      items: [
-        'features/csv-excel',
-        'features/databases',
-        'features/warehouses',
-        'features/real-time-streams'
+        'security/security-overview',
+        'performance/performance-overview'
       ]
     },
 
-    // ---------------------------------
-    // 3️⃣ Developer & Contributor Path
-    // ---------------------------------
+    // Troubleshooting (Our custom comprehensive guide)
     {
       type: 'category',
-      label: '️ Developer',
-      link: { type: 'doc', id: 'developer/developer-index' },
+      label: '🛠️ Troubleshooting',
+      collapsed: true,
       items: [
-        'developer/local-dev',
-        'developer/architecture',
-        'developer/writing-tests',
-        'developer/plugin-architecture',
-        'developer/release-process'
+        'troubleshooting/troubleshooting-overview'
       ]
     },
 
-    // ---------------------------------
-    // 4️⃣ Community & Governance
-    // ---------------------------------
+    // Features
+    {
+      type: 'category',
+      label: '🤖 Features',
+      items: [
+        'features/ai-overview'
+      ]
+    },
+
+    // Developer
+    {
+      type: 'category',
+      label: '🛠️ Developer',
+      items: [
+        'developer/developer-index'
+      ]
+    },
+
+    // Community
     {
       type: 'category',
       label: '🌍 Community',
-      link: { type: 'doc', id: 'community/community-index' },
       items: [
-        'community/roadmap',
-        'community/contributing',
-        'community/code-of-conduct',
-        'community/bi-weekly-calls',
-        'community/ambassador-program'
+        'community/community-index'
       ]
     },
 
-    // ---------------------------------
-    // 5️⃣ Reference (integrated into main sidebar)
-    // ---------------------------------
+    // Reference
     {
       type: 'category',
       label: '📖 Reference',
@@ -130,20 +84,6 @@ const sidebars = {
         'reference/api-reference',
         'reference/config-reference'
       ]
-    },
-
-    // ---------------------------------
-    // 6️⃣ Legal & Compliance (footer link)
-    // ---------------------------------
-    {
-      type: 'link',
-      label: 'License (MIT) + Enterprise License',
-      href: 'https://github.com/aiser-platform/aiser-world/blob/main/LICENSE'
-    },
-    {
-      type: 'link',
-      label: 'Privacy Policy',
-      href: 'https://aiser.com/privacy'
     }
   ]
 };

@@ -4,9 +4,11 @@ const config = {
   favicon: 'img/favicon.ico',
   
   // Set the production url of your site here
-  url: 'https://docs.aiser.dataticon.com',
+  url: 'https://aiser-docs.dataticon.com',
   // Set the /<baseUrl>/ pathname under which your site is served
-  baseUrl: '/',
+  // For local development, use '/'
+  // For production deployment, use '/docs/'
+  baseUrl: process.env.NODE_ENV === 'production' ? '/docs/' : '/',
   
   // GitHub Pages deployment
   deploymentBranch: 'gh-pages',
@@ -17,7 +19,7 @@ const config = {
   
   // Custom domain
   customFields: {
-    domain: 'docs.aiser.dataticon.com'
+    domain: 'aiser-docs.dataticon.com'
   },
   
   // Even if you don't use internalization, you can use this field to set useful
@@ -33,6 +35,7 @@ const config = {
       'classic',
       {
         docs: {
+          path: 'src/docs',
           sidebarPath: require.resolve('./sidebars.js'),
           // Remove this to remove the "edit this page" links.
           editUrl: 'https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/',
@@ -51,15 +54,17 @@ const config = {
     ],
   ],
   
+  // Global configuration
+  onBrokenLinks: 'warn',
+  
   // Theme configuration
   themeConfig: {
     // Replace with project's social card
     image: 'img/aiser-docs-social-card.jpg',
     navbar: {
-      title: 'Aiser Docs',
       logo: {
-        alt: 'Aiser Logo',
-        src: 'img/logo.svg',
+        alt: 'Aiser Platform',
+        src: 'img/logo.jpg',
       },
       items: [
         {
@@ -75,7 +80,7 @@ const config = {
           position: 'right',
         },
         {
-          href: 'https://aiser.com',
+          href: 'https://aiser-platform.vercel.app/',
           label: 'Website',
           position: 'right',
         },
@@ -107,6 +112,10 @@ const config = {
             {
               label: 'GitHub',
               href: 'https://github.com/bigstack-analytics/aiser-world',
+            },
+            {
+              label: 'Telegram (Aisertics)',
+              href: 'https://t.me/dataticon_ai',
             },
             {
               label: 'Discussions',
@@ -152,7 +161,7 @@ const config = {
   
   // Custom port configuration
   customFields: {
-    port: 3001  // Use port 3001 for docs
+    port: 3005  // Use port 3005 for docs
   },
 };
 

@@ -1,0 +1,21 @@
+{
+  "id": "community/bi-weekly-calls",
+  "title": "Bi Weekly Calls",
+  "description": "Overview",
+  "source": "@site/src/docs/community/bi-weekly-calls.md",
+  "sourceDirName": "community",
+  "slug": "/community/bi-weekly-calls",
+  "permalink": "/docs/community/bi-weekly-calls",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/community/bi-weekly-calls.md",
+  "tags": [],
+  "version": "current",
+  "lastUpdatedAt": 1755570184,
+  "formattedLastUpdatedAt": "Aug 19, 2025",
+  "frontMatter": {
+    "id": "bi-weekly-calls",
+    "title": "Bi Weekly Calls",
+    "sidebar_label": "Bi Weekly Calls"
+  }
+}

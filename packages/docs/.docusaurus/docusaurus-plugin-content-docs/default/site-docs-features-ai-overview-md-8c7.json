@@ -20,11 +20,11 @@
   },
   "sidebar": "docs",
   "previous": {
-    "title": "Backups",
-    "permalink": "/docs/self-host/backups"
+    "title": "Docker Compose",
+    "permalink": "/docs/self-host/docker-compose"
   },
   "next": {
-    "title": "Natural Language Queries",
-    "permalink": "/docs/features/natural-language-queries"
+    "title": "Developer Index",
+    "permalink": "/docs/developer/"
   }
 }

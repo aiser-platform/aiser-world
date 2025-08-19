@@ -17,14 +17,5 @@
     "id": "agents",
     "title": "Agents",
     "sidebar_label": "Agents"
-  },
-  "sidebar": "docs",
-  "previous": {
-    "title": "Natural Language Queries",
-    "permalink": "/docs/features/natural-language-queries"
-  },
-  "next": {
-    "title": "Conversation Memory",
-    "permalink": "/docs/features/conversation-memory"
   }
 }

@@ -1,0 +1,31 @@
+{
+  "id": "self-host/self-host-index",
+  "title": "Self-Host & Enterprise Deployment",
+  "description": "Deploy Aiser Platform in your own infrastructure with enterprise-grade security, scalability, and customization options",
+  "source": "@site/src/docs/self-host/index.md",
+  "sourceDirName": "self-host",
+  "slug": "/self-host/",
+  "permalink": "/docs/self-host/",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/self-host/index.md",
+  "tags": [],
+  "version": "current",
+  "lastUpdatedAt": 1755570184,
+  "formattedLastUpdatedAt": "Aug 19, 2025",
+  "frontMatter": {
+    "id": "self-host-index",
+    "title": "Self-Host & Enterprise Deployment",
+    "sidebar_label": "Self-Host & Enterprise",
+    "description": "Deploy Aiser Platform in your own infrastructure with enterprise-grade security, scalability, and customization options"
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "FAQ",
+    "permalink": "/docs/getting-started/faq"
+  },
+  "next": {
+    "title": "Docker Compose",
+    "permalink": "/docs/self-host/docker-compose"
+  }
+}

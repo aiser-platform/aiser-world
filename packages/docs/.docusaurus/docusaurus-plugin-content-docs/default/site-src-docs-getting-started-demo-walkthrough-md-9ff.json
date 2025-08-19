@@ -1,0 +1,31 @@
+{
+  "id": "getting-started/demo-walkthrough",
+  "title": "Demo Walkthrough",
+  "description": "Follow along with our interactive demo to see Aiser Platform's AI-powered analytics in action",
+  "source": "@site/src/docs/getting-started/demo-walkthrough.md",
+  "sourceDirName": "getting-started",
+  "slug": "/getting-started/demo-walkthrough",
+  "permalink": "/docs/getting-started/demo-walkthrough",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/getting-started/demo-walkthrough.md",
+  "tags": [],
+  "version": "current",
+  "lastUpdatedAt": 1755570184,
+  "formattedLastUpdatedAt": "Aug 19, 2025",
+  "frontMatter": {
+    "id": "demo-walkthrough",
+    "title": "Demo Walkthrough",
+    "sidebar_label": "Demo Walkthrough",
+    "description": "Follow along with our interactive demo to see Aiser Platform's AI-powered analytics in action"
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "First Chart",
+    "permalink": "/docs/getting-started/first-chart"
+  },
+  "next": {
+    "title": "FAQ",
+    "permalink": "/docs/getting-started/faq"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "id": "features/what-if-simulations",
+  "title": "What If Simulations",
+  "description": "Overview",
+  "source": "@site/src/docs/features/what-if-simulations.md",
+  "sourceDirName": "features",
+  "slug": "/features/what-if-simulations",
+  "permalink": "/docs/features/what-if-simulations",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/features/what-if-simulations.md",
+  "tags": [],
+  "version": "current",
+  "lastUpdatedAt": 1755570184,
+  "formattedLastUpdatedAt": "Aug 19, 2025",
+  "frontMatter": {
+    "id": "what-if-simulations",
+    "title": "What If Simulations",
+    "sidebar_label": "What If Simulations"
+  }
+}

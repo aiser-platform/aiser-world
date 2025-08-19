@@ -17,14 +17,5 @@
     "id": "roadmap",
     "title": "Roadmap",
     "sidebar_label": "Roadmap"
-  },
-  "sidebar": "docs",
-  "previous": {
-    "title": "Community Index",
-    "permalink": "/docs/community/"
-  },
-  "next": {
-    "title": "Contributing",
-    "permalink": "/docs/community/contributing"
   }
 }

@@ -17,14 +17,5 @@
     "id": "architecture",
     "title": "Architecture",
     "sidebar_label": "Architecture"
-  },
-  "sidebar": "docs",
-  "previous": {
-    "title": "Local Dev",
-    "permalink": "/docs/developer/local-dev"
-  },
-  "next": {
-    "title": "Writing Tests",
-    "permalink": "/docs/developer/writing-tests"
   }
 }

@@ -1,0 +1,31 @@
+{
+  "id": "reference/api-reference",
+  "title": "API Reference",
+  "description": "Complete API documentation for Aiser Platform - integrate AI-powered analytics into your applications",
+  "source": "@site/src/docs/reference/api-reference.md",
+  "sourceDirName": "reference",
+  "slug": "/reference/api-reference",
+  "permalink": "/docs/reference/api-reference",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/reference/api-reference.md",
+  "tags": [],
+  "version": "current",
+  "lastUpdatedAt": 1755570184,
+  "formattedLastUpdatedAt": "Aug 19, 2025",
+  "frontMatter": {
+    "id": "api-reference",
+    "title": "API Reference",
+    "sidebar_label": "API Reference",
+    "description": "Complete API documentation for Aiser Platform - integrate AI-powered analytics into your applications"
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "Community",
+    "permalink": "/docs/community/"
+  },
+  "next": {
+    "title": "Configuration",
+    "permalink": "/docs/reference/config-reference"
+  }
+}

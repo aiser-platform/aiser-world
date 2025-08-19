@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  docs:
+    build:
+      context: .
+      dockerfile: Dockerfile.docs
+    container_name: aiser-docs
+    ports:
+      - "3005:3005"
+    environment:
+      - NODE_ENV=production
+      - PORT=3005
+      - BASE_URL=/docs/
+      - CUSTOM_DOMAIN=aiser-docs.dataticon.com
+    volumes:
+      - ./src:/app/src:ro
+      - ./static:/app/static:ro
+      - ./docusaurus.config.js:/app/docusaurus.config.js:ro
+      - ./sidebars.js:/app/sidebars.js:ro
+      - ./package.json:/app/package.json:ro
+    networks:
+      - aiser-docs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3005/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  docs-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.docs.dev
+    container_name: aiser-docs-dev
+    ports:
+      - "3006:3005"
+    environment:
+      - NODE_ENV=development
+      - PORT=3005
+      - BASE_URL=/docs/
+      - DEBUG=true
+      - WATCH=true
+    volumes:
+      - ./src:/app/src
+      - ./static:/app/static
+      - ./docusaurus.config.js:/app/docusaurus.config.js
+      - ./sidebars.js:/app/sidebars.js
+      - ./package.json:/app/package.json
+      - ./node_modules:/app/node_modules
+    networks:
+      - aiser-docs
+    restart: unless-stopped
+    profiles:
+      - dev
+
+networks:
+  aiser-docs:
+    driver: bridge
+    name: aiser-docs-network
+
+volumes:
+  docs-node-modules:
+    driver: local

@@ -1,0 +1,21 @@
+{
+  "id": "features/echarts-integration",
+  "title": "Echarts Integration",
+  "description": "Overview",
+  "source": "@site/src/docs/features/echarts-integration.md",
+  "sourceDirName": "features",
+  "slug": "/features/echarts-integration",
+  "permalink": "/docs/features/echarts-integration",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/features/echarts-integration.md",
+  "tags": [],
+  "version": "current",
+  "lastUpdatedAt": 1755570184,
+  "formattedLastUpdatedAt": "Aug 19, 2025",
+  "frontMatter": {
+    "id": "echarts-integration",
+    "title": "Echarts Integration",
+    "sidebar_label": "Echarts Integration"
+  }
+}

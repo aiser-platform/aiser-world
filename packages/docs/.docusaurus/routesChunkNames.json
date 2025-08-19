@@ -1,228 +1,197 @@
 {
-  "/__docusaurus/debug-107": {
-    "__comp": "__comp---theme-debug-config-23-a-2ff",
-    "__context": {
-      "plugin": "plugin---docusaurus-debug-9-e-0-ea8"
-    }
-  },
-  "/__docusaurus/debug/config-c27": {
-    "__comp": "__comp---theme-debug-config-23-a-2ff",
-    "__context": {
-      "plugin": "plugin---docusaurus-debug-9-e-0-ea8"
-    }
-  },
-  "/__docusaurus/debug/content-ac9": {
-    "__comp": "__comp---theme-debug-contentba-8-ce7",
-    "__context": {
-      "plugin": "plugin---docusaurus-debug-9-e-0-ea8"
-    },
-    "allContent": "allContent---docusaurus-debug-content-246-9aa"
-  },
-  "/__docusaurus/debug/globalData-e4c": {
-    "__comp": "__comp---theme-debug-global-dataede-0fa",
-    "__context": {
-      "plugin": "plugin---docusaurus-debug-9-e-0-ea8"
-    }
-  },
-  "/__docusaurus/debug/metadata-96d": {
-    "__comp": "__comp---theme-debug-site-metadata-68-e-3d4",
-    "__context": {
-      "plugin": "plugin---docusaurus-debug-9-e-0-ea8"
-    }
-  },
-  "/__docusaurus/debug/registry-5ba": {
-    "__comp": "__comp---theme-debug-registry-679-501",
-    "__context": {
-      "plugin": "plugin---docusaurus-debug-9-e-0-ea8"
-    }
-  },
-  "/__docusaurus/debug/routes-379": {
-    "__comp": "__comp---theme-debug-routes-946-699",
-    "__context": {
-      "plugin": "plugin---docusaurus-debug-9-e-0-ea8"
-    }
-  },
   "/search-4d6": {
-    "__comp": "__comp---theme-search-page-1-a-4-d6f",
+    "__comp": "1a4e3797",
     "__context": {
-      "plugin": "plugin---search-482-1c0"
+      "plugin": "4828ac2f"
     }
   },
-  "/docs-dc6": {
-    "__comp": "__comp---theme-docs-root-5-e-9-0b6",
+  "/docs-1a9": {
+    "__comp": "5e95c892",
     "__context": {
-      "plugin": "plugin---docsf-4-b-2bd"
+      "plugin": "f4b7a3da"
     }
   },
-  "/docs-5d2": {
-    "__comp": "__comp---theme-doc-version-roota-7-b-5de",
-    "version": "version---docs-935-398"
+  "/docs-0e0": {
+    "__comp": "a7bd4aaa",
+    "version": "935f2afb"
   },
-  "/docs-f6c": {
-    "__comp": "__comp---theme-doc-roota-94-67a"
+  "/docs-79c": {
+    "__comp": "a94703ab"
   },
-  "/docs/community/-2ea": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---docs-community-3-fa-ce5"
+  "/docs/community/-63e": {
+    "__comp": "17896441",
+    "content": "159199bf"
   },
-  "/docs/community/ambassador-program-b72": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---docs-community-ambassador-programa-53-97a"
+  "/docs/community/ambassador-program-b2a": {
+    "__comp": "17896441",
+    "content": "9ccb5cd3"
   },
-  "/docs/community/bi-weekly-calls-4aa": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---docs-community-bi-weekly-calls-154-0e3"
+  "/docs/community/bi-weekly-calls-f1e": {
+    "__comp": "17896441",
+    "content": "33552a28"
   },
-  "/docs/community/code-of-conduct-7b2": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---docs-community-code-of-conduct-5-c-2-fdf"
+  "/docs/community/code-of-conduct-bbc": {
+    "__comp": "17896441",
+    "content": "51a56f22"
   },
-  "/docs/community/contributing-734": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---docs-community-contributing-61-c-6c6"
+  "/docs/community/contributing-0bb": {
+    "__comp": "17896441",
+    "content": "93dc14ff"
   },
-  "/docs/community/roadmap-8cf": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---docs-community-roadmap-5-cd-3b8"
+  "/docs/community/roadmap-3c2": {
+    "__comp": "17896441",
+    "content": "67707330"
   },
-  "/docs/developer/-b88": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---docs-developer-3-a-4-383"
+  "/docs/developer/-880": {
+    "__comp": "17896441",
+    "content": "43dd609f"
   },
-  "/docs/developer/architecture-c48": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---docs-developer-architecture-319-a02"
+  "/docs/developer/architecture-21f": {
+    "__comp": "17896441",
+    "content": "8b04cfb5"
   },
-  "/docs/developer/local-dev-06e": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---docs-developer-local-devfd-0-d1b"
+  "/docs/developer/local-dev-bd3": {
+    "__comp": "17896441",
+    "content": "978de9a7"
   },
-  "/docs/developer/plugin-architecture-16f": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---docs-developer-plugin-architecture-2-ba-958"
+  "/docs/developer/plugin-architecture-37f": {
+    "__comp": "17896441",
+    "content": "987d1c77"
   },
-  "/docs/developer/release-process-a0a": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---docs-developer-release-processb-52-440"
+  "/docs/developer/release-process-e35": {
+    "__comp": "17896441",
+    "content": "df087062"
   },
-  "/docs/developer/writing-tests-f74": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---docs-developer-writing-testsfdf-8a6"
+  "/docs/developer/writing-tests-e20": {
+    "__comp": "17896441",
+    "content": "838649fa"
   },
-  "/docs/features/agents-f2a": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---docs-features-agents-918-ec5"
+  "/docs/features/agents-ffb": {
+    "__comp": "17896441",
+    "content": "bb58811b"
   },
-  "/docs/features/ai-overview-417": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---docs-features-ai-overview-8-c-7-b7b"
+  "/docs/features/ai-overview-c3d": {
+    "__comp": "17896441",
+    "content": "1ff1de0d"
   },
-  "/docs/features/bar-charts-475": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---docs-features-bar-charts-860-dea"
+  "/docs/features/bar-charts-5cd": {
+    "__comp": "17896441",
+    "content": "c2b6d87c"
   },
-  "/docs/features/charts-overview-8da": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---docs-features-charts-overview-17-f-c8a"
+  "/docs/features/charts-overview-b5c": {
+    "__comp": "17896441",
+    "content": "90369e4a"
   },
-  "/docs/features/conversation-memory-5d6": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---docs-features-conversation-memory-030-cd1"
+  "/docs/features/conversation-memory-5ec": {
+    "__comp": "17896441",
+    "content": "a4e4231c"
   },
-  "/docs/features/csv-excel-f29": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---docs-features-csv-excel-36-f-d46"
+  "/docs/features/csv-excel-aac": {
+    "__comp": "17896441",
+    "content": "1b5928f6"
   },
-  "/docs/features/custom-prompts-76e": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---docs-features-custom-prompts-702-f38"
+  "/docs/features/custom-prompts-63f": {
+    "__comp": "17896441",
+    "content": "7c7d1f04"
   },
-  "/docs/features/data-sources-overview-4bb": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---docs-features-data-sources-overview-1-a-5-1fc"
+  "/docs/features/data-sources-overview-9ec": {
+    "__comp": "17896441",
+    "content": "635fb555"
   },
-  "/docs/features/databases-704": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---docs-features-databasesbe-9-dfa"
+  "/docs/features/databases-71a": {
+    "__comp": "17896441",
+    "content": "d6ea7606"
   },
-  "/docs/features/deep-analysis-de9": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---docs-features-deep-analysis-16-a-a87"
+  "/docs/features/deep-analysis-a68": {
+    "__comp": "17896441",
+    "content": "94450ee8"
   },
-  "/docs/features/echarts-integration-984": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---docs-features-echarts-integration-346-869"
+  "/docs/features/echarts-integration-d27": {
+    "__comp": "17896441",
+    "content": "8917b0f8"
   },
-  "/docs/features/heatmaps-71a": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---docs-features-heatmapsede-fd8"
+  "/docs/features/heatmaps-a70": {
+    "__comp": "17896441",
+    "content": "9d0b6693"
   },
-  "/docs/features/line-charts-c48": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---docs-features-line-chartsb-75-f7f"
+  "/docs/features/line-charts-337": {
+    "__comp": "17896441",
+    "content": "cf3544ef"
   },
-  "/docs/features/natural-language-queries-02c": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---docs-features-natural-language-queriesa-47-e82"
+  "/docs/features/natural-language-queries-d8d": {
+    "__comp": "17896441",
+    "content": "8798320c"
   },
-  "/docs/features/real-time-streams-bf0": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---docs-features-real-time-streams-038-23a"
+  "/docs/features/real-time-streams-0c5": {
+    "__comp": "17896441",
+    "content": "a6e83ac1"
   },
-  "/docs/features/warehouses-3c2": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---docs-features-warehousese-72-1e2"
+  "/docs/features/warehouses-cf8": {
+    "__comp": "17896441",
+    "content": "1b3e0e45"
   },
-  "/docs/features/what-if-simulations-522": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---docs-features-what-if-simulations-845-664"
+  "/docs/features/what-if-simulations-37b": {
+    "__comp": "17896441",
+    "content": "a51652b0"
   },
-  "/docs/getting-started/-3c7": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---docs-getting-started-54-c-251"
+  "/docs/getting-started/-7a1": {
+    "__comp": "17896441",
+    "content": "76ae2649"
   },
-  "/docs/getting-started/demo-walkthrough-d41": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---docs-getting-started-demo-walkthrough-5-c-8-5f0"
+  "/docs/getting-started/demo-walkthrough-959": {
+    "__comp": "17896441",
+    "content": "9ff03a28"
   },
-  "/docs/getting-started/faq-c23": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---docs-getting-started-faq-6-dd-908"
+  "/docs/getting-started/faq-a99": {
+    "__comp": "17896441",
+    "content": "b9a80fb4"
   },
-  "/docs/getting-started/first-chart-25e": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---docs-getting-started-first-chart-1-b-2-e99"
+  "/docs/getting-started/first-chart-22a": {
+    "__comp": "17896441",
+    "content": "11e9cd99"
   },
-  "/docs/getting-started/quick-start-docker-609": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---docs-getting-started-quick-start-docker-063-2f4"
+  "/docs/getting-started/quick-start-docker-202": {
+    "__comp": "17896441",
+    "content": "010b61cd"
   },
-  "/docs/reference/api-reference-879": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---docs-reference-api-referencea-18-e92"
+  "/docs/performance/-c59": {
+    "__comp": "17896441",
+    "content": "c8ec6146"
   },
-  "/docs/reference/config-reference-722": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---docs-reference-config-reference-8-ef-75a"
+  "/docs/reference/api-reference-b41": {
+    "__comp": "17896441",
+    "content": "c37eaa2d"
   },
-  "/docs/self-host/-bb9": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---docs-self-host-616-e0a"
+  "/docs/reference/config-reference-864": {
+    "__comp": "17896441",
+    "content": "9d34a299"
   },
-  "/docs/self-host/backups-b55": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---docs-self-host-backups-49-a-d53"
+  "/docs/security/-6c4": {
+    "__comp": "17896441",
+    "content": "8e5849e7"
   },
-  "/docs/self-host/config-reference-d88": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---docs-self-host-config-reference-653-613"
+  "/docs/self-host/-3ea": {
+    "__comp": "17896441",
+    "content": "9d16a2b1"
   },
-  "/docs/self-host/docker-compose-f84": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---docs-self-host-docker-compose-188-4c3"
+  "/docs/self-host/backups-4c7": {
+    "__comp": "17896441",
+    "content": "27a07cf8"
   },
-  "/docs/self-host/ssl-certificates-327": {
-    "__comp": "__comp---theme-doc-item-178-a40",
-    "content": "content---docs-self-host-ssl-certificatescc-6-e2f"
+  "/docs/self-host/config-reference-21a": {
+    "__comp": "17896441",
+    "content": "3011585a"
+  },
+  "/docs/self-host/docker-compose-a6c": {
+    "__comp": "17896441",
+    "content": "4a54264f"
+  },
+  "/docs/self-host/ssl-certificates-97c": {
+    "__comp": "17896441",
+    "content": "d359442e"
+  },
+  "/docs/troubleshooting/-ecd": {
+    "__comp": "17896441",
+    "content": "8ea9a4f1"
   }
 }

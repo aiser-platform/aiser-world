@@ -1,0 +1,31 @@
+{
+  "id": "self-host/docker-compose",
+  "title": "Docker Compose Deployment",
+  "description": "Deploy Aiser Platform with Docker Compose for production-ready, scalable analytics infrastructure",
+  "source": "@site/src/docs/self-host/docker-compose.md",
+  "sourceDirName": "self-host",
+  "slug": "/self-host/docker-compose",
+  "permalink": "/docs/self-host/docker-compose",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/self-host/docker-compose.md",
+  "tags": [],
+  "version": "current",
+  "lastUpdatedAt": 1755570184,
+  "formattedLastUpdatedAt": "Aug 19, 2025",
+  "frontMatter": {
+    "id": "docker-compose",
+    "title": "Docker Compose Deployment",
+    "sidebar_label": "Docker Compose",
+    "description": "Deploy Aiser Platform with Docker Compose for production-ready, scalable analytics infrastructure"
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "Self-Host & Enterprise",
+    "permalink": "/docs/self-host/"
+  },
+  "next": {
+    "title": "Security Overview",
+    "permalink": "/docs/security/"
+  }
+}

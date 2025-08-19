@@ -17,14 +17,5 @@
     "id": "bar-charts",
     "title": "Bar Charts",
     "sidebar_label": "Bar Charts"
-  },
-  "sidebar": "docs",
-  "previous": {
-    "title": "Line Charts",
-    "permalink": "/docs/features/line-charts"
-  },
-  "next": {
-    "title": "Heatmaps",
-    "permalink": "/docs/features/heatmaps"
   }
 }

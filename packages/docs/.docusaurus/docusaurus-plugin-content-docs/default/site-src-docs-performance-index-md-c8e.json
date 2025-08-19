@@ -1,0 +1,29 @@
+{
+  "id": "performance/performance-overview",
+  "title": "Performance & Optimization",
+  "description": "Performance optimization, scaling strategies, and monitoring for Aiser Platform",
+  "source": "@site/src/docs/performance/index.md",
+  "sourceDirName": "performance",
+  "slug": "/performance/",
+  "permalink": "/docs/performance/",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/performance/index.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {
+    "id": "performance-overview",
+    "title": "Performance & Optimization",
+    "sidebar_label": "Performance Overview",
+    "description": "Performance optimization, scaling strategies, and monitoring for Aiser Platform"
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "Security Overview",
+    "permalink": "/docs/security/"
+  },
+  "next": {
+    "title": "Troubleshooting Overview",
+    "permalink": "/docs/troubleshooting/"
+  }
+}

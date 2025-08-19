@@ -17,14 +17,5 @@
     "id": "custom-prompts",
     "title": "Custom Prompts",
     "sidebar_label": "Custom Prompts"
-  },
-  "sidebar": "docs",
-  "previous": {
-    "title": "What If Simulations",
-    "permalink": "/docs/features/what-if-simulations"
-  },
-  "next": {
-    "title": "Charts Overview",
-    "permalink": "/docs/features/charts-overview"
   }
 }

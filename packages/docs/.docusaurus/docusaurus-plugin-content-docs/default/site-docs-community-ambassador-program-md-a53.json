@@ -17,14 +17,5 @@
     "id": "ambassador-program",
     "title": "Ambassador Program",
     "sidebar_label": "Ambassador Program"
-  },
-  "sidebar": "docs",
-  "previous": {
-    "title": "Bi Weekly Calls",
-    "permalink": "/docs/community/bi-weekly-calls"
-  },
-  "next": {
-    "title": "Api Reference",
-    "permalink": "/docs/reference/api-reference"
   }
 }

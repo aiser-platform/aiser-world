@@ -20,11 +20,11 @@
   },
   "sidebar": "docs",
   "previous": {
-    "title": "Release Process",
-    "permalink": "/docs/developer/release-process"
+    "title": "Developer Index",
+    "permalink": "/docs/developer/"
   },
   "next": {
-    "title": "Roadmap",
-    "permalink": "/docs/community/roadmap"
+    "title": "Api Reference",
+    "permalink": "/docs/reference/api-reference"
   }
 }
