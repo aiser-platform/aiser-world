@@ -257,7 +257,7 @@ See the [LICENSE](LICENSE) file for complete details.
 
 ## 🆘 Support
 
-- **Documentation**: Check the `docs/` directory
+- **Documentation**: Check the `packages/docs/` directory
 - **Issues**: Report bugs and request features via GitHub Issues
 - **Email Support**: support@dataticon.com
 - **Discussions**: Join community discussions
@@ -266,5 +266,6 @@ See the [LICENSE](LICENSE) file for complete details.
 
 
 **Built with ❤️ by DataTicon Team**
+
 
 
