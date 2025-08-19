@@ -6,11 +6,15 @@ import {
     DislikeOutlined,
     LikeOutlined,
     ReloadOutlined,
+    RobotOutlined,
+    UserOutlined,
 } from '@ant-design/icons';
-import { Avatar, Button, Tooltip } from 'antd';
+import { Avatar, Button, Tooltip, Badge } from 'antd';
 import React from 'react';
 import Markdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
+import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
 import './styles.css';
 
 interface ChartButton {
@@ -35,13 +39,56 @@ interface MessageBoxProps {
     answer?: string;
 }
 
-// const Iframe = ({ src, title, ...props }: React.ComponentProps<'iframe'>) => {
-//     return (
-//         <div className="iframe-container">
-//             <iframe src={src} title={title} allowFullScreen {...props} />
-//         </div>
-//     );
-// };
+// AI Profile Component with animated avatar
+const AIProfile: React.FC = () => (
+    <div className="ai-profile">
+        <Badge 
+            count={<div className="ai-status-indicator" />} 
+            offset={[-5, 5]}
+        >
+            <Avatar 
+                size={40}
+                style={{ 
+                    backgroundColor: '#1890ff',
+                    border: '2px solid #40a9ff',
+                    boxShadow: '0 0 10px rgba(24, 144, 255, 0.3)'
+                }}
+                icon={<RobotOutlined style={{ fontSize: '20px' }} />}
+            />
+        </Badge>
+        <div className="ai-info">
+            <div className="ai-name">AI Assistant</div>
+            <div className="ai-status">Online</div>
+        </div>
+    </div>
+);
+
+// User Profile Component
+const UserProfile: React.FC = () => {
+    const { user } = useAuth();
+    const router = useRouter();
+    
+    const handleProfileClick = () => {
+        router.push('/settings/profile');
+    };
+    
+    return (
+        <div className="user-profile" onClick={handleProfileClick} style={{ cursor: 'pointer' }}>
+            <Avatar 
+                size={40}
+                style={{ 
+                    backgroundColor: '#52c41a',
+                    border: '2px solid #73d13d'
+                }}
+                icon={<UserOutlined style={{ fontSize: '20px' }} />}
+            />
+            <div className="user-info">
+                <div className="user-name">{user?.email?.split('@')[0] || 'You'}</div>
+                <div className="user-email">{user?.email || 'user@example.com'}</div>
+            </div>
+        </div>
+    );
+};
 
 export default function ChatMessageBox({
     id,
@@ -52,37 +99,31 @@ export default function ChatMessageBox({
     answer,
 }: MessageBoxProps) {
     return (
-        <div>
+        <div className="message-container">
             {answer && query && (
                 <>
+                    {/* User Message */}
                     <div
-                        className="ContainerMessageBox justify-end "
+                        className="ContainerMessageBox justify-end"
                         key={`user-${id}`}
                     >
                         <div className="MessageBox justify-end">
-                            <div className="Message">
+                            <div className="Message user-message">
                                 <Markdown>{query ?? ''}</Markdown>
                             </div>
                         </div>
-                        <Avatar
-                            style={{
-                                backgroundColor: '#f56a00',
-                            }}
-                        >
-                            You
-                        </Avatar>
+                        <UserProfile />
                     </div>
 
+                    {/* AI Message */}
                     <div
                         className="ContainerMessageBox justify-start"
                         key={`assistant-${id}`}
                     >
-                        <Avatar style={{ backgroundColor: '#0891b2' }}>
-                            AI
-                        </Avatar>
+                        <AIProfile />
                         <div className={`MessageBox justify-start`}>
                             <div
-                                className={`Message ${answer?.includes('<iframe') ? 'has-iframe' : ''}`}
+                                className={`Message ai-message ${answer?.includes('<iframe') ? 'has-iframe' : ''}`}
                             >
                                 {id === 'loading' || id.startsWith('error') ? (
                                     <span
@@ -102,9 +143,6 @@ export default function ChatMessageBox({
                             </div>
                         </div>
                     </div>
-                    {/* <div className="ActionButtons">
-                        <ActionButtons isLike={isLike} onAction={onAction} />
-                    </div> */}
                 </>
             )}
         </div>

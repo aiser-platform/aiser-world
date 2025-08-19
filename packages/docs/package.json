@@ -1,0 +1,52 @@
+{
+  "name": "@aiser/docs",
+  "version": "1.0.0",
+  "description": "Aiser Platform Documentation",
+  "private": true,
+  "scripts": {
+    "docusaurus": "npx docusaurus",
+    "start": "npx docusaurus start --port 3001",
+    "build": "npx docusaurus build",
+    "swizzle": "npx docusaurus swizzle",
+    "deploy": "npx docusaurus deploy",
+    "clear": "npx docusaurus clear",
+    "serve": "npx docusaurus serve --port 3001",
+    "write-translations": "npx docusaurus write-translations",
+    "write-heading-ids": "npx docusaurus write-heading-ids",
+    "typecheck": "tsc",
+    "generate-docs": "python scripts/generate_docs.py",
+    "prebuild": "npm run generate-docs"
+  },
+  "dependencies": {
+    "@docusaurus/core": "3.1.1",
+    "@docusaurus/preset-classic": "3.1.1",
+    "@docusaurus/theme-search-algolia": "3.1.1",
+    "@docusaurus/plugin-sitemap": "3.1.1",
+    "@mdx-js/react": "^3.0.0",
+    "clsx": "^2.0.0",
+    "prism-react-renderer": "^2.3.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@docusaurus/module-type-aliases": "3.1.1",
+    "@docusaurus/types": "3.1.1",
+    "@types/react": "^18.2.0",
+    "typescript": "^5.0.0"
+  },
+  "browserslist": {
+    "production": [
+      ">0.5%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

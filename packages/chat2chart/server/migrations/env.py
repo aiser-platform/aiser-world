@@ -30,12 +30,16 @@ fileConfig(config.config_file_name)
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
 # ---------------- added code here -------------------------#
-from migrations.models import *
-
-# ------------------------------------------------------------#
-# ---------------- changed code here -------------------------#
-# here target_metadata was equal to None
-target_metadata = [Base.metadata]
+# Import models only when needed for migrations
+# This prevents circular imports during application startup
+try:
+    from migrations.models import *
+    target_metadata = [Base.metadata]
+except ImportError:
+    # If models can't be imported, use empty metadata
+    # This allows the application to start without migration conflicts
+    target_metadata = None
+    print("Warning: Could not import migration models. Migrations may not work correctly.")
 # ------------------------------------------------------------#
 
 
@@ -71,8 +75,13 @@ def run_migrations_online() -> None:
 
     """
     # Override sqlalchemy.url with sync PostgreSQL URL
+    # Use explicit driver specification to avoid conflicts
     async_url = settings.SQLALCHEMY_DATABASE_URI
-    sync_url = async_url.replace("postgresql+asyncpg://", "postgresql://")
+    if "postgresql+asyncpg://" in async_url:
+        sync_url = async_url.replace("postgresql+asyncpg://", "postgresql+psycopg2://")
+    else:
+        # Fallback to explicit psycopg2 driver
+        sync_url = f"postgresql+psycopg2://{settings.POSTGRES_USER}:{settings.POSTGRES_PASSWORD}@{settings.POSTGRES_SERVER}:{settings.POSTGRES_PORT}/{settings.POSTGRES_DB}"
 
     configuration = config.get_section(config.config_ini_section)
     configuration["sqlalchemy.url"] = sync_url

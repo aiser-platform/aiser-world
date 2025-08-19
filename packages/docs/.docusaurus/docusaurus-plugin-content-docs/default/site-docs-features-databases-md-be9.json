@@ -1,0 +1,30 @@
+{
+  "id": "features/databases",
+  "title": "Databases",
+  "description": "Overview",
+  "source": "@site/docs/features/databases.md",
+  "sourceDirName": "features",
+  "slug": "/features/databases",
+  "permalink": "/docs/features/databases",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/features/databases.md",
+  "tags": [],
+  "version": "current",
+  "lastUpdatedAt": 1539502055,
+  "formattedLastUpdatedAt": "Oct 14, 2018",
+  "frontMatter": {
+    "id": "databases",
+    "title": "Databases",
+    "sidebar_label": "Databases"
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "Csv Excel",
+    "permalink": "/docs/features/csv-excel"
+  },
+  "next": {
+    "title": "Warehouses",
+    "permalink": "/docs/features/warehouses"
+  }
+}

@@ -1,0 +1,32 @@
+cubes:
+- dimensions:
+    Date of birth:
+      sql: Date of birth
+      type: time
+    Email:
+      sql: Email
+      type: string
+    First Name:
+      sql: First Name
+      type: string
+    Index:
+      sql: Index
+      type: string
+    Job Title:
+      sql: Job Title
+      type: string
+    Last Name:
+      sql: Last Name
+      type: string
+    Phone:
+      sql: Phone
+      type: string
+    Sex:
+      sql: Sex
+      type: string
+    User Id:
+      sql: User Id
+      type: string
+  measures: {}
+  name: File_1755327726
+  sql_table: file_1755327726

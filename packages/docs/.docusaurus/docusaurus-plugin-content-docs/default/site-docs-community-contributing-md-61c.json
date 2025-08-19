@@ -1,0 +1,30 @@
+{
+  "id": "community/contributing",
+  "title": "Contributing",
+  "description": "Overview",
+  "source": "@site/docs/community/contributing.md",
+  "sourceDirName": "community",
+  "slug": "/community/contributing",
+  "permalink": "/docs/community/contributing",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/community/contributing.md",
+  "tags": [],
+  "version": "current",
+  "lastUpdatedAt": 1539502055,
+  "formattedLastUpdatedAt": "Oct 14, 2018",
+  "frontMatter": {
+    "id": "contributing",
+    "title": "Contributing",
+    "sidebar_label": "Contributing"
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "Roadmap",
+    "permalink": "/docs/community/roadmap"
+  },
+  "next": {
+    "title": "Code Of Conduct",
+    "permalink": "/docs/community/code-of-conduct"
+  }
+}

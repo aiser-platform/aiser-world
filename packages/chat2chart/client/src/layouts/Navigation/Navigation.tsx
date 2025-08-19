@@ -5,10 +5,16 @@ import {
     DatabaseOutlined,
     MessageOutlined,
     SettingOutlined,
+    TeamOutlined,
+    ProjectOutlined,
+    CreditCardOutlined,
+    UserOutlined,
+    ExperimentOutlined,
 } from '@ant-design/icons';
 import { Button, Layout, Menu, MenuProps } from 'antd';
-// import { useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import React from 'react';
+import AiserLogo from '@/app/components/Logo/AiserLogo';
 
 interface NavigationProps {
     collapsed: boolean;
@@ -33,19 +39,52 @@ const Navigation: React.FC<NavigationProps> = (props: NavigationProps) => {
             label: 'Chat',
         },
         {
+            key: 'ai-analytics',
+            icon: <ExperimentOutlined />,
+            label: 'AI Analytics',
+        },
+        {
             key: 'chart-builder',
             icon: <BarChartOutlined />,
             label: 'Chart Builder',
         },
         {
-            key: 'database',
+            key: 'data',
             icon: <DatabaseOutlined />,
-            label: 'Database',
+            label: 'Data',
+        },
+        {
+            type: 'divider' as const,
+        },
+        {
+            key: 'settings',
+            icon: <SettingOutlined />,
+            label: 'Settings',
         },
     ];
 
+    const router = useRouter();
+
     const onClick: MenuProps['onClick'] = (e) => {
         console.log('click ', e);
+        switch (e.key) {
+            case 'chat':
+                router.push('/chat');
+                break;
+            case 'ai-analytics':
+                router.push('/ai-analytics');
+                break;
+            case 'chart-builder':
+                router.push('/chart-builder');
+                break;
+            case 'data':
+                router.push('/data');
+                break;
+
+            case 'settings':
+                router.push('/settings');
+                break;
+        }
     };
 
     return (
@@ -55,20 +94,21 @@ const Navigation: React.FC<NavigationProps> = (props: NavigationProps) => {
             collapsible
             collapsed={props.collapsed}
             breakpoint="lg"
-            trigger={
-                <Button
-                    className="min-w-full text-left"
-                    type="text"
-                    icon={<SettingOutlined />}
-                >
-                    {props.collapsed ? null : 'Settings'}
-                </Button>
-            }
         >
-            <div className="demo-logo-vertical" />
+            <div style={{ 
+                padding: '16px', 
+                textAlign: 'center', 
+                borderBottom: '1px solid #f0f0f0',
+                marginBottom: '8px'
+            }}>
+                <AiserLogo 
+                    size={props.collapsed ? 32 : 48} 
+                    showText={!props.collapsed}
+                />
+            </div>
             <Menu
                 mode="inline"
-                defaultSelectedKeys={['chat-to-chart']}
+                defaultSelectedKeys={['ai-analytics']}
                 items={items}
                 onClick={onClick}
             />

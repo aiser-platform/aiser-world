@@ -1,0 +1,23 @@
+{
+  "name": "@aiser/ai-analytics",
+  "version": "1.0.0",
+  "description": "AI-powered analytics engine with LiteLLM and Cube.js integration",
+  "main": "src/intelligent_analytics.py",
+  "scripts": {
+    "test": "python -m pytest",
+    "lint": "python -m flake8 src",
+    "lint:fix": "python -m black src"
+  },
+  "dependencies": {},
+  "devDependencies": {},
+  "keywords": [
+    "ai",
+    "analytics",
+    "litellm",
+    "cube.js",
+    "semantic-layer",
+    "business-intelligence"
+  ],
+  "author": "Aiser Platform",
+  "license": "Commercial"
+}

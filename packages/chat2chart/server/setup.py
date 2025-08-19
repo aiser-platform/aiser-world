@@ -4,8 +4,8 @@ from setuptools import find_packages, setup
 PACKAGE_NAME = "aiser-chat2chart-server"
 VERSION = "0.1"
 DESCRIPTION = "Chat to chart server"
-AUTHOR = "Kimseng Duong"
-AUTHOR_EMAIL = "kimseng.duong@dataticon.com"
+AUTHOR = "DataTicon Dev Team"
+AUTHOR_EMAIL = "support@dataticon.com"
 
 # Dependencies
 REQUIRED_PACKAGES = [

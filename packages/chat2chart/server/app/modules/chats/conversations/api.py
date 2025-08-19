@@ -14,7 +14,8 @@ service = ConversationService()
 @router.get("/", response_model=ListResponseSchema[ConversationResponseSchema])
 async def get_conversations(params: Annotated[BaseFilterParams, Depends()]):
     try:
-        search_query = create_search_query(params.search, params.search_columns)
+        # Fix: BaseFilterParams doesn't have search_columns, use search only
+        search_query = create_search_query(params.search, None)
 
         result = await service.get_all(
             offset=params.offset,

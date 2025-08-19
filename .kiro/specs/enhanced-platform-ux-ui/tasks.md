@@ -51,7 +51,9 @@ This implementation plan transforms the Aiser Platform into a comprehensive busi
     - _Requirements: 2.4, 9.2, 9.3_
 
 - [ ] 3. Enhanced Chat Interface with AI Agents
-  - [ ] 3.1 Create multi-agent chat system
+  - [x] 3.1 Create multi-agent chat system
+
+
     - Implement AI agent selection with specialized personas
     - Build context-aware conversation management
     - Create agent switching with conversation continuity
@@ -325,7 +327,7 @@ This implementation plan transforms the Aiser Platform into a comprehensive busi
 
 ### Phase 2 (Weeks 9-16): Advanced Analytics and Visualization
 - Tasks 4.1-4.3: Dashboard builder
-- Tasks 5.1-5.3: Chart builder with AntV
+- Tasks 5.1-5.3: Chart builder with Echarts (or AntV)
 - Tasks 7.1-7.3: SQL editor and notebooks
 - Tasks 8.1-8.3: AI insights engine
 

@@ -18,7 +18,7 @@ class Auth:
     JWT_REFRESH_EXP_TIME_MINUTES = settings.JWT_REFRESH_EXP_TIME_MINUTES
 
     def hash_password(self, password):
-        return pbkdf2_sha256.hash(password, salt=self.SECRET.encode("utf-8"))
+        return pbkdf2_sha256.hash(password)
 
     def verify_password(self, password, hashed_password):
         try:

@@ -4,14 +4,13 @@ import { LayoutHeader } from '../Header/Header';
 import Navigation from '../Navigation/Navigation';
 
 const { useBreakpoint } = Grid;
-
 const { Content } = Layout;
 
 interface CustomLayoutProps {
     children: React.ReactNode;
 }
 
-const CustomLayout: React.FC<CustomLayoutProps> = ({ children }) => {
+const CustomLayout: React.FC<CustomLayoutProps> = React.memo(({ children }) => {
     const [collapsed, setCollapsed] = useState(true);
     const [isBreakpoint, setIsBreakpoint] = useState(false);
     const {
@@ -57,6 +56,8 @@ const CustomLayout: React.FC<CustomLayoutProps> = ({ children }) => {
             </Layout>
         </Layout>
     );
-};
+});
+
+CustomLayout.displayName = 'CustomLayout';
 
 export default CustomLayout;

@@ -9,16 +9,16 @@ export interface UploadDraggerProps {
     validFileTypes?: string[];
 }
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-const UPLOAD_API_URL = 'http://localhost:8000/files/upload';
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB - Enhanced limit
+const UPLOAD_API_URL = 'http://localhost:8000/data/upload'; // Correct endpoint
 
 const UploadDragger: React.FC<UploadDraggerProps> = ({
     onUpload,
-    validFileTypes = [],
+    validFileTypes = ['csv', 'xlsx', 'xls', 'json', 'tsv'], // Enhanced file support
 }) => {
     const handleFileSizeValidation = (file: File): boolean => {
         if (file.size > MAX_FILE_SIZE) {
-            message.error('File must be smaller than 10MB!');
+            message.error('File must be smaller than 50MB!');
             return false;
         }
         return true;
@@ -69,20 +69,32 @@ const UploadDragger: React.FC<UploadDraggerProps> = ({
             const { status, response } = info.file;
 
             if (status === 'done') {
-                if (response) {
+                if (response && response.success) {
+                    // Handle the new data API response format
+                    const dataSource = response.data_source;
+                    
+                    // Create upload response with all available data
                     const uploadResponse = new IFileUpload(
-                        response.file?.filename,
-                        response.file?.content_type,
-                        response.file?.storage_type,
-                        response.file?.file_size,
-                        response.file?.uuid_filename
+                        dataSource?.name || info.file.name,
+                        dataSource?.content_type || `application/${dataSource?.format || 'unknown'}`,
+                        dataSource?.storage_type || 'local',
+                        dataSource?.size || info.file.size,
+                        dataSource?.uuid_filename || dataSource?.id || Date.now().toString()
                     );
 
+                    // Store additional metadata for later use
+                    (uploadResponse as any).rowCount = dataSource?.row_count;
+                    (uploadResponse as any).schema = dataSource?.schema;
+                    (uploadResponse as any).preview = dataSource?.preview;
+                    (uploadResponse as any).uploadedAt = dataSource?.uploaded_at;
+
                     handleUploadSuccess(uploadResponse);
+                    message.success(
+                        `${info.file.name} file uploaded successfully. ${response.message || ''}`
+                    );
+                } else {
+                    message.error(`Upload failed: ${response?.error || 'Unknown error'}`);
                 }
-                message.success(
-                    `${info.file.name} file uploaded successfully.`
-                );
             } else if (status === 'error') {
                 message.error(`${info.file.name} file upload failed.`);
             }

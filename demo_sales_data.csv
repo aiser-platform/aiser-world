@@ -1,0 +1,11 @@
+product_name,sales_amount,sale_date,category,region,customer_type
+iPhone 15,999.99,2024-01-15,Electronics,North America,Premium
+MacBook Pro,2499.99,2024-01-16,Electronics,North America,Premium
+AirPods,199.99,2024-01-17,Electronics,Europe,Standard
+iPad Air,599.99,2024-01-18,Electronics,Asia,Standard
+Apple Watch,399.99,2024-01-19,Electronics,North America,Premium
+iPhone 14,799.99,2024-01-20,Electronics,Europe,Standard
+MacBook Air,1299.99,2024-01-21,Electronics,Asia,Premium
+Magic Mouse,79.99,2024-01-22,Accessories,North America,Standard
+Magic Keyboard,179.99,2024-01-23,Accessories,Europe,Standard
+Studio Display,1599.99,2024-01-24,Electronics,Asia,Premium

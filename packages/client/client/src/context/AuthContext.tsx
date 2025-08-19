@@ -8,8 +8,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { ReactNode } from 'react';
 
 interface AuthContextType {
-    isAuthenticated: boolean;
-    user: { email: string; password: string } | null;
+    user: any | null;
     loading: boolean;
     signinError: string | null;
     signupError: string | null;
@@ -20,9 +19,11 @@ interface AuthContextType {
     verifyEmailError: string | null;
     resendVerificationError: string | null;
     resendVerificationSuccess: boolean;
-    signin: (account: string, password: string) => void;
-    signup: (userData: SignupData) => void;
-    signout: () => void;
+    signin: (account: string, password: string) => Promise<void>;
+    signup: (userData: SignupData) => Promise<void>;
+    signout: () => Promise<void>;
+    isAuthenticated: () => boolean;
+    getAccessToken: () => string | null;
     forgotPassword: (email: string) => Promise<void>;
     resetPassword: (token: string, newPassword: string) => Promise<void>;
     verifyEmail: (token: string) => Promise<void>;
@@ -30,7 +31,6 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType>({
-    isAuthenticated: false,
     user: null,
     loading: true,
     signinError: null,
@@ -42,9 +42,11 @@ const AuthContext = createContext<AuthContextType>({
     verifyEmailError: null,
     resendVerificationError: null,
     resendVerificationSuccess: false,
-    signin: () => null,
-    signup: () => null,
-    signout: () => null,
+    signin: () => Promise.resolve(),
+    signup: () => Promise.resolve(),
+    signout: () => Promise.resolve(),
+    isAuthenticated: () => false,
+    getAccessToken: () => null,
     forgotPassword: () => Promise.resolve(),
     resetPassword: () => Promise.resolve(),
     verifyEmail: () => Promise.resolve(),
@@ -89,12 +91,57 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     useEffect(() => {
         async function loadUserFromCookies() {
-            console.log(Cookies);
-            const userInfo = Cookies.get('access_token');
-            console.log('User info:', userInfo);
-            if (userInfo) {
-                setUser(JSON.parse(userInfo));
+            console.log('Loading user from cookies...');
+            
+            // Check for access token first
+            const accessToken = Cookies.get('access_token');
+            const userInfo = Cookies.get('user_info');
+            
+            console.log('Access token:', accessToken ? 'Present' : 'Not found');
+            console.log('User info:', userInfo ? 'Present' : 'Not found');
+            
+            if (accessToken && userInfo) {
+                try {
+                    const user = JSON.parse(userInfo);
+                    setUser(user);
+                    console.log('User loaded from cookies:', user);
+                } catch (error) {
+                    console.error('Error parsing user info from cookies:', error);
+                    // Clear invalid cookies
+                    Cookies.remove('access_token');
+                    Cookies.remove('user_info');
+                }
+            } else if (accessToken) {
+                // If we have a token but no user info, try to fetch user data
+                try {
+                    const response = await fetchAuthApi('users/me/', {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${accessToken}`,
+                        },
+                    });
+                    
+                    if (response.ok) {
+                        const userData = await response.json();
+                        setUser(userData);
+                        // Store user info for future use
+                        Cookies.set('user_info', JSON.stringify(userData), {
+                            path: '/',
+                            expires: 7,
+                        });
+                    } else {
+                        // Token might be invalid, clear it
+                        Cookies.remove('access_token');
+                        Cookies.remove('user_info');
+                    }
+                } catch (error) {
+                    console.error('Error fetching user data:', error);
+                    // Clear invalid cookies
+                    Cookies.remove('access_token');
+                    Cookies.remove('user_info');
+                }
             }
+            
             setLoading(false);
         }
         loadUserFromCookies();
@@ -123,14 +170,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 return;
             }
 
-            const userInfo = JSON.stringify(data);
-            Cookies.set(AUTH_COOKIE_KEYS[2], userInfo, {
-                path: '/',
-            });
-            // setLoading(false);
-            setUser(data);
-            setSigninError(null);
-            router.push('/');
+            // Extract access token and user info from response
+            if (data.access_token) {
+                // Store the access token in cookies
+                Cookies.set('access_token', data.access_token, {
+                    path: '/',
+                    expires: 7, // 7 days
+                });
+                
+                // Store user info if available
+                if (data.user) {
+                    Cookies.set('user_info', JSON.stringify(data.user), {
+                        path: '/',
+                        expires: 7,
+                    });
+                    setUser(data.user);
+                } else {
+                    // If no user info, set basic info from token
+                    setUser({ account, isAuthenticated: true });
+                }
+                
+                setSigninError(null);
+                router.push('/');
+            } else {
+                // Handle case where no token is returned
+                setSigninError('No authentication token received');
+            }
         } catch (error) {
             setSigninError(
                 error instanceof Error
@@ -314,58 +379,54 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
-    const signout = async () => {
+    const signout = async (): Promise<void> => {
         try {
-            // Remove cookie with all possible combinations of options
-            await fetchAuthApi('users/signout', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            }).finally(() => {
-                setUser(null);
-                setLoading(false);
-                router.push('/signin');
-            });
-            // for (const key of AUTH_COOKIE_KEYS) {
-            //     Cookies.remove(key, { path: '/' });
-
-            //     // Verify removal
-            //     const remainingCookie = Cookies.get(key);
-            //     console.log('After cookie removal:', remainingCookie);
-
-            //     // Force clear if still exists
-            //     if (remainingCookie) {
-            //         Cookies.remove(key, { path: '/' });
-            //     }
-            // }
+            // Clear cookies
+            Cookies.remove('access_token');
+            Cookies.remove('user_info');
+            
+            // Clear user state
+            setUser(null);
+            
+            // Redirect to login
+            router.push('/login');
         } catch (error) {
             console.error('Error during signout:', error);
         }
     };
 
+    const isAuthenticated = (): boolean => {
+        const accessToken = Cookies.get('access_token');
+        return !!accessToken && !!user;
+    };
+
+    const getAccessToken = (): string | null => {
+        return Cookies.get('access_token') || null;
+    };
+
     return (
         <AuthContext.Provider
             value={{
-                isAuthenticated: !!user,
                 user,
                 loading,
-                signinError,
-                signupError,
-                forgotPasswordError,
-                resetPasswordError,
-                forgotPasswordSuccess,
-                resetPasswordSuccess,
-                verifyEmailError,
-                resendVerificationError,
-                resendVerificationSuccess,
                 signin,
                 signup,
                 signout,
+                isAuthenticated,
+                getAccessToken,
+                signinError,
+                signupError,
                 forgotPassword,
+                forgotPasswordError,
+                forgotPasswordSuccess,
                 resetPassword,
+                resetPasswordError,
+                resetPasswordSuccess,
                 verifyEmail,
+                verifyEmailError,
                 resendVerification,
+                resendVerificationError,
+                resendVerificationSuccess,
             }}
         >
             {children}

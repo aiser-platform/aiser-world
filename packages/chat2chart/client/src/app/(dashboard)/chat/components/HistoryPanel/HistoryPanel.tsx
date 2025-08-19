@@ -39,29 +39,36 @@ const ChatHistoryPanel: React.FC<ChatHistoryPanelProps> = (props) => {
             has_more: false,
         });
 
-        await fetchApi(
-            `conversations/?offset=${_offset}&limit=${pagination.limit}`,
-            {
-                signal: new AbortController().signal,
+        try {
+            const response = await fetchApi(
+                `conversations/?offset=${_offset}&limit=${pagination.limit}`,
+                {
+                    signal: new AbortController().signal,
+                }
+            );
+            
+            if (!response.ok) {
+                throw new Error('Failed to fetch conversations');
             }
-        )
-            .then((response) => {
-                if (!response.ok)
-                    throw new Error('Failed to fetch conversations');
-                response.json().then((data) => {
-                    if (_offset === 0) {
-                        setConversations(data.items);
-                    } else {
-                        setConversations((prevConversations: IConversation[]) =>
-                            prevConversations.concat(data.items)
-                        );
-                    }
-                    setPagination(data.pagination);
-                });
-            })
-            .finally(() => {
-                setLoading(false);
-            });
+            
+            const data = await response.json();
+            if (_offset === 0) {
+                setConversations(data.items || []);
+            } else {
+                setConversations((prevConversations: IConversation[]) =>
+                    prevConversations.concat(data.items || [])
+                );
+            }
+            setPagination(data.pagination || { has_more: false, offset: 0, limit: 10, total: 0 });
+        } catch (error) {
+            console.error('Failed to fetch conversations:', error);
+            // Set empty conversations instead of failing
+            if (_offset === 0) {
+                setConversations([]);
+            }
+        } finally {
+            setLoading(false);
+        }
     };
 
     const { containerRef, handleScroll } = useInfiniteScroll({
@@ -99,23 +106,7 @@ const ChatHistoryPanel: React.FC<ChatHistoryPanelProps> = (props) => {
 
     return (
         <div className="ChatHistoryPanel">
-            <div className="ChatHistoryHeader">
-                <Button
-                    onClick={() =>
-                        props.onClick({
-                            id: null,
-                            title: 'New chat',
-                        })
-                    }
-                    type="primary"
-                    style={{
-                        width: '100%',
-                    }}
-                    shape="round"
-                >
-                    {'New chat'}
-                </Button>
-            </div>
+            {/* New conversation button removed - handled by CollapsibleHistoryPanel */}
             <div
                 ref={containerRef}
                 className="ChatHistoryContainer"
@@ -130,6 +121,21 @@ const ChatHistoryPanel: React.FC<ChatHistoryPanelProps> = (props) => {
                         id={conv.id || ''}
                         name={conv.title}
                         isSelected={conv.id === props.id}
+                        onNameChange={(newName: string) => {
+                            // Update conversation title in localStorage
+                            const savedConversations = localStorage.getItem('chat_conversations');
+                            if (savedConversations) {
+                                try {
+                                    const conversations = JSON.parse(savedConversations);
+                                    const updatedConversations = conversations.map((c: IConversation) => 
+                                        c.id === conv.id ? { ...c, title: newName } : c
+                                    );
+                                    localStorage.setItem('chat_conversations', JSON.stringify(updatedConversations));
+                                } catch (error) {
+                                    console.error('Failed to update conversation title:', error);
+                                }
+                            }
+                        }}
                     />
                 ))}
             </div>

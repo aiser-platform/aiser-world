@@ -18,11 +18,18 @@ export interface IDatabase {
     id?: number;
     name?: string;
     backend?: string;
+    type?: string;
+    host?: string;
+    port?: number;
+    database?: string;
+    username?: string;
+    password?: string;
 }
 
 export interface IConversation {
     id: string | null;
     title: string;
+    messages?: IChatMessage[];
     json_metadata?: {
         database?: IDatabase;
         schema?: string;
@@ -122,6 +129,8 @@ export class IChatMessage {
     created_at?: Date;
 
     updated_at?: Date;
+
+    chartData?: any; // For storing chart configuration data
 
     constructor(props: IChatMessage) {
         this.id = props.id;

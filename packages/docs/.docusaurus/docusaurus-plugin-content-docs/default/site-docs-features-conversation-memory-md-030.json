@@ -1,0 +1,30 @@
+{
+  "id": "features/conversation-memory",
+  "title": "Conversation Memory",
+  "description": "Overview",
+  "source": "@site/docs/features/conversation-memory.md",
+  "sourceDirName": "features",
+  "slug": "/features/conversation-memory",
+  "permalink": "/docs/features/conversation-memory",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/features/conversation-memory.md",
+  "tags": [],
+  "version": "current",
+  "lastUpdatedAt": 1539502055,
+  "formattedLastUpdatedAt": "Oct 14, 2018",
+  "frontMatter": {
+    "id": "conversation-memory",
+    "title": "Conversation Memory",
+    "sidebar_label": "Conversation Memory"
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "Agents",
+    "permalink": "/docs/features/agents"
+  },
+  "next": {
+    "title": "What If Simulations",
+    "permalink": "/docs/features/what-if-simulations"
+  }
+}

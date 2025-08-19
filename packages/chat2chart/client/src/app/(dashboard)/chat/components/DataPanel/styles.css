@@ -85,3 +85,270 @@
     overflow: hidden;
     text-overflow: ellipsis;
 }
+/* Enhanced Data Panel Styles */
+.enhanced-data-panel {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: var(--panel-background);
+    color: var(--foreground);
+    transition: all 0.3s ease;
+}
+
+.enhanced-data-panel .ant-card {
+    background: var(--card-background) !important;
+    border-color: var(--border-color-light) !important;
+    color: var(--foreground) !important;
+}
+
+.enhanced-data-panel .ant-card .ant-card-head {
+    background: var(--card-background) !important;
+    border-color: var(--border-color-light) !important;
+    color: var(--heading-color) !important;
+}
+
+.enhanced-data-panel .ant-card .ant-card-body {
+    background: var(--card-background) !important;
+    color: var(--foreground) !important;
+}
+
+.enhanced-data-panel .ant-tabs {
+    color: var(--foreground) !important;
+}
+
+.enhanced-data-panel .ant-tabs .ant-tabs-tab {
+    color: var(--text-color) !important;
+}
+
+.enhanced-data-panel .ant-tabs .ant-tabs-tab.ant-tabs-tab-active {
+    color: var(--primary-color) !important;
+}
+
+.enhanced-data-panel .ant-tabs .ant-tabs-content-holder {
+    background: var(--panel-background) !important;
+}
+
+.enhanced-data-panel .ant-select {
+    background: var(--input-background) !important;
+}
+
+.enhanced-data-panel .ant-select .ant-select-selector {
+    background: var(--input-background) !important;
+    border-color: var(--border-color-base) !important;
+    color: var(--foreground) !important;
+}
+
+.enhanced-data-panel .ant-table {
+    background: var(--card-background) !important;
+    color: var(--foreground) !important;
+}
+
+.enhanced-data-panel .ant-table .ant-table-thead > tr > th {
+    background: var(--background-secondary) !important;
+    border-color: var(--border-color-light) !important;
+    color: var(--heading-color) !important;
+}
+
+.enhanced-data-panel .ant-table .ant-table-tbody > tr > td {
+    border-color: var(--border-color-light) !important;
+    color: var(--foreground) !important;
+}
+
+.enhanced-data-panel .ant-table .ant-table-tbody > tr:hover > td {
+    background: var(--background-secondary) !important;
+}
+
+.data-panel-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-color-light);
+    background: var(--header-background);
+    color: var(--heading-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.data-panel-collapsed {
+    width: 40px;
+    height: 100%;
+    background: var(--panel-background);
+    border-left: 1px solid var(--border-color-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-color);
+}
+
+.database-browser {
+    padding: 16px;
+    height: calc(100vh - 200px);
+    overflow-y: auto;
+}
+
+.tables-list {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.table-item {
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 4px;
+    background: var(--card-background);
+    color: var(--foreground);
+    border: 1px solid transparent;
+}
+
+.table-item:hover {
+    background: var(--background-secondary);
+}
+
+.table-item.selected {
+    background: var(--background-tertiary);
+    border-color: var(--primary-color);
+}
+
+.table-schema {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.column-item {
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--border-color-light);
+    font-size: 12px;
+    color: var(--text-color);
+}
+
+.column-item:last-child {
+    border-bottom: none;
+}
+
+/* SQL Editor Styles */
+.sql-editor-container {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: var(--panel-background);
+    color: var(--foreground);
+}
+
+.sql-editor-wrapper {
+    position: relative;
+}
+
+.sql-editor-textarea {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace !important;
+    line-height: 1.5;
+    tab-size: 2;
+    background: var(--input-background) !important;
+    color: var(--foreground) !important;
+    border-color: var(--border-color-base) !important;
+}
+
+.sql-editor-textarea:focus {
+    border-color: var(--primary-color) !important;
+    box-shadow: 0 0 0 2px rgba(1, 165, 241, 0.2) !important;
+}
+
+/* Ace Editor Dark Theme Support */
+.ace-github {
+    background-color: var(--input-background) !important;
+    color: var(--foreground) !important;
+}
+
+.ace-github .ace_gutter {
+    background: var(--background-secondary) !important;
+    color: var(--text-color-secondary) !important;
+    border-right: 1px solid var(--border-color-light) !important;
+}
+
+.ace-github .ace_gutter-active-line {
+    background-color: var(--background-tertiary) !important;
+}
+
+.ace-github .ace_marker-layer .ace_active-line {
+    background: var(--background-secondary) !important;
+}
+
+.ace-github .ace_cursor {
+    color: var(--foreground) !important;
+}
+
+.ace-github .ace_selection {
+    background: var(--primary-color) !important;
+    opacity: 0.3;
+}
+
+.query-history {
+    padding: 16px;
+    height: calc(100vh - 200px);
+    overflow-y: auto;
+}
+
+.query-suggestions {
+    padding: 16px;
+    height: calc(100vh - 200px);
+    overflow-y: auto;
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+    .enhanced-data-panel {
+        width: 100%;
+    }
+    
+    .database-browser,
+    .query-history,
+    .query-suggestions {
+        height: calc(100vh - 250px);
+    }
+    
+    .sql-editor-container .ace_editor {
+        font-size: 13px !important;
+    }
+}
+
+@media (max-width: 768px) {
+    .data-panel-header {
+        padding: 8px 12px;
+    }
+    
+    .data-panel-header h5 {
+        font-size: 14px;
+        margin: 0;
+    }
+    
+    .database-browser {
+        padding: 12px;
+    }
+    
+    .table-item {
+        padding: 6px 8px;
+        font-size: 13px;
+    }
+    
+    .column-item {
+        padding: 3px 6px;
+        font-size: 11px;
+    }
+    
+    .sql-editor-container .ace_editor {
+        font-size: 12px !important;
+    }
+    
+    .enhanced-data-panel .ant-card .ant-card-head {
+        padding: 8px 12px !important;
+    }
+    
+    .enhanced-data-panel .ant-card .ant-card-body {
+        padding: 12px !important;
+    }
+    
+    .enhanced-data-panel .ant-tabs .ant-tabs-tab {
+        padding: 8px 12px !important;
+        font-size: 13px !important;
+    }
+}

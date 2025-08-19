@@ -52,31 +52,55 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         loadUserFromCookies();
     }, []);
 
-    const login = async (account: string, password: string): Promise<void> => {
+    const login = async (identifier: string, password: string): Promise<void> => {
         try {
             setLoginError(null);
-            const response = await fetchApi('users/signin', {
+            
+            // First try enterprise login (username only)
+            let response = await fetch('http://localhost:5000/api/v1/enterprise/auth/login', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ username: account, password }),
+                body: JSON.stringify({
+                    username: identifier,
+                    password,
+                }),
             });
-            const data = await response.json();
 
-            if (!response.ok) {
-                const errorMessage = data.detail || 'Failed to login';
-                console.log('Login error:', data);
-                setLoginError(errorMessage);
+            if (response.ok) {
+                const data = await response.json();
+                // Set the access token cookie for enterprise login
+                Cookies.set('access_token', data.access_token, { expires: 7, path: '/' });
+                setUser(data.user);
+                setLoginError(null);
+                router.push('/');
                 return;
             }
 
-            const userInfo = JSON.stringify(data);
-            Cookies.set(AUTH_COOKIE_KEYS[2], userInfo, {
-                path: '/',
+            // If enterprise login fails, try standard login (supports both email and username)
+            response = await fetch('http://localhost:5000/users/signin', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    identifier: identifier,
+                    password,
+                }),
             });
-            // setLoading(false);
-            setUser(data);
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || 'Login failed');
+            }
+
+            const data = await response.json();
+            // Set the access token cookie for standard login
+            if (data.access_token) {
+                Cookies.set('access_token', data.access_token, { expires: 7, path: '/' });
+            }
+            setUser(data.user);
             setLoginError(null);
             router.push('/');
         } catch (error) {
@@ -92,27 +116,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const signup = async (email: string, username: string, password: string): Promise<void> => {
         try {
             setLoginError(null);
-            const response = await fetchApi('users/signup', {
+            const response = await fetch('http://localhost:5000/users/signup', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ email, username, password }),
+                body: JSON.stringify({
+                    email,
+                    username,
+                    password,
+                }),
             });
-            const data = await response.json();
 
             if (!response.ok) {
-                const errorMessage = data.detail || 'Failed to sign up';
-                console.log('Signup error:', data);
-                setLoginError(errorMessage);
-                return;
+                const errorData = await response.json();
+                throw new Error(errorData.detail || 'Signup failed');
             }
 
-            const userInfo = JSON.stringify(data);
-            Cookies.set(AUTH_COOKIE_KEYS[2], userInfo, {
-                path: '/',
-            });
-            setUser(data);
+            const data = await response.json();
+            setUser(data.user);
             setLoginError(null);
             router.push('/');
         } catch (error) {
@@ -127,23 +149,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const logout = () => {
         try {
-            // Remove cookie with all possible combinations of options
+            // Clear user state
+            setUser(null);
+            
+            // Remove all auth cookies
             for (const key of AUTH_COOKIE_KEYS) {
                 Cookies.remove(key, { path: '/' });
-
-                // Verify removal
-                const remainingCookie = Cookies.get(key);
-                console.log('After cookie removal:', remainingCookie);
-
-                // Force clear if still exists
-                if (remainingCookie) {
-                    Cookies.remove(key, { path: '/' });
-                }
+                Cookies.remove(key, { path: '/', domain: 'localhost' });
+                Cookies.remove(key, { path: '/', domain: '.localhost' });
             }
-
+            
+            // Clear any other cookies that might exist
+            Cookies.remove('access_token', { path: '/' });
+            Cookies.remove('refresh_token', { path: '/' });
+            Cookies.remove('user_id', { path: '/' });
+            
+            // Navigate to login
             router.push('/login');
         } catch (error) {
             console.error('Error during logout:', error);
+            // Force navigation even if cookie removal fails
+            router.push('/login');
         }
     };
 
@@ -196,14 +222,21 @@ export const RedirectAuthenticated = ({
     const { isAuthenticated, loading } = useAuth();
 
     useEffect(() => {
-        if (isAuthenticated && pathname !== '/chat') {
+        // Only redirect from login/signup pages, not from dashboard routes
+        if (isAuthenticated && (pathname === '/login' || pathname === '/signup')) {
             router.push('/chat');
         }
     }, [isAuthenticated, router, pathname]);
 
-    if (loading || (isAuthenticated && pathname !== '/chat')) {
+    if (loading) {
         return <LoadingScreen />;
     }
+    
+    // Only redirect if on login/signup pages and authenticated
+    if (isAuthenticated && (pathname === '/login' || pathname === '/signup')) {
+        return <LoadingScreen />;
+    }
+    
     return children;
 };
 

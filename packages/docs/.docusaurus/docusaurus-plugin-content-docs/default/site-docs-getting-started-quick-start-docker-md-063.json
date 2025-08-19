@@ -1,0 +1,30 @@
+{
+  "id": "getting-started/quick-start-docker",
+  "title": "Quick Start Docker",
+  "description": "Overview",
+  "source": "@site/docs/getting-started/quick-start-docker.md",
+  "sourceDirName": "getting-started",
+  "slug": "/getting-started/quick-start-docker",
+  "permalink": "/docs/getting-started/quick-start-docker",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/getting-started/quick-start-docker.md",
+  "tags": [],
+  "version": "current",
+  "lastUpdatedAt": 1539502055,
+  "formattedLastUpdatedAt": "Oct 14, 2018",
+  "frontMatter": {
+    "id": "quick-start-docker",
+    "title": "Quick Start Docker",
+    "sidebar_label": "Quick Start Docker"
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "Getting Started Index",
+    "permalink": "/docs/getting-started/"
+  },
+  "next": {
+    "title": "First Chart",
+    "permalink": "/docs/getting-started/first-chart"
+  }
+}

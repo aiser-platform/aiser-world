@@ -14,7 +14,25 @@ export const useDarkMode = () => {
 
     useEffect(() => {
         localStorage.setItem('darkMode', JSON.stringify(isDarkMode));
+        
+        // Apply theme class to document root
+        const root = document.documentElement;
+        if (isDarkMode) {
+            root.classList.add('dark');
+        } else {
+            root.classList.remove('dark');
+        }
     }, [isDarkMode]);
+
+    // Apply initial theme on mount
+    useEffect(() => {
+        const root = document.documentElement;
+        if (isDarkMode) {
+            root.classList.add('dark');
+        } else {
+            root.classList.remove('dark');
+        }
+    }, []);
 
     return [isDarkMode, setIsDarkMode] as const;
 };

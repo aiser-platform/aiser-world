@@ -20,22 +20,22 @@ export default function RootLayout({
                 />
                 <title>
                     {pathname === '/'
-                        ? 'Dashboard'
+                        ? 'Aiser - AI-Powered Data Visualization'
                         : pathname === '/login'
-                          ? 'Login'
+                          ? 'Login - Aiser'
                           : pathname === '/logout'
-                            ? 'Logout'
+                            ? 'Logout - Aiser'
                             : pathname.includes('test')
-                              ? 'Test'
+                              ? 'Test - Aiser'
                               : `${
                                     pathname
                                         .substring(1)
                                         .charAt(0)
                                         .toUpperCase() +
-                                    pathname.slice(2) +
-                                    ' - Dashboard'
-                                }`}
+                                    pathname.slice(2)
+                                } - Aiser`}
                 </title>
+                <link rel="icon" href="/aiser-logo.png" />
             </head>
             <body>
                 <Providers>{children}</Providers>

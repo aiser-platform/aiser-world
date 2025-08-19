@@ -1,0 +1,529 @@
+/* Chart Builder Styles */
+.chart-builder-container {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--background);
+    color: var(--text-color);
+    overflow-y: auto;
+}
+
+/* Header */
+.chart-builder-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border-color-light);
+    background: var(--component-background);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    z-index: 10;
+}
+
+.chart-builder-header h3 {
+    margin: 0;
+    color: var(--text-color);
+}
+
+/* Main Content */
+.chart-builder-content {
+    flex: 1;
+    display: flex;
+    gap: 16px;
+    padding: 16px;
+    overflow: hidden;
+}
+
+/* Left Panel */
+.chart-builder-left-panel {
+    width: 320px;
+    min-width: 320px;
+    overflow-y: auto;
+    background: var(--component-background);
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.chart-builder-left-panel .ant-card {
+    border: 1px solid var(--border-color-light);
+    background: var(--component-background);
+}
+
+.chart-builder-left-panel .ant-card-head {
+    background: var(--component-background);
+    border-bottom: 1px solid var(--border-color-light);
+}
+
+.chart-builder-left-panel .ant-card-head-title {
+    color: var(--text-color);
+    font-weight: 600;
+}
+
+/* Center Panel */
+.chart-builder-center-panel {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.chart-builder-center-panel .ant-card {
+    height: 100%;
+    border: 1px solid var(--border-color-light);
+    background: var(--component-background);
+}
+
+.chart-builder-center-panel .ant-card-body {
+    height: 100%;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+}
+
+.chart-builder-center-panel .ant-card-extra {
+    margin-left: 8px;
+}
+
+/* Right Panel */
+.chart-builder-right-panel {
+    width: 320px;
+    min-width: 320px;
+    overflow-y: auto;
+    background: var(--component-background);
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.chart-builder-right-panel .ant-card {
+    border: 1px solid var(--border-color-light);
+    background: var(--component-background);
+}
+
+.chart-builder-right-panel .ant-card-head {
+    background: var(--component-background);
+    border-bottom: 1px solid var(--border-color-light);
+}
+
+.chart-builder-right-panel .ant-card-head-title {
+    color: var(--text-color);
+    font-weight: 600;
+}
+
+/* Chart Container */
+.chart-builder-center-panel > div {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.chart-builder-center-panel .ant-card-body > div:last-child {
+    flex: 1;
+    min-height: 400px;
+}
+
+/* Tabs */
+.chart-builder-right-panel .ant-tabs {
+    height: 100%;
+}
+
+.chart-builder-right-panel .ant-tabs-content-holder {
+    height: calc(100% - 46px);
+    overflow-y: auto;
+}
+
+.chart-builder-right-panel .ant-tabs-tabpane {
+    height: 100%;
+}
+
+/* Form Elements */
+.chart-builder-container .ant-input,
+.chart-builder-container .ant-select,
+.chart-builder-container .ant-textarea {
+    background: var(--component-background);
+    border-color: var(--border-color-base);
+    color: var(--text-color);
+}
+
+.chart-builder-container .ant-input:focus,
+.chart-builder-container .ant-select:focus,
+.chart-builder-container .ant-textarea:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px var(--primary-color-outline);
+}
+
+.chart-builder-container .ant-input::placeholder,
+.chart-builder-container .ant-textarea::placeholder {
+    color: var(--text-color-placeholder);
+}
+
+/* Sliders */
+.chart-builder-container .ant-slider {
+    margin: 8px 0;
+}
+
+.chart-builder-container .ant-slider-track {
+    background-color: var(--primary-color);
+}
+
+.chart-builder-container .ant-slider-handle {
+    border-color: var(--primary-color);
+}
+
+.chart-builder-container .ant-slider-handle:focus {
+    box-shadow: 0 0 0 2px var(--primary-color-outline);
+}
+
+/* Color Picker */
+.chart-builder-container .ant-color-picker {
+    width: 40px;
+    height: 32px;
+}
+
+.chart-builder-container .ant-color-picker-trigger {
+    border: 1px solid var(--border-color-base);
+    border-radius: 4px;
+}
+
+/* Buttons */
+.chart-builder-container .ant-btn {
+    border-color: var(--border-color-base);
+    background: var(--component-background);
+    color: var(--text-color);
+}
+
+.chart-builder-container .ant-btn:hover {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.chart-builder-container .ant-btn-primary {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    color: #fff;
+}
+
+.chart-builder-container .ant-btn-primary:hover {
+    background: var(--primary-color-hover);
+    border-color: var(--primary-color-hover);
+}
+
+/* Cards */
+.chart-builder-container .ant-card {
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.chart-builder-container .ant-card-head {
+    border-radius: 8px 8px 0 0;
+}
+
+/* Scrollbars */
+.chart-builder-left-panel::-webkit-scrollbar,
+.chart-builder-right-panel::-webkit-scrollbar,
+.chart-builder-right-panel .ant-tabs-content-holder::-webkit-scrollbar {
+    width: 6px;
+}
+
+.chart-builder-left-panel::-webkit-scrollbar-track,
+.chart-builder-right-panel::-webkit-scrollbar-track,
+.chart-builder-right-panel .ant-tabs-content-holder::-webkit-scrollbar-track {
+    background: var(--background);
+    border-radius: 3px;
+}
+
+.chart-builder-left-panel::-webkit-scrollbar-thumb,
+.chart-builder-right-panel::-webkit-scrollbar-thumb,
+.chart-builder-right-panel .ant-tabs-content-holder::-webkit-scrollbar-thumb {
+    background: var(--border-color-base);
+    border-radius: 3px;
+}
+
+.chart-builder-left-panel::-webkit-scrollbar-thumb:hover,
+.chart-builder-right-panel::-webkit-scrollbar-thumb:hover,
+.chart-builder-right-panel .ant-tabs-content-holder::-webkit-scrollbar-thumb:hover {
+    background: var(--border-color);
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+    .chart-builder-left-panel,
+    .chart-builder-right-panel {
+        width: 280px;
+        min-width: 280px;
+    }
+}
+
+@media (max-width: 992px) {
+    .chart-builder-content {
+        flex-direction: column;
+        gap: 12px;
+    }
+    
+    .chart-builder-left-panel,
+    .chart-builder-right-panel {
+        width: 100%;
+        min-width: 100%;
+        max-height: 300px;
+    }
+    
+    .chart-builder-center-panel {
+        min-height: 400px;
+    }
+}
+
+@media (max-width: 768px) {
+    .chart-builder-header {
+        padding: 12px 16px;
+        flex-direction: column;
+        gap: 12px;
+        align-items: flex-start;
+    }
+    
+    .chart-builder-content {
+        padding: 12px;
+    }
+    
+    .chart-builder-left-panel,
+    .chart-builder-right-panel {
+        max-height: 250px;
+    }
+}
+
+/* Dark Mode Enhancements */
+.chart-builder-container[data-theme="dark"] {
+    --background: #1f1f1f;
+    --component-background: #262626;
+    --text-color: #ffffff;
+    --text-color-secondary: #cccccc;
+    --text-color-placeholder: #666666;
+    --border-color-light: #434343;
+    --border-color-base: #434343;
+    --border-color: #595959;
+    --primary-color: #1890ff;
+    --primary-color-hover: #40a9ff;
+    --primary-color-outline: rgba(24, 144, 255, 0.2);
+}
+
+/* Ensure all white backgrounds are dark in dark mode */
+.chart-builder-container[data-theme="dark"] .ant-card {
+    background-color: #262626 !important;
+    border-color: #434343 !important;
+}
+
+.chart-builder-container[data-theme="dark"] .ant-card-head {
+    background-color: #262626 !important;
+    border-bottom-color: #434343 !important;
+}
+
+.chart-builder-container[data-theme="dark"] .ant-input,
+.chart-builder-container[data-theme="dark"] .ant-textarea,
+.chart-builder-container[data-theme="dark"] .ant-select-selector {
+    background-color: #1f1f1f !important;
+    border-color: #434343 !important;
+    color: #ffffff !important;
+}
+
+.chart-builder-container[data-theme="dark"] .ant-tabs-tab {
+    color: #cccccc !important;
+}
+
+.chart-builder-container[data-theme="dark"] .ant-tabs-tab-active {
+    color: #1890ff !important;
+}
+
+.chart-builder-container[data-theme="dark"] .ant-slider-track {
+    background-color: #1890ff !important;
+}
+
+.chart-builder-container[data-theme="dark"] .ant-slider-handle {
+    border-color: #1890ff !important;
+}
+
+/* Animation */
+.chart-builder-container * {
+    transition: all 0.2s ease;
+}
+
+/* Focus States */
+.chart-builder-container .ant-input:focus,
+.chart-builder-container .ant-select:focus,
+.chart-builder-container .ant-textarea:focus,
+.chart-builder-container .ant-btn:focus {
+    outline: none;
+}
+
+/* Loading States */
+.chart-builder-container .ant-spin {
+    color: var(--primary-color);
+}
+
+.chart-builder-container .ant-spin-dot-item {
+    background-color: var(--primary-color);
+}
+
+/* Error States */
+.chart-builder-container .ant-input-status-error {
+    border-color: var(--error-color);
+}
+
+.chart-builder-container .ant-input-status-error:focus {
+    box-shadow: 0 0 0 2px var(--error-color-outline);
+}
+
+/* Success States */
+.chart-builder-container .ant-input-status-success {
+    border-color: var(--success-color);
+}
+
+.chart-builder-container .ant-input-status-success:focus {
+    box-shadow: 0 0 0 2px var(--success-color-outline);
+}
+
+/* Warning States */
+.chart-builder-container .ant-input-status-warning {
+    border-color: var(--warning-color);
+}
+
+.chart-builder-container .ant-input-status-warning:focus {
+    box-shadow: 0 0 0 2px var(--warning-color-outline);
+}
+
+/* Fullscreen Mode */
+.chart-builder-container.fullscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 9999;
+}
+
+/* Chart Preview Enhancements */
+.chart-builder-center-panel .ant-card-body > div:last-child {
+    border: 1px solid var(--border-color-light);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+/* Data Display */
+.chart-builder-left-panel .data-points {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid var(--border-color-light);
+    border-radius: 4px;
+    padding: 8px;
+    background: var(--background);
+}
+
+.chart-builder-left-panel .data-points > div {
+    padding: 4px 8px;
+    margin-bottom: 4px;
+    border: 1px solid var(--border-color-light);
+    border-radius: 4px;
+    font-size: 12px;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    background: var(--component-background);
+    color: var(--text-color);
+}
+
+/* Code Display */
+.chart-builder-right-panel .ant-textarea {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+/* Tooltips */
+.chart-builder-container .ant-tooltip {
+    z-index: 1000;
+}
+
+.chart-builder-container .ant-tooltip-inner {
+    background: var(--component-background);
+    color: var(--text-color);
+    border: 1px solid var(--border-color-light);
+}
+
+.chart-builder-container .ant-tooltip-arrow::before {
+    background: var(--component-background);
+    border: 1px solid var(--border-color-light);
+}
+
+/* Badges and Tags */
+.chart-builder-container .ant-badge-count {
+    background: var(--primary-color);
+    color: #fff;
+}
+
+.chart-builder-container .ant-tag {
+    border-color: var(--border-color-light);
+    background: var(--component-background);
+    color: var(--text-color);
+}
+
+/* Space Components */
+.chart-builder-container .ant-space {
+    gap: 8px !important;
+}
+
+.chart-builder-container .ant-space-vertical {
+    gap: 8px !important;
+}
+
+/* Form Layout */
+.chart-builder-container .ant-form-item {
+    margin-bottom: 16px;
+}
+
+.chart-builder-container .ant-form-item-label > label {
+    color: var(--text-color);
+    font-weight: 500;
+}
+
+/* Select Dropdowns */
+.chart-builder-container .ant-select-dropdown {
+    background: var(--component-background);
+    border: 1px solid var(--border-color-light);
+}
+
+.chart-builder-container .ant-select-item {
+    color: var(--text-color);
+}
+
+.chart-builder-container .ant-select-item-option-selected {
+    background: var(--primary-color);
+    color: #fff;
+}
+
+.chart-builder-container .ant-select-item-option-active {
+    background: var(--border-color-light);
+}
+
+/* Switch Component */
+.chart-builder-container .ant-switch {
+    background: var(--border-color-base);
+}
+
+.chart-builder-container .ant-switch-checked {
+    background: var(--primary-color);
+}
+
+/* Color Picker Dropdown */
+.chart-builder-container .ant-color-picker-dropdown {
+    background: var(--component-background);
+    border: 1px solid var(--border-color-light);
+}
+
+.chart-builder-container .ant-color-picker-panel {
+    background: var(--component-background);
+}
+
+/* ECharts Integration */
+.chart-builder-container .echarts-for-react {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+.chart-builder-container .echarts-for-react canvas {
+    border-radius: 4px;
+}

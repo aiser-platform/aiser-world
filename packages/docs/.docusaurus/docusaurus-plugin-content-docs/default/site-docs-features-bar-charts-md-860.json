@@ -1,0 +1,30 @@
+{
+  "id": "features/bar-charts",
+  "title": "Bar Charts",
+  "description": "Overview",
+  "source": "@site/docs/features/bar-charts.md",
+  "sourceDirName": "features",
+  "slug": "/features/bar-charts",
+  "permalink": "/docs/features/bar-charts",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/features/bar-charts.md",
+  "tags": [],
+  "version": "current",
+  "lastUpdatedAt": 1539502055,
+  "formattedLastUpdatedAt": "Oct 14, 2018",
+  "frontMatter": {
+    "id": "bar-charts",
+    "title": "Bar Charts",
+    "sidebar_label": "Bar Charts"
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "Line Charts",
+    "permalink": "/docs/features/line-charts"
+  },
+  "next": {
+    "title": "Heatmaps",
+    "permalink": "/docs/features/heatmaps"
+  }
+}

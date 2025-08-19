@@ -1,31 +1,21 @@
 'use client';
 
 import CustomLayout from '@/layouts/DashboardLayout/DashboardLayout';
+import React from 'react';
 import { ProtectRoute } from '@/context/AuthContext';
-import { MoonOutlined, SunOutlined } from '@ant-design/icons';
-import { FloatButton } from 'antd';
-import { useDarkMode } from '@/hooks/useDarkMode';
+import { OrganizationProvider } from '@/context/OrganizationContext';
+// Dark mode toggle moved to header
 
-export default function DashboardLayout({
-    children,
-}: {
-    children: React.ReactNode;
-}) {
-    const [isDarkMode, setIsDarkMode] = useDarkMode();
-
+const DashboardLayout: React.FC<{ children: React.ReactNode }> = React.memo(({ children }) => {
     return (
         <ProtectRoute>
-            <CustomLayout>
-                <FloatButton
-                    onClick={() => {
-                        setIsDarkMode(!isDarkMode);
-                        window.location.reload();
-                    }}
-                    icon={isDarkMode ? <SunOutlined /> : <MoonOutlined />}
-                    className="mb-4"
-                />
-                {children}
-            </CustomLayout>
+            <OrganizationProvider>
+                <CustomLayout>
+                    {children}
+                </CustomLayout>
+            </OrganizationProvider>
         </ProtectRoute>
     );
-}
+});
+
+export default DashboardLayout;

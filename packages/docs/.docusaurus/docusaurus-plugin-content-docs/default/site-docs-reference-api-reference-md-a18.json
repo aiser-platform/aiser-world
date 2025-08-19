@@ -1,0 +1,30 @@
+{
+  "id": "reference/api-reference",
+  "title": "Api Reference",
+  "description": "Overview",
+  "source": "@site/docs/reference/api-reference.md",
+  "sourceDirName": "reference",
+  "slug": "/reference/api-reference",
+  "permalink": "/docs/reference/api-reference",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/docs/reference/api-reference.md",
+  "tags": [],
+  "version": "current",
+  "lastUpdatedAt": 1539502055,
+  "formattedLastUpdatedAt": "Oct 14, 2018",
+  "frontMatter": {
+    "id": "api-reference",
+    "title": "Api Reference",
+    "sidebar_label": "Api Reference"
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "Ambassador Program",
+    "permalink": "/docs/community/ambassador-program"
+  },
+  "next": {
+    "title": "Config Reference",
+    "permalink": "/docs/reference/config-reference"
+  }
+}
