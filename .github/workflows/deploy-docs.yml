@@ -1,34 +1,23 @@
-name: Deploy Documentation
+name: Deploy Documentation to GitHub Pages
 
 on:
   push:
-    branches: [main]
-    paths: 
+    branches: [ main ]
+    paths:
       - 'packages/docs/**'
-      - 'packages/**/*.py'
-      - 'packages/**/*.ts'
-      - 'packages/**/*.tsx'
-      - 'docs/**'
   pull_request:
-    paths: 
+    branches: [ main ]
+    paths:
       - 'packages/docs/**'
-      - 'packages/**/*.py'
-      - 'packages/**/*.ts'
-      - 'packages/**/*.tsx'
-      - 'docs/**'
 
 jobs:
-  generate-docs:
+  build-and-deploy:
     runs-on: ubuntu-latest
+    
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
         
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-          
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -36,31 +25,29 @@ jobs:
           cache: 'npm'
           cache-dependency-path: packages/docs/package-lock.json
           
-      - name: Install Python dependencies
-        run: |
-          cd packages/docs
-          pip install -r requirements.txt
-          
-      - name: Install Node.js dependencies
-        run: |
-          cd packages/docs
-          npm ci
-          
-      - name: Generate documentation from codebase
-        run: |
-          cd packages/docs
-          python scripts/generate_docs.py
-          
+      - name: Install dependencies
+        working-directory: packages/docs
+        run: npm ci
+        
       - name: Build documentation
-        run: |
-          cd packages/docs
-          npm run build
-          
+        working-directory: packages/docs
+        env:
+          NODE_ENV: production
+        run: npm run build
+        
       - name: Deploy to GitHub Pages
         if: github.ref == 'refs/heads/main'
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./packages/docs/build
-          cname: docs.aiser.dataticon.com
+          cname: aiser-docs.dataticon.com
           force_orphan: true
+          
+      - name: Deploy to GitHub Pages (PR Preview)
+        if: github.event_name == 'pull_request'
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./packages/docs/build
+          destination_dir: preview/${{ github.event.number }}
