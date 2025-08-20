@@ -1,7 +1,7 @@
 const config = {
   title: 'Aiser Platform Documentation',
   tagline: 'AI-Powered Analytics Platform',
-  favicon: 'img/favicon.ico',
+  favicon: '/favicon.ico',
   
   // Set the production url of your site here
   url: 'https://aiser-docs.dataticon.com',
@@ -94,7 +94,7 @@ const config = {
       ],
     },
     footer: {
-      style: 'dark',
+      style: 'dark', 
       links: [
         {
           title: 'Docs',
