@@ -170,7 +170,6 @@ const config = {
   },
   
   // Trigger deployment - GitHub Actions will run on push
-  // This comment ensures the workflow triggers for docs changes
 };
 
 module.exports = config;
