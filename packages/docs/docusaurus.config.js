@@ -12,6 +12,8 @@ const config = {
   // GitHub Pages deployment
   deploymentBranch: 'gh-pages',
   
+  // Trigger deployment - GitHub Actions will run on push
+  
   // Organization and project names
   organizationName: 'Aiser',
   projectName: 'aiser-world',
