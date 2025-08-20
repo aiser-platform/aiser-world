@@ -17,5 +17,14 @@
     "id": "what-if-simulations",
     "title": "What If Simulations",
     "sidebar_label": "What If Simulations"
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "Warehouses",
+    "permalink": "/docs/features/warehouses"
+  },
+  "next": {
+    "title": "Security Overview",
+    "permalink": "/docs/security/"
   }
 }

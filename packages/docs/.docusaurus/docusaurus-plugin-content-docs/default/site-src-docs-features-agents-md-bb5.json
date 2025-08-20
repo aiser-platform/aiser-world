@@ -17,5 +17,14 @@
     "id": "agents",
     "title": "Agents",
     "sidebar_label": "Agents"
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "AI Overview",
+    "permalink": "/docs/features/ai-overview"
+  },
+  "next": {
+    "title": "Bar Charts",
+    "permalink": "/docs/features/bar-charts"
   }
 }

@@ -17,5 +17,14 @@
     "id": "csv-excel",
     "title": "Csv Excel",
     "sidebar_label": "Csv Excel"
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "Conversation Memory",
+    "permalink": "/docs/features/conversation-memory"
+  },
+  "next": {
+    "title": "Custom Prompts",
+    "permalink": "/docs/features/custom-prompts"
   }
 }

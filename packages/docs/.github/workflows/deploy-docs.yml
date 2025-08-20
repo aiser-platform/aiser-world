@@ -43,6 +43,8 @@ jobs:
           publish_dir: ./packages/docs/build
           cname: aiser-docs.dataticon.com
           force_orphan: true
+          # Ensure proper GitHub Pages deployment
+          destination_dir: /
           
       - name: Deploy to GitHub Pages (PR Preview)
         if: github.event_name == 'pull_request'

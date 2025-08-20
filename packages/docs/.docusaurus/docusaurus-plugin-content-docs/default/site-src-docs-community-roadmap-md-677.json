@@ -17,5 +17,14 @@
     "id": "roadmap",
     "title": "Roadmap",
     "sidebar_label": "Roadmap"
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "Contributing",
+    "permalink": "/docs/community/contributing"
+  },
+  "next": {
+    "title": "API Reference",
+    "permalink": "/docs/reference/api-reference"
   }
 }

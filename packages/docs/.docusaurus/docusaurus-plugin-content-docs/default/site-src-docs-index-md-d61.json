@@ -1,0 +1,25 @@
+{
+  "id": "index",
+  "title": "Aiser Platform Documentation",
+  "description": "Complete documentation for Aiser Platform - AI-powered business intelligence platform",
+  "source": "@site/src/docs/index.md",
+  "sourceDirName": ".",
+  "slug": "/",
+  "permalink": "/docs/",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/index.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {
+    "id": "index",
+    "title": "Aiser Platform Documentation",
+    "sidebar_label": "Home",
+    "description": "Complete documentation for Aiser Platform - AI-powered business intelligence platform"
+  },
+  "sidebar": "docs",
+  "next": {
+    "title": "Getting Started",
+    "permalink": "/docs/getting-started/"
+  }
+}

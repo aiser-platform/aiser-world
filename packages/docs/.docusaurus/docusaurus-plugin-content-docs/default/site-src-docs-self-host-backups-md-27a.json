@@ -17,5 +17,14 @@
     "id": "backups",
     "title": "Backups",
     "sidebar_label": "Backups"
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "Docker Compose",
+    "permalink": "/docs/self-host/docker-compose"
+  },
+  "next": {
+    "title": "Config Reference",
+    "permalink": "/docs/self-host/config-reference"
   }
 }

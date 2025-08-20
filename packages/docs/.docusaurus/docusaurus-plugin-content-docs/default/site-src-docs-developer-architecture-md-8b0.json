@@ -17,5 +17,14 @@
     "id": "architecture",
     "title": "Architecture",
     "sidebar_label": "Architecture"
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "Developer Guide",
+    "permalink": "/docs/developer/"
+  },
+  "next": {
+    "title": "Local Dev",
+    "permalink": "/docs/developer/local-dev"
   }
 }

@@ -17,5 +17,14 @@
     "id": "ambassador-program",
     "title": "Ambassador Program",
     "sidebar_label": "Ambassador Program"
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "Community",
+    "permalink": "/docs/community/"
+  },
+  "next": {
+    "title": "Bi Weekly Calls",
+    "permalink": "/docs/community/bi-weekly-calls"
   }
 }

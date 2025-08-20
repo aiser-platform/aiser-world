@@ -6,9 +6,8 @@ const config = {
   // Set the production url of your site here
   url: 'https://aiser-docs.dataticon.com',
   // Set the /<baseUrl>/ pathname under which your site is served
-  // For local development, use '/'
-  // For production deployment, use '/docs/'
-  baseUrl: process.env.NODE_ENV === 'production' ? '/docs/' : '/',
+  // For GitHub Pages deployment, use '/docs/'
+  baseUrl: '/docs/',
   
   // GitHub Pages deployment
   deploymentBranch: 'gh-pages',
@@ -41,6 +40,8 @@ const config = {
           editUrl: 'https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/',
           // Show last update time
           showLastUpdateTime: true,
+          // Serve docs from root of baseUrl to avoid double /docs/docs/ paths
+          routeBasePath: '/',
         },
         blog: false,
         theme: {
@@ -94,15 +95,19 @@ const config = {
           items: [
             {
               label: 'Getting Started',
-              to: '/docs/getting-started',
+              to: '/getting-started',
             },
             {
               label: 'Self-Host',
-              to: '/docs/self-host',
+              to: '/self-host',
+            },
+            {
+              label: 'Features',
+              to: '/features',
             },
             {
               label: 'API Reference',
-              to: '/docs/reference/api-reference',
+              to: '/reference/api-reference',
             },
           ],
         },
@@ -111,7 +116,7 @@ const config = {
           items: [
             {
               label: 'GitHub',
-              href: 'https://github.com/bigstack-analytics/aiser-world',
+              href: 'https://github.com/aiser-platform/aiser-world',
             },
             {
               label: 'Telegram (Aisertics)',

@@ -17,5 +17,14 @@
     "id": "databases",
     "title": "Databases",
     "sidebar_label": "Databases"
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "Data Sources Overview",
+    "permalink": "/docs/features/data-sources-overview"
+  },
+  "next": {
+    "title": "Deep Analysis",
+    "permalink": "/docs/features/deep-analysis"
   }
 }

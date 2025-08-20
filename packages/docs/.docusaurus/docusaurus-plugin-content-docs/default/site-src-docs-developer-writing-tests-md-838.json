@@ -17,5 +17,14 @@
     "id": "writing-tests",
     "title": "Writing Tests",
     "sidebar_label": "Writing Tests"
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "Release Process",
+    "permalink": "/docs/developer/release-process"
+  },
+  "next": {
+    "title": "Community",
+    "permalink": "/docs/community/"
   }
 }

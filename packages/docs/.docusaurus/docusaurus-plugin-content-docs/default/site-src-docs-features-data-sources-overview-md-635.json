@@ -17,5 +17,14 @@
     "id": "data-sources-overview",
     "title": "Data Sources Overview",
     "sidebar_label": "Data Sources Overview"
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "Custom Prompts",
+    "permalink": "/docs/features/custom-prompts"
+  },
+  "next": {
+    "title": "Databases",
+    "permalink": "/docs/features/databases"
   }
 }

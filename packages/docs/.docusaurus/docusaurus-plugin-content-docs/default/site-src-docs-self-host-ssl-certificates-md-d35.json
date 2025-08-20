@@ -17,5 +17,14 @@
     "id": "ssl-certificates",
     "title": "Ssl Certificates",
     "sidebar_label": "Ssl Certificates"
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "Config Reference",
+    "permalink": "/docs/self-host/config-reference"
+  },
+  "next": {
+    "title": "AI Overview",
+    "permalink": "/docs/features/ai-overview"
   }
 }

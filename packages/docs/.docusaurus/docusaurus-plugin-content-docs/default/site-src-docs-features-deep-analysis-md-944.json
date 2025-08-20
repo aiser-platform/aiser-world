@@ -17,5 +17,14 @@
     "id": "deep-analysis",
     "title": "Deep Analysis",
     "sidebar_label": "Deep Analysis"
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "Databases",
+    "permalink": "/docs/features/databases"
+  },
+  "next": {
+    "title": "Echarts Integration",
+    "permalink": "/docs/features/echarts-integration"
   }
 }

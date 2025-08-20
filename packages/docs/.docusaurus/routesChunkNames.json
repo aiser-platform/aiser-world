@@ -1,44 +1,44 @@
 {
-  "/search-4d6": {
+  "/docs/search-a95": {
     "__comp": "1a4e3797",
     "__context": {
       "plugin": "4828ac2f"
     }
   },
-  "/docs-1a9": {
+  "/docs/-d09": {
     "__comp": "5e95c892",
     "__context": {
       "plugin": "f4b7a3da"
     }
   },
-  "/docs-0e0": {
+  "/docs/-e64": {
     "__comp": "a7bd4aaa",
     "version": "935f2afb"
   },
-  "/docs-79c": {
+  "/docs/-51a": {
     "__comp": "a94703ab"
   },
   "/docs/community/-63e": {
     "__comp": "17896441",
     "content": "159199bf"
   },
-  "/docs/community/ambassador-program-b2a": {
+  "/docs/community/ambassador-program-240": {
     "__comp": "17896441",
     "content": "9ccb5cd3"
   },
-  "/docs/community/bi-weekly-calls-f1e": {
+  "/docs/community/bi-weekly-calls-fa6": {
     "__comp": "17896441",
     "content": "33552a28"
   },
-  "/docs/community/code-of-conduct-bbc": {
+  "/docs/community/code-of-conduct-7f6": {
     "__comp": "17896441",
     "content": "51a56f22"
   },
-  "/docs/community/contributing-0bb": {
+  "/docs/community/contributing-5e3": {
     "__comp": "17896441",
     "content": "93dc14ff"
   },
-  "/docs/community/roadmap-3c2": {
+  "/docs/community/roadmap-eea": {
     "__comp": "17896441",
     "content": "67707330"
   },
@@ -46,27 +46,27 @@
     "__comp": "17896441",
     "content": "43dd609f"
   },
-  "/docs/developer/architecture-21f": {
+  "/docs/developer/architecture-289": {
     "__comp": "17896441",
     "content": "8b04cfb5"
   },
-  "/docs/developer/local-dev-bd3": {
+  "/docs/developer/local-dev-7af": {
     "__comp": "17896441",
     "content": "978de9a7"
   },
-  "/docs/developer/plugin-architecture-37f": {
+  "/docs/developer/plugin-architecture-16b": {
     "__comp": "17896441",
     "content": "987d1c77"
   },
-  "/docs/developer/release-process-e35": {
+  "/docs/developer/release-process-a54": {
     "__comp": "17896441",
     "content": "df087062"
   },
-  "/docs/developer/writing-tests-e20": {
+  "/docs/developer/writing-tests-f18": {
     "__comp": "17896441",
     "content": "838649fa"
   },
-  "/docs/features/agents-ffb": {
+  "/docs/features/agents-53b": {
     "__comp": "17896441",
     "content": "bb58811b"
   },
@@ -74,63 +74,63 @@
     "__comp": "17896441",
     "content": "1ff1de0d"
   },
-  "/docs/features/bar-charts-5cd": {
+  "/docs/features/bar-charts-285": {
     "__comp": "17896441",
     "content": "c2b6d87c"
   },
-  "/docs/features/charts-overview-b5c": {
+  "/docs/features/charts-overview-851": {
     "__comp": "17896441",
     "content": "90369e4a"
   },
-  "/docs/features/conversation-memory-5ec": {
+  "/docs/features/conversation-memory-365": {
     "__comp": "17896441",
     "content": "a4e4231c"
   },
-  "/docs/features/csv-excel-aac": {
+  "/docs/features/csv-excel-1b6": {
     "__comp": "17896441",
     "content": "1b5928f6"
   },
-  "/docs/features/custom-prompts-63f": {
+  "/docs/features/custom-prompts-68b": {
     "__comp": "17896441",
     "content": "7c7d1f04"
   },
-  "/docs/features/data-sources-overview-9ec": {
+  "/docs/features/data-sources-overview-878": {
     "__comp": "17896441",
     "content": "635fb555"
   },
-  "/docs/features/databases-71a": {
+  "/docs/features/databases-d04": {
     "__comp": "17896441",
     "content": "d6ea7606"
   },
-  "/docs/features/deep-analysis-a68": {
+  "/docs/features/deep-analysis-033": {
     "__comp": "17896441",
     "content": "94450ee8"
   },
-  "/docs/features/echarts-integration-d27": {
+  "/docs/features/echarts-integration-61c": {
     "__comp": "17896441",
     "content": "8917b0f8"
   },
-  "/docs/features/heatmaps-a70": {
+  "/docs/features/heatmaps-16a": {
     "__comp": "17896441",
     "content": "9d0b6693"
   },
-  "/docs/features/line-charts-337": {
+  "/docs/features/line-charts-23c": {
     "__comp": "17896441",
     "content": "cf3544ef"
   },
-  "/docs/features/natural-language-queries-d8d": {
+  "/docs/features/natural-language-queries-6ec": {
     "__comp": "17896441",
     "content": "8798320c"
   },
-  "/docs/features/real-time-streams-0c5": {
+  "/docs/features/real-time-streams-92a": {
     "__comp": "17896441",
     "content": "a6e83ac1"
   },
-  "/docs/features/warehouses-cf8": {
+  "/docs/features/warehouses-34a": {
     "__comp": "17896441",
     "content": "1b3e0e45"
   },
-  "/docs/features/what-if-simulations-37b": {
+  "/docs/features/what-if-simulations-f88": {
     "__comp": "17896441",
     "content": "a51652b0"
   },
@@ -174,11 +174,11 @@
     "__comp": "17896441",
     "content": "9d16a2b1"
   },
-  "/docs/self-host/backups-4c7": {
+  "/docs/self-host/backups-5a6": {
     "__comp": "17896441",
     "content": "27a07cf8"
   },
-  "/docs/self-host/config-reference-21a": {
+  "/docs/self-host/config-reference-103": {
     "__comp": "17896441",
     "content": "3011585a"
   },
@@ -186,12 +186,16 @@
     "__comp": "17896441",
     "content": "4a54264f"
   },
-  "/docs/self-host/ssl-certificates-97c": {
+  "/docs/self-host/ssl-certificates-0ec": {
     "__comp": "17896441",
     "content": "d359442e"
   },
   "/docs/troubleshooting/-ecd": {
     "__comp": "17896441",
     "content": "8ea9a4f1"
+  },
+  "/docs/-668": {
+    "__comp": "17896441",
+    "content": "d61aab09"
   }
 }

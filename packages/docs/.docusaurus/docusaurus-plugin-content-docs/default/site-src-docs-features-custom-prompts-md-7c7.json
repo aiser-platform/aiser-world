@@ -17,5 +17,14 @@
     "id": "custom-prompts",
     "title": "Custom Prompts",
     "sidebar_label": "Custom Prompts"
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "Csv Excel",
+    "permalink": "/docs/features/csv-excel"
+  },
+  "next": {
+    "title": "Data Sources Overview",
+    "permalink": "/docs/features/data-sources-overview"
   }
 }

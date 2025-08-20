@@ -17,5 +17,14 @@
     "id": "line-charts",
     "title": "Line Charts",
     "sidebar_label": "Line Charts"
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "Heatmaps",
+    "permalink": "/docs/features/heatmaps"
+  },
+  "next": {
+    "title": "Natural Language Queries",
+    "permalink": "/docs/features/natural-language-queries"
   }
 }

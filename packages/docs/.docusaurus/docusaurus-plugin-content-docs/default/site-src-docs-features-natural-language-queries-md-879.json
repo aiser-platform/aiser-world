@@ -17,5 +17,14 @@
     "id": "natural-language-queries",
     "title": "Natural Language Queries",
     "sidebar_label": "Natural Language Queries"
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "Line Charts",
+    "permalink": "/docs/features/line-charts"
+  },
+  "next": {
+    "title": "Real Time Streams",
+    "permalink": "/docs/features/real-time-streams"
   }
 }
