@@ -10,11 +10,13 @@ const config = {
   baseUrl: '/docs/',
   
   // GitHub Pages deployment
-  deploymentBranch: 'gh-pages',
+  deploymentBranch: 'gh-pages', 
   
   // Trigger deployment - GitHub Actions will run on push
   
   // Fix deployment workflow - trigger new build
+  
+  // Fix publish_dir paths - trigger deployment
   
   // Organization and project names 
   organizationName: 'Aiser',
