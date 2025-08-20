@@ -17,5 +17,14 @@
     "id": "warehouses",
     "title": "Warehouses",
     "sidebar_label": "Warehouses"
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "Real Time Streams",
+    "permalink": "/docs/features/real-time-streams"
+  },
+  "next": {
+    "title": "What If Simulations",
+    "permalink": "/docs/features/what-if-simulations"
   }
 }

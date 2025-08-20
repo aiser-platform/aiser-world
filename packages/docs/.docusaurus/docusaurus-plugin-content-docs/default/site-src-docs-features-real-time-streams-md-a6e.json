@@ -17,5 +17,14 @@
     "id": "real-time-streams",
     "title": "Real Time Streams",
     "sidebar_label": "Real Time Streams"
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "Natural Language Queries",
+    "permalink": "/docs/features/natural-language-queries"
+  },
+  "next": {
+    "title": "Warehouses",
+    "permalink": "/docs/features/warehouses"
   }
 }

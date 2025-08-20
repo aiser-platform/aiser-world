@@ -17,5 +17,14 @@
     "id": "release-process",
     "title": "Release Process",
     "sidebar_label": "Release Process"
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "Plugin Architecture",
+    "permalink": "/docs/developer/plugin-architecture"
+  },
+  "next": {
+    "title": "Writing Tests",
+    "permalink": "/docs/developer/writing-tests"
   }
 }

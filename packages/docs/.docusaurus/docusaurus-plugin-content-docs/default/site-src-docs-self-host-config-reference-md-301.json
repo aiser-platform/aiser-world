@@ -17,5 +17,14 @@
     "id": "config-reference",
     "title": "Config Reference",
     "sidebar_label": "Config Reference"
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "Backups",
+    "permalink": "/docs/self-host/backups"
+  },
+  "next": {
+    "title": "Ssl Certificates",
+    "permalink": "/docs/self-host/ssl-certificates"
   }
 }

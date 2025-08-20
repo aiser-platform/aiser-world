@@ -17,5 +17,14 @@
     "id": "bi-weekly-calls",
     "title": "Bi Weekly Calls",
     "sidebar_label": "Bi Weekly Calls"
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "Ambassador Program",
+    "permalink": "/docs/community/ambassador-program"
+  },
+  "next": {
+    "title": "Code Of Conduct",
+    "permalink": "/docs/community/code-of-conduct"
   }
 }

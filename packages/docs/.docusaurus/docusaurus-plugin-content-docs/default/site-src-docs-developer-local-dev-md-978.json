@@ -17,5 +17,14 @@
     "id": "local-dev",
     "title": "Local Dev",
     "sidebar_label": "Local Dev"
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "Architecture",
+    "permalink": "/docs/developer/architecture"
+  },
+  "next": {
+    "title": "Plugin Architecture",
+    "permalink": "/docs/developer/plugin-architecture"
   }
 }

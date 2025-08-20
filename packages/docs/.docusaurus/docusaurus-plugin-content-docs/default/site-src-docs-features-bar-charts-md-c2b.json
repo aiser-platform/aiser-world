@@ -17,5 +17,14 @@
     "id": "bar-charts",
     "title": "Bar Charts",
     "sidebar_label": "Bar Charts"
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "Agents",
+    "permalink": "/docs/features/agents"
+  },
+  "next": {
+    "title": "Charts Overview",
+    "permalink": "/docs/features/charts-overview"
   }
 }

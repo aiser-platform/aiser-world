@@ -17,5 +17,14 @@
     "id": "plugin-architecture",
     "title": "Plugin Architecture",
     "sidebar_label": "Plugin Architecture"
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "Local Dev",
+    "permalink": "/docs/developer/local-dev"
+  },
+  "next": {
+    "title": "Release Process",
+    "permalink": "/docs/developer/release-process"
   }
 }

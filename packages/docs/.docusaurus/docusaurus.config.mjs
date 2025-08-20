@@ -8,7 +8,7 @@ export default {
   "tagline": "AI-Powered Analytics Platform",
   "favicon": "img/favicon.ico",
   "url": "https://aiser-docs.dataticon.com",
-  "baseUrl": "/",
+  "baseUrl": "/docs/",
   "deploymentBranch": "gh-pages",
   "organizationName": "Aiser",
   "projectName": "aiser-world",
@@ -31,7 +31,8 @@ export default {
           "path": "src/docs",
           "sidebarPath": "/home/sv/project/aiser-world/packages/docs/sidebars.js",
           "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/",
-          "showLastUpdateTime": true
+          "showLastUpdateTime": true,
+          "routeBasePath": "/"
         },
         "blog": false,
         "theme": {
@@ -80,15 +81,19 @@ export default {
           "items": [
             {
               "label": "Getting Started",
-              "to": "/docs/getting-started"
+              "to": "/getting-started"
             },
             {
               "label": "Self-Host",
-              "to": "/docs/self-host"
+              "to": "/self-host"
+            },
+            {
+              "label": "Features",
+              "to": "/features"
             },
             {
               "label": "API Reference",
-              "to": "/docs/reference/api-reference"
+              "to": "/reference/api-reference"
             }
           ]
         },
@@ -97,7 +102,7 @@ export default {
           "items": [
             {
               "label": "GitHub",
-              "href": "https://github.com/bigstack-analytics/aiser-world"
+              "href": "https://github.com/aiser-platform/aiser-world"
             },
             {
               "label": "Telegram (Aisertics)",

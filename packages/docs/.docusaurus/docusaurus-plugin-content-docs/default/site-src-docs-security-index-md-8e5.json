@@ -11,6 +11,8 @@
   "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/security/index.md",
   "tags": [],
   "version": "current",
+  "lastUpdatedAt": 1755622594,
+  "formattedLastUpdatedAt": "Aug 19, 2025",
   "frontMatter": {
     "id": "security-overview",
     "title": "Security Overview",
@@ -19,8 +21,8 @@
   },
   "sidebar": "docs",
   "previous": {
-    "title": "Docker Compose",
-    "permalink": "/docs/self-host/docker-compose"
+    "title": "What If Simulations",
+    "permalink": "/docs/features/what-if-simulations"
   },
   "next": {
     "title": "Performance Overview",

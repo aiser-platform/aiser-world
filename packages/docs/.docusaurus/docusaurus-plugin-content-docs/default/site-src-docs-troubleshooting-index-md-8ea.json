@@ -11,6 +11,8 @@
   "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/troubleshooting/index.md",
   "tags": [],
   "version": "current",
+  "lastUpdatedAt": 1755622594,
+  "formattedLastUpdatedAt": "Aug 19, 2025",
   "frontMatter": {
     "id": "troubleshooting-overview",
     "title": "Troubleshooting Guide",
@@ -19,11 +21,7 @@
   },
   "sidebar": "docs",
   "previous": {
-    "title": "Performance Overview",
-    "permalink": "/docs/performance/"
-  },
-  "next": {
-    "title": "AI Overview",
-    "permalink": "/docs/features/ai-overview"
+    "title": "Configuration",
+    "permalink": "/docs/reference/config-reference"
   }
 }

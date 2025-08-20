@@ -11,7 +11,7 @@
   "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/developer/index.md",
   "tags": [],
   "version": "current",
-  "lastUpdatedAt": 1755570184,
+  "lastUpdatedAt": 1755622594,
   "formattedLastUpdatedAt": "Aug 19, 2025",
   "frontMatter": {
     "id": "developer-index",
@@ -21,11 +21,11 @@
   },
   "sidebar": "docs",
   "previous": {
-    "title": "AI Overview",
-    "permalink": "/docs/features/ai-overview"
+    "title": "Performance Overview",
+    "permalink": "/docs/performance/"
   },
   "next": {
-    "title": "Community",
-    "permalink": "/docs/community/"
+    "title": "Architecture",
+    "permalink": "/docs/developer/architecture"
   }
 }

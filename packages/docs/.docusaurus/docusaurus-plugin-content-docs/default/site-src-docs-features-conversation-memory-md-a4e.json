@@ -17,5 +17,14 @@
     "id": "conversation-memory",
     "title": "Conversation Memory",
     "sidebar_label": "Conversation Memory"
+  },
+  "sidebar": "docs",
+  "previous": {
+    "title": "Charts Overview",
+    "permalink": "/docs/features/charts-overview"
+  },
+  "next": {
+    "title": "Csv Excel",
+    "permalink": "/docs/features/csv-excel"
   }
 }

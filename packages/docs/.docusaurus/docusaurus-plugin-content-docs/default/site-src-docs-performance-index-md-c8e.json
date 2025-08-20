@@ -11,6 +11,8 @@
   "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/performance/index.md",
   "tags": [],
   "version": "current",
+  "lastUpdatedAt": 1755622594,
+  "formattedLastUpdatedAt": "Aug 19, 2025",
   "frontMatter": {
     "id": "performance-overview",
     "title": "Performance & Optimization",
@@ -23,7 +25,7 @@
     "permalink": "/docs/security/"
   },
   "next": {
-    "title": "Troubleshooting Overview",
-    "permalink": "/docs/troubleshooting/"
+    "title": "Developer Guide",
+    "permalink": "/docs/developer/"
   }
 }
