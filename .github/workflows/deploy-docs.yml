@@ -46,7 +46,7 @@ jobs:
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./packages/docs/build
+          publish_dir: ./build
           cname: aiser-docs.dataticon.com
           force_orphan: true
           
