@@ -168,6 +168,8 @@ const config = {
   customFields: {
     port: 3005  // Use port 3005 for docs
   },
+  
+  // Trigger deployment - GitHub Actions will run on push
 };
 
 module.exports = config;
