@@ -14,7 +14,9 @@ const config = {
   
   // Trigger deployment - GitHub Actions will run on push
   
-  // Organization and project names
+  // Fix deployment workflow - trigger new build
+  
+  // Organization and project names 
   organizationName: 'Aiser',
   projectName: 'aiser-world',
   
