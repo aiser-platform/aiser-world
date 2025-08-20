@@ -43,9 +43,13 @@ jobs:
         
       - name: Deploy to GitHub Pages
         if: github.ref == 'refs/heads/main'
-        uses: actions/deploy-pages@v4
+        uses: peaceiris/actions-gh-pages@v3
         with:
-          path: packages/docs/build
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: packages/docs/build
+          destination_dir: docs
+          cname: aiser-docs.dataticon.com
+          force_orphan: true
           
       - name: Deploy to GitHub Pages (PR Preview)
         if: github.event_name == 'pull_request'
