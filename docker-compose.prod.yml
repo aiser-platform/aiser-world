@@ -1,11 +1,15 @@
+# Load environment variables from .env file
+env_file:
+  - .env
+
 services:
   # PostgreSQL Database
   postgres:
     image: postgres:15-alpine
     container_name: aiser-postgres-prod
     environment:
-      POSTGRES_DB: aiser_world
-      POSTGRES_USER: aiser
+      POSTGRES_DB: ${POSTGRES_DB:-aiser_world}
+      POSTGRES_USER: ${POSTGRES_USER:-aiser}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5432:5432"
@@ -13,7 +17,7 @@ services:
       - postgres_prod_data:/var/lib/postgresql/data
       - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U aiser -d aiser_world"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aiser} -d ${POSTGRES_DB:-aiser_world}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -45,13 +49,13 @@ services:
       - "5000:5000"
     environment:
       - POSTGRES_SERVER=postgres
-      - POSTGRES_DB=aiser_world
-      - POSTGRES_USER=aiser
+      - POSTGRES_DB=${POSTGRES_DB:-aiser_world}
+      - POSTGRES_USER=${POSTGRES_USER:-aiser}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_PORT=5432
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
       - SECRET_KEY=${SECRET_KEY}
-      - DEBUG=false
-      - ENVIRONMENT=production
+      - DEBUG=${DEBUG:-false}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
     depends_on:
       postgres:
         condition: service_healthy
@@ -68,16 +72,20 @@ services:
       - "8000:8000"
     environment:
       - POSTGRES_SERVER=postgres
-      - POSTGRES_DB=aiser_world
-      - POSTGRES_USER=aiser
+      - POSTGRES_DB=${POSTGRES_DB:-aiser_world}
+      - POSTGRES_USER=${POSTGRES_USER:-aiser}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_PORT=5432
-      - REDIS_URL=redis://redis:6379
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY}
+      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
+      - AZURE_OPENAI_API_VERSION=${AZURE_OPENAI_API_VERSION:-2025-04-01-preview}
+      - AZURE_OPENAI_DEPLOYMENT_NAME=${AZURE_OPENAI_DEPLOYMENT_NAME:-gpt-5-mini}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - OPENAI_MODEL_ID=gpt-4o-mini
+      - OPENAI_MODEL_ID=${OPENAI_MODEL_ID:-gpt-4o-mini}
       - SECRET_KEY=${SECRET_KEY}
-      - ENVIRONMENT=production
-      - DEBUG=false
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - DEBUG=${DEBUG:-false}
     depends_on:
       postgres:
         condition: service_healthy
@@ -95,9 +103,9 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NODE_ENV=production
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
-      - NEXT_PUBLIC_AUTH_URL=http://localhost:5000
+      - NODE_ENV=${NODE_ENV:-production}
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+      - NEXT_PUBLIC_AUTH_URL=${NEXT_PUBLIC_AUTH_URL:-http://localhost:5000}
     depends_on:
       - chat2chart-server
       - auth-service

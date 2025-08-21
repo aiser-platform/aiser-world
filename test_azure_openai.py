@@ -5,19 +5,40 @@ Simple script to test your Azure OpenAI configuration
 """
 
 import os
+from pathlib import Path
+from dotenv import load_dotenv
 from litellm import completion
 
-# Set environment variables (you can also set these in your .env file)
-os.environ['AZURE_OPENAI_API_KEY'] = '35rWswdPyyyisuGwl2tgrlxFtfLhjD0cFDQaJi44YzBx91Rz3nINJQQJ99BEACHYHv6XJ3w3AAABACOGbUlA'
-os.environ['AZURE_OPENAI_ENDPOINT'] = 'https://ateybot-eastus2-123-nut.openai.azure.com/'
-os.environ['AZURE_OPENAI_API_VERSION'] = '2025-04-01-preview'
+# Load environment variables from .env file
+env_path = Path(__file__).parent / '.env'
+if env_path.exists():
+    load_dotenv(env_path)
+else:
+    print("⚠️  .env file not found. Make sure to create one based on env.example")
+    print("   The script will use system environment variables if available.")
 
 def test_azure_openai():
     """Test Azure OpenAI connection"""
     print("🧪 Testing Azure OpenAI Connection...")
-    print(f"🔑 API Key: {'*' * 8 + os.environ['AZURE_OPENAI_API_KEY'][-4:]}")
-    print(f"🌐 Endpoint: {os.environ['AZURE_OPENAI_ENDPOINT']}")
-    print(f"📅 API Version: {os.environ['AZURE_OPENAI_API_VERSION']}")
+    
+    # Get environment variables
+    api_key = os.getenv('AZURE_OPENAI_API_KEY')
+    endpoint = os.getenv('AZURE_OPENAI_ENDPOINT')
+    api_version = os.getenv('AZURE_OPENAI_API_VERSION', '2025-04-01-preview')
+    
+    if not api_key:
+        print("❌ AZURE_OPENAI_API_KEY not found in environment variables")
+        print("   Please set it in your .env file or system environment")
+        return None
+    
+    if not endpoint:
+        print("❌ AZURE_OPENAI_ENDPOINT not found in environment variables")
+        print("   Please set it in your .env file or system environment")
+        return None
+    
+    print(f"🔑 API Key: {'*' * 8 + api_key[-4:] if len(api_key) > 4 else '***'}")
+    print(f"🌐 Endpoint: {endpoint}")
+    print(f"📅 API Version: {api_version}")
     
     # Test different deployment names
     deployment_names = [
@@ -33,9 +54,9 @@ def test_azure_openai():
             response = completion(
                 model=f"azure/{deployment}",
                 messages=[{"role": "user", "content": "Hello, respond with 'Azure OpenAI connection successful'"}],
-                api_key=os.environ['AZURE_OPENAI_API_KEY'],
-                api_base=os.environ['AZURE_OPENAI_ENDPOINT'],
-                api_version=os.environ['AZURE_OPENAI_API_VERSION']
+                api_key=api_key,
+                api_base=endpoint,
+                api_version=api_version
             )
             print(f"✅ SUCCESS with {deployment}: {response.choices[0].message.content}")
             return deployment
@@ -51,3 +72,7 @@ if __name__ == "__main__":
         print(f"Update your .env file with: AZURE_OPENAI_DEPLOYMENT_NAME={working_deployment}")
     else:
         print("\n💥 No working deployments found. Check your Azure OpenAI resource.")
+        print("\n📝 Make sure your .env file contains:")
+        print("   AZURE_OPENAI_API_KEY=your_actual_api_key")
+        print("   AZURE_OPENAI_ENDPOINT=https://your_resource.openai.azure.com/")
+        print("   AZURE_OPENAI_API_VERSION=2025-04-01-preview")

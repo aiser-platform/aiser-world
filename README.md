@@ -53,9 +53,8 @@ npm install
 npm run build
 
 # Set up environment variables
-cp packages/auth/.env.example packages/auth/.env
-cp packages/chat2chart/server/.env.example packages/chat2chart/server/.env
-# Update .env files with your configuration
+cp env.example .env
+# Update .env file with your configuration (API keys, passwords, etc.)
 ```
 
 ### Development
@@ -93,6 +92,32 @@ For development and testing, you can create a test user:
 - 🔐 Auth API: http://localhost:5000
 - 🗄️ PostgreSQL: localhost:5432
 - 🔴 Redis: localhost:6379
+
+## 🔐 Environment Variables
+
+The platform uses environment variables for configuration. Create a `.env` file in the root directory:
+
+```bash
+# Copy the example file
+cp env.example .env
+
+# Edit with your actual values
+nano .env
+```
+
+**Required Variables:**
+- `POSTGRES_PASSWORD`: Database password
+- `SECRET_KEY`: Application secret key
+- `AZURE_OPENAI_API_KEY`: Azure OpenAI API key (if using Azure)
+- `AZURE_OPENAI_ENDPOINT`: Azure OpenAI endpoint (if using Azure)
+
+**Optional Variables (with defaults):**
+- `POSTGRES_DB`: Database name (default: `aiser_world`)
+- `POSTGRES_USER`: Database user (default: `aiser`)
+- `DEBUG`: Debug mode (default: `True`)
+- `NODE_ENV`: Node environment (default: `development`)
+
+For detailed configuration, see [DOCKER_ENV_SETUP.md](DOCKER_ENV_SETUP.md).
 
 ### Available Scripts
 

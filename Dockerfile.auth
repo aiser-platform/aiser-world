@@ -44,7 +44,6 @@ COPY --from=deps /usr/local/bin /usr/local/bin
 
 # Copy application code
 COPY packages/auth/src ./src
-COPY packages/auth/.env.example .env
 
 # Expose port
 EXPOSE 5000

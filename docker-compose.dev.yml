@@ -1,19 +1,23 @@
+# Load environment variables from .env file
+env_file:
+  - .env
+
 services:
   # PostgreSQL Database
   postgres:
     image: postgres:15-alpine
     container_name: aiser-postgres-dev
     environment:
-      POSTGRES_DB: aiser_world
-      POSTGRES_USER: aiser
-      POSTGRES_PASSWORD: aiser_password
+      POSTGRES_DB: ${POSTGRES_DB:-aiser_world}
+      POSTGRES_USER: ${POSTGRES_USER:-aiser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aiser_password}
     ports:
       - "5432:5432"
     volumes:
       - postgres_dev_data:/var/lib/postgresql/data
       - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U aiser -d aiser_world"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aiser} -d ${POSTGRES_DB:-aiser_world}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -41,13 +45,13 @@ services:
       - "5000:5000"
     environment:
       - POSTGRES_SERVER=postgres
-      - POSTGRES_DB=aiser_world
-      - POSTGRES_USER=aiser
-      - POSTGRES_PASSWORD=aiser_password
-      - POSTGRES_PORT=5432
-      - SECRET_KEY=980a731d35aca422c93179d49e7956ce880335cdbb8741906d881c6aa9755d36
-      - DEBUG=True
-      - ENVIRONMENT=development
+      - POSTGRES_DB=${POSTGRES_DB:-aiser_world}
+      - POSTGRES_USER=${POSTGRES_USER:-aiser}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-aiser_password}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-key}
+      - DEBUG=${DEBUG:-True}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
     depends_on:
       postgres:
         condition: service_healthy
@@ -67,18 +71,24 @@ services:
       - "8000:8000"
     environment:
       - POSTGRES_SERVER=postgres
-      - POSTGRES_DB=aiser_chat2chart
-      - POSTGRES_USER=aiser
-      - POSTGRES_PASSWORD=aiser_password
-      - POSTGRES_PORT=5432
-      - DATABASE_URL=postgresql+asyncpg://aiser:aiser_password@postgres:5432/aiser_chat2chart
-      - SECRET_KEY=980a731d35aca422c93179d49e7956ce880335cdbb8741906d881c6aa9755d36
-      - ENVIRONMENT=development
-      - DEBUG=True
+      - POSTGRES_DB=${POSTGRES_DB:-aiser_chat2chart}
+      - POSTGRES_USER=${POSTGRES_USER:-aiser}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-aiser_password}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-aiser}:${POSTGRES_PASSWORD:-aiser_password}@postgres:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-aiser_chat2chart}
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-key}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - DEBUG=${DEBUG:-True}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_DB=0
       - REDIS_URL=redis://redis:6379/0
+      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY}
+      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
+      - AZURE_OPENAI_API_VERSION=${AZURE_OPENAI_API_VERSION:-2025-04-01-preview}
+      - AZURE_OPENAI_DEPLOYMENT_NAME=${AZURE_OPENAI_DEPLOYMENT_NAME:-gpt-5-mini}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL_ID=${OPENAI_MODEL_ID:-gpt-4o-mini}
     depends_on:
       postgres:
         condition: service_healthy
@@ -101,24 +111,24 @@ services:
     ports:
       - "4000:4000"
     environment:
-      - NODE_ENV=development
-      - CUBE_DB_TYPE=postgres
-      - CUBE_DB_HOST=postgres
-      - CUBE_DB_PORT=5432
-      - CUBE_DB_NAME=aiser_world
-      - CUBE_DB_USER=aiser
-      - CUBE_DB_PASS=aiser_password
-      - CUBE_DB_SCHEMA=public
-      - CUBE_DB_SSL=false
-      - CUBE_DB_POOL_MIN=2
-      - CUBE_DB_POOL_MAX=10
-      - CUBE_REDIS_URL=redis://redis:6379
-      - CUBE_API_SECRET=dev-cube-secret-key
-      - CUBE_DEV_MODE=true
-      - CUBE_LOG_LEVEL=info
-      - CUBEJS_EXTERNAL_DEFAULT=true
-      - CUBEJS_SCHEDULED_REFRESH_DEFAULT=true
-      - CUBEJS_SKIP_NATIVE_EXTENSIONS=true
+      - NODE_ENV=${NODE_ENV:-development}
+      - CUBE_DB_TYPE=${CUBE_DB_TYPE:-postgres}
+      - CUBE_DB_HOST=${CUBE_DB_HOST:-postgres}
+      - CUBE_DB_PORT=${CUBE_DB_PORT:-5432}
+      - CUBE_DB_NAME=${POSTGRES_DB:-aiser_world}
+      - CUBE_DB_USER=${POSTGRES_USER:-aiser}
+      - CUBE_DB_PASS=${POSTGRES_PASSWORD:-aiser_password}
+      - CUBE_DB_SCHEMA=${CUBE_DB_SCHEMA:-public}
+      - CUBE_DB_SSL=${CUBE_DB_SSL:-false}
+      - CUBE_DB_POOL_MIN=${CUBE_DB_POOL_MIN:-2}
+      - CUBE_DB_POOL_MAX=${CUBE_DB_POOL_MAX:-10}
+      - CUBE_REDIS_URL=${CUBE_REDIS_URL:-redis://redis:6379}
+      - CUBE_API_SECRET=${CUBE_API_SECRET:-dev-cube-secret-key}
+      - CUBE_DEV_MODE=${CUBE_DEV_MODE:-true}
+      - CUBE_LOG_LEVEL=${CUBE_LOG_LEVEL:-info}
+      - CUBEJS_EXTERNAL_DEFAULT=${CUBEJS_EXTERNAL_DEFAULT:-true}
+      - CUBEJS_SCHEDULED_REFRESH_DEFAULT=${CUBEJS_SCHEDULED_REFRESH_DEFAULT:-true}
+      - CUBEJS_SKIP_NATIVE_EXTENSIONS=${CUBEJS_SKIP_NATIVE_EXTENSIONS:-true}
     depends_on:
       postgres:
         condition: service_healthy
@@ -142,10 +152,10 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NODE_ENV=development
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
-      - NEXT_PUBLIC_AUTH_URL=http://localhost:5000
-      - NEXT_PUBLIC_CUBE_URL=http://localhost:4000
+      - NODE_ENV=${NODE_ENV:-development}
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+      - NEXT_PUBLIC_AUTH_URL=${NEXT_PUBLIC_AUTH_URL:-http://localhost:5000}
+      - NEXT_PUBLIC_CUBE_URL=${NEXT_PUBLIC_CUBE_URL:-http://localhost:4000}
     volumes:
       - ./packages/chat2chart/client:/app
       - ./packages/shared:/shared
