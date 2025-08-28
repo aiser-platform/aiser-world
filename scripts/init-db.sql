@@ -1,5 +1,10 @@
 -- Aiser Platform Database Initialization
 -- Multi-tenant architecture with Cube.js semantic layer support
+--
+-- Default Users (Development Only - Change in Production):
+-- admin@aiser.app / admin123 (admin role)
+-- user@aiser.app / user123 (user role)  
+-- analyst@aiser.app / analyst123 (analyst role)
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -11,6 +16,7 @@ CREATE TABLE IF NOT EXISTS users (
     username VARCHAR(100) UNIQUE,
     first_name VARCHAR(100),
     last_name VARCHAR(100),
+    password VARCHAR(256) NOT NULL,
     role VARCHAR(50) DEFAULT 'user',
     status VARCHAR(50) DEFAULT 'active',
     tenant_id VARCHAR(50) DEFAULT 'default',
@@ -63,12 +69,12 @@ CREATE INDEX IF NOT EXISTS idx_charts_conversation_id ON charts(conversation_id)
 CREATE INDEX IF NOT EXISTS idx_charts_created_at ON charts(created_at);
 CREATE INDEX IF NOT EXISTS idx_charts_type ON charts(chart_type);
 
--- Insert sample data for development
-INSERT INTO users (email, username, first_name, last_name, role, tenant_id) 
+-- Insert sample data for development with hashed passwords
+INSERT INTO users (email, username, first_name, last_name, password, role, tenant_id) 
 VALUES 
-    ('admin@aiser.app', 'admin', 'Admin', 'User', 'admin', 'default'),
-    ('user@aiser.app', 'user', 'Test', 'User', 'user', 'default'),
-    ('analyst@aiser.app', 'analyst', 'Data', 'Analyst', 'analyst', 'default')
+    ('admin@aiser.app', 'admin', 'Admin', 'User', '$2b$12$hKYCyJEZ/xB8jGY5sX5e3.4kUzYrtwZrtoKSACsUqTqmSr5is67LS', 'admin', 'default'),
+    ('user@aiser.app', 'user', 'Test', 'User', '$2b$12$K6WPdTEaymVOCZDNpzbVvuCKDuSURzEHbsH3IDjDxRN0a9mhS6yn2', 'user', 'default'),
+    ('analyst@aiser.app', 'analyst', 'Data', 'Analyst', '$2b$12$mbeDtR1AlF0AB8VJBco6l.GM6EhI9nqpIv6U1E8tEjgnxGV3s/7M.', 'analyst', 'default')
 ON CONFLICT (email) DO NOTHING;
 
 -- Insert sample conversations
