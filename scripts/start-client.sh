@@ -8,8 +8,6 @@ apk add --no-cache libc6-compat
 
 cd /app
 
-echo "📦 Installing Node.js dependencies..."
-npm install --silent
-
-echo "🚀 Starting client..."
-npm run dev
+echo "🚀 Starting client with host binding..."
+# Start Next.js development server with proper host binding
+exec npx next dev -p 3000 -H 0.0.0.0

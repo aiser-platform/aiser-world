@@ -1,4 +1,5 @@
 import { fetchApi } from '@/utils/api';
+import { getBackendUrl } from '@/utils/backendUrl';
 
 // Unified AI Service Types
 export interface UnifiedAIRequest {
@@ -93,7 +94,7 @@ class UnifiedAIService {
     private baseURL: string;
 
     constructor() {
-        this.baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+        this.baseURL = getBackendUrl();
     }
 
     // ===== Core AI Analytics Endpoints =====

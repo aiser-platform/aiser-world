@@ -112,28 +112,34 @@ class EnhancedChatService:
         except Exception as e:
             logger.error(f"❌ Enhanced chat processing failed: {str(e)}")
             # Return a fallback response
+            # Create proper fallback response
+            from datetime import datetime
+            fallback_conversation = ConversationSchema(
+                id=self.__conversation_id,
+                title='Chat Session',
+                created_at=datetime.now(),
+                updated_at=datetime.now(),
+                is_active=True,
+                is_deleted=False,
+                json_metadata={}
+            )
+            
+            fallback_message = MessageResponseSchema(
+                id=str(uuid4()),
+                query=data.prompt,
+                answer="I apologize, but I encountered an issue processing your request. Please try again.",
+                status='error',
+                conversation_id=self.__conversation_id,
+                created_at=datetime.now(),
+                updated_at=datetime.now(),
+                is_active=True,
+                is_deleted=False,
+                error=str(e)
+            )
+            
             return ChatResponseSchema(
-                conversation=type('obj', (object,), {
-                    'id': self.__conversation_id,
-                    'title': 'Chat Session',
-                    'created_at': None,
-                    'updated_at': None,
-                    'is_active': True,
-                    'is_deleted': False,
-                    'json_metadata': None
-                }),
-                message=type('obj', (object,), {
-                    'id': str(uuid4()),
-                    'query': data.prompt,
-                    'answer': "I apologize, but I encountered an issue processing your request. Please try again.",
-                    'status': 'error',
-                    'conversation_id': self.__conversation_id,
-                    'created_at': None,
-                    'updated_at': None,
-                    'is_active': True,
-                    'is_deleted': False,
-                    'error': str(e)
-                })
+                conversation=fallback_conversation,
+                message=fallback_message
             )
     
     async def _process_analytics_query(
@@ -511,15 +517,16 @@ class EnhancedChatService:
         except Exception as e:
             logger.error(f"Error ensuring conversation exists: {e}")
             # Create a minimal response
-            self.__conversation_response = type('obj', (object,), {
-                'id': self.__conversation_id,
-                'title': 'Chat Session',
-                'created_at': None,
-                'updated_at': None,
-                'is_active': True,
-                'is_deleted': False,
-                'json_metadata': None
-            })()
+            from datetime import datetime
+            self.__conversation_response = ConversationSchema(
+                id=self.__conversation_id,
+                title='Chat Session',
+                created_at=datetime.now(),
+                updated_at=datetime.now(),
+                is_active=True,
+                is_deleted=False,
+                json_metadata={}
+            )
 
     def _format_ai_response(self, ai_result: Dict[str, Any]) -> str:
         """Format AI response for display"""
@@ -584,33 +591,34 @@ class EnhancedChatService:
             except Exception as db_error:
                 logger.warning(f"Could not save to database: {db_error}")
                 # Return a mock response
-                return type('obj', (object,), {
-                    'id': self.__message_id,
-                    'conversation_id': self.__conversation_id,
-                    'query': user_query,
-                    'answer': ai_response,
-                    'status': 'completed',
-                    'error': None,
-                    'created_at': None,
-                    'updated_at': None,
-                    'is_active': True,
-                    'is_deleted': False
-                })()
+                from datetime import datetime
+                return MessageResponseSchema(
+                    id=self.__message_id,
+                    conversation_id=self.__conversation_id,
+                    query=user_query,
+                    answer=ai_response,
+                    status='completed',
+                    error=None,
+                    created_at=datetime.now(),
+                    updated_at=datetime.now(),
+                    is_active=True,
+                    is_deleted=False
+                )
                 
         except Exception as e:
             logger.error(f"Error saving message: {e}")
-            return type('obj', (object,), {
-                'id': self.__message_id or str(uuid4()),
-                'conversation_id': self.__conversation_id,
-                'query': user_query,
-                'answer': ai_response,
-                'status': 'completed',
-                'error': str(e),
-                'created_at': None,
-                'updated_at': None,
-                'is_active': True,
-                'is_deleted': False
-            })()
+            return MessageResponseSchema(
+                id=self.__message_id or str(uuid4()),
+                conversation_id=self.__conversation_id,
+                query=user_query,
+                answer=ai_response,
+                status='completed',
+                error=str(e),
+                created_at=datetime.now(),
+                updated_at=datetime.now(),
+                is_active=True,
+                is_deleted=False
+            )
 
     async def health_check(self) -> Dict[str, Any]:
         """Health check for enhanced chat service"""
@@ -688,15 +696,15 @@ class EnhancedChatService:
         except Exception as e:
             logger.error(f"Error ensuring conversation exists: {e}")
             # Create a minimal response
-            self.__conversation_response = type('obj', (object,), {
-                'id': self.__conversation_id,
-                'title': 'Chat Session',
-                'created_at': None,
-                'updated_at': None,
-                'is_active': True,
-                'is_deleted': False,
-                'json_metadata': None
-            })
+            self.__conversation_response = ConversationSchema(
+                id=self.__conversation_id,
+                title='Chat Session',
+                created_at=datetime.now(),
+                updated_at=datetime.now(),
+                is_active=True,
+                is_deleted=False,
+                json_metadata={}
+            )
 
     async def _save_message(self, query: str, response: str) -> MessageResponseSchema:
         """Save message to database"""
@@ -714,15 +722,15 @@ class EnhancedChatService:
         except Exception as e:
             logger.error(f"Error saving message: {e}")
             # Return a minimal response
-            return type('obj', (object,), {
-                'id': self.__message_id,
-                'query': query,
-                'answer': response,
-                'status': 'completed',
-                'conversation_id': self.__conversation_id,
-                'created_at': None,
-                'updated_at': None,
-                'is_active': True,
-                'is_deleted': False,
-                'error': None
-            })
+            return MessageResponseSchema(
+                id=self.__message_id,
+                query=query,
+                answer=response,
+                status='completed',
+                conversation_id=self.__conversation_id,
+                created_at=datetime.now(),
+                updated_at=datetime.now(),
+                is_active=True,
+                is_deleted=False,
+                error=None
+            )

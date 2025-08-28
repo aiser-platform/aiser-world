@@ -106,7 +106,7 @@ const ProjectsPage: React.FC = React.memo(() => {
             key: 'status',
             render: (status: string) => (
                 <Tag color={getStatusColor(status)}>
-                    {status.charAt(0).toUpperCase() + status.slice(1)}
+                    {status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Unknown'}
                 </Tag>
             )
         },
@@ -167,7 +167,7 @@ const ProjectsPage: React.FC = React.memo(() => {
             key: 'priority',
             render: (priority: string) => (
                 <Tag color={getPriorityColor(priority)}>
-                    {priority.charAt(0).toUpperCase() + priority.slice(1)}
+                    {priority ? priority.charAt(0).toUpperCase() + priority.slice(1) : 'Unknown'}
                 </Tag>
             )
         },

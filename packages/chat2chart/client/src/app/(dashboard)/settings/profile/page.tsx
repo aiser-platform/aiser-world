@@ -19,7 +19,7 @@ export default function ProfileSettingsPage() {
     const { user } = useAuth();
     const [form] = Form.useForm();
     const [loading, setLoading] = useState(false);
-    const [avatarUrl, setAvatarUrl] = useState(user?.avatar || '');
+    const [avatarUrl, setAvatarUrl] = useState('');
 
     const onFinish = async (values: any) => {
         setLoading(true);
@@ -69,14 +69,14 @@ export default function ProfileSettingsPage() {
                             form={form}
                             layout="vertical"
                             initialValues={{
-                                firstName: user?.firstName || '',
-                                lastName: user?.lastName || '',
+                                firstName: '',
+                                lastName: '',
                                 email: user?.email || '',
-                                phone: user?.phone || '',
-                                bio: user?.bio || '',
-                                website: user?.website || '',
-                                location: user?.location || '',
-                                timezone: user?.timezone || 'UTC'
+                                phone: '',
+                                bio: '',
+                                website: '',
+                                location: '',
+                                timezone: 'UTC'
                             }}
                             onFinish={onFinish}
                         >

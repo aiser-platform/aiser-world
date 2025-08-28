@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
+import { getBackendUrlForApi } from '@/utils/backendUrl';
 
 // Types
 export interface Organization {
@@ -117,7 +118,26 @@ export const OrganizationProvider: React.FC<OrganizationProviderProps> = ({ chil
 
   const getOrganizations = async () => {
     try {
-      // For now, create a default organization
+      // Call the real API to get organizations
+      const response = await fetch(`${getBackendUrlForApi()}/api/organizations`);
+      if (response.ok) {
+        const orgs = await response.json();
+        setOrganizations(orgs);
+        
+        // Set the first organization as current (or find by user's organization)
+        if (orgs.length > 0) {
+          setCurrentOrganization(orgs[0]);
+          // Load projects for the current organization
+          await getProjects(orgs[0].id);
+          // Load usage stats for the current organization
+          await getOrganizationUsage(orgs[0].id);
+        }
+      } else {
+        throw new Error('Failed to fetch organizations');
+      }
+    } catch (err) {
+      console.error('Error fetching organizations:', err);
+      // Fallback to default organization if API fails
       const defaultOrg: Organization = {
         id: 1,
         name: 'Default Organization',
@@ -127,22 +147,24 @@ export const OrganizationProvider: React.FC<OrganizationProviderProps> = ({ chil
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
-      
       setOrganizations([defaultOrg]);
       setCurrentOrganization(defaultOrg);
-      
-      // Load projects for the default organization
-      await getProjects(defaultOrg.id);
-      // Load usage stats for the default organization
-      await getOrganizationUsage(defaultOrg.id);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch organizations');
     }
   };
 
   const getProjects = async (orgId?: number) => {
     try {
-      // For now, create a default project
+      // Call the real API to get projects
+      const response = await fetch(`${getBackendUrlForApi()}/api/projects?user_id=default`);
+      if (response.ok) {
+        const data = await response.json();
+        setProjects(data.items || []);
+      } else {
+        throw new Error('Failed to fetch projects');
+      }
+    } catch (err) {
+      console.error('Error fetching projects:', err);
+      // Fallback to default project if API fails
       const defaultProject: Project = {
         id: 1,
         name: 'Data Analysis Project',
@@ -152,16 +174,33 @@ export const OrganizationProvider: React.FC<OrganizationProviderProps> = ({ chil
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
-      
       setProjects([defaultProject]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch projects');
     }
   };
 
   const getOrganizationUsage = async (orgId: number) => {
     try {
-      // For now, create default usage stats
+      // Call the real API to get usage stats
+      const response = await fetch(`${getBackendUrlForApi()}/api/organizations/${orgId}/usage`);
+      if (response.ok) {
+        const usage = await response.json();
+        // Transform the API response to match our UsageStats interface
+        const transformedUsage: UsageStats = {
+          organization_id: orgId,
+          ai_queries_used: usage.limits.ai_credits_used || 0,
+          ai_queries_limit: usage.limits.ai_credits_limit || 100,
+          storage_used_mb: 0, // Not provided by API yet
+          storage_limit_mb: (usage.limits.max_storage_gb || 1) * 1024, // Convert GB to MB
+          projects_count: usage.limits.max_projects || 1,
+          projects_limit: usage.limits.max_projects || 5,
+        };
+        setUsageStats(transformedUsage);
+      } else {
+        throw new Error('Failed to fetch usage stats');
+      }
+    } catch (err) {
+      console.error('Error fetching usage stats:', err);
+      // Fallback to default usage stats if API fails
       const defaultUsage: UsageStats = {
         organization_id: orgId,
         ai_queries_used: 0,
@@ -171,10 +210,7 @@ export const OrganizationProvider: React.FC<OrganizationProviderProps> = ({ chil
         projects_count: 1,
         projects_limit: 5,
       };
-      
       setUsageStats(defaultUsage);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch usage stats');
     }
   };
 

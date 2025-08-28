@@ -1,238 +1,242 @@
 {
   "docusaurus-plugin-content-docs": {
     "default": {
-      "path": "/docs/",
+      "path": "/",
       "versions": [
         {
           "name": "current",
           "label": "Next",
           "isLast": true,
-          "path": "/docs/",
+          "path": "/",
           "mainDocId": "index",
           "docs": [
             {
               "id": "community/ambassador-program",
-              "path": "/docs/community/ambassador-program",
+              "path": "/community/ambassador-program",
               "sidebar": "docs"
             },
             {
               "id": "community/bi-weekly-calls",
-              "path": "/docs/community/bi-weekly-calls",
+              "path": "/community/bi-weekly-calls",
               "sidebar": "docs"
             },
             {
               "id": "community/code-of-conduct",
-              "path": "/docs/community/code-of-conduct",
+              "path": "/community/code-of-conduct",
               "sidebar": "docs"
             },
             {
               "id": "community/community-index",
-              "path": "/docs/community/",
+              "path": "/community/",
               "sidebar": "docs"
             },
             {
               "id": "community/contributing",
-              "path": "/docs/community/contributing",
+              "path": "/community/contributing",
               "sidebar": "docs"
             },
             {
               "id": "community/roadmap",
-              "path": "/docs/community/roadmap",
+              "path": "/community/roadmap",
               "sidebar": "docs"
             },
             {
               "id": "developer/architecture",
-              "path": "/docs/developer/architecture",
+              "path": "/developer/architecture",
               "sidebar": "docs"
             },
             {
               "id": "developer/developer-index",
-              "path": "/docs/developer/",
+              "path": "/developer/",
               "sidebar": "docs"
             },
             {
               "id": "developer/local-dev",
-              "path": "/docs/developer/local-dev",
+              "path": "/developer/local-dev",
               "sidebar": "docs"
             },
             {
               "id": "developer/plugin-architecture",
-              "path": "/docs/developer/plugin-architecture",
+              "path": "/developer/plugin-architecture",
               "sidebar": "docs"
             },
             {
               "id": "developer/release-process",
-              "path": "/docs/developer/release-process",
+              "path": "/developer/release-process",
               "sidebar": "docs"
             },
             {
               "id": "developer/writing-tests",
-              "path": "/docs/developer/writing-tests",
+              "path": "/developer/writing-tests",
               "sidebar": "docs"
             },
             {
               "id": "features/agents",
-              "path": "/docs/features/agents",
+              "path": "/features/agents",
               "sidebar": "docs"
             },
             {
               "id": "features/ai-overview",
-              "path": "/docs/features/ai-overview",
+              "path": "/features/ai-overview",
               "sidebar": "docs"
             },
             {
               "id": "features/bar-charts",
-              "path": "/docs/features/bar-charts",
+              "path": "/features/bar-charts",
               "sidebar": "docs"
             },
             {
               "id": "features/charts-overview",
-              "path": "/docs/features/charts-overview",
+              "path": "/features/charts-overview",
               "sidebar": "docs"
             },
             {
               "id": "features/conversation-memory",
-              "path": "/docs/features/conversation-memory",
+              "path": "/features/conversation-memory",
               "sidebar": "docs"
             },
             {
               "id": "features/csv-excel",
-              "path": "/docs/features/csv-excel",
+              "path": "/features/csv-excel",
               "sidebar": "docs"
             },
             {
               "id": "features/custom-prompts",
-              "path": "/docs/features/custom-prompts",
+              "path": "/features/custom-prompts",
               "sidebar": "docs"
             },
             {
               "id": "features/data-sources-overview",
-              "path": "/docs/features/data-sources-overview",
+              "path": "/features/data-sources-overview",
               "sidebar": "docs"
             },
             {
               "id": "features/databases",
-              "path": "/docs/features/databases",
+              "path": "/features/databases",
               "sidebar": "docs"
             },
             {
               "id": "features/deep-analysis",
-              "path": "/docs/features/deep-analysis",
+              "path": "/features/deep-analysis",
               "sidebar": "docs"
             },
             {
               "id": "features/echarts-integration",
-              "path": "/docs/features/echarts-integration",
+              "path": "/features/echarts-integration",
               "sidebar": "docs"
             },
             {
+              "id": "features/features",
+              "path": "/features/"
+            },
+            {
               "id": "features/heatmaps",
-              "path": "/docs/features/heatmaps",
+              "path": "/features/heatmaps",
               "sidebar": "docs"
             },
             {
               "id": "features/line-charts",
-              "path": "/docs/features/line-charts",
+              "path": "/features/line-charts",
               "sidebar": "docs"
             },
             {
               "id": "features/natural-language-queries",
-              "path": "/docs/features/natural-language-queries",
+              "path": "/features/natural-language-queries",
               "sidebar": "docs"
             },
             {
               "id": "features/real-time-streams",
-              "path": "/docs/features/real-time-streams",
+              "path": "/features/real-time-streams",
               "sidebar": "docs"
             },
             {
               "id": "features/warehouses",
-              "path": "/docs/features/warehouses",
+              "path": "/features/warehouses",
               "sidebar": "docs"
             },
             {
               "id": "features/what-if-simulations",
-              "path": "/docs/features/what-if-simulations",
+              "path": "/features/what-if-simulations",
               "sidebar": "docs"
             },
             {
               "id": "getting-started/demo-walkthrough",
-              "path": "/docs/getting-started/demo-walkthrough",
+              "path": "/getting-started/demo-walkthrough",
               "sidebar": "docs"
             },
             {
               "id": "getting-started/faq",
-              "path": "/docs/getting-started/faq",
+              "path": "/getting-started/faq",
               "sidebar": "docs"
             },
             {
               "id": "getting-started/first-chart",
-              "path": "/docs/getting-started/first-chart",
+              "path": "/getting-started/first-chart",
               "sidebar": "docs"
             },
             {
-              "id": "getting-started/getting-started-index",
-              "path": "/docs/getting-started/",
+              "id": "getting-started/getting-started",
+              "path": "/getting-started/",
               "sidebar": "docs"
             },
             {
               "id": "getting-started/quick-start-docker",
-              "path": "/docs/getting-started/quick-start-docker",
+              "path": "/getting-started/quick-start-docker",
               "sidebar": "docs"
             },
             {
               "id": "index",
-              "path": "/docs/",
+              "path": "/",
               "sidebar": "docs"
             },
             {
               "id": "performance/performance-overview",
-              "path": "/docs/performance/",
+              "path": "/performance/",
               "sidebar": "docs"
             },
             {
               "id": "reference/api-reference",
-              "path": "/docs/reference/api-reference",
+              "path": "/reference/api-reference",
               "sidebar": "docs"
             },
             {
               "id": "reference/config-reference",
-              "path": "/docs/reference/config-reference",
+              "path": "/reference/config-reference",
               "sidebar": "docs"
             },
             {
               "id": "security/security-overview",
-              "path": "/docs/security/",
+              "path": "/security/",
               "sidebar": "docs"
             },
             {
               "id": "self-host/backups",
-              "path": "/docs/self-host/backups",
+              "path": "/self-host/backups",
               "sidebar": "docs"
             },
             {
               "id": "self-host/config-reference",
-              "path": "/docs/self-host/config-reference",
+              "path": "/self-host/config-reference",
               "sidebar": "docs"
             },
             {
               "id": "self-host/docker-compose",
-              "path": "/docs/self-host/docker-compose",
+              "path": "/self-host/docker-compose",
               "sidebar": "docs"
             },
             {
               "id": "self-host/self-host-index",
-              "path": "/docs/self-host/",
+              "path": "/self-host/",
               "sidebar": "docs"
             },
             {
               "id": "self-host/ssl-certificates",
-              "path": "/docs/self-host/ssl-certificates",
+              "path": "/self-host/ssl-certificates",
               "sidebar": "docs"
             },
             {
               "id": "troubleshooting/troubleshooting-overview",
-              "path": "/docs/troubleshooting/",
+              "path": "/troubleshooting/",
               "sidebar": "docs"
             }
           ],
@@ -240,7 +244,7 @@
           "sidebars": {
             "docs": {
               "link": {
-                "path": "/docs/",
+                "path": "/",
                 "label": "index"
               }
             }

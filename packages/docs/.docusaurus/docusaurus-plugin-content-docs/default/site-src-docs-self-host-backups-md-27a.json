@@ -5,14 +5,14 @@
   "source": "@site/src/docs/self-host/backups.md",
   "sourceDirName": "self-host",
   "slug": "/self-host/backups",
-  "permalink": "/docs/self-host/backups",
+  "permalink": "/self-host/backups",
   "draft": false,
   "unlisted": false,
   "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/self-host/backups.md",
   "tags": [],
   "version": "current",
-  "lastUpdatedAt": 1755570184,
-  "formattedLastUpdatedAt": "Aug 19, 2025",
+  "lastUpdatedAt": 1539502055,
+  "formattedLastUpdatedAt": "Oct 14, 2018",
   "frontMatter": {
     "id": "backups",
     "title": "Backups",
@@ -21,10 +21,10 @@
   "sidebar": "docs",
   "previous": {
     "title": "Docker Compose",
-    "permalink": "/docs/self-host/docker-compose"
+    "permalink": "/self-host/docker-compose"
   },
   "next": {
     "title": "Config Reference",
-    "permalink": "/docs/self-host/config-reference"
+    "permalink": "/self-host/config-reference"
   }
 }

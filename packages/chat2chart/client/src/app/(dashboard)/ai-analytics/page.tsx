@@ -355,7 +355,7 @@ export default function AIAnalyticsDashboard() {
                                     </Text>
                                     <div style={{ marginTop: '8px' }}>
                                         <Tag color={getStatusColor(capability.status)} icon={getStatusIcon(capability.status)}>
-                                            {capability.status.toUpperCase()}
+                                            {capability.status?.toUpperCase() || 'UNKNOWN'}
                                         </Tag>
                                     </div>
                                 </div>

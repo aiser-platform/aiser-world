@@ -460,8 +460,9 @@ body {
 
 .ant-tooltip .ant-tooltip-arrow::before {
     background: var(--background-tertiary) !important;
-}/
-* Smooth theme transitions */
+}
+
+/* Smooth theme transitions */
 * {
     transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease !important;
 }

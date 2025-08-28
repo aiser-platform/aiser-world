@@ -51,7 +51,7 @@ const DatabaseConnector: React.FC<DatabaseConnectorProps> = ({
 
     const loadSupportedDatabases = async () => {
         try {
-            const response = await fetch('http://localhost:8000/api/v1/data/supported-databases');
+            const response = await fetch('http://localhost:8000/data/supported-databases');
             const data = await response.json();
             
             if (data.success) {
@@ -101,7 +101,7 @@ const DatabaseConnector: React.FC<DatabaseConnectorProps> = ({
                 connectionConfig.region = values.region;
             }
 
-            const response = await fetch('http://localhost:8000/api/v1/data/connect-database', {
+            const response = await fetch('http://localhost:8000/data/database/test', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -152,7 +152,7 @@ const DatabaseConnector: React.FC<DatabaseConnectorProps> = ({
                 connectionConfig.region = values.region;
             }
 
-            const response = await fetch('http://localhost:8000/api/v1/data/connect-database', {
+            const response = await fetch('http://localhost:8000/data/database/connect', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -163,20 +163,21 @@ const DatabaseConnector: React.FC<DatabaseConnectorProps> = ({
             const data = await response.json();
 
             if (data.success) {
+                // Create data source object from the response
                 const dataSource: IDataSource = {
-                    id: data.data_source.id,
-                    name: data.data_source.name,
+                    id: data.data_source_id || data.connection_info?.id,
+                    name: data.connection_info?.name || connectionConfig.name,
                     type: 'database',
-                    dbType: data.data_source.db_type,
-                    createdAt: data.data_source.created_at,
-                    status: data.data_source.status
+                    dbType: data.connection_info?.type || connectionConfig.type,
+                    createdAt: data.connection_info?.created_at || new Date().toISOString(),
+                    status: data.connection_info?.status || 'connected'
                 };
 
                 message.success('Database connected successfully!');
                 onConnect(dataSource);
                 form.resetFields();
             } else {
-                message.error(`Connection failed: ${data.error}`);
+                message.error(`Connection failed: ${data.error || data.message}`);
             }
         } catch (error) {
             console.error('Database connection error:', error);

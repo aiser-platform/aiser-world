@@ -6,8 +6,8 @@ const config = {
   // Set the production url of your site here
   url: 'https://aiser-docs.dataticon.com',
   // Set the /<baseUrl>/ pathname under which your site is served
-  // For GitHub Pages deployment, use '/docs/' to match local development
-  baseUrl: '/docs/',
+  // For custom domain deployment, use '/' to serve from root
+  baseUrl: '/',
   
   // GitHub Pages deployment 
   deploymentBranch: 'gh-pages', 

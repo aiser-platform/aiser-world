@@ -5,14 +5,14 @@
   "source": "@site/src/docs/getting-started/first-chart.md",
   "sourceDirName": "getting-started",
   "slug": "/getting-started/first-chart",
-  "permalink": "/docs/getting-started/first-chart",
+  "permalink": "/getting-started/first-chart",
   "draft": false,
   "unlisted": false,
   "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/getting-started/first-chart.md",
   "tags": [],
   "version": "current",
-  "lastUpdatedAt": 1755622594,
-  "formattedLastUpdatedAt": "Aug 19, 2025",
+  "lastUpdatedAt": 1539502055,
+  "formattedLastUpdatedAt": "Oct 14, 2018",
   "frontMatter": {
     "id": "first-chart",
     "title": "Create Your First Chart",
@@ -22,10 +22,10 @@
   "sidebar": "docs",
   "previous": {
     "title": "Docker Quick Start",
-    "permalink": "/docs/getting-started/quick-start-docker"
+    "permalink": "/getting-started/quick-start-docker"
   },
   "next": {
     "title": "Demo Walkthrough",
-    "permalink": "/docs/getting-started/demo-walkthrough"
+    "permalink": "/getting-started/demo-walkthrough"
   }
 }

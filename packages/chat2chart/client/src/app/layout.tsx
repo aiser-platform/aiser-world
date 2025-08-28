@@ -27,12 +27,10 @@ export default function RootLayout({
                             ? 'Logout - Aiser'
                             : pathname.includes('test')
                               ? 'Test - Aiser'
-                              : `${
-                                    pathname
-                                        .substring(1)
-                                        .charAt(0)
-                                        .toUpperCase() +
-                                    pathname.slice(2)
+                                                              : `${
+                                    pathname && pathname.length > 1
+                                        ? pathname.substring(1).charAt(0)?.toUpperCase() + pathname.slice(2)
+                                        : 'Dashboard'
                                 } - Aiser`}
                 </title>
                 <link rel="icon" href="/aiser-logo.png" />

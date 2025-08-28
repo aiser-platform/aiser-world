@@ -5,14 +5,14 @@
   "source": "@site/src/docs/developer/plugin-architecture.md",
   "sourceDirName": "developer",
   "slug": "/developer/plugin-architecture",
-  "permalink": "/docs/developer/plugin-architecture",
+  "permalink": "/developer/plugin-architecture",
   "draft": false,
   "unlisted": false,
   "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/developer/plugin-architecture.md",
   "tags": [],
   "version": "current",
-  "lastUpdatedAt": 1755570184,
-  "formattedLastUpdatedAt": "Aug 19, 2025",
+  "lastUpdatedAt": 1539502055,
+  "formattedLastUpdatedAt": "Oct 14, 2018",
   "frontMatter": {
     "id": "plugin-architecture",
     "title": "Plugin Architecture",
@@ -21,10 +21,10 @@
   "sidebar": "docs",
   "previous": {
     "title": "Local Dev",
-    "permalink": "/docs/developer/local-dev"
+    "permalink": "/developer/local-dev"
   },
   "next": {
     "title": "Release Process",
-    "permalink": "/docs/developer/release-process"
+    "permalink": "/developer/release-process"
   }
 }

@@ -58,7 +58,7 @@ GitHub Pages automatically provides SSL certificates for custom domains. Wait 24
 The build automatically detects the environment:
 
 - **Development**: `baseUrl: '/'` (localhost:3005)
-- **Production**: `baseUrl: '/docs/'` (aiser-docs.dataticon.com/docs)
+- **Production**: `baseUrl: '/'` (aiser-docs.dataticon.com)
 
 ### Build Output
 

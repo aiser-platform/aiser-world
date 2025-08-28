@@ -5,7 +5,6 @@ import { MessageOutlined, DatabaseOutlined, BarChartOutlined, HistoryOutlined, S
 import ModelSelector from '@/app/components/ModelSelector/ModelSelector';
 import React, { useState, useEffect, useCallback } from 'react';
 import ChatPanel from './components/ChatPanel/ChatPanel';
-import DataPanel from './components/DataPanel/DataPanel';
 import EnhancedDataPanel from './components/DataPanel/EnhancedDataPanel';
 import ChatHistoryPanel from './components/HistoryPanel/HistoryPanel';
 import CollapsibleHistoryPanel from './components/HistoryPanel/CollapsibleHistoryPanel';
@@ -13,6 +12,22 @@ import UniversalDataSourceModal from '@/app/components/UniversalDataSourceModal/
 import { ExtendedTable, IConversation, IDatabase } from './types';
 import { IFileUpload } from '@/app/components/FileUpload/types';
 import { useSearchParams } from 'next/navigation';
+
+interface DataSource {
+    id: string;
+    name: string;
+    type: 'file' | 'database' | 'warehouse' | 'api' | 'cube';
+    status: 'connected' | 'disconnected' | 'error';
+    config: Record<string, any>;
+    schema?: Record<string, any>;
+    metadata?: Record<string, any>;
+    row_count?: number;
+    description?: string;
+    lastUsed?: string;
+    rowCount?: number;
+    columns?: string[];
+    size?: string;
+}
 
 // const { TabPane } = Tabs; // Deprecated - using items prop instead
 const { Text } = Typography;
@@ -24,16 +39,17 @@ const ChatToChart = () => {
     const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
     const [conversationState, setConversationState] = useState<IConversation | undefined>(undefined);
     const [activeTab, setActiveTab] = React.useState<string>('chat');
-    const [selectedDataSource, setSelectedDataSource] = React.useState<any>(null);
-    const [generatedCharts, setGeneratedCharts] = React.useState<any[]>([]);
+    const [selectedDataSource, setSelectedDataSource] = React.useState<DataSource | null>(null);
+    const [generatedCharts, setGeneratedCharts] = React.useState<Record<string, any>[]>([]);
     const [dataPanelCollapsed, setDataPanelCollapsed] = React.useState<boolean>(false);
     const [historyPanelCollapsed, setHistoryPanelCollapsed] = React.useState<boolean>(false);
-    const [sqlResults, setSqlResults] = React.useState<any[]>([]);
+    const [sqlResults, setSqlResults] = React.useState<Record<string, any>[]>([]);
     const [showDataSourceModal, setShowDataSourceModal] = React.useState<boolean>(false);
     const [dataPanelWidth, setDataPanelWidth] = React.useState<number>(5); // Dynamic width for data panel
     const [historyPanelWidth, setHistoryPanelWidth] = React.useState<number>(4); // Dynamic width for history panel
     const [isDragging, setIsDragging] = React.useState<boolean>(false);
     const [isDraggingHistory, setIsDraggingHistory] = React.useState<boolean>(false);
+    const [selectedDataSources, setSelectedDataSources] = React.useState<DataSource[]>([]); // Data sources selected from DataPanel
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [dbList, setDbList] = React.useState<IDatabase[]>([]);
@@ -123,7 +139,7 @@ const ChatToChart = () => {
         // Save current messages to the previous conversation
         const currentMessages = localStorage.getItem('chat_messages');
         if (currentMessages && currentConversationId) {
-            const conversationKey = `conv_messages_${currentConversationId}`;
+            const conversationKey = `messages_${currentConversationId}`;
             localStorage.setItem(conversationKey, currentMessages);
             console.log('Saved messages for conversation:', currentConversationId);
         }
@@ -133,7 +149,7 @@ const ChatToChart = () => {
         
         // Load messages for the selected conversation
         if (conversation.id) {
-            const conversationKey = `conv_messages_${conversation.id}`;
+            const conversationKey = `messages_${conversation.id}`;
             const savedMessages = localStorage.getItem(conversationKey);
             if (savedMessages) {
                 localStorage.setItem('chat_messages', savedMessages);
@@ -150,13 +166,13 @@ const ChatToChart = () => {
         // Save current messages to the previous conversation before switching
         const currentMessages = localStorage.getItem('chat_messages');
         if (currentMessages && currentConversationId) {
-            const conversationKey = `conv_messages_${currentConversationId}`;
+            const conversationKey = `messages_${currentConversationId}`;
             localStorage.setItem(conversationKey, currentMessages);
             console.log('Saved messages for conversation:', currentConversationId);
         }
         
         const newConversation: IConversation = {
-            id: `conv_${Date.now()}`,
+            id: crypto.randomUUID(),
             title: `New Conversation ${conversations.length + 1}`,
             messages: []
         };
@@ -179,12 +195,9 @@ const ChatToChart = () => {
         const modelingComplete = searchParams.get('modeling');
         
         if (dataSourceId) {
-            // Set the selected data source
-            setSelectedDataSource({
-                id: dataSourceId,
-                type: 'file', // Assume file for now
-                name: `Data Source ${dataSourceId}`
-            });
+            // For now, we'll set a placeholder and let the EnhancedDataPanel handle the actual data source
+            // The EnhancedDataPanel will load and set the real data source when it mounts
+            console.log('Data source ID from URL:', dataSourceId);
             
             // If modeling is complete, show success message
             if (modelingComplete === 'complete') {
@@ -430,30 +443,24 @@ const ChatToChart = () => {
                                     }}
                                 >
                                     <ChatPanel
-                                        id={conversationState?.id || ''}
+                                        id="chat-panel"
                                         file={file}
                                         db={db}
                                         schema={schema}
                                         tables={tables}
                                         customAIModel={openAIModel}
-                                        onDefaultDbChange={(ddb?: IDatabase) => {
-                                            const defaultDb = dbList.find(
-                                                (db) => db.id === ddb?.id
-                                            );
-                                            setDb(defaultDb);
-                                        }}
+                                        onDefaultDbChange={setDb}
                                         onDefaultSchemaChange={setSchema}
                                         onDefaultTablesChange={setTables}
+                                        onFileChange={setFile}
                                         callback={(props: {
                                             conversation: IConversation;
                                         }) => {
                                             setConversationState(props.conversation);
                                         }}
-                                        onFileChange={(file) => {
-                                            setFile(file);
-                                        }}
                                         selectedDataSource={selectedDataSource}
                                         conversationId={currentConversationId}
+                                        selectedDataSources={selectedDataSources}
                                     />
                                 </Col>
                                 
@@ -493,31 +500,49 @@ const ChatToChart = () => {
                                     {/* Data Panel Content */}
                                     
                                     <EnhancedDataPanel
-                                        db={db}
-                                        schema={schema}
-                                        tables={tables}
-                                        file={file}
-                                        collapsed={dataPanelCollapsed}
-                                        onDbChange={setDb}
-                                        onSchemaChange={setSchema}
-                                        onTableSelectChange={setTables}
-                                        onFileChange={setFile}
-                                        onCollapsedChange={setDataPanelCollapsed}
-                                        onSQLExecute={(sql, results) => {
-                                            setSqlResults(results);
-                                            console.log('SQL executed:', sql, 'Results:', results);
+                                        onDataSourceSelect={(dataSource) => {
+                                            console.log('🔄 Chat page onDataSourceSelect called with:', dataSource);
+                                            setSelectedDataSource(dataSource);
+                                            
+                                            // Update selectedDataSources for AI analysis
+                                            if (dataSource) {
+                                                console.log('✅ Setting selectedDataSources to:', [dataSource]);
+                                                setSelectedDataSources([dataSource]);
+                                            } else {
+                                                console.log('❌ Clearing selectedDataSources');
+                                                setSelectedDataSources([]);
+                                            }
+                                            
+                                            // Also update the file/db state for backward compatibility
+                                            if (dataSource && dataSource.type === 'file') {
+                                                setFile({
+                                                    filename: dataSource.name,
+                                                    content_type: 'application/octet-stream',
+                                                    storage_type: 'local',
+                                                    file_size: 0,
+                                                    uuid_filename: dataSource.id
+                                                });
+                                            } else if (dataSource && dataSource.type === 'database') {
+                                                setDb({
+                                                    id: Number(dataSource.id) || undefined,
+                                                    name: dataSource.name,
+                                                    type: dataSource.config?.db_type || 'postgresql',
+                                                    host: dataSource.config?.host || '',
+                                                    port: Number(dataSource.config?.port) || 5432,
+                                                    database: dataSource.config?.database || '',
+                                                    username: dataSource.config?.username || ''
+                                                });
+                                            }
                                         }}
-                                        onChartGenerate={(data, query) => {
-                                            // Generate chart from SQL results
-                                            const newChart = {
-                                                id: Date.now().toString(),
-                                                title: `Chart from SQL Query`,
-                                                data: data,
-                                                query: query,
-                                                timestamp: new Date()
-                                            };
-                                            setGeneratedCharts(prev => [newChart, ...prev]);
-                                            setActiveTab('charts');
+                                        selectedDataSource={selectedDataSource}
+                                        onRefresh={() => {
+                                            // Refresh data sources
+                                            console.log('Refreshing data sources...');
+                                        }}
+                                        onDataSourcesChange={(sources) => {
+                                            console.log('🔄 Chat page onDataSourcesChange called with:', sources);
+                                            setSelectedDataSources(sources);
+                                            console.log('✅ Updated selectedDataSources to:', sources);
                                         }}
                                     />
                                 </Col>

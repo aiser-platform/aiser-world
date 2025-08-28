@@ -5,14 +5,14 @@
   "source": "@site/src/docs/self-host/index.md",
   "sourceDirName": "self-host",
   "slug": "/self-host/",
-  "permalink": "/docs/self-host/",
+  "permalink": "/self-host/",
   "draft": false,
   "unlisted": false,
   "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/self-host/index.md",
   "tags": [],
   "version": "current",
-  "lastUpdatedAt": 1755622594,
-  "formattedLastUpdatedAt": "Aug 19, 2025",
+  "lastUpdatedAt": 1539502055,
+  "formattedLastUpdatedAt": "Oct 14, 2018",
   "frontMatter": {
     "id": "self-host-index",
     "title": "Self-Host & Enterprise Deployment",
@@ -22,10 +22,10 @@
   "sidebar": "docs",
   "previous": {
     "title": "FAQ",
-    "permalink": "/docs/getting-started/faq"
+    "permalink": "/getting-started/faq"
   },
   "next": {
     "title": "Docker Compose",
-    "permalink": "/docs/self-host/docker-compose"
+    "permalink": "/self-host/docker-compose"
   }
 }

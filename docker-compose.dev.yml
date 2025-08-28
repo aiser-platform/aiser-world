@@ -1,6 +1,4 @@
-# Load environment variables from .env file
-env_file:
-  - .env
+version: '3.8'
 
 services:
   # PostgreSQL Database
@@ -70,25 +68,15 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - POSTGRES_SERVER=postgres
-      - POSTGRES_DB=${POSTGRES_DB:-aiser_chat2chart}
-      - POSTGRES_USER=${POSTGRES_USER:-aiser}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-aiser_password}
-      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
-      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-aiser}:${POSTGRES_PASSWORD:-aiser_password}@postgres:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-aiser_chat2chart}
-      - SECRET_KEY=${SECRET_KEY:-dev-secret-key}
-      - ENVIRONMENT=${ENVIRONMENT:-development}
-      - DEBUG=${DEBUG:-True}
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_DB=0
-      - REDIS_URL=redis://redis:6379/0
-      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY}
-      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
-      - AZURE_OPENAI_API_VERSION=${AZURE_OPENAI_API_VERSION:-2025-04-01-preview}
-      - AZURE_OPENAI_DEPLOYMENT_NAME=${AZURE_OPENAI_DEPLOYMENT_NAME:-gpt-5-mini}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - OPENAI_MODEL_ID=${OPENAI_MODEL_ID:-gpt-4o-mini}
+       - DATABASE_URL=postgresql+asyncpg://aiser:aiser_password@postgres:5432/aiser_world
+       - SECRET_KEY=${SECRET_KEY:-dev-secret-key}
+       - ENVIRONMENT=development
+       - DEBUG=True
+       - REDIS_URL=redis://redis:6379/0
+       - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY}
+       - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
+       - AZURE_OPENAI_API_VERSION=${AZURE_OPENAI_API_VERSION:-2025-04-01-preview}
+       - AZURE_OPENAI_DEPLOYMENT_NAME=${AZURE_OPENAI_DEPLOYMENT_NAME:-gpt-5-mini}
     depends_on:
       postgres:
         condition: service_healthy
@@ -153,15 +141,16 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=${NODE_ENV:-development}
-      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
-      - NEXT_PUBLIC_AUTH_URL=${NEXT_PUBLIC_AUTH_URL:-http://localhost:5000}
-      - NEXT_PUBLIC_CUBE_URL=${NEXT_PUBLIC_CUBE_URL:-http://localhost:4000}
+      - NEXT_PUBLIC_API_URL=http://chat2chart-server:8000/api/v1
+      - NEXT_PUBLIC_AUTH_URL=http://auth-service:5000
+      - NEXT_PUBLIC_CUBE_URL=http://cube-server:4000
+      - HOSTNAME=0.0.0.0
+      - PORT=3000
+      - NEXT_TELEMETRY_DISABLED=1
     volumes:
       - ./packages/chat2chart/client:/app
       - ./packages/shared:/shared
       - ./scripts/start-client.sh:/start.sh
-      - /app/node_modules
-      - /app/.next
     depends_on:
       - chat2chart-server
       - auth-service
@@ -175,6 +164,8 @@ volumes:
   auth_poetry_cache:
   chat2chart_poetry_cache:
   cube_node_modules:
+  client_node_modules:
+  client_next_build:
 
 networks:
   default:

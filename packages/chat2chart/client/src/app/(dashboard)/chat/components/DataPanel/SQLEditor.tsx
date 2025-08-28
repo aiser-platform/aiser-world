@@ -313,10 +313,10 @@ LIMIT 10;`
                                                 {query.timestamp.toLocaleTimeString()}
                                             </Text>
                                             {query.duration && (
-                                                <Tag size="small">{query.duration}ms</Tag>
+                                                <Tag>{query.duration}ms</Tag>
                                             )}
                                             {query.rowCount !== undefined && (
-                                                <Tag size="small">{query.rowCount} rows</Tag>
+                                                <Tag>{query.rowCount} rows</Tag>
                                             )}
                                         </Space>
                                     </div>

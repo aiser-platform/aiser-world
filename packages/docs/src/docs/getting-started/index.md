@@ -1,62 +1,36 @@
 ---
-id: getting-started-index
-title: Welcome to Aiser Platform
+id: getting-started
+title: Getting Started
 sidebar_label: Getting Started
-description: Get started with Aiser Platform - the AI-first business intelligence platform that transforms how you interact with data
+description: Quick start guide for Aiser Platform
 ---
 
-# 🚀 Welcome to Aiser Platform
+# 🚀 Getting Started with Aiser Platform
 
-**Transform your data into actionable insights with AI-powered business intelligence.**
+**Get up and running with Aiser Platform in minutes - the AI-first business intelligence platform.**
 
-Aiser Platform is the next-generation open-source AI-first business intelligence and visualization tool designed for everyone - from executives to analysts. Chat with your data in natural language and get enterprise-scale insights with agentic AI.
+## 🎯 Quick Start Options
 
-## ✨ Why Choose Aiser?
+### **🐳 Docker Quick Start (Recommended)**
+Get Aiser running in **5 minutes** with Docker:
 
-- **🤖 AI-First Design**: Built from the ground up for AI-powered analytics
-- **🌍 Open Source Core**: Transparent, community-driven development
-- **💼 Enterprise Ready**: Scale from startup to Fortune 500
-- **🔒 Privacy First**: Self-host or cloud with full data control
-- **📊 Natural Language**: Ask questions in plain English, get charts instantly
-
-## 🎯 Who Is This For?
-
-| Role | Use Case | Experience Level |
-|------|----------|------------------|
-| **Executives** | Strategic insights, KPI dashboards | Non-technical |
-| **Business Users** | Ad-hoc analysis, reports | Beginner |
-| **Data Analysts** | Deep analysis, custom visualizations | Intermediate |
-| **Developers** | API integration, custom solutions | Advanced |
-| **Open Source Contributors** | Platform enhancement, community | Expert |
-
-## 🚀 Quick Start Paths
-
-### 🐳 **Docker Quick Start** (Recommended)
-Get Aiser running in 5 minutes with Docker:
 ```bash
 git clone https://github.com/aiser-platform/aiser-world
 cd aiser-world
 docker-compose up -d
 ```
-[Start with Docker →](./quick-start-docker)
 
-### 📊 **First Chart in 2 Minutes**
-Upload data and create your first AI-generated chart:
-[Create Your First Chart →](./first-chart)
+[**Start with Docker →**](./quick-start-docker)
 
-### 🎬 **Interactive Demo**
-See Aiser in action with our guided walkthrough:
-[Watch Demo →](./demo-walkthrough)
+### **📊 First Chart Creation**
+Learn how to create your first AI-powered chart:
 
-## 🏗️ Platform Architecture
+[**Create Your First Chart →**](./first-chart)
 
-Aiser Platform consists of several interconnected services:
+### **🎮 Interactive Demo**
+Take a guided tour of the platform:
 
-- **🤖 Chat2Chart**: Core AI-powered chart generation engine
-- **💼 Client**: Enterprise frontend with advanced features  
-- **🔐 Authentication**: Centralized auth with enterprise SSO
-- **📊 Cube.js**: High-performance analytics engine
-- **🛠️ Shared**: Common utilities and components
+[**Demo Walkthrough →**](./demo-walkthrough)
 
 ## 🔧 System Requirements
 
@@ -67,13 +41,19 @@ Aiser Platform consists of several interconnected services:
 | **Storage** | 20GB | 100GB+ |
 | **OS** | Linux, macOS, Windows | Linux (production) |
 
-## 📚 What's Next?
+## 📋 Prerequisites
 
-1. **🚀 [Quick Start with Docker](./quick-start-docker)** - Get running in minutes
-2. **📊 [Create Your First Chart](./first-chart)** - Experience AI-powered analytics
-3. **🏠 [Self-Host & Deploy](../self-host/self-host-index)** - Production deployment
-4. **🤖 [AI Features](../features/ai-overview)** - Explore AI capabilities
-5. **🔌 [API Reference](../reference/api-reference)** - Integrate with your systems
+- **Docker & Docker Compose** (for containerized deployment)
+- **Git** (for cloning the repository)
+- **Modern web browser** (Chrome, Firefox, Safari, Edge)
+
+## 🚀 What You'll Learn
+
+1. **Platform Setup** - Get Aiser running on your machine
+2. **First Chart** - Create AI-powered visualizations
+3. **Data Connection** - Connect to your data sources
+4. **AI Features** - Use natural language queries
+5. **Dashboard Creation** - Build professional dashboards
 
 ## 🆘 Need Help?
 
@@ -82,14 +62,13 @@ Aiser Platform consists of several interconnected services:
 - **💬 [Discussions](https://github.com/aiser-platform/aiser-world/discussions)** - Community support
 - **📧 [Email Support](mailto:support@dataticon.com)** - Enterprise support
 
-## 🌟 Community & Support
+## 🌟 Why Aiser?
 
-Join our growing community of data enthusiasts, developers, and business users:
-
-- **⭐ Star us on [GitHub](https://github.com/aiser-platform/aiser-world)**
-- **🤝 [Contribute](../community/contributing)** to the platform
-- **📅 Join [Bi-weekly Calls](../community/bi-weekly-calls)**
-- **🌍 Become an [Ambassador](../community/ambassador-program)**
+- **🤖 AI-First Design**: Built from the ground up for AI-powered analytics
+- **🌍 Open Source Core**: Transparent, community-driven development
+- **💼 Enterprise Ready**: Scale from startup to Fortune 500
+- **🔒 Privacy First**: Self-host or cloud with full data control
+- **📊 Natural Language**: Ask questions in plain English, get charts instantly
 
 ---
 

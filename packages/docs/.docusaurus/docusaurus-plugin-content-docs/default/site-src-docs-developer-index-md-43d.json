@@ -5,14 +5,14 @@
   "source": "@site/src/docs/developer/index.md",
   "sourceDirName": "developer",
   "slug": "/developer/",
-  "permalink": "/docs/developer/",
+  "permalink": "/developer/",
   "draft": false,
   "unlisted": false,
   "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/developer/index.md",
   "tags": [],
   "version": "current",
-  "lastUpdatedAt": 1755622594,
-  "formattedLastUpdatedAt": "Aug 19, 2025",
+  "lastUpdatedAt": 1539502055,
+  "formattedLastUpdatedAt": "Oct 14, 2018",
   "frontMatter": {
     "id": "developer-index",
     "title": "Developer Guide",
@@ -22,10 +22,10 @@
   "sidebar": "docs",
   "previous": {
     "title": "Performance Overview",
-    "permalink": "/docs/performance/"
+    "permalink": "/performance/"
   },
   "next": {
     "title": "Architecture",
-    "permalink": "/docs/developer/architecture"
+    "permalink": "/developer/architecture"
   }
 }

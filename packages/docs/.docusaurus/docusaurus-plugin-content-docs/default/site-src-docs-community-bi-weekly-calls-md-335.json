@@ -5,14 +5,14 @@
   "source": "@site/src/docs/community/bi-weekly-calls.md",
   "sourceDirName": "community",
   "slug": "/community/bi-weekly-calls",
-  "permalink": "/docs/community/bi-weekly-calls",
+  "permalink": "/community/bi-weekly-calls",
   "draft": false,
   "unlisted": false,
   "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/community/bi-weekly-calls.md",
   "tags": [],
   "version": "current",
-  "lastUpdatedAt": 1755570184,
-  "formattedLastUpdatedAt": "Aug 19, 2025",
+  "lastUpdatedAt": 1539502055,
+  "formattedLastUpdatedAt": "Oct 14, 2018",
   "frontMatter": {
     "id": "bi-weekly-calls",
     "title": "Bi Weekly Calls",
@@ -21,10 +21,10 @@
   "sidebar": "docs",
   "previous": {
     "title": "Ambassador Program",
-    "permalink": "/docs/community/ambassador-program"
+    "permalink": "/community/ambassador-program"
   },
   "next": {
     "title": "Code Of Conduct",
-    "permalink": "/docs/community/code-of-conduct"
+    "permalink": "/community/code-of-conduct"
   }
 }

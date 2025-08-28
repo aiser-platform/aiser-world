@@ -3,15 +3,29 @@ set -e
 
 echo "🔧 Setting up chat2chart service..."
 
+# Set non-interactive mode to avoid debconf prompts
+export DEBIAN_FRONTEND=noninteractive
+export DEBCONF_NONINTERACTIVE_SEEN=true
+
+# Fix any interrupted dpkg operations
+echo "🔧 Fixing interrupted package installations..."
+dpkg --configure -a || true
+
 # Install system dependencies
 echo "📦 Installing system dependencies..."
-apt-get update -qq && apt-get install -y -qq build-essential libpq-dev curl
+apt-get update -qq && apt-get install -y -qq --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    curl \
+    gnupg \
+    lsb-release \
+    wget
 
 # Install dependencies directly with pip
 echo "📦 Installing Python dependencies..."
 cd /app
 
-pip install fastapi uvicorn alembic asyncpg psycopg2-binary sqlalchemy cryptography passlib python-jose email-validator pydantic pydantic-settings openai litellm boto3 colorama pandas numpy pillow redis python-dotenv python-multipart
+pip install --no-cache-dir fastapi uvicorn alembic asyncpg psycopg2-binary sqlalchemy cryptography passlib python-jose email-validator pydantic pydantic-settings openai litellm boto3 colorama pandas numpy pillow redis python-dotenv python-multipart
 
 echo "🚀 Running database migrations..."
 export PYTHONPATH=/app:$PYTHONPATH

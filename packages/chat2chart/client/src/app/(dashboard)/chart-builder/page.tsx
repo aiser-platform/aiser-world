@@ -24,7 +24,9 @@ import {
     InputNumber,
     Radio,
     Checkbox,
-    Upload
+    Upload,
+    Spin,
+    Alert
 } from 'antd';
 import {
     BarChartOutlined,
@@ -48,12 +50,20 @@ import {
     CopyOutlined,
     ImportOutlined,
     ExportOutlined,
-    DatabaseOutlined
+    DatabaseOutlined,
+    ReloadOutlined,
+    BulbOutlined,
+    CheckCircleOutlined,
+    InfoCircleOutlined,
+    RadarChartOutlined,
+    FunnelPlotOutlined,
+    BugOutlined
 } from '@ant-design/icons';
 import { useRouter, useSearchParams } from 'next/navigation';
 import * as echarts from 'echarts';
 import { useDarkMode } from '@/hooks/useDarkMode';
 import './styles.css';
+import { getBackendUrlForApi } from '@/utils/backendUrl';
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -71,27 +81,23 @@ interface ChartData {
     updatedAt: Date;
 }
 
-interface ChartBuilderProps {
-    initialData?: any;
-    initialQuery?: string;
-    chartType?: string;
-}
-
-const ChartBuilder: React.FC<ChartBuilderProps> = ({ 
-    initialData, 
-    initialQuery, 
-    chartType: initialChartType = 'bar' 
-}) => {
+const ChartBuilder: React.FC = () => {
     const router = useRouter();
     const searchParams = useSearchParams();
     const [isDarkMode] = useDarkMode();
     
     // Chart state
-    const [chartData, setChartData] = useState<any[]>(initialData || []);
-    const [chartType, setChartType] = useState<string>(initialChartType);
+    const [chartData, setChartData] = useState<any[]>([]);
+    const [chartType, setChartType] = useState<string>('bar');
     const [chartConfig, setChartConfig] = useState<any>({});
     const [chartInstance, setChartInstance] = useState<echarts.ECharts | null>(null);
-    const [currentQuery, setCurrentQuery] = useState<string>(initialQuery || '');
+    const [currentQuery, setCurrentQuery] = useState<string>('');
+    
+    // Data sources state
+    const [dataSources, setDataSources] = useState<any[]>([]);
+    const [selectedDataSource, setSelectedDataSource] = useState<string>('');
+    const [dataSourceSchema, setDataSourceSchema] = useState<any>(null);
+    const [loadingData, setLoadingData] = useState(false);
     
     // UI state
     const [activeTab, setActiveTab] = useState<string>('design');
@@ -196,6 +202,11 @@ const ChartBuilder: React.FC<ChartBuilderProps> = ({
     const chartContainerRef = useRef<HTMLDivElement>(null);
     const chartRef = useRef<HTMLDivElement>(null);
     
+    // Load data sources on component mount
+    useEffect(() => {
+        loadDataSources();
+    }, []);
+
     // Initialize chart from URL params
     useEffect(() => {
         const dataParam = searchParams.get('data');
@@ -522,6 +533,75 @@ const ChartBuilder: React.FC<ChartBuilderProps> = ({
         setChartData(newData);
         message.success('Chart data updated');
     };
+
+    // Auto-detect best chart type based on data structure
+    const autoDetectChartType = (data: any[]) => {
+        if (data.length === 0) return 'bar';
+        
+        const firstItem = data[0];
+        const keys = Object.keys(firstItem);
+        
+        // Check if we have numeric values
+        const hasNumericValues = keys.some(key => 
+            typeof firstItem[key] === 'number' && !isNaN(firstItem[key])
+        );
+        
+        // Check if we have categorical/text values
+        const hasCategoricalValues = keys.some(key => 
+            typeof firstItem[key] === 'string' || typeof firstItem[key] === 'boolean'
+        );
+        
+        // Check if we have date values
+        const hasDateValues = keys.some(key => {
+            const val = firstItem[key];
+            return val && (typeof val === 'string' && (val.includes('-') || val.includes('/')));
+        });
+        
+        if (hasDateValues && hasNumericValues) {
+            return 'line'; // Time series
+        } else if (hasCategoricalValues && hasNumericValues) {
+            return 'bar'; // Categorical comparison
+        } else if (keys.length === 2 && hasNumericValues) {
+            return 'scatter'; // Two numeric variables
+        } else if (hasNumericValues && data.length <= 10) {
+            return 'pie'; // Small dataset with values
+        } else {
+            return 'bar'; // Default fallback
+        }
+    };
+
+    // Get chart improvement suggestions based on data structure
+    const getChartSuggestions = (data: any[]) => {
+        if (data.length === 0) return [];
+        
+        const suggestions = [];
+        const firstItem = data[0];
+        const keys = Object.keys(firstItem);
+        
+        // Check for potential improvements
+        if (data.length > 100) {
+            suggestions.push('Consider using aggregation or sampling for better performance');
+        }
+        
+        if (keys.length > 5) {
+            suggestions.push('Multiple dimensions detected - consider using grouped or stacked charts');
+        }
+        
+        const numericKeys = keys.filter(key => typeof firstItem[key] === 'number');
+        if (numericKeys.length > 1) {
+            suggestions.push('Multiple numeric fields - consider multi-series charts');
+        }
+        
+        const dateKeys = keys.filter(key => {
+            const val = firstItem[key];
+            return val && (typeof val === 'string' && (val.includes('-') || val.includes('/')));
+        });
+        if (dateKeys.length > 0) {
+            suggestions.push('Date fields detected - consider time-series visualizations');
+        }
+        
+        return suggestions;
+    };
     
     // Save chart
     const handleSaveChart = () => {
@@ -577,6 +657,174 @@ const ChartBuilder: React.FC<ChartBuilderProps> = ({
         });
     };
     
+    // Load data sources from backend
+    const loadDataSources = async () => {
+        try {
+            setLoadingData(true);
+            const response = await fetch(`${getBackendUrlForApi()}/data/sources`);
+            if (response.ok) {
+                const result = await response.json();
+                setDataSources(result.data_sources || []);
+                console.log('Loaded data sources:', result.data_sources);
+            } else {
+                console.error('Failed to load data sources');
+                message.error('Failed to load data sources');
+            }
+        } catch (error) {
+            console.error('Error loading data sources:', error);
+            message.error('Error loading data sources');
+        } finally {
+            setLoadingData(false);
+        }
+    };
+
+    // Load schema for selected data source
+    const loadDataSourceSchema = async (dataSourceId: string) => {
+        try {
+            const response = await fetch(`${getBackendUrlForApi()}/data/sources/${dataSourceId}/schema`);
+            if (response.ok) {
+                const result = await response.json();
+                setDataSourceSchema(result.schema || {});
+                console.log('Loaded schema for data source:', result.schema);
+            } else {
+                console.error('Failed to load schema');
+            }
+        } catch (error) {
+            console.error('Error loading schema:', error);
+        }
+    };
+
+    // Handle data source selection
+    const handleDataSourceSelect = (dataSourceId: string) => {
+        setSelectedDataSource(dataSourceId);
+        if (dataSourceId) {
+            loadDataSourceSchema(dataSourceId);
+            // Load sample data from the selected source
+            loadDataFromSource(dataSourceId);
+        }
+    };
+
+    // Load data from selected data source
+    const loadDataFromSource = async (dataSourceId: string) => {
+        try {
+            setLoadingData(true);
+            const response = await fetch(`${getBackendUrlForApi()}/data/sources/${dataSourceId}/data`);
+            if (response.ok) {
+                const result = await response.json();
+                const data = result.data || [];
+                if (data.length > 0) {
+                    setChartData(data);
+                    setTitle(`${dataSources.find(ds => ds.id === dataSourceId)?.name || 'Data Source'} Analysis`);
+                    setSubtitle(`${data.length} data points loaded`);
+                    
+                    // Auto-detect and set the best chart type for the loaded data
+                    const bestChartType = autoDetectChartType(data);
+                    setChartType(bestChartType);
+                    
+                    message.success(`Loaded ${data.length} data points from data source. Auto-selected ${bestChartType} chart type.`);
+                } else {
+                    message.warning('No data available from selected source');
+                }
+            } else {
+                console.error('Failed to load data from source');
+                message.error('Failed to load data from source');
+            }
+        } catch (error) {
+            console.error('Error loading data from source:', error);
+            message.error('Error loading data from source');
+        } finally {
+            setLoadingData(false);
+        }
+    };
+
+    // Execute custom query on selected data source
+    const executeQuery = async (query: string) => {
+        if (!selectedDataSource || !currentQuery.trim()) {
+            message.warning('Please select a data source and enter a query');
+            return;
+        }
+
+        try {
+            setLoadingData(true);
+            const response = await fetch(`${getBackendUrlForApi()}/data/sources/${selectedDataSource}/data`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ query }),
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                const data = result.data || [];
+                if (data.length > 0) {
+                    setChartData(data);
+                    setTitle('Custom Query Results');
+                    setSubtitle(`${data.length} data points from query`);
+                    
+                    // Auto-detect and set the best chart type for the query results
+                    const bestChartType = autoDetectChartType(data);
+                    setChartType(bestChartType);
+                    
+                    message.success(`Query executed successfully: ${data.length} results. Auto-selected ${bestChartType} chart type.`);
+                } else {
+                    message.warning('Query returned no results');
+                }
+            } else {
+                console.error('Failed to execute query');
+                message.error('Failed to execute query');
+            }
+        } catch (error) {
+            console.error('Error executing query:', error);
+            message.error('Error executing query');
+        } finally {
+            setLoadingData(false);
+        }
+    };
+
+    // Generate sample query based on data source schema
+    const generateSampleQuery = (queryType: string) => {
+        if (!dataSourceSchema || !dataSourceSchema.tables) {
+            return '';
+        }
+
+        const tableName = Object.keys(dataSourceSchema.tables)[0];
+        const columns = dataSourceSchema.tables[tableName]?.columns || [];
+        
+        if (columns.length === 0) {
+            return '';
+        }
+
+        const numericColumns = columns.filter((col: any) => 
+            col.type.includes('int') || col.type.includes('decimal') || col.type.includes('float')
+        );
+        const textColumns = columns.filter((col: any) => 
+            col.type.includes('varchar') || col.type.includes('text') || col.type.includes('char')
+        );
+
+        switch (queryType) {
+            case 'sample':
+                return `SELECT * FROM ${tableName} LIMIT 100`;
+            case 'count':
+                return `SELECT COUNT(*) as total_count FROM ${tableName}`;
+            case 'aggregate':
+                if (numericColumns.length > 0) {
+                    return `SELECT ${textColumns[0]?.name || 'id'}, SUM(${numericColumns[0].name}) as total FROM ${tableName} GROUP BY ${textColumns[0]?.name || 'id'} LIMIT 20`;
+                }
+                return `SELECT ${textColumns[0]?.name || 'id'}, COUNT(*) as count FROM ${tableName} GROUP BY ${textColumns[0]?.name || 'id'} LIMIT 20`;
+            case 'recent':
+                const dateColumns = columns.filter((col: any) => 
+                    col.type.includes('date') || col.type.includes('timestamp')
+                );
+                if (dateColumns.length > 0) {
+                    return `SELECT * FROM ${tableName} ORDER BY ${dateColumns[0].name} DESC LIMIT 50`;
+                }
+                return `SELECT * FROM ${tableName} ORDER BY id DESC LIMIT 50`;
+            default:
+                return `SELECT * FROM ${tableName} LIMIT 100`;
+        }
+    };
+
     // Sample data for testing
     const sampleData = [
         { name: 'Product A', value: 120, category: 'Electronics' },
@@ -595,39 +843,50 @@ const ChartBuilder: React.FC<ChartBuilderProps> = ({
     };
     
     return (
-        <div className="chart-builder-container">
+        <div className="chart-builder-container" style={{ height: '100vh', overflow: 'hidden' }}>
             {/* Header */}
             <div className="chart-builder-header">
-                <Space>
-                    <Title level={3} style={{ margin: 0, color: isDarkMode ? '#ffffff' : '#333333' }}>
-                        Chart Builder
-                    </Title>
-                    <Badge count={chartData.length} showZero>
-                        <Tag color="blue">Data Points</Tag>
-                    </Badge>
-                </Space>
+                                 <Space>
+                     <Title level={3} style={{ margin: 0, color: isDarkMode ? '#ffffff' : '#333333' }}>
+                         Chart Builder
+                     </Title>
+                     <Badge count={chartData.length} showZero>
+                         <Tag color="blue">Data Points</Tag>
+                     </Badge>
+                     {dataSources.length > 0 && (
+                         <Badge count={dataSources.length} showZero>
+                             <Tag color="green" icon={<DatabaseOutlined />}>Data Sources</Tag>
+                         </Badge>
+                     )}
+                 </Space>
                 
-                <Space>
-                    <Tooltip title="Load Sample Data">
-                        <Button 
-                            icon={<PlusOutlined />} 
-                            onClick={loadSampleData}
-                            size="small"
-                        >
-                            Sample Data
-                        </Button>
-                    </Tooltip>
-                    
-                    <Tooltip title="Save Chart">
-                        <Button 
-                            type="primary" 
-                            icon={<SaveOutlined />} 
-                            onClick={handleSaveChart}
-                            size="small"
-                        >
-                            Save
-                        </Button>
-                    </Tooltip>
+                                 <Space>
+                     {selectedDataSource && (
+                         <Tag color="blue" icon={<DatabaseOutlined />}>
+                             {dataSources.find(ds => ds.id === selectedDataSource)?.name}
+                         </Tag>
+                     )}
+                     
+                     <Tooltip title="Load Sample Data">
+                         <Button 
+                             icon={<PlusOutlined />} 
+                             onClick={loadSampleData}
+                             size="small"
+                         >
+                             Sample Data
+                         </Button>
+                     </Tooltip>
+                     
+                     <Tooltip title="Save Chart">
+                         <Button 
+                             type="primary" 
+                             icon={<SaveOutlined />} 
+                             onClick={handleSaveChart}
+                             size="small"
+                         >
+                             Save
+                         </Button>
+                     </Tooltip>
                     
                     <Tooltip title="Export PNG">
                         <Button 
@@ -669,7 +928,7 @@ const ChartBuilder: React.FC<ChartBuilderProps> = ({
             </div>
             
             {/* Main Content */}
-            <div className="chart-builder-content">
+            <div className="chart-builder-content" style={{ height: 'calc(100vh - 80px)', overflowY: 'auto' }}>
                 {/* Left Panel - Chart Type & Data */}
                 {showDataPanel && (
                     <div className="chart-builder-left-panel">
@@ -729,56 +988,140 @@ const ChartBuilder: React.FC<ChartBuilderProps> = ({
                                 
                                 <TabPane tab="Data Mapping" key="data">
                                     <Space direction="vertical" style={{ width: '100%' }} size="small">
-                                        <div>
-                                            <Text strong>X-Axis Field</Text>
-                                            <Select
-                                                placeholder="Select X-axis field"
-                                                style={{ width: '100%', marginTop: 8 }}
-                                            >
-                                                {chartData.length > 0 && Object.keys(chartData[0]).map(key => (
-                                                    <Option key={key} value={key}>{key}</Option>
-                                                ))}
-                                            </Select>
-                                        </div>
-                                        
-                                        <div>
-                                            <Text strong>Y-Axis Field</Text>
-                                            <Select
-                                                placeholder="Select Y-axis field"
-                                                style={{ width: '100%', marginTop: 8 }}
-                                            >
-                                                {chartData.length > 0 && Object.keys(chartData[0]).map(key => (
-                                                    <Option key={key} value={key}>{key}</Option>
-                                                ))}
-                                            </Select>
-                                        </div>
-                                        
-                                        <div>
-                                            <Text strong>Series Field</Text>
-                                            <Select
-                                                placeholder="Select series field (optional)"
-                                                style={{ width: '100%', marginTop: 8 }}
-                                                allowClear
-                                            >
-                                                {chartData.length > 0 && Object.keys(chartData[0]).map(key => (
-                                                    <Option key={key} value={key}>{key}</Option>
-                                                ))}
-                                            </Select>
-                                        </div>
-                                        
-                                        <div>
-                                            <Text strong>Aggregation</Text>
-                                            <Select
-                                                defaultValue="sum"
-                                                style={{ width: '100%', marginTop: 8 }}
-                                            >
-                                                <Option value="sum">Sum</Option>
-                                                <Option value="avg">Average</Option>
-                                                <Option value="count">Count</Option>
-                                                <Option value="min">Minimum</Option>
-                                                <Option value="max">Maximum</Option>
-                                            </Select>
-                                        </div>
+                                        {chartData.length > 0 ? (
+                                            <>
+                                                <div>
+                                                    <Text strong>Smart Field Detection</Text>
+                                                    <div style={{ marginTop: 8, padding: '8px', backgroundColor: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: '4px' }}>
+                                                        <Text type="success" style={{ fontSize: '12px' }}>
+                                                            ✓ Auto-detected chart type: {chartType.toUpperCase()}
+                                                        </Text>
+                                                        <div style={{ marginTop: 4 }}>
+                                                            <Text type="secondary" style={{ fontSize: '11px' }}>
+                                                                Based on data structure analysis
+                                                            </Text>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div>
+                                                    <Text strong>X-Axis Field</Text>
+                                                    <Select
+                                                        placeholder="Select X-axis field"
+                                                        style={{ width: '100%', marginTop: 8 }}
+                                                    >
+                                                        {Object.keys(chartData[0]).map(key => (
+                                                            <Option key={key} value={key}>
+                                                                {key}
+                                                            </Option>
+                                                        ))}
+                                                    </Select>
+                                                </div>
+                                                
+                                                <div>
+                                                    <Text strong>Y-Axis Field</Text>
+                                                    <Select
+                                                        placeholder="Select Y-axis field"
+                                                        style={{ width: '100%', marginTop: 8 }}
+                                                    >
+                                                        {Object.keys(chartData[0]).map(key => (
+                                                            <Option key={key} value={key}>
+                                                                {key}
+                                                            </Option>
+                                                        ))}
+                                                    </Select>
+                                                </div>
+                                                
+                                                <div>
+                                                    <Text strong>Series Field</Text>
+                                                    <Select
+                                                        placeholder="Select series field (optional)"
+                                                        style={{ width: '100%', marginTop: 8 }}
+                                                        allowClear
+                                                    >
+                                                        {Object.keys(chartData[0]).map(key => (
+                                                            <Option key={key} value={key}>
+                                                                {key} ({typeof chartData[0][key]})
+                                                            </Option>
+                                                        ))}
+                                                    </Select>
+                                                </div>
+                                                
+                                                <div>
+                                                    <Text strong>Aggregation</Text>
+                                                    <Select
+                                                        defaultValue="sum"
+                                                        style={{ width: '100%', marginTop: 8 }}
+                                                    >
+                                                        <Option value="sum">Sum</Option>
+                                                        <Option value="avg">Average</Option>
+                                                        <Option value="count">Count</Option>
+                                                        <Option value="min">Minimum</Option>
+                                                        <Option value="max">Maximum</Option>
+                                                    </Select>
+                                                </div>
+                                                
+                                                                                                 <div>
+                                                     <Text strong>Quick Field Mapping</Text>
+                                                     <div style={{ marginTop: 8 }}>
+                                                         <Button 
+                                                             size="small" 
+                                                             style={{ margin: '2px' }}
+                                                             onClick={() => {
+                                                                 const keys = Object.keys(chartData[0]);
+                                                                 if (keys.length >= 2) {
+                                                                     // Auto-map first text field to X, first numeric field to Y
+                                                                     const textField = keys.find(key => typeof chartData[0][key] === 'string');
+                                                                     const numericField = keys.find(key => typeof chartData[0][key] === 'number');
+                                                                     if (textField && numericField) {
+                                                                         message.success(`Auto-mapped: ${textField} → X-axis, ${numericField} → Y-axis`);
+                                                                     }
+                                                                 }
+                                                             }}
+                                                         >
+                                                             Auto-Map Fields
+                                                         </Button>
+                                                     </div>
+                                                 </div>
+                                                 
+                                                 <div>
+                                                     <Text strong>Chart Suggestions</Text>
+                                                     <div style={{ marginTop: 8 }}>
+                                                         {getChartSuggestions(chartData).map((suggestion, index) => (
+                                                             <div 
+                                                                 key={index}
+                                                                 style={{ 
+                                                                     padding: '8px', 
+                                                                     backgroundColor: '#f0f8ff', 
+                                                                     border: '1px solid #d6e4ff', 
+                                                                     borderRadius: '4px',
+                                                                     marginBottom: '4px',
+                                                                     fontSize: '12px'
+                                                                 }}
+                                                             >
+                                                                 💡 {suggestion}
+                                                             </div>
+                                                         ))}
+                                                         {getChartSuggestions(chartData).length === 0 && (
+                                                             <div style={{ 
+                                                                 padding: '8px', 
+                                                                 backgroundColor: '#f6ffed', 
+                                                                 border: '1px solid #b7eb8f', 
+                                                                 borderRadius: '4px',
+                                                                 fontSize: '12px',
+                                                                 textAlign: 'center'
+                                                             }}>
+                                                                 ✓ Data structure looks good for current chart type
+                                                             </div>
+                                                         )}
+                                                     </div>
+                                                 </div>
+                                            </>
+                                        ) : (
+                                            <div style={{ padding: '16px', textAlign: 'center', color: '#999' }}>
+                                                <Text>No data available. Please load data from a data source first.</Text>
+                                            </div>
+                                        )}
                                     </Space>
                                 </TabPane>
                                 
@@ -904,39 +1247,57 @@ const ChartBuilder: React.FC<ChartBuilderProps> = ({
                             <Tabs defaultActiveKey="connected" size="small">
                                 <TabPane tab="Connected" key="connected">
                                     <Space direction="vertical" style={{ width: '100%' }} size="small">
-                                        <div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                             <Text strong>Available Data Sources</Text>
-                                            <div style={{ marginTop: 8 }}>
-                                                <Button 
-                                                    size="small" 
-                                                    icon={<DatabaseOutlined />}
-                                                    style={{ margin: '2px' }}
-                                                >
-                                                    PostgreSQL
-                                                </Button>
-                                                <Button 
-                                                    size="small" 
-                                                    icon={<DatabaseOutlined />}
-                                                    style={{ margin: '2px' }}
-                                                >
-                                                    MySQL
-                                                </Button>
-                                                <Button 
-                                                    size="small" 
-                                                    icon={<DatabaseOutlined />}
-                                                    style={{ margin: '2px' }}
-                                                >
-                                                    CSV Upload
-                                                </Button>
-                                                <Button 
-                                                    size="small" 
-                                                    icon={<DatabaseOutlined />}
-                                                    style={{ margin: '2px' }}
-                                                >
-                                                    Excel
-                                                </Button>
-                                            </div>
+                                            <Button 
+                                                size="small" 
+                                                icon={<ReloadOutlined />}
+                                                onClick={loadDataSources}
+                                                loading={loadingData}
+                                            >
+                                                Refresh
+                                            </Button>
                                         </div>
+                                        
+                                        {dataSources.length > 0 ? (
+                                            <div style={{ marginTop: 8 }}>
+                                                {dataSources.map((ds) => (
+                                                    <Button 
+                                                        key={ds.id}
+                                                        size="small" 
+                                                        icon={<DatabaseOutlined />}
+                                                        style={{ 
+                                                            margin: '2px',
+                                                            backgroundColor: selectedDataSource === ds.id ? '#1890ff' : undefined,
+                                                            color: selectedDataSource === ds.id ? '#ffffff' : undefined,
+                                                            borderColor: selectedDataSource === ds.id ? '#1890ff' : undefined
+                                                        }}
+                                                        onClick={() => handleDataSourceSelect(ds.id)}
+                                                    >
+                                                        {ds.name} ({ds.type})
+                                                    </Button>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div style={{ marginTop: 8, padding: '8px', backgroundColor: '#fff7e6', border: '1px solid #ffd591', borderRadius: '4px' }}>
+                                                <Text type="warning" style={{ fontSize: '12px' }}>
+                                                    {loadingData ? 'Loading data sources...' : 'No data sources available'}
+                                                </Text>
+                                            </div>
+                                        )}
+                                        
+                                        {selectedDataSource && (
+                                            <div style={{ marginTop: 12, padding: '8px', backgroundColor: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: '4px' }}>
+                                                <Text type="success" style={{ fontSize: '12px' }}>
+                                                    ✓ Selected: {dataSources.find(ds => ds.id === selectedDataSource)?.name}
+                                                </Text>
+                                                <div style={{ marginTop: 4 }}>
+                                                    <Text type="secondary" style={{ fontSize: '11px' }}>
+                                                        Type: {dataSources.find(ds => ds.id === selectedDataSource)?.type}
+                                                    </Text>
+                                                </div>
+                                            </div>
+                                        )}
                                         
                                         <div>
                                             <Text strong>Cube.js Semantic Model</Text>
@@ -957,63 +1318,93 @@ const ChartBuilder: React.FC<ChartBuilderProps> = ({
                                 <TabPane tab="Query Builder" key="query">
                                     <Space direction="vertical" style={{ width: '100%' }} size="small">
                                         <div>
+                                            <Text strong>Data Source</Text>
+                                            <Select
+                                                placeholder="Select a data source first"
+                                                value={selectedDataSource}
+                                                onChange={handleDataSourceSelect}
+                                                style={{ width: '100%', marginTop: 8 }}
+                                                disabled={dataSources.length === 0}
+                                            >
+                                                {dataSources.map(ds => (
+                                                    <Option key={ds.id} value={ds.id}>
+                                                        {ds.name} ({ds.type})
+                                                    </Option>
+                                                ))}
+                                            </Select>
+                                        </div>
+                                        
+                                        <div>
                                             <Text strong>Data Query</Text>
                                             <TextArea
                                                 value={currentQuery}
                                                 onChange={(e) => setCurrentQuery(e.target.value)}
-                                                placeholder="Enter your data query here or use the query builder below..."
+                                                placeholder="Enter your data query here (SQL, JSON, etc.)..."
                                                 rows={3}
                                                 style={{ marginTop: 8 }}
                                             />
                                         </div>
                                         
                                         <div>
-                                            <Text strong>Cube.js Query Builder</Text>
+                                            <Button 
+                                                type="primary"
+                                                onClick={() => executeQuery(currentQuery)}
+                                                loading={loadingData}
+                                                disabled={!selectedDataSource || !currentQuery.trim()}
+                                                style={{ width: '100%', marginTop: 8 }}
+                                            >
+                                                Execute Query
+                                            </Button>
+                                        </div>
+                                        
+                                        <div>
+                                            <Text strong>Quick Queries</Text>
                                             <div style={{ marginTop: 8 }}>
-                                                <div style={{ marginBottom: 8 }}>
-                                                    <Text type="secondary" style={{ fontSize: '12px' }}>Measures</Text>
-                                                    <Select
-                                                        mode="multiple"
-                                                        placeholder="Select measures"
-                                                        style={{ width: '100%' }}
-                                                        options={[
-                                                            { label: 'Total Sales', value: 'total_sales' },
-                                                            { label: 'Order Count', value: 'order_count' },
-                                                            { label: 'Average Order Value', value: 'avg_order_value' },
-                                                            { label: 'Customer Count', value: 'customer_count' }
-                                                        ]}
-                                                    />
-                                                </div>
-                                                
-                                                <div style={{ marginBottom: 8 }}>
-                                                    <Text type="secondary" style={{ fontSize: '12px' }}>Dimensions</Text>
-                                                    <Select
-                                                        mode="multiple"
-                                                        placeholder="Select dimensions"
-                                                        style={{ width: '100%' }}
-                                                        options={[
-                                                            { label: 'Product Category', value: 'product_category' },
-                                                            { label: 'Region', value: 'region' },
-                                                            { label: 'Date', value: 'date' },
-                                                            { label: 'Customer Segment', value: 'customer_segment' }
-                                                        ]}
-                                                    />
-                                                </div>
-                                                
-                                                <div>
-                                                    <Text type="secondary" style={{ fontSize: '12px' }}>Filters</Text>
-                                                    <Select
-                                                        placeholder="Add filters"
-                                                        style={{ width: '100%' }}
-                                                        options={[
-                                                            { label: 'Date Range', value: 'date_range' },
-                                                            { label: 'Product Category', value: 'product_filter' },
-                                                            { label: 'Region Filter', value: 'region_filter' }
-                                                        ]}
-                                                    />
-                                                </div>
+                                                <Button 
+                                                    size="small" 
+                                                    style={{ margin: '2px' }}
+                                                    onClick={() => setCurrentQuery(generateSampleQuery('sample'))}
+                                                    disabled={!dataSourceSchema}
+                                                >
+                                                    Sample Data
+                                                </Button>
+                                                <Button 
+                                                    size="small" 
+                                                    style={{ margin: '2px' }}
+                                                    onClick={() => setCurrentQuery(generateSampleQuery('count'))}
+                                                    disabled={!dataSourceSchema}
+                                                >
+                                                    Count Records
+                                                </Button>
+                                                <Button 
+                                                    size="small" 
+                                                    style={{ margin: '2px' }}
+                                                    onClick={() => setCurrentQuery(generateSampleQuery('aggregate'))}
+                                                    disabled={!dataSourceSchema}
+                                                >
+                                                    Aggregate Data
+                                                </Button>
+                                                <Button 
+                                                    size="small" 
+                                                    style={{ margin: '2px' }}
+                                                    onClick={() => setCurrentQuery(generateSampleQuery('recent'))}
+                                                    disabled={!dataSourceSchema}
+                                                >
+                                                    Recent Records
+                                                </Button>
                                             </div>
                                         </div>
+                                        
+                                        {dataSourceSchema && (
+                                            <div>
+                                                <Text strong>Schema Information</Text>
+                                                <div style={{ marginTop: 8, padding: '8px', backgroundColor: '#f0f0f0', borderRadius: '4px', fontSize: '11px' }}>
+                                                    <Text type="secondary">
+                                                        Available tables/collections: {Object.keys(dataSourceSchema.tables || {}).join(', ')}
+                                                    </Text>
+                                                </div>
+                                            </div>
+                                        )}
                                     </Space>
                                 </TabPane>
                                 
@@ -1047,6 +1438,76 @@ const ChartBuilder: React.FC<ChartBuilderProps> = ({
                                                 ))}
                                             </div>
                                         </div>
+                                    </Space>
+                                </TabPane>
+                                
+                                <TabPane tab="Aggregation" key="aggregation">
+                                    <Space direction="vertical" style={{ width: '100%' }} size="small">
+                                        <div>
+                                            <Text strong>Data Source Required</Text>
+                                            {selectedDataSource ? (
+                                                <div style={{ marginTop: 8, padding: '8px', backgroundColor: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: '4px' }}>
+                                                    <Text type="success" style={{ fontSize: '12px' }}>
+                                                        ✓ Ready for aggregation
+                                                    </Text>
+                                                </div>
+                                            ) : (
+                                                <div style={{ marginTop: 8, padding: '8px', backgroundColor: '#fff7e6', border: '1px solid #ffd591', borderRadius: '4px' }}>
+                                                    <Text type="warning" style={{ fontSize: '12px' }}>
+                                                        Please select a data source first
+                                                    </Text>
+                                                </div>
+                                            )}
+                                        </div>
+                                        
+                                        {selectedDataSource && dataSourceSchema && (
+                                            <>
+                                                <div>
+                                                    <Text strong>Available Fields</Text>
+                                                    <div style={{ marginTop: 8, maxHeight: 150, overflow: 'auto' }}>
+                                                        {Object.keys(dataSourceSchema.tables || {}).map(tableName => (
+                                                            <div key={tableName} style={{ marginBottom: 8 }}>
+                                                                <Text strong style={{ fontSize: '12px' }}>{tableName}</Text>
+                                                                <div style={{ marginLeft: 12 }}>
+                                                                    {dataSourceSchema.tables[tableName]?.columns?.map((col: any) => (
+                                                                        <div key={col.name} style={{ fontSize: '11px', color: '#666' }}>
+                                                                            • {col.name} ({col.type})
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                
+                                                <div>
+                                                    <Text strong>Quick Aggregations</Text>
+                                                    <div style={{ marginTop: 8 }}>
+                                                        <Button 
+                                                            size="small" 
+                                                            style={{ margin: '2px' }}
+                                                            onClick={() => setCurrentQuery(generateSampleQuery('count'))}
+                                                        >
+                                                            Count All
+                                                        </Button>
+                                                        <Button 
+                                                            size="small" 
+                                                            style={{ margin: '2px' }}
+                                                            onClick={() => setCurrentQuery(generateSampleQuery('aggregate'))}
+                                                        >
+                                                            Group & Sum
+                                                        </Button>
+                                                        <Button 
+                                                            size="small" 
+                                                            style={{ margin: '2px' }}
+                                                            onClick={() => setCurrentQuery(generateSampleQuery('sample'))}
+                                                        >
+                                                            Sample Data
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            </>
+                                        )}
                                     </Space>
                                 </TabPane>
                             </Tabs>
@@ -1174,7 +1635,7 @@ const ChartBuilder: React.FC<ChartBuilderProps> = ({
                                 fontSize: '12px',
                                 color: isDarkMode ? '#ffffff' : '#333333'
                             }}>
-                                <div><strong>Type:</strong> {chartType.toUpperCase()}</div>
+                                <div><strong>Type:</strong> {chartType?.toUpperCase() || 'UNKNOWN'}</div>
                                 <div><strong>Data Points:</strong> {chartData.length}</div>
                                 <div><strong>Colors:</strong> {colors.length}</div>
                             </div>

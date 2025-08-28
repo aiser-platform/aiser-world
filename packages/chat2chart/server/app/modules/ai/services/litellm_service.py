@@ -10,6 +10,8 @@ import asyncio
 from litellm import acompletion, completion
 import json
 from app.core.cache import cache
+import re
+import time
 
 # Configure LiteLLM to drop unsupported parameters for GPT-5
 import litellm
@@ -25,8 +27,8 @@ class LiteLLMService:
         # Azure OpenAI Configuration (Primary)
         self.azure_api_key = os.getenv('AZURE_OPENAI_API_KEY')
         self.azure_endpoint = os.getenv('AZURE_OPENAI_ENDPOINT')
-        self.azure_api_version = os.getenv('AZURE_OPENAI_API_VERSION', '2025-04-01-preview')
-        self.azure_deployment = os.getenv('AZURE_OPENAI_DEPLOYMENT_NAME', 'gpt-5-mini')
+        self.azure_api_version = os.getenv('AZURE_OPENAI_API_VERSION', '2025-01-01-preview')
+        self.azure_deployment = os.getenv('AZURE_OPENAI_DEPLOYMENT_NAME', 'gpt-4.1-mini')
         
         # OpenAI Configuration (Fallback)
         self.openai_api_key = os.getenv('OPENAI_API_KEY')
@@ -60,8 +62,8 @@ class LiteLLMService:
                 'provider': 'azure'
             },
             'azure_gpt4_mini': {
-                'name': 'GPT-4o Mini (Azure)',
-                'model': 'azure/gpt-4o-mini',
+                'name': 'GPT-4.1 Mini (Azure)',
+                'model': 'azure/gpt-4.1-mini',
                 'api_key': self.azure_api_key,
                 'api_base': self.azure_endpoint,
                 'api_version': self.azure_api_version,
@@ -90,16 +92,16 @@ class LiteLLMService:
             }
         }
         
-        # Default model selection - Prioritize Azure OpenAI GPT-5 for better token availability
+        # Default model selection - Prioritize Azure OpenAI GPT-4.1 Mini for better compatibility
         if self.azure_api_key and self.azure_endpoint:
-            self.default_model = 'azure_gpt5_mini'
-            logger.info("🚀 Using Azure OpenAI GPT-5 Mini as primary model")
+            self.default_model = 'azure_gpt4_mini'
+            logger.info("🚀 Using Azure OpenAI GPT-4.1 Mini as primary model")
         elif self.openai_api_key:
             self.default_model = 'openai_gpt4_mini'
-            logger.info("🚀 Using OpenAI as fallback model")
+            logger.info("🚀 Using OpenAI GPT-4o Mini as fallback model")
         else:
-            self.default_model = 'azure_gpt5_mini'  # Default to Azure even without key for error handling
-            logger.warning("⚠️ No valid API keys found - will use fallback responses")
+            self.default_model = None
+            logger.warning("⚠️ No AI models configured - service will use fallback responses")
         
         # Cost optimization settings
         self.cost_optimization = {
@@ -110,6 +112,34 @@ class LiteLLMService:
         
         # Simple cache for responses
         self.response_cache = {}
+    
+    async def _get_model_config(self, model_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Get model configuration for the specified model ID"""
+        try:
+            # Use default model if none specified
+            if not model_id:
+                model_id = self.default_model
+            
+            if not model_id or model_id not in self.available_models:
+                logger.warning(f"Model {model_id} not found, using default")
+                model_id = self.default_model
+            
+            if not model_id:
+                logger.error("No models available")
+                return None
+            
+            model_config = self.available_models[model_id].copy()
+            
+            # Ensure required fields are present
+            if not model_config.get('api_key'):
+                logger.error(f"Model {model_id} missing API key")
+                return None
+            
+            return model_config
+            
+        except Exception as e:
+            logger.error(f"Failed to get model config: {e}")
+            return None
     
     def _validate_azure_config(self):
         """Validate Azure OpenAI configuration and log status"""
@@ -187,9 +217,14 @@ Return only valid JSON.
                     {"role": "system", "content": "You are an expert data analyst. Analyze queries and return structured JSON responses."},
                     {"role": "user", "content": prompt}
                 ],
-                'max_tokens': model_config['max_tokens'],
-                'temperature': model_config['temperature']
+                'temperature': model_config.get('temperature', 0.1)
             }
+            
+            # Use correct token parameter for GPT-5 models
+            if 'gpt-5' in model_config['model']:
+                litellm_params['max_completion_tokens'] = min(1000, model_config['max_tokens'])
+            else:
+                litellm_params['max_tokens'] = min(1000, model_config['max_tokens'])
             
             # Add Azure-specific parameters
             if model_config['provider'] == 'azure':
@@ -269,12 +304,39 @@ Return only valid JSON.
                     {"role": "system", "content": "You are an expert data visualization specialist. Recommend optimal chart types based on data characteristics."},
                     {"role": "user", "content": prompt}
                 ],
-                max_tokens=1000,
                 temperature=0.2,
                 api_key=model_config['api_key'],
                 api_base=model_config.get('api_base'),
                 api_version=model_config.get('api_version')
             )
+            
+            # Use correct token parameter for GPT-5 models
+            if 'gpt-5' in model_config['model']:
+                response = await acompletion(
+                    model=model_config['model'],
+                    messages=[
+                        {"role": "system", "content": "You are an expert data visualization specialist. Recommend optimal chart types based on data characteristics."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    max_completion_tokens=1000,
+                    temperature=0.2,
+                    api_key=model_config['api_key'],
+                    api_base=model_config.get('api_base'),
+                    api_version=model_config.get('api_version')
+                )
+            else:
+                response = await acompletion(
+                    model=model_config['model'],
+                    messages=[
+                        {"role": "system", "content": "You are an expert data visualization specialist. Recommend optimal chart types based on data characteristics."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    max_tokens=1000,
+                    temperature=0.2,
+                    api_key=model_config['api_key'],
+                    api_base=model_config.get('api_base'),
+                    api_version=model_config.get('api_version')
+                )
             
             content = response.choices[0].message.content.strip()
             if content.startswith('```json'):
@@ -489,145 +551,150 @@ Return only valid JSON array.
         ]
 
     async def generate_completion(
-        self,
-        prompt: str,
-        system_context: Optional[str] = None,
-        model_id: Optional[str] = None,
-        max_tokens: int = 1000,
-        temperature: float = 1.0,  # Default to GPT-5 compatible temperature
-        stream: bool = False
+        self, 
+        prompt: str = None,
+        system_context: str = None,
+        messages: List[Dict[str, str]] = None,
+        max_tokens: int = 2000,
+        temperature: float = 0.7,
+        model_id: str = None
     ) -> Dict[str, Any]:
-        """Generate completion using Azure OpenAI"""
-        # Initialize variables outside try block to avoid scope issues
-        selected_model = model_id or self.default_model
-        model_config = self.available_models.get(selected_model, self.available_models[self.default_model])
-        messages = []
-        
+        """Generate AI completion with enhanced error handling and context"""
         try:
+            # Get model configuration
+            model_config = await self._get_model_config(model_id)
+            if not model_config:
+                return {
+                    'success': False,
+                    'error': 'No AI model configured',
+                    'fallback': True
+                }
             
-            logger.info(f"🤖 Generating completion with {model_config['name']}")
-            
-            # Check Redis cache for non-streaming requests
-            if not stream:
-                cache_context = {"prompt": prompt, "system_context": system_context or ""}
-                cached_completion = cache.get_ai_response(prompt, cache_context)
-                if cached_completion:
-                    logger.info("📋 Using cached completion from Redis")
-                    return cached_completion
-            
-            # Ensure temperature is compatible with the model
-            if 'gpt-5' in model_config['model'] and temperature != 1.0:
-                logger.info(f"🔧 Adjusting temperature from {temperature} to 1.0 for GPT-5 compatibility")
-                temperature = 1.0
-            
-            # Prepare messages
-            messages = []
-            if system_context:
-                messages.append({"role": "system", "content": system_context})
-            messages.append({"role": "user", "content": prompt})
+            # Prepare messages - handle both prompt/system_context and messages formats
+            if messages:
+                # Use provided messages directly
+                final_messages = messages
+            elif prompt and system_context:
+                # Convert prompt/system_context to messages format
+                final_messages = [
+                    {"role": "system", "content": system_context},
+                    {"role": "user", "content": prompt}
+                ]
+            elif prompt:
+                # Use default system context with prompt
+                final_messages = [
+                    {"role": "system", "content": "You are a helpful AI assistant. Provide clear, accurate, and helpful responses."},
+                    {"role": "user", "content": prompt}
+                ]
+            else:
+                return {
+                    'success': False,
+                    'error': 'No prompt or messages provided',
+                    'fallback': True
+                }
             
             # Prepare LiteLLM parameters
             litellm_params = {
                 'model': model_config['model'],
-                'messages': messages,
-                'max_tokens': min(max_tokens, model_config['max_tokens']),
-                'temperature': temperature,
-                'stream': stream
+                'messages': final_messages,
+                'api_key': model_config['api_key'],
+                'api_base': model_config.get('api_base'),
+                'api_version': model_config.get('api_version')
             }
             
-            # Add Azure-specific parameters
-            if model_config['provider'] == 'azure':
-                litellm_params.update({
-                    'api_key': model_config['api_key'],
-                    'api_base': model_config['api_base'],
-                    'api_version': model_config['api_version']
-                })
+            # Handle temperature for GPT-5 models (only supports temperature=1)
+            if 'gpt-5' in model_config['model']:
+                litellm_params['temperature'] = 1.0
             else:
-                litellm_params['api_key'] = model_config['api_key']
+                litellm_params['temperature'] = temperature
             
-            # Make the API call
-            if stream:
-                # For streaming, return the generator
-                response = await acompletion(**litellm_params)
+            # Use correct token parameter for GPT-5 models
+            if 'gpt-5' in model_config['model']:
+                # For Azure OpenAI GPT-5, use max_tokens (not max_completion_tokens)
+                litellm_params['max_tokens'] = min(max_tokens, model_config['max_tokens'])
+            else:
+                litellm_params['max_tokens'] = min(max_tokens, model_config['max_tokens'])
+            
+            logger.info(f"🚀 Generating completion with model: {model_config['model']}")
+            logger.info(f"🔧 LiteLLM parameters: {litellm_params}")
+            
+            # Generate completion
+            response = await acompletion(**litellm_params)
+            
+            logger.info(f"🔍 Raw response from acompletion: {response}")
+            logger.info(f"🔍 Response type: {type(response)}")
+            logger.info(f"🔍 Response has choices: {hasattr(response, 'choices')}")
+            
+            if not response or not response.choices:
+                logger.warning("Empty response from AI model")
                 return {
-                    'success': True,
-                    'stream': response,
-                    'model': model_config['name']
+                    'success': False,
+                    'error': 'Empty response from AI model',
+                    'fallback': True
                 }
-            else:
-                # For non-streaming, get the complete response
-                response = await acompletion(**litellm_params)
-                
-                content = response.choices[0].message.content
-                
-                # Validate and clean the response
-                cleaned_content = self._validate_and_clean_response(content, prompt)
-                
-                result = {
-                    'success': True,
-                    'content': cleaned_content,
-                    'model': model_config['name'],
-                    'usage': {
-                        'prompt_tokens': getattr(response.usage, 'prompt_tokens', 0),
-                        'completion_tokens': getattr(response.usage, 'completion_tokens', 0),
-                        'total_tokens': getattr(response.usage, 'total_tokens', 0)
-                    }
+            
+            logger.info(f"🔍 Number of choices: {len(response.choices)}")
+            logger.info(f"🔍 First choice: {response.choices[0] if response.choices else 'None'}")
+            
+            content = response.choices[0].message.content
+            logger.info(f"🔍 Raw content: '{content}'")
+            logger.info(f"🔍 Content length: {len(content) if content else 0}")
+            logger.info(f"🔍 Content stripped: '{content.strip() if content else ''}'")
+            
+            if not content or content.strip() == '':
+                logger.warning("Empty content in AI response")
+                return {
+                    'success': False,
+                    'error': 'Empty content in AI response',
+                    'fallback': True
                 }
-                
-                # Cache the result in Redis
-                cache_context = {"prompt": prompt, "system_context": system_context or ""}
-                cache.set_ai_response(prompt, cache_context, result)
-                logger.info("💾 Cached completion in Redis")
-                
-                return result
-                
-        except Exception as error:
-            logger.error(f"❌ LiteLLM completion failed: {str(error)}")
             
-            # Try fallback model if available
-            if selected_model != 'openai_gpt4_mini' and self.openai_api_key:
-                try:
-                    logger.info("🔄 Trying fallback OpenAI model...")
-                    fallback_config = self.available_models.get('openai_gpt4_mini')
-                    if fallback_config:
-                        fallback_params = {
-                            'model': fallback_config['model'],
-                            'messages': messages,
-                            'max_tokens': min(max_tokens, fallback_config['max_tokens']),
-                            'temperature': 0.1,
-                            'stream': stream,
-                            'api_key': fallback_config['api_key']
-                        }
-                        
-                        fallback_response = await acompletion(**fallback_params)
-                        content = fallback_response.choices[0].message.content
-                        
-                        logger.info("✅ Fallback model succeeded")
-                        return {
-                            'success': True,
-                            'content': content,
-                            'model': fallback_config['name'],
-                            'usage': {
-                                'prompt_tokens': getattr(fallback_response.usage, 'prompt_tokens', 0),
-                                'completion_tokens': getattr(fallback_response.usage, 'completion_tokens', 0),
-                                'total_tokens': getattr(fallback_response.usage, 'total_tokens', 0)
-                            },
-                            'fallback': True
-                        }
-                except Exception as fallback_error:
-                    logger.error(f"❌ Fallback model also failed: {str(fallback_error)}")
-            
-            # Provide intelligent fallback responses based on the query
-            fallback_response = self._generate_fallback_response(prompt, error)
+            # Clean up content - remove excessive newlines and spaces
+            cleaned_content = self._clean_ai_response(content)
             
             return {
-                'success': True,  # Mark as success to avoid breaking the chat flow
-                'content': fallback_response,
-                'model': 'fallback',
-                'usage': {'total_tokens': 0},
-                'fallback': True,
-                'error': str(error)
+                'success': True,
+                'content': cleaned_content,
+                'model': model_config['model'],
+                'usage': {
+                    'prompt_tokens': getattr(response.usage, 'prompt_tokens', 0),
+                    'completion_tokens': getattr(response.usage, 'completion_tokens', 0),
+                    'total_tokens': getattr(response.usage, 'total_tokens', 0)
+                } if response.usage else None,
+                'fallback': False
             }
+            
+        except Exception as e:
+            logger.error(f"❌ AI completion failed: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e),
+                'fallback': True
+            }
+    
+    def _clean_ai_response(self, content: str) -> str:
+        """Clean up AI response content to remove excessive formatting issues"""
+        if not content:
+            return content
+        
+        # Remove excessive newlines (more than 2 consecutive)
+        import re
+        content = re.sub(r'\n{3,}', '\n\n', content)
+        
+        # Remove excessive spaces at line beginnings
+        content = re.sub(r'^\s+', '', content, flags=re.MULTILINE)
+        
+        # Remove excessive spaces at line endings
+        content = re.sub(r'\s+$', '', content, flags=re.MULTILINE)
+        
+        # Remove empty lines at the beginning and end
+        content = content.strip()
+        
+        # Ensure proper spacing around code blocks
+        content = re.sub(r'```(\w+)\n', r'```\1\n', content)
+        content = re.sub(r'\n```\n', r'\n```\n', content)
+        
+        return content
 
     async def generate_streaming_completion(
         self,
@@ -850,9 +917,14 @@ Please try connecting a data source to get started, or let me know if you need h
                 'messages': [
                     {"role": "user", "content": "Hello, respond with 'Connection successful'"}
                 ],
-                'max_tokens': 50,
-                'temperature': 0.1
+                'temperature': model_config.get('temperature', 0.1)
             }
+            
+            # Use correct token parameter for GPT-5 models
+            if 'gpt-5' in model_config['model']:
+                litellm_params['max_completion_tokens'] = 50
+            else:
+                litellm_params['max_tokens'] = 50
             
             # Add provider-specific parameters
             if model_config['provider'] == 'azure':
@@ -865,6 +937,7 @@ Please try connecting a data source to get started, or let me know if you need h
                 logger.info(f"   - Model: {model_config['model']}")
                 logger.info(f"   - Endpoint: {model_config['api_base']}")
                 logger.info(f"   - API Version: {model_config['api_version']}")
+                logger.info(f"   - Temperature: {litellm_params['temperature']}")
             else:
                 litellm_params['api_key'] = model_config['api_key']
                 logger.info(f"🧪 Testing OpenAI connection: {model_config['model']}")
@@ -899,23 +972,29 @@ Please try connecting a data source to get started, or let me know if you need h
         try:
             logger.info("🧪 Testing Azure OpenAI specifically...")
             
-            # Test with Azure GPT-4o Mini
+            # Test with Azure GPT-5 Mini using correct parameters
             test_params = {
                 'model': f'azure/{self.azure_deployment}',
                 'messages': [
                     {"role": "user", "content": "Hello, respond with 'Azure OpenAI connection successful'"}
                 ],
-                'max_tokens': 50,
-                'temperature': 0.1,
+                'temperature': 1.0,  # GPT-5 only supports temperature=1
                 'api_key': self.azure_api_key,
                 'api_base': self.azure_endpoint,
                 'api_version': self.azure_api_version
             }
             
+            # Use correct token parameter for GPT-5 models
+            if 'gpt-5' in self.azure_deployment:
+                test_params['max_completion_tokens'] = 50
+            else:
+                test_params['max_tokens'] = 50
+            
             logger.info(f"🔧 Test parameters:")
             logger.info(f"   - Model: {test_params['model']}")
             logger.info(f"   - Endpoint: {test_params['api_base']}")
             logger.info(f"   - API Version: {test_params['api_version']}")
+            logger.info(f"   - Temperature: {test_params['temperature']}")
             
             response = await acompletion(**test_params)
             
@@ -1050,3 +1129,194 @@ Please try connecting a data source to get started, or let me know if you need h
                 insights.append(indicator)
         
         return insights if insights else ['general_analysis']
+
+    async def generate_completion_stream(
+        self, 
+        messages: List[Dict[str, str]], 
+        data_context: Dict[str, Any] = None,
+        stream: bool = True,
+        max_tokens: int = 2000,
+        temperature: float = 0.7
+    ) -> Dict[str, Any]:
+        """Generate streaming AI completion with enhanced context"""
+        try:
+            # Get model configuration
+            model_config = await self._get_model_config()
+            if not model_config:
+                return {
+                    'success': False,
+                    'error': 'No AI model configured',
+                    'fallback': True
+                }
+            
+            # Enhance messages with data context
+            enhanced_messages = self._enhance_messages_with_context(messages, data_context)
+            
+            # Prepare LiteLLM parameters
+            litellm_params = {
+                'model': model_config['model'],
+                'messages': enhanced_messages,
+                'temperature': temperature,
+                'stream': stream,
+                'api_key': model_config['api_key'],
+                'api_base': model_config.get('api_base'),
+                'api_version': model_config.get('api_version')
+            }
+            
+            # Handle temperature for GPT-5 models (only supports temperature=1)
+            if 'gpt-5' in model_config['model']:
+                litellm_params['temperature'] = 1.0
+            else:
+                litellm_params['temperature'] = temperature
+            
+            # Use correct token parameter for GPT-5 models
+            if 'gpt-5' in model_config['model']:
+                litellm_params['max_tokens'] = min(max_tokens, model_config['max_tokens'])
+            else:
+                litellm_params['max_tokens'] = min(max_tokens, model_config['max_tokens'])
+            
+            logger.info(f"🚀 Starting streaming completion with model: {model_config['model']}")
+            
+            # Generate streaming response
+            response = await acompletion(**litellm_params)
+            
+            if not response:
+                return {
+                    'success': False,
+                    'error': 'No response from AI model',
+                    'fallback': True
+                }
+            
+            # Process streaming response
+            content = ""
+            execution_time = 0
+            start_time = time.time()
+            
+            async for chunk in response:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    content += chunk.choices[0].delta.content
+            
+            execution_time = int((time.time() - start_time) * 1000)
+            
+            # Extract insights and generate chart recommendations
+            insights = self._extract_insights_from_response(content, data_context)
+            chart_recommendations = await self._generate_chart_recommendations(content, data_context)
+            
+            # Generate SQL queries if data analysis is involved
+            sql_queries = []
+            if data_context and data_context.get('type') in ['database', 'warehouse', 'cube']:
+                sql_queries = self._extract_sql_queries(content, data_context)
+            
+            return {
+                'success': True,
+                'content': content,
+                'execution_time': execution_time,
+                'model': model_config['model'],
+                'insights': insights,
+                'chart_recommendations': chart_recommendations,
+                'sql_queries': sql_queries,
+                'data_context': data_context
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ Streaming completion failed: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e),
+                'fallback': True
+            }
+    
+    def _enhance_messages_with_context(self, messages: List[Dict[str, str]], data_context: Dict[str, Any]) -> List[Dict[str, str]]:
+        """Enhance messages with data context for better AI understanding"""
+        if not data_context:
+            return messages
+        
+        # Create context-aware system message
+        context_message = self._build_context_message(data_context)
+        
+        # Insert context message after the first system message or at the beginning
+        enhanced_messages = []
+        system_message_added = False
+        
+        for message in messages:
+            if message['role'] == 'system' and not system_message_added:
+                enhanced_messages.append(message)
+                enhanced_messages.append({
+                    'role': 'system',
+                    'content': context_message
+                })
+                system_message_added = True
+            else:
+                enhanced_messages.append(message)
+        
+        if not system_message_added:
+            enhanced_messages.insert(0, {
+                'role': 'system',
+                'content': context_message
+            })
+        
+        return enhanced_messages
+    
+    def _build_context_message(self, data_context: Dict[str, Any]) -> str:
+        """Build comprehensive context message for AI"""
+        context_parts = []
+        
+        # Data source type and capabilities
+        if data_context.get('type'):
+            context_parts.append(f"Data Source Type: {data_context['type']}")
+        
+        if data_context.get('analysis_capabilities'):
+            caps = data_context['analysis_capabilities']
+            context_parts.append(f"Capabilities: {', '.join([k for k, v in caps.items() if v])}")
+        
+        # Schema information
+        if data_context.get('schema'):
+            schema = data_context['schema']
+            if schema.get('tables'):
+                context_parts.append(f"Tables: {len(schema['tables'])} tables available")
+                for table in schema['tables'][:3]:  # Show first 3 tables
+                    context_parts.append(f"  - {table.get('name', 'Unknown')}: {table.get('rowCount', 0)} rows")
+        
+        # Cube.js specific context
+        if data_context.get('cube_schema'):
+            cube = data_context['cube_schema']
+            context_parts.append(f"Cube.js Model: {len(cube.get('cubes', []))} cubes")
+            if cube.get('cubes'):
+                for cube_info in cube['cubes'][:2]:  # Show first 2 cubes
+                    context_parts.append(f"  - {cube_info.get('name', 'Unknown')}: {len(cube_info.get('dimensions', []))}D, {len(cube_info.get('measures', []))}M")
+        
+        # File context
+        if data_context.get('file_info'):
+            file_info = data_context['file_info']
+            context_parts.append(f"File: {file_info.get('filename', 'Unknown')} ({file_info.get('row_count', 0)} rows, {len(file_info.get('columns', []))} columns)")
+        
+        # User preferences
+        if data_context.get('user_context', {}).get('analysis_preferences'):
+            prefs = data_context['user_context']['analysis_preferences']
+            context_parts.append(f"User Preferences: {prefs.get('analysis_depth', 'standard')} analysis, include charts: {prefs.get('include_charts', True)}")
+        
+        return f"""You are analyzing data with the following context:
+
+{chr(10).join(context_parts)}
+
+Please provide:
+1. Clear, actionable insights based on the data
+2. Specific recommendations with data-driven reasoning
+3. SQL queries when appropriate (for database/warehouse sources)
+4. Chart recommendations with proper ECharts configuration
+5. Professional, business-focused analysis
+
+Focus on accuracy, relevance, and practical value for business users."""
+    
+    def _extract_sql_queries(self, content: str, data_context: Dict[str, Any]) -> List[str]:
+        """Extract SQL queries from AI response"""
+        # Simple SQL extraction - look for code blocks with SQL
+        sql_pattern = r'```sql\s*([\s\S]*?)```'
+        matches = re.findall(sql_pattern, content, re.IGNORECASE)
+        
+        if not matches:
+            # Look for inline SQL
+            sql_pattern = r'`([^`]*SELECT[^`]*)`'
+            matches = re.findall(sql_pattern, content, re.IGNORECASE)
+        
+        return [query.strip() for query in matches if query.strip()]

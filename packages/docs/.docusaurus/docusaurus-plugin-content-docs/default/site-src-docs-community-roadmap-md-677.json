@@ -5,14 +5,14 @@
   "source": "@site/src/docs/community/roadmap.md",
   "sourceDirName": "community",
   "slug": "/community/roadmap",
-  "permalink": "/docs/community/roadmap",
+  "permalink": "/community/roadmap",
   "draft": false,
   "unlisted": false,
   "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/community/roadmap.md",
   "tags": [],
   "version": "current",
-  "lastUpdatedAt": 1755570184,
-  "formattedLastUpdatedAt": "Aug 19, 2025",
+  "lastUpdatedAt": 1539502055,
+  "formattedLastUpdatedAt": "Oct 14, 2018",
   "frontMatter": {
     "id": "roadmap",
     "title": "Roadmap",
@@ -21,10 +21,10 @@
   "sidebar": "docs",
   "previous": {
     "title": "Contributing",
-    "permalink": "/docs/community/contributing"
+    "permalink": "/community/contributing"
   },
   "next": {
     "title": "API Reference",
-    "permalink": "/docs/reference/api-reference"
+    "permalink": "/reference/api-reference"
   }
 }

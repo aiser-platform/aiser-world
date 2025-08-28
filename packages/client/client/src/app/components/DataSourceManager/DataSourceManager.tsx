@@ -55,7 +55,7 @@ const DataSourceManager: React.FC<DataSourceManagerProps> = ({
     const loadDataSources = async () => {
         setLoading(true);
         try {
-            const response = await fetch('http://localhost:8000/api/v1/data/sources');
+            const response = await fetch('http://localhost:8000/data/sources');
             const data = await response.json();
             
             if (data.success) {
@@ -95,7 +95,7 @@ const DataSourceManager: React.FC<DataSourceManagerProps> = ({
 
     const handleDeleteDataSource = async (dataSourceId: string) => {
         try {
-            const response = await fetch(`http://localhost:8000/api/v1/data/sources/${dataSourceId}`, {
+            const response = await fetch(`http://localhost:8000/data/sources/${dataSourceId}`, {
                 method: 'DELETE'
             });
             

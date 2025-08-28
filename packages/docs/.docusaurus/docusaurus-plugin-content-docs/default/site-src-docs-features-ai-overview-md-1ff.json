@@ -5,14 +5,14 @@
   "source": "@site/src/docs/features/ai-overview.md",
   "sourceDirName": "features",
   "slug": "/features/ai-overview",
-  "permalink": "/docs/features/ai-overview",
+  "permalink": "/features/ai-overview",
   "draft": false,
   "unlisted": false,
   "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/features/ai-overview.md",
   "tags": [],
   "version": "current",
-  "lastUpdatedAt": 1755622594,
-  "formattedLastUpdatedAt": "Aug 19, 2025",
+  "lastUpdatedAt": 1539502055,
+  "formattedLastUpdatedAt": "Oct 14, 2018",
   "frontMatter": {
     "id": "ai-overview",
     "title": "AI Overview",
@@ -22,10 +22,10 @@
   "sidebar": "docs",
   "previous": {
     "title": "Ssl Certificates",
-    "permalink": "/docs/self-host/ssl-certificates"
+    "permalink": "/self-host/ssl-certificates"
   },
   "next": {
     "title": "Agents",
-    "permalink": "/docs/features/agents"
+    "permalink": "/features/agents"
   }
 }

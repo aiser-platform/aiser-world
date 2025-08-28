@@ -260,7 +260,7 @@ const DataSourceManager: React.FC<DataSourceManagerProps> = ({
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <span>{source.name}</span>
                         <Tag color={source.type === 'file' ? 'blue' : 'green'}>
-                            {source.type.toUpperCase()}
+                            {source.type?.toUpperCase() || 'UNKNOWN'}
                         </Tag>
                     </div>
                 }

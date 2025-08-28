@@ -5,14 +5,14 @@
   "source": "@site/src/docs/features/databases.md",
   "sourceDirName": "features",
   "slug": "/features/databases",
-  "permalink": "/docs/features/databases",
+  "permalink": "/features/databases",
   "draft": false,
   "unlisted": false,
   "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/features/databases.md",
   "tags": [],
   "version": "current",
-  "lastUpdatedAt": 1755570184,
-  "formattedLastUpdatedAt": "Aug 19, 2025",
+  "lastUpdatedAt": 1539502055,
+  "formattedLastUpdatedAt": "Oct 14, 2018",
   "frontMatter": {
     "id": "databases",
     "title": "Databases",
@@ -21,10 +21,10 @@
   "sidebar": "docs",
   "previous": {
     "title": "Data Sources Overview",
-    "permalink": "/docs/features/data-sources-overview"
+    "permalink": "/features/data-sources-overview"
   },
   "next": {
     "title": "Deep Analysis",
-    "permalink": "/docs/features/deep-analysis"
+    "permalink": "/features/deep-analysis"
   }
 }

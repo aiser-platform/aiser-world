@@ -5,14 +5,14 @@
   "source": "@site/src/docs/reference/api-reference.md",
   "sourceDirName": "reference",
   "slug": "/reference/api-reference",
-  "permalink": "/docs/reference/api-reference",
+  "permalink": "/reference/api-reference",
   "draft": false,
   "unlisted": false,
   "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/reference/api-reference.md",
   "tags": [],
   "version": "current",
-  "lastUpdatedAt": 1755622594,
-  "formattedLastUpdatedAt": "Aug 19, 2025",
+  "lastUpdatedAt": 1539502055,
+  "formattedLastUpdatedAt": "Oct 14, 2018",
   "frontMatter": {
     "id": "api-reference",
     "title": "API Reference",
@@ -22,10 +22,10 @@
   "sidebar": "docs",
   "previous": {
     "title": "Roadmap",
-    "permalink": "/docs/community/roadmap"
+    "permalink": "/community/roadmap"
   },
   "next": {
     "title": "Configuration",
-    "permalink": "/docs/reference/config-reference"
+    "permalink": "/reference/config-reference"
   }
 }

@@ -5,14 +5,14 @@
   "source": "@site/src/docs/features/echarts-integration.md",
   "sourceDirName": "features",
   "slug": "/features/echarts-integration",
-  "permalink": "/docs/features/echarts-integration",
+  "permalink": "/features/echarts-integration",
   "draft": false,
   "unlisted": false,
   "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/features/echarts-integration.md",
   "tags": [],
   "version": "current",
-  "lastUpdatedAt": 1755570184,
-  "formattedLastUpdatedAt": "Aug 19, 2025",
+  "lastUpdatedAt": 1539502055,
+  "formattedLastUpdatedAt": "Oct 14, 2018",
   "frontMatter": {
     "id": "echarts-integration",
     "title": "Echarts Integration",
@@ -21,10 +21,10 @@
   "sidebar": "docs",
   "previous": {
     "title": "Deep Analysis",
-    "permalink": "/docs/features/deep-analysis"
+    "permalink": "/features/deep-analysis"
   },
   "next": {
     "title": "Heatmaps",
-    "permalink": "/docs/features/heatmaps"
+    "permalink": "/features/heatmaps"
   }
 }

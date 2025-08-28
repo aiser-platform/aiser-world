@@ -1,5 +1,6 @@
 import { fetchApi } from '@/utils/api';
 import { unifiedAIService } from './unifiedAIService';
+import { getBackendUrl } from '@/utils/backendUrl';
 
 // Type definitions
 export interface ApiResponse<T = any> {
@@ -47,7 +48,7 @@ class ApiService {
     private baseURL: string;
 
     constructor() {
-        this.baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+        this.baseURL = getBackendUrl();
     }
 
     // Data Upload API

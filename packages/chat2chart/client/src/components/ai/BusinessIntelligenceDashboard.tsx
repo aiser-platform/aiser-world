@@ -417,7 +417,7 @@ const BusinessIntelligenceDashboard: React.FC = () => {
                       <div className="flex items-center justify-between">
                         <span>{insight.title}</span>
                         <Tag color={getInsightColor(insight.impact)}>
-                          {insight.impact.toUpperCase()}
+                          {insight.impact?.toUpperCase() || 'UNKNOWN'}
                         </Tag>
                       </div>
                     }
@@ -468,7 +468,7 @@ const BusinessIntelligenceDashboard: React.FC = () => {
                       <div className="flex items-center justify-between">
                         <span>{item.title}</span>
                         <Tag color={getPriorityColor(item.priority)}>
-                          {item.priority.toUpperCase()}
+                          {item.priority?.toUpperCase() || 'UNKNOWN'}
                         </Tag>
                       </div>
                     }
@@ -481,7 +481,7 @@ const BusinessIntelligenceDashboard: React.FC = () => {
                         </div>
                         <div className="flex items-center justify-between">
                           <Tag color={getStatusColor(item.status)}>
-                            {item.status.replace('_', ' ').toUpperCase()}
+                            {item.status?.replace('_', ' ')?.toUpperCase() || 'UNKNOWN'}
                           </Tag>
                           <span className="text-sm">
                             Impact Score: <strong>{item.impact_score}</strong>

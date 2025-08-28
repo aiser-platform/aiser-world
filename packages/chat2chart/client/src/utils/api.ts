@@ -1,7 +1,7 @@
 import Cookies from 'js-cookie';
+import { getBackendUrl } from './backendUrl';
 
-export const API_URL =
-    process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+export const API_URL = getBackendUrl();
 
 export const AUTH_URL =
     process.env.NEXT_PUBLIC_AUTH_URL || 'http://localhost:5000';
@@ -10,7 +10,7 @@ export const fetchApi = async (
     endpoint: string,
     options: RequestInit = {}
 ): Promise<Response> => {
-    const defaultHeaders = {
+    const defaultHeaders: Record<string, string> = {
         'Content-Type': 'application/json',
     };
 

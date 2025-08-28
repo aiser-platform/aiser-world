@@ -1,0 +1,99 @@
+version: '3.8'
+
+services:
+  # Frontend (Next.js)
+  aiser-client-prod:
+    build:
+      context: ./client
+      dockerfile: Dockerfile.production
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_BACKEND_URL=http://aiser-chat2chart-prod:8000
+      - NEXT_PUBLIC_CUBEJS_URL=http://aiser-cube-prod:4000
+    networks:
+      - aiser-prod-network
+    depends_on:
+      - aiser-chat2chart-prod
+      - aiser-cube-prod
+
+  # Backend (FastAPI)
+  aiser-chat2chart-prod:
+    build:
+      context: ./server
+      dockerfile: Dockerfile.production
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+      - DATABASE_URL=postgresql://user:password@aiser-postgres-prod:5432/aiser_prod
+      - REDIS_URL=redis://aiser-redis-prod:6379
+      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY}
+      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
+      - AZURE_OPENAI_API_VERSION=${AZURE_OPENAI_API_VERSION}
+      - AZURE_OPENAI_DEPLOYMENT_NAME=${AZURE_OPENAI_DEPLOYMENT_NAME}
+    networks:
+      - aiser-prod-network
+    depends_on:
+      - aiser-postgres-prod
+      - aiser-redis-prod
+
+  # Cube.js
+  aiser-cube-prod:
+    build:
+      context: ./cube
+      dockerfile: Dockerfile.production
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=production
+      - CUBEJS_DB_TYPE=postgres
+      - CUBEJS_DB_HOST=aiser-postgres-prod
+      - CUBEJS_DB_PORT=5432
+      - CUBEJS_DB_NAME=aiser_prod
+      - CUBEJS_DB_USER=user
+      - CUBEJS_DB_PASS=password
+    networks:
+      - aiser-prod-network
+    depends_on:
+      - aiser-postgres-prod
+
+  # PostgreSQL
+  aiser-postgres-prod:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=aiser_prod
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+    networks:
+      - aiser-prod-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d aiser_prod"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis
+  aiser-redis-prod:
+    image: redis:7-alpine
+    command: redis-server --requirepass password
+    volumes:
+      - redis_prod_data:/data
+    networks:
+      - aiser-prod-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  aiser-prod-network:
+    driver: bridge
+
+volumes:
+  postgres_prod_data:
+  redis_prod_data:

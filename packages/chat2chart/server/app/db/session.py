@@ -66,9 +66,7 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
         finally:
             await session.close()
 
-def get_sync_session():
-    """Get sync database session for migrations"""
-    return sync_session()
+# Removed duplicate function definition
 
 # Global async database session instance - lazy initialization
 _db_instance = None

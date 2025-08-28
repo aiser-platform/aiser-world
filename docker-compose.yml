@@ -1,14 +1,12 @@
 version: '3.8'
 
-# Load environment variables from .env file
-env_file:
-  - .env
-
 services:
   # PostgreSQL Database
   postgres:
     image: postgres:15-alpine
     container_name: aiser-postgres
+    env_file:
+      - .env
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-aiser_world}
       POSTGRES_USER: ${POSTGRES_USER:-aiser}
@@ -43,6 +41,8 @@ services:
     image: python:3.11-slim
     container_name: aiser-auth
     working_dir: /app
+    env_file:
+      - .env
     ports:
       - "5000:5000"
     environment:
@@ -72,6 +72,8 @@ services:
     image: node:18-alpine
     container_name: aiser-cube
     working_dir: /app
+    env_file:
+      - .env
     ports:
       - "4000:4000"
     environment:
@@ -117,6 +119,8 @@ services:
     image: python:3.11-slim
     container_name: aiser-chat2chart
     working_dir: /app
+    env_file:
+      - .env
     ports:
       - "8000:8000"
     environment:

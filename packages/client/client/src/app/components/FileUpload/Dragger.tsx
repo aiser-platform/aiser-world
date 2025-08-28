@@ -13,7 +13,7 @@ export interface UploadDraggerProps {
 }
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB (matching backend)
-const UPLOAD_API_URL = 'http://localhost:8000/api/v1/data/upload';
+const UPLOAD_API_URL = 'http://localhost:8000/data/upload';
 
 const UploadDragger: React.FC<UploadDraggerProps> = ({
     onUpload,
