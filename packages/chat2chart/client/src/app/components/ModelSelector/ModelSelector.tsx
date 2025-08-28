@@ -152,11 +152,11 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
                     <Text strong={selectedModel === model.id}>
                         {model.name}
                     </Text>
-                    <Tag color={getProviderColor(model.provider)} size="small">
-                        {model.provider.toUpperCase()}
+                    <Tag color={getProviderColor(model.provider)}>
+                        {model.provider?.toUpperCase() || 'UNKNOWN'}
                     </Tag>
                     {showCostInfo && (
-                        <Tag icon={<DollarOutlined />} size="small">
+                        <Tag icon={<DollarOutlined />}>
                             ${model.cost_per_1k_tokens.toFixed(4)}/1K
                         </Tag>
                     )}
@@ -164,7 +164,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
                 <Space>
                     {getStatusIcon(model.id)}
                     {!model.available && (
-                        <Tag color="red" size="small">Not Available</Tag>
+                        <Tag color="red">Not Available</Tag>
                     )}
                 </Space>
             </div>
@@ -246,7 +246,6 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
                         description="Configure API keys in environment variables to enable all models"
                         type="warning"
                         showIcon
-                        size="small"
                     />
                 )}
             </Space>

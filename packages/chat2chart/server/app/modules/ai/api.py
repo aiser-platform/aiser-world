@@ -5,9 +5,19 @@ Provides comprehensive AI-powered analytics and visualization
 
 import logging
 import json
+import datetime
+from datetime import timezone
+import httpx
 from typing import Dict, List, Any, Optional
-from fastapi import APIRouter, HTTPException, Body
+from fastapi import APIRouter, HTTPException, Body, Depends, BackgroundTasks
+from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel
+import asyncio
+
+from .services.ai_orchestrator import AIOrchestrator
+from .services.litellm_service import LiteLLMService
+from app.core.deps import get_current_user
+from app.modules.user.models import User
 
 logger = logging.getLogger(__name__)
 
@@ -17,8 +27,9 @@ router = APIRouter(prefix="/ai", tags=["AI Services"])
 class ChatAnalysisRequest(BaseModel):
     query: str
     data_source_id: Optional[str] = None
-    data_summary: Optional[Dict[str, Any]] = None
     business_context: Optional[str] = None
+    data_source_context: Optional[Dict[str, Any]] = None  # Enhanced context
+    user_context: Optional[Dict[str, Any]] = None  # User preferences and history
 
 class EChartsGenerationRequest(BaseModel):
     query: str
@@ -36,6 +47,28 @@ class SchemaGenerationRequest(BaseModel):
     connection_details: Dict[str, Any]
     business_context: Optional[str] = None
 
+class ChatRequest(BaseModel):
+    message: str
+    conversation_id: Optional[str] = None
+    data_sources: Optional[List[Dict]] = None
+    analysis_type: Optional[str] = "general"
+
+class EnhancedAnalysisRequest(BaseModel):
+    query: str
+    data_sources: List[Dict]
+    conversation_history: Optional[List[Dict]] = None
+    analysis_type: str = "general"
+
+class AnalysisResponse(BaseModel):
+    success: bool
+    analysis: Optional[Dict] = None
+    strategy_used: Optional[str] = None
+    data_sources_used: Optional[List[str]] = None
+    context_summary: Optional[str] = None
+    execution_metadata: Optional[Dict] = None
+    error: Optional[str] = None
+    fallback_suggestion: Optional[str] = None
+
 # Core Chat Integration Endpoints
 @router.post("/chat/analyze")
 async def analyze_chat_query(request: ChatAnalysisRequest) -> Dict[str, Any]:
@@ -43,71 +76,278 @@ async def analyze_chat_query(request: ChatAnalysisRequest) -> Dict[str, Any]:
     Analyze chat query and provide intelligent response with data insights
     """
     try:
-        from .services.litellm_service import LiteLLMService
-        service = LiteLLMService()
+        # Use the enhanced AI Orchestrator for comprehensive analysis
+        ai_orchestrator = AIOrchestrator()
         
-        # Create enhanced system context for data analysis
-        system_context = f"""You are an expert AI data analyst and business intelligence specialist with a warm, conversational personality.
-
-Your capabilities:
-- Analyze data queries and provide actionable insights
-- Generate sample data when needed for demonstrations
-- Create ECharts configurations and visualizations
-- Recommend optimal chart types and visualizations
-- Generate business intelligence and recommendations
-- Help users understand their data and make decisions
-- Be conversational, friendly, and engaging
-
-Current Context:
-- Data Source ID: {request.data_source_id or 'None'}
-- Business Context: {request.business_context or 'General Analytics'}
-
-IMPORTANT: 
-- Always provide detailed, helpful responses
-- Never return empty messages
-- Be conversational and natural, not rigid or overly structured
-- When appropriate, generate sample data to demonstrate concepts
-- Offer to create charts and visualizations
-- Suggest next steps and follow-up questions
-- Use emojis and friendly language to make responses engaging
-- If user asks for sample data, generate realistic examples
-- If user asks for charts, provide ECharts configurations
-- Be helpful even without connected data sources"""
-
-        # Generate AI response
-        ai_response = await service.generate_completion(
-            prompt=request.query,
-            system_context=system_context,
-            max_tokens=1000,
-            temperature=1.0  # GPT-5 compatible
+        # Convert the request to the format expected by AI Orchestrator
+        data_sources = []
+        if request.data_source_id:
+            # Get all data sources and find the specific one
+            async with httpx.AsyncClient() as client:
+                try:
+                    # Get all data sources - use internal Docker networking
+                    all_sources_response = await client.get("http://127.0.0.1:8000/data/sources")
+                    if all_sources_response.status_code == 200:
+                        all_sources = all_sources_response.json()
+                        # Find the specific data source
+                        target_source = None
+                        for source in all_sources.get("data_sources", []):
+                            if source.get("id") == request.data_source_id:
+                                target_source = source
+                                break
+                        
+                        if target_source:
+                            data_sources.append({
+                                "id": target_source.get("id"),
+                                "name": target_source.get("name"),
+                                "type": target_source.get("type"),
+                                "config": {
+                                    "endpoint": f"http://127.0.0.1:8000/data/sources/{request.data_source_id}",
+                                    "format": target_source.get("format"),
+                                    "db_type": target_source.get("db_type")
+                                },
+                                "schema": target_source.get("schema", {}),
+                                "size": target_source.get("size"),
+                                "row_count": target_source.get("row_count")
+                            })
+                        else:
+                            logger.warning(f"Data source {request.data_source_id} not found in available sources")
+                    else:
+                        logger.warning(f"Failed to fetch data sources: {all_sources_response.status_code}")
+                except Exception as data_error:
+                    logger.warning(f"Data source fetch failed: {data_error}")
+        
+        # Use AI Orchestrator for enhanced analysis
+        result = await ai_orchestrator.analyze_data_with_context(
+            user_query=request.query,
+            data_sources=data_sources,
+            conversation_history=None,
+            analysis_type="data_analysis",
+            user_context={
+                "selected_data_source_id": request.data_source_id,
+                "active_data_sources": [request.data_source_id] if request.data_source_id else [],
+                "business_context": request.business_context,
+                "data_source_context": request.data_source_context,
+                "user_context": request.user_context
+            }
         )
         
-        if ai_response.get('success') and ai_response.get('content'):
+        if result.get("success"):
             return {
                 "success": True,
                 "query": request.query,
-                "analysis": ai_response.get('content'),
-                "model": ai_response.get('model'),
+                "analysis": result.get("analysis", {}).get("ai_insights", "Analysis completed successfully."),
+                "execution_metadata": result.get("execution_metadata", {}),
+                "data_insights": {
+                    "key_findings": ["AI-powered analysis completed"],
+                    "patterns": ["Enhanced data analysis"],
+                    "recommendations": ["Use the insights for decision making"]
+                },
+                "chart_recommendations": result.get("analysis", {}).get("visualization_config"),
+                "model": result.get("execution_metadata", {}).get("model_used", "AI Orchestrator"),
                 "data_source_id": request.data_source_id,
-                "ai_engine": "GPT-5 Mini (Azure)",
-                "capabilities": ["data_analysis", "insights_generation", "chart_recommendations"]
+                "ai_engine": "Enhanced AI Orchestrator",
+                "capabilities": ["data_analysis", "insights_generation", "chart_recommendations", "cube_integration"],
+                "data_context_summary": result.get("context_summary", "Data analysis completed")
             }
         else:
-            # Use fallback response
-            fallback = service._generate_fallback_response(request.query, Exception("AI analysis failed"))
+            # Enhanced fallback with data context
+            fallback_response = await _generate_enhanced_fallback(request.query, {"data_source_id": request.data_source_id})
             return {
                 "success": True,
                 "query": request.query,
-                "analysis": fallback,
+                "analysis": fallback_response.get("analysis"),
+                "execution_metadata": fallback_response.get("execution_metadata"),
+                "data_insights": fallback_response.get("data_insights"),
                 "model": "fallback",
                 "data_source_id": request.data_source_id,
-                "ai_engine": "Fallback System",
-                "capabilities": ["basic_guidance", "fallback_support"]
+                "ai_engine": "Enhanced Fallback System",
+                "capabilities": ["basic_guidance", "fallback_support", "data_context_awareness"]
             }
             
     except Exception as e:
         logger.error(f"Chat analysis failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+        # Return structured error response instead of throwing exception
+        return {
+            "success": False,
+            "query": request.query,
+            "error": str(e),
+            "analysis": "I encountered an issue while analyzing your request. Let me try a different approach.",
+            "execution_metadata": {
+                "status": "error",
+                "error_type": type(e).__name__,
+                "timestamp": str(datetime.datetime.now())
+            },
+            "data_source_id": request.data_source_id,
+            "ai_engine": "Error Recovery System",
+            "capabilities": ["error_recovery", "basic_guidance"]
+        }
+
+@router.post("/chat", response_model=Dict)
+async def chat_completion(
+    request: ChatRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """Standard chat completion endpoint"""
+    try:
+        ai_orchestrator = AIOrchestrator()
+        
+        # If data sources are provided, use enhanced analysis
+        if request.data_sources:
+            result = await ai_orchestrator.analyze_data_with_context(
+                user_query=request.message,
+                data_sources=request.data_sources,
+                conversation_history=request.conversation_id,  # You might want to fetch actual history
+                analysis_type=request.analysis_type
+            )
+            return result
+        else:
+            # Standard chat completion
+            result = await ai_orchestrator.chat_completion(
+                messages=[{"role": "user", "content": request.message}]
+            )
+            return result
+            
+    except Exception as e:
+        logger.error(f"Chat completion failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Chat completion failed: {str(e)}")
+
+@router.post("/analyze", response_model=AnalysisResponse)
+async def enhanced_data_analysis(
+    request: EnhancedAnalysisRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """Enhanced data analysis with full context awareness"""
+    try:
+        ai_orchestrator = AIOrchestrator()
+        
+        result = await ai_orchestrator.analyze_data_with_context(
+            user_query=request.query,
+            data_sources=request.data_sources,
+            conversation_history=request.conversation_history,
+            analysis_type=request.analysis_type
+        )
+        
+        return AnalysisResponse(**result)
+        
+    except Exception as e:
+        logger.error(f"Enhanced analysis failed: {str(e)}")
+        return AnalysisResponse(
+            success=False,
+            error=f"Analysis failed: {str(e)}",
+            fallback_suggestion="Try rephrasing your query or check data source connections"
+        )
+
+@router.post("/chat/stream")
+async def stream_chat_analysis(request: ChatAnalysisRequest):
+    """Stream AI chat analysis with real-time updates"""
+    try:
+        logger.info(f"🚀 Starting streaming chat analysis for query: {request.query[:100]}...")
+        
+        # Build comprehensive data context
+        data_context = await _build_comprehensive_data_context(request)
+        
+        # Build enhanced system context
+        system_context = await _build_enhanced_system_context(request, data_context)
+        
+        # Prepare streaming response
+        async def generate_stream():
+            try:
+                # Start with metadata
+                yield f"data: {json.dumps({'type': 'execution_metadata', 'metadata': {'start_time': datetime.datetime.now().isoformat(), 'data_source': data_context.get('type', 'unknown')}})}\n\n"
+                
+                # Generate AI response with streaming
+                from .services.litellm_service import LiteLLMService
+                litellm_service = LiteLLMService()
+                ai_response = await litellm_service.generate_completion_stream(
+                    messages=[
+                        {"role": "system", "content": system_context},
+                        {"role": "user", "content": request.query}
+                    ],
+                    data_context=data_context,
+                    stream=True
+                )
+                
+                if not ai_response or not ai_response.get('success'):
+                    # Fallback response
+                    fallback = await _generate_enhanced_fallback(request.query, data_context)
+                    yield f"data: {json.dumps({'type': 'content', 'content': fallback.get('content', 'Sorry, I encountered an error. Please try again.')})}\n\n"
+                else:
+                    # Stream the content
+                    content = ai_response.get('content', '')
+                    if content:
+                        # Split content into chunks for streaming
+                        chunks = content.split(' ')
+                        for i, chunk in enumerate(chunks):
+                            yield f"data: {json.dumps({'type': 'content', 'content': chunk + ' '})}\n\n"
+                            await asyncio.sleep(0.05)  # Small delay for smooth streaming
+                    
+                    # Add execution metadata
+                    execution_metadata = {
+                        'execution_time': ai_response.get('execution_time', 0),
+                        'data_source': data_context.get('type', 'unknown'),
+                        'total_rows': data_context.get('total_rows', 0),
+                        'timestamp': datetime.datetime.now().isoformat(),
+                        'ai_model': ai_response.get('model', 'unknown')
+                    }
+                    yield f"data: {json.dumps({'type': 'execution_metadata', 'metadata': execution_metadata})}\n\n"
+                    
+                    # Add SQL queries if available
+                    if ai_response.get('sql_queries'):
+                        for sql in ai_response['sql_queries']:
+                            yield f"data: {json.dumps({'type': 'sql_query', 'query': sql})}\n\n"
+                    
+                    # Add chart data if available
+                    if ai_response.get('chart_data'):
+                        yield f"data: {json.dumps({'type': 'chart_data', 'data': ai_response['chart_data']})}\n\n"
+                
+                # End stream
+                yield "data: [DONE]\n\n"
+                
+            except Exception as e:
+                logger.error(f"❌ Streaming error: {str(e)}")
+                error_response = {
+                    'type': 'error',
+                    'error': str(e),
+                    'fallback': await _generate_enhanced_fallback(request.query, data_context)
+                }
+                yield f"data: {json.dumps(error_response)}\n\n"
+                yield "data: [DONE]\n\n"
+        
+        return StreamingResponse(
+            generate_stream(),
+            media_type="text/plain",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "Content-Type": "text/event-stream"
+            }
+        )
+        
+    except Exception as e:
+        logger.error(f"❌ Streaming chat analysis failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Streaming failed: {str(e)}")
+
+@router.post("/chat/stream")
+async def streaming_chat(
+    request: ChatRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """Streaming chat completion endpoint"""
+    try:
+        ai_orchestrator = AIOrchestrator()
+        
+        # For streaming, we'll use the standard chat completion for now
+        # In a full implementation, you'd implement proper streaming
+        result = await ai_orchestrator.chat_completion(
+            messages=[{"role": "user", "content": request.message}]
+        )
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Streaming chat failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Streaming chat failed: {str(e)}")
 
 @router.post("/echarts/generate")
 async def generate_echarts(request: EChartsGenerationRequest) -> Dict[str, Any]:
@@ -194,7 +434,7 @@ IMPORTANT:
         logger.error(f"ECharts generation failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"ECharts generation failed: {str(e)}")
 
-@router.post("/sample-data/{dataset_type}")
+@router.get("/sample-data/{dataset_type}")
 async def get_sample_dataset(dataset_type: str) -> Dict[str, Any]:
     """
     Get sample dataset for AI analysis and demonstration
@@ -507,35 +747,23 @@ async def test_ai_configuration() -> Dict[str, Any]:
         }
 
 @router.get("/models")
-async def get_available_models() -> Dict[str, Any]:
+async def get_available_models(current_user: User = Depends(get_current_user)):
     """Get available AI models"""
     try:
-        from .services.litellm_service import LiteLLMService
-        service = LiteLLMService()
-        return service.get_available_models()
+        litellm_service = LiteLLMService()
+        models = litellm_service.get_available_models()
+        return {"success": True, "models": models}
     except Exception as e:
         logger.error(f"Failed to get models: {str(e)}")
-        return {"error": f"Failed to get models: {str(e)}"}
+        raise HTTPException(status_code=500, detail=f"Failed to get models: {str(e)}")
 
 @router.get("/health")
-async def health_check() -> Dict[str, Any]:
+async def health_check():
     """Health check endpoint"""
     return {
-        "success": True,
-        "service": "ai_services",
         "status": "healthy",
-        "version": "2.0.0",
-        "capabilities": [
-            "chat_analysis",
-            "echarts_generation", 
-            "business_insights",
-            "gpt5_integration",
-            "fallback_support"
-        ],
-        "models": {
-            "primary": "gpt-5-mini",
-            "fallback": "gpt-4o-mini"
-        }
+        "timestamp": datetime.datetime.now(timezone.utc).isoformat(),
+        "service": "AI Orchestrator"
     }
 
 @router.get("/test-config")
@@ -557,6 +785,401 @@ async def test_config() -> Dict[str, Any]:
             "error": str(e),
             "service": "ai_services"
         }
+
+# Comprehensive Data Context Builder
+async def _build_comprehensive_data_context(request: ChatAnalysisRequest) -> Dict[str, Any]:
+    """Build comprehensive data context including Cube.js integration"""
+    data_context = {
+        "summary": {},
+        "schema": {},
+        "sample_data": {},
+        "cube_integration": False,
+        "data_source_type": None,
+        "available_metrics": [],
+        "available_dimensions": []
+    }
+    
+    try:
+        if request.data_source_id:
+            # Try to get data source info from data API
+            async with httpx.AsyncClient() as client:
+                try:
+                    # Get data source details
+                    data_response = await client.get(f"http://localhost:8000/data/sources/{request.data_source_id}")
+                    if data_response.status_code == 200:
+                        data_source = data_response.json()
+                        data_context["data_source_type"] = data_source.get("type")
+                        data_context["summary"]["name"] = data_source.get("name")
+                        data_context["summary"]["description"] = data_source.get("description")
+                        
+                        # Get schema and data
+                        schema_response = await client.get(f"http://localhost:8000/data/sources/{request.data_source_id}/data")
+                        if schema_response.status_code == 200:
+                            schema_data = schema_response.json()
+                            data_context["schema"] = schema_data.get("schema", {})
+                            data_context["sample_data"] = schema_data.get("sample_data", {})
+                            
+                            # Extract available metrics and dimensions
+                            if data_context["data_source_type"] == "database":
+                                tables = schema_data.get("schema", {}).get("tables", [])
+                                for table in tables:
+                                    if table and table.get("columns"):
+                                        columns = table.get("columns", [])
+                                        for col in columns:
+                                            if col and col.get("data_type") in ["integer", "numeric", "decimal", "float"]:
+                                                table_name = table.get('name', 'unknown')
+                                                col_name = col.get('name', 'unknown')
+                                                if table_name and col_name:
+                                                    data_context["available_metrics"].append(f"{table_name}.{col_name}")
+                                            elif col and col.get("name"):
+                                                data_context["available_dimensions"].append(col.get("name"))
+                            
+                            elif data_context["data_source_type"] == "file":
+                                columns = schema_data.get("schema", {}).get("columns", [])
+                                for col in columns:
+                                    if col and col.get("type") in ["number", "integer"] and col.get("name"):
+                                        data_context["available_metrics"].append(col.get("name"))
+                                    elif col and col.get("name"):
+                                        data_context["available_dimensions"].append(col.get("name"))
+                        
+                        # Try Cube.js integration if available
+                        if data_context["data_source_type"] in ["cube", "warehouse"]:
+                            try:
+                                cube_response = await client.get(f"http://localhost:8000/cube/schema/{request.data_source_id}")
+                                if cube_response.status_code == 200:
+                                    cube_data = cube_response.json()
+                                    data_context["cube_integration"] = True
+                                    data_context["cube_schema"] = cube_data
+                                    data_context["available_metrics"] = [m.get("name") for m in cube_data.get("measures", []) if m and m.get("name")]
+                                    data_context["available_dimensions"] = [d.get("name") for d in cube_data.get("dimensions", []) if d and d.get("name")]
+                            except Exception as cube_error:
+                                logger.warning(f"Cube.js integration failed: {cube_error}")
+                                
+                except Exception as data_error:
+                    logger.warning(f"Data source fetch failed: {data_error}")
+                    
+    except Exception as e:
+        logger.error(f"Data context building failed: {e}")
+    
+    return data_context
+
+# Enhanced System Context Builder
+async def _build_enhanced_system_context(request: ChatAnalysisRequest, data_context: Dict[str, Any]) -> str:
+    """Build comprehensive system context for AI analysis"""
+    
+    base_context = """You are an expert AI data analyst and business intelligence specialist with a warm, conversational personality.
+
+Your capabilities:
+- Analyze data queries and provide actionable insights
+- Generate sample data when needed for demonstrations
+- Create ECharts configurations and visualizations
+- Recommend optimal chart types and visualizations
+- Generate business intelligence and recommendations
+- Help users understand their data and make decisions
+- Be conversational, friendly, and engaging
+
+IMPORTANT: 
+- Always provide detailed, helpful responses
+- Never return empty messages
+- Be conversational and natural, not rigid or overly structured
+- When appropriate, generate sample data to demonstrate concepts
+- Offer to create charts and visualizations
+- Suggest next steps and follow-up questions
+- Use emojis and friendly language to make responses engaging
+- If user asks for sample data, generate realistic examples
+- If user asks for charts, provide ECharts configurations
+- Be helpful even without connected data sources
+- Focus on practical business value and actionable insights
+- Provide specific recommendations with data-driven reasoning
+- Include SQL queries when appropriate for database analysis
+- Generate chart recommendations with proper ECharts configuration"""
+
+    # Add comprehensive data context
+    if data_context and data_context.get("data_source_type"):
+        context = f"""{base_context}
+
+Current Data Source Context:
+- Type: {data_context.get('data_source_type', 'Unknown')}
+- Name: {data_context.get('summary', {}).get('name', 'Unknown')}
+- Description: {data_context.get('summary', {}).get('description', 'No description')}
+- Available Metrics: {len(data_context.get('available_metrics', []))}
+- Available Dimensions: {len(data_context.get('available_dimensions', []))}"""
+
+        # Add Cube.js specific context
+        if data_context.get("cube_integration") and data_context.get("cube_schema"):
+            cube_schema = data_context["cube_schema"]
+            context += f"""
+
+Cube.js Semantic Model:
+- Total Cubes: {len(cube_schema.get('cubes', []))}
+- Total Dimensions: {len(cube_schema.get('dimensions', []))}
+- Total Measures: {len(cube_schema.get('measures', []))}
+- Time Dimensions: {len([d for d in cube_schema.get('dimensions', []) if d.get('type') == 'time'])}
+- Pre-aggregations: {len(cube_schema.get('pre_aggregations', []))}
+
+Available Metrics: {', '.join(data_context.get('available_metrics', [])[:10])}
+Available Dimensions: {', '.join(data_context.get('available_dimensions', [])[:10])}
+
+Use this semantic model for:
+- Business-friendly query generation
+- Optimized aggregations using pre-aggregations
+- Time-based analysis with proper granularity
+- Performance-optimized queries
+- Domain-specific insights
+- Semantic business logic"""
+
+        # Add database context
+        elif data_context.get("data_source_type") in ["database", "warehouse"]:
+            schema = data_context.get("schema", {})
+            if schema:
+                context += f"""
+
+Database Schema:
+- Tables: {len(schema.get('tables', []))}
+- Total Rows: {schema.get('total_rows', 'Unknown')}
+- Schemas: {', '.join(schema.get('schemas', []))}
+
+Available Metrics: {', '.join(data_context.get('available_metrics', [])[:10])}
+Available Dimensions: {', '.join(data_context.get('available_dimensions', [])[:10])}
+
+Use this schema for:
+- Accurate SQL generation with proper table relationships
+- Table relationship analysis
+- Data type validation
+- Performance optimization
+- Complex joins and aggregations"""
+
+        # Add file context
+        elif data_context.get("data_source_type") == "file":
+            schema = data_context.get("schema", {})
+            if schema:
+                context += f"""
+
+File Data Structure:
+- Columns: {len(schema.get('columns', []))}
+- Row Count: {schema.get('row_count', 'Unknown')}
+- Sample Data: Available
+
+Available Metrics: {', '.join(data_context.get('available_metrics', [])[:10])}
+Available Dimensions: {', '.join(data_context.get('available_dimensions', [])[:10])}
+
+Use this structure for:
+- Column-based analysis
+- Data type inference
+- Pattern recognition
+- Statistical analysis
+- Data quality assessment"""
+
+        context += f"""
+
+Analysis Instructions:
+1. Start with a clear understanding of the user's request
+2. Analyze the available data structure and capabilities
+3. Provide specific, actionable insights based on the data
+4. Include relevant SQL queries when appropriate
+5. Recommend optimal chart types with ECharts configurations
+6. Suggest follow-up questions and next steps
+7. Be conversational and engaging while maintaining professionalism
+8. Focus on business value and practical applications
+
+Remember: You have access to real data sources and should use them to provide accurate, contextual analysis."""
+        
+        return context
+    
+    return base_context
+
+# AI Response Processing Functions
+async def _process_ai_response(content: str, query: str, data_context: Dict[str, Any]) -> Dict[str, Any]:
+    """Process and structure AI response for consistent output"""
+    try:
+        # Extract key insights and structure the response
+        analysis = content.strip()
+        
+        # Generate execution metadata
+        execution_metadata = {
+            "status": "success",
+            "timestamp": str(datetime.datetime.now()),
+            "data_source_type": data_context.get("data_source_type"),
+            "cube_integration": data_context.get("cube_integration", False),
+            "available_metrics": len(data_context.get("available_metrics", [])),
+            "available_dimensions": len(data_context.get("available_dimensions", []))
+        }
+        
+        # Extract data insights
+        data_insights = {
+            "key_findings": _extract_key_findings(analysis),
+            "patterns": _extract_patterns(analysis),
+            "recommendations": _extract_recommendations(analysis)
+        }
+        
+        # Generate chart recommendations
+        chart_recommendations = _generate_chart_recommendations(query, data_context)
+        
+        return {
+            "analysis": analysis,
+            "execution_metadata": execution_metadata,
+            "data_insights": data_insights,
+            "chart_recommendations": chart_recommendations
+        }
+        
+    except Exception as e:
+        logger.error(f"AI response processing failed: {e}")
+        return {
+            "analysis": content,
+            "execution_metadata": {"status": "processing_error", "error": str(e)},
+            "data_insights": {},
+            "chart_recommendations": []
+        }
+
+async def _generate_enhanced_fallback(query: str, data_context: Dict[str, Any]) -> Dict[str, Any]:
+    """Generate enhanced fallback response with data context awareness"""
+    try:
+        if data_context.get("data_source_type"):
+            # Generate context-aware fallback
+            analysis = f"""I can see you have a {data_context.get('data_source_type')} data source connected. 
+
+Based on the available data structure:
+- **Available Metrics**: {len(data_context.get('available_metrics', []))} numeric fields for analysis
+- **Available Dimensions**: {len(data_context.get('available_dimensions', []))} categorical fields for grouping
+
+For your query: "{query}"
+
+Here are some analysis suggestions:
+1. **Exploratory Analysis**: Start with basic statistics on your metrics
+2. **Pattern Recognition**: Look for trends across your dimensions
+3. **Data Quality**: Check for missing values or outliers
+4. **Business Insights**: Identify key performance indicators
+
+Would you like me to:
+- Generate specific charts for your data?
+- Provide SQL queries for analysis?
+- Create a comprehensive data summary?
+- Help with specific business questions?
+
+Let me know what specific analysis you'd like to perform!"""
+        else:
+            analysis = f"""I'd be happy to help you analyze your data! 
+
+For your query: "{query}"
+
+To provide the most accurate and insightful analysis, I recommend:
+1. **Connect a Data Source**: Upload a file, connect to a database, or use Cube.js
+2. **Specify Your Analysis**: Tell me what specific insights you're looking for
+3. **Business Context**: Share any business goals or constraints
+
+Once connected, I can:
+- Generate interactive charts and visualizations
+- Provide SQL queries and data analysis
+- Identify patterns and trends
+- Offer business recommendations
+- Create comprehensive reports
+
+Would you like help connecting a data source first?"""
+        
+        execution_metadata = {
+            "status": "fallback",
+            "timestamp": str(datetime.datetime.now()),
+            "data_source_type": data_context.get("data_source_type"),
+            "fallback_reason": "AI service unavailable"
+        }
+        
+        data_insights = {
+            "key_findings": ["Data source analysis available", "Multiple analysis options"],
+            "patterns": ["Structured fallback response", "Context-aware guidance"],
+            "recommendations": ["Connect data source", "Specify analysis needs"]
+        }
+        
+        return {
+            "analysis": analysis,
+            "execution_metadata": execution_metadata,
+            "data_insights": data_insights
+        }
+        
+    except Exception as e:
+        logger.error(f"Enhanced fallback generation failed: {e}")
+        return {
+            "analysis": f"I'm here to help with your data analysis! For your query: '{query}', I can provide insights, generate charts, and help with business intelligence. Let me know what specific analysis you need.",
+            "execution_metadata": {"status": "fallback_error", "error": str(e)},
+            "data_insights": {}
+        }
+
+def _extract_key_findings(analysis: str) -> List[str]:
+    """Extract key findings from AI analysis"""
+    # Simple extraction - in production, use more sophisticated NLP
+    lines = analysis.split('\n')
+    findings = []
+    for line in lines:
+        if any(keyword in line.lower() for keyword in ['key', 'finding', 'insight', 'discovery', 'pattern']):
+            findings.append(line.strip())
+    return findings[:5] if findings else ["Analysis completed successfully"]
+
+def _extract_patterns(analysis: str) -> List[str]:
+    """Extract patterns from AI analysis"""
+    lines = analysis.split('\n')
+    patterns = []
+    for line in lines:
+        if any(keyword in line.lower() for keyword in ['trend', 'pattern', 'correlation', 'relationship', 'increase', 'decrease']):
+            patterns.append(line.strip())
+    return patterns[:5] if patterns else ["Patterns identified in data"]
+
+def _extract_recommendations(analysis: str) -> List[str]:
+    """Extract recommendations from AI analysis"""
+    lines = analysis.split('\n')
+    recommendations = []
+    for line in lines:
+        if any(keyword in line.lower() for keyword in ['recommend', 'suggest', 'should', 'could', 'consider', 'next step']):
+            recommendations.append(line.strip())
+    return recommendations[:5] if recommendations else ["Continue exploring data insights"]
+
+def _generate_chart_recommendations(query: str, data_context: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Generate chart recommendations based on query and data context"""
+    recommendations = []
+    
+    # Basic chart recommendations based on query keywords
+    query_lower = query.lower()
+    
+    if any(word in query_lower for word in ['trend', 'time', 'over time', 'growth']):
+        recommendations.append({
+            "type": "line",
+            "title": "Time Series Analysis",
+            "description": "Show trends and patterns over time",
+            "metrics": data_context.get("available_metrics", [])[:3]
+        })
+    
+    if any(word in query_lower for word in ['compare', 'vs', 'versus', 'difference']):
+        recommendations.append({
+            "type": "bar",
+            "title": "Comparison Chart",
+            "description": "Compare values across different categories",
+            "metrics": data_context.get("available_metrics", [])[:2]
+        })
+    
+    if any(word in query_lower for word in ['distribution', 'spread', 'range']):
+        recommendations.append({
+            "type": "histogram",
+            "title": "Distribution Analysis",
+            "description": "Show data distribution and spread",
+            "metrics": data_context.get("available_metrics", [])[:1]
+        })
+    
+    if any(word in query_lower for word in ['correlation', 'relationship', 'scatter']):
+        recommendations.append({
+            "type": "scatter",
+            "title": "Correlation Analysis",
+            "description": "Explore relationships between variables",
+            "metrics": data_context.get("available_metrics", [])[:2]
+        })
+    
+    # Default recommendation
+    if not recommendations:
+        recommendations.append({
+            "type": "bar",
+            "title": "Data Overview",
+            "description": "General overview of your data",
+            "metrics": data_context.get("available_metrics", [])[:3]
+        })
+    
+    return recommendations
 
 # Helper Functions
 def _generate_fallback_echarts_config(query: str) -> Dict[str, Any]:

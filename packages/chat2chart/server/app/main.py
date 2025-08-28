@@ -51,22 +51,18 @@ async def shutdown_event():
 #     )
 
 
-@app.middleware("http")
-async def set_context(request: Request, call_next):
-    try:
-        # Check if route is public
-        # if any(request.url.path.startswith(route) for route in PUBLIC_ROUTES):
-        #     return await call_next(request)
+# @app.middleware("http")
+# async def set_context(request: Request, call_next):
+#     try:
+#         # For now, just pass through requests without setting context
+#         # TODO: Implement proper context management later
+#         response = await call_next(request)
+#         return response
 
-        # Extract the session cookie
-
-        # Initialize globals for this request
-
-        user = request.cookies.get("user")
-
-        g.set({"user": user})
-        response = await call_next(request)
-        return response
-
-    except Exception as e:
-        logger.error(f"Error setting context: {e}")
+#     except Exception as e:
+#         logger.error(f"Error in middleware: {e}")
+#         # Return a proper error response instead of None
+#         return JSONResponse(
+#             status_code=500,
+#             content={"error": "Internal server error in middleware"}
+#         )

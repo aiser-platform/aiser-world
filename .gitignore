@@ -15,6 +15,10 @@ build/
 .env.development.local
 .env.test.local
 .env.production.local
+.env.backup
+.env.backup2
+.env.corrected
+.env.fixed
 
 # IDE
 .vscode/
@@ -95,6 +99,34 @@ docs/updated-task-priorities.md
 # Internal development logs and temporary files
 dev.log
 INITIAL_COMMIT_MESSAGE.md
+
+# Backup and temporary files
+*.backup
+*.backup2
+*.corrected
+*.fixed
+.env.backup*
+.env.corrected*
+.env.fixed*
+
+# Test data files
+test_data.csv
+test_data.parquet
+test_data_fixed.csv
+
+# Build artifacts and cache
+.docusaurus/
+tsconfig.tsbuildinfo
+*.tsbuildinfo
+
+# Docker volumes and data
+postgres_dev_data/
+redis_dev_data/
+auth_poetry_cache/
+chat2chart_poetry_cache/
+cube_node_modules/
+client_node_modules/
+client_next_build/
 
 # Kiro IDE settings (may contain sensitive project info)
 .kiro/settings/

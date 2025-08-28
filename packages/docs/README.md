@@ -108,7 +108,7 @@ docker-compose -f docker-compose.docs.yml --profile dev up -d docs-dev
 
 ### Custom Domain Deployment
 The documentation is configured for deployment at:
-- **Production**: https://aiser-docs.dataticon.com/docs/
+- **Production**: https://aiser-docs.dataticon.com/
 - **Development**: http://localhost:3005
 
 ## 🚀 Deployment Scripts
@@ -148,7 +148,7 @@ docker-compose -f docker-compose.docs.yml up -d --build
 # Documentation configuration
 NODE_ENV=production
 PORT=3005
-BASE_URL=/docs/
+BASE_URL=/
 CUSTOM_DOMAIN=aiser-docs.dataticon.com
 
 # AI service configuration

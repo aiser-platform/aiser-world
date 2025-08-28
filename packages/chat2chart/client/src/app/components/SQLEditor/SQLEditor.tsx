@@ -524,7 +524,7 @@ const SQLEditor: React.FC<SQLEditorProps> = ({
                                                             color: status === 'success' ? '#52c41a' : '#ff4d4f',
                                                             fontWeight: 'bold'
                                                         }}>
-                                                            {status.toUpperCase()}
+                                                            {status?.toUpperCase() || 'UNKNOWN'}
                                                         </span>
                                                     )
                                                 },

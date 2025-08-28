@@ -12,7 +12,7 @@ const sidebars = {
       label: '🚀 Getting Started',
       collapsed: false,
       items: [
-        'getting-started/getting-started-index',
+        'getting-started/getting-started',
         'getting-started/quick-start-docker',
         'getting-started/first-chart',
         'getting-started/demo-walkthrough',

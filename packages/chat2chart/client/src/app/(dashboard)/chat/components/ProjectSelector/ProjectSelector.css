@@ -1,0 +1,31 @@
+.project-selector {
+    display: flex;
+    align-items: center;
+}
+
+.project-selector.header-mode {
+    /* Compact styling for header usage */
+}
+
+.project-selector.header-mode .ant-select {
+    min-width: 180px !important;
+}
+
+.project-selector.header-mode .ant-btn {
+    height: 32px;
+    padding: 4px 8px;
+}
+
+.project-selector.header-mode .ant-space {
+    gap: 4px;
+}
+
+/* Dark mode compatibility */
+[data-theme='dark'] .project-selector.header-mode .ant-select {
+    background: var(--colorBgContainer);
+    border-color: var(--colorBorder);
+}
+
+[data-theme='dark'] .project-selector.header-mode .ant-select:hover {
+    border-color: var(--colorPrimary);
+}

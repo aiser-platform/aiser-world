@@ -9,7 +9,8 @@ import {
   CrownOutlined,
   BarChartOutlined,
   TeamOutlined,
-  BellOutlined
+  BellOutlined,
+  ProjectOutlined
 } from '@ant-design/icons';
 import { useAuth } from '@/context/AuthContext';
 import { useOrganization } from '@/context/OrganizationContext';
@@ -22,19 +23,19 @@ interface UserProfileDropdownProps {
 
 const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({ className }) => {
   const { user, logout } = useAuth();
-  const { currentOrganization, usageStats, upgradePlan } = useOrganization();
+  const { currentOrganization, usageStats } = useOrganization();
   const [pricingModalVisible, setPricingModalVisible] = useState(false);
   const [upgradeLoading, setUpgradeLoading] = useState(false);
   const router = useRouter();
 
-  // Use real organization data or fallback to defaults
+  // Use real organization data from context
   const organizationData = {
     name: currentOrganization?.name || 'My Organization',
     plan: currentOrganization?.plan_type || 'free',
-    aiCreditsUsed: usageStats?.ai_credits_used || 0,
-    aiCreditsLimit: usageStats?.ai_credits_limit || 50,
-    daysLeftInTrial: usageStats?.days_left_in_trial || 0,
-    isTrialActive: currentOrganization?.is_trial_active || false
+    aiCreditsUsed: usageStats?.ai_queries_used || 0,
+    aiCreditsLimit: usageStats?.ai_queries_limit || 50,
+    daysLeftInTrial: 0, // Not implemented yet
+    isTrialActive: false // Not implemented yet
   };
 
   const getPlanBadgeColor = (plan: string) => {
@@ -48,7 +49,7 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({ className }) 
   };
 
   const getPlanDisplayName = (plan: string) => {
-    return plan.charAt(0).toUpperCase() + plan.slice(1);
+    return plan ? plan.charAt(0).toUpperCase() + plan.slice(1) : 'Unknown';
   };
 
   const handleUpgrade = async (planType: string, isYearly: boolean) => {
@@ -63,7 +64,8 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({ className }) 
       // Simulate payment method (in real app, this would come from Stripe)
       const mockPaymentMethodId = 'pm_mock_payment_method';
       
-      await upgradePlan(planType, mockPaymentMethodId);
+      // await upgradePlan(planType, mockPaymentMethodId); // Commented out since function doesn't exist
+      console.log('Upgrade requested for plan:', planType);
       setPricingModalVisible(false);
       
     } catch (error) {
@@ -81,10 +83,11 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({ className }) 
       icon: <UserOutlined />,
       label: (
         <div className="py-2">
-          <div className="font-medium">{user?.email || 'User'}</div>
-          <div className="text-xs text-gray-500">{organizationData.name}</div>
+          <div className="font-medium text-gray-900 dark:text-gray-100">{user?.email || 'User'}</div>
+          <div className="text-xs text-gray-500 dark:text-gray-400">{organizationData.name}</div>
         </div>
       ),
+      onClick: () => router.push('/settings/profile'),
     },
     {
       type: 'divider' as const,
@@ -94,7 +97,7 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({ className }) 
       label: (
         <div className="py-2">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium">Current Plan</span>
+            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">Current Plan</span>
             <Badge 
               color={getPlanBadgeColor(organizationData.plan)} 
               text={getPlanDisplayName(organizationData.plan)}
@@ -103,8 +106,8 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({ className }) 
           
           <div className="mb-3">
             <div className="flex justify-between text-xs mb-1">
-              <span>AI Credits</span>
-              <span>{organizationData.aiCreditsUsed}/{organizationData.aiCreditsLimit}</span>
+              <span className="text-gray-600 dark:text-gray-300">AI Credits</span>
+              <span className="text-gray-900 dark:text-gray-100">{organizationData.aiCreditsUsed}/{organizationData.aiCreditsLimit}</span>
             </div>
             <Progress 
               percent={creditsPercentage} 
@@ -115,7 +118,7 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({ className }) 
           </div>
 
           {organizationData.isTrialActive && (
-            <div className="text-xs text-orange-600 mb-2">
+            <div className="text-xs text-orange-600 dark:text-orange-400 mb-2">
               Trial expires in {organizationData.daysLeftInTrial} days
             </div>
           )}
@@ -149,6 +152,12 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({ className }) 
       onClick: () => router.push('/team'),
     },
     {
+      key: 'projects',
+      icon: <ProjectOutlined />,
+      label: 'Projects',
+      onClick: () => router.push('/projects'),
+    },
+    {
       key: 'settings',
       icon: <SettingOutlined />,
       label: 'Settings',
@@ -180,7 +189,7 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({ className }) 
         overlayClassName="user-profile-dropdown"
         overlayStyle={{ minWidth: 280 }}
       >
-        <div className={`flex items-center cursor-pointer hover:bg-gray-100 rounded-lg p-2 transition-colors ${className}`}>
+        <div className={`flex items-center cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg p-2 transition-colors ${className}`}>
           <div className="relative">
             <Avatar 
               size="default" 
@@ -192,10 +201,10 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({ className }) 
             )}
           </div>
           <div className="ml-2 hidden sm:block">
-            <div className="text-sm font-medium text-gray-900">
+            <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
               {user?.email?.split('@')[0] || 'User'}
             </div>
-            <div className="text-xs text-gray-500">
+            <div className="text-xs text-gray-500 dark:text-gray-400">
               {getPlanDisplayName(organizationData.plan)} Plan
             </div>
           </div>

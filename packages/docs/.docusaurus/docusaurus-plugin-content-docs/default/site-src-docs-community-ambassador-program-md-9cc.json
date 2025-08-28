@@ -5,14 +5,14 @@
   "source": "@site/src/docs/community/ambassador-program.md",
   "sourceDirName": "community",
   "slug": "/community/ambassador-program",
-  "permalink": "/docs/community/ambassador-program",
+  "permalink": "/community/ambassador-program",
   "draft": false,
   "unlisted": false,
   "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/community/ambassador-program.md",
   "tags": [],
   "version": "current",
-  "lastUpdatedAt": 1755570184,
-  "formattedLastUpdatedAt": "Aug 19, 2025",
+  "lastUpdatedAt": 1539502055,
+  "formattedLastUpdatedAt": "Oct 14, 2018",
   "frontMatter": {
     "id": "ambassador-program",
     "title": "Ambassador Program",
@@ -21,10 +21,10 @@
   "sidebar": "docs",
   "previous": {
     "title": "Community",
-    "permalink": "/docs/community/"
+    "permalink": "/community/"
   },
   "next": {
     "title": "Bi Weekly Calls",
-    "permalink": "/docs/community/bi-weekly-calls"
+    "permalink": "/community/bi-weekly-calls"
   }
 }

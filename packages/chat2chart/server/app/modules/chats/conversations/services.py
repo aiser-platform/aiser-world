@@ -9,6 +9,7 @@ from app.modules.chats.conversations.schemas import (
 )
 from app.modules.chats.messages.repository import MessageRepository
 import logging
+import uuid
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +36,12 @@ class ConversationService(
         sort_order: str = "desc",
     ) -> SpecificConversationResponseSchema:
         try:
+            # Validate UUID format
+            try:
+                uuid.UUID(conversation_id)
+            except ValueError:
+                raise Exception(f"Invalid conversation ID format: {conversation_id}. Expected UUID format.")
+            
             conversation = await self.repository.get(conversation_id)
             messages = await self.__messages_repository.get_all(
                 offset,
@@ -60,4 +67,40 @@ class ConversationService(
         except Exception as e:
             logger.error(f"Failed to get conversation: {str(e)}")
             raise e
-            # raise Exception("Failed to get conversation")
+
+    async def add_message(self, conversation_id: str, message: dict):
+        """Add a message to a conversation"""
+        try:
+            # Validate UUID format
+            try:
+                uuid.UUID(conversation_id)
+            except ValueError:
+                raise Exception(f"Invalid conversation ID format: {conversation_id}. Expected UUID format.")
+            
+            # Verify conversation exists
+            conversation = await self.repository.get(conversation_id)
+            if not conversation:
+                raise Exception("Conversation not found")
+            
+            # Create message using the message repository
+            message_data = {
+                "conversation_id": conversation_id,
+                "query": message.get("role") == "user" and message.get("content", "") or None,
+                "answer": message.get("role") == "assistant" and message.get("content", "") or None,
+                "status": "completed"
+            }
+            
+            created_message = await self.__messages_repository.create(message_data)
+            
+            # Update conversation metadata if needed
+            if message.get("update_conversation_metadata"):
+                update_data = ConversationUpdateSchema(
+                    json_metadata=message.get("conversation_metadata")
+                )
+                await self.update(conversation_id, update_data)
+            
+            return created_message
+            
+        except Exception as e:
+            logger.error(f"Failed to add message to conversation: {str(e)}")
+            raise e

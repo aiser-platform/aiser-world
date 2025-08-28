@@ -16,5 +16,5 @@ Documentation content will be generated here.
 
 ## Related
 
-- [Getting Started](/docs/getting-started)
-- [Features](/docs/features)
+- [Getting Started](/getting-started)
+- [Features](/features)

@@ -1,7 +1,7 @@
 import { IFileUpload } from '@/app/components/FileUpload/types';
 import { fetchApi } from '@/utils/api';
-import { SendOutlined } from '@ant-design/icons';
-import { Button, Input } from 'antd';
+import { SendOutlined, BarChartOutlined, MessageOutlined, CloudOutlined } from '@ant-design/icons';
+import { Button, Input, Tabs } from 'antd';
 import React from 'react';
 import shortid from 'shortid';
 import {
@@ -14,9 +14,12 @@ import {
     Pagination,
 } from '../../types';
 import ChatMessageBox from './MessageBox';
+import DashboardBuilder from '@/app/components/DashboardBuilder/DashboardBuilder';
+
 import './styles.css';
 
 const { TextArea } = Input;
+const { TabPane } = Tabs;
 const CHAT_LOADING_MESSAGE = 'AI Is Thinking';
 const LIMIT = 10;
 
@@ -385,54 +388,82 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                     {conversation?.title || 'Untitled Conversation'}
                 </div>
             </div>
-            <div className="Loading">{loading && 'Loading...'}</div>
-            <div
-                key={props.id}
-                className="ContainerMessage"
-                ref={containerRef}
-                onScroll={handleScroll}
-            >
-                {/* <ChatMessageBox
-                    id="testing-chart"
-                    query={'Test Chart'}
-                    answer={`<iframe 
-                src="http://localhost:3000/embedded/chart/7cd47e0e-15e2-4a39-a34d-081303ce6241" 
-                title="Example"            
-            />`}
-                /> */}
-                {messageBoxMap}
-            </div>
-            <div className="ChatInput">
-                <TextArea
-                    ref={textAreaRef}
-                    autoSize={{ minRows: 1, maxRows: 6 }}
-                    size="large"
-                    value={prompt}
-                    disabled={chatLoading}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            chatToAI(prompt);
-                        }
-                    }}
-                    autoFocus={true || !chatLoading}
-                />
-                <div
-                    style={{
-                        margin: '4px 8px',
-                    }}
+            
+            <Tabs defaultActiveKey="chat" style={{ height: 'calc(100% - 60px)' }}>
+                <TabPane 
+                    tab={
+                        <span>
+                            <MessageOutlined />
+                            Chat
+                        </span>
+                    } 
+                    key="chat"
                 >
-                    <Button
-                        loading={chatLoading}
-                        onClick={() => {
-                            chatToAI(prompt);
-                        }}
+                    <div className="Loading">{loading && 'Loading...'}</div>
+                    <div
+                        key={props.id}
+                        className="ContainerMessage"
+                        ref={containerRef}
+                        onScroll={handleScroll}
+                        style={{ height: 'calc(100% - 120px)' }}
                     >
-                        <SendOutlined />
-                    </Button>
-                </div>
-            </div>
+                        {messageBoxMap}
+                    </div>
+                    <div className="ChatInput">
+                        <TextArea
+                            ref={textAreaRef}
+                            autoSize={{ minRows: 1, maxRows: 6 }}
+                            size="large"
+                            value={prompt}
+                            disabled={chatLoading}
+                            onChange={(e) => setPrompt(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault();
+                                    chatToAI(prompt);
+                                }
+                            }}
+                            autoFocus={true || !chatLoading}
+                        />
+                        <div
+                            style={{
+                                margin: '4px 8px',
+                            }}
+                        >
+                            <Button
+                                loading={chatLoading}
+                                onClick={() => {
+                                    chatToAI(prompt);
+                                }}
+                            >
+                                <SendOutlined />
+                            </Button>
+                        </div>
+                    </div>
+                </TabPane>
+                
+                <TabPane 
+                    tab={
+                        <span>
+                            <BarChartOutlined />
+                            Dashboard Builder
+                        </span>
+                    } 
+                    key="dashboard"
+                >
+                    <div style={{ padding: '16px', height: 'calc(100% - 32px)', overflow: 'auto' }}>
+                        <DashboardBuilder 
+                            dataSources={[]} // TODO: Get data sources from props
+                            onDashboardSave={(dashboard) => {
+                                console.log('Dashboard saved:', dashboard);
+                                // TODO: Save dashboard to backend
+                            }}
+                        />
+                    </div>
+                </TabPane>
+                
+
+            </Tabs>
         </div>
     );
 };

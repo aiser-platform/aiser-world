@@ -5,14 +5,14 @@
   "source": "@site/src/docs/self-host/docker-compose.md",
   "sourceDirName": "self-host",
   "slug": "/self-host/docker-compose",
-  "permalink": "/docs/self-host/docker-compose",
+  "permalink": "/self-host/docker-compose",
   "draft": false,
   "unlisted": false,
   "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/self-host/docker-compose.md",
   "tags": [],
   "version": "current",
-  "lastUpdatedAt": 1755622594,
-  "formattedLastUpdatedAt": "Aug 19, 2025",
+  "lastUpdatedAt": 1539502055,
+  "formattedLastUpdatedAt": "Oct 14, 2018",
   "frontMatter": {
     "id": "docker-compose",
     "title": "Docker Compose Deployment",
@@ -22,10 +22,10 @@
   "sidebar": "docs",
   "previous": {
     "title": "Self-Host & Enterprise",
-    "permalink": "/docs/self-host/"
+    "permalink": "/self-host/"
   },
   "next": {
     "title": "Backups",
-    "permalink": "/docs/self-host/backups"
+    "permalink": "/self-host/backups"
   }
 }

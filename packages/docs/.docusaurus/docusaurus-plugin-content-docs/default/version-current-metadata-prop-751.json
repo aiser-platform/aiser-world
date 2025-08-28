@@ -12,7 +12,7 @@
       {
         "type": "link",
         "label": "Home",
-        "href": "/docs/",
+        "href": "/",
         "docId": "index",
         "unlisted": false
       },
@@ -24,35 +24,35 @@
           {
             "type": "link",
             "label": "Getting Started",
-            "href": "/docs/getting-started/",
-            "docId": "getting-started/getting-started-index",
+            "href": "/getting-started/",
+            "docId": "getting-started/getting-started",
             "unlisted": false
           },
           {
             "type": "link",
             "label": "Docker Quick Start",
-            "href": "/docs/getting-started/quick-start-docker",
+            "href": "/getting-started/quick-start-docker",
             "docId": "getting-started/quick-start-docker",
             "unlisted": false
           },
           {
             "type": "link",
             "label": "First Chart",
-            "href": "/docs/getting-started/first-chart",
+            "href": "/getting-started/first-chart",
             "docId": "getting-started/first-chart",
             "unlisted": false
           },
           {
             "type": "link",
             "label": "Demo Walkthrough",
-            "href": "/docs/getting-started/demo-walkthrough",
+            "href": "/getting-started/demo-walkthrough",
             "docId": "getting-started/demo-walkthrough",
             "unlisted": false
           },
           {
             "type": "link",
             "label": "FAQ",
-            "href": "/docs/getting-started/faq",
+            "href": "/getting-started/faq",
             "docId": "getting-started/faq",
             "unlisted": false
           }
@@ -66,35 +66,35 @@
           {
             "type": "link",
             "label": "Self-Host & Enterprise",
-            "href": "/docs/self-host/",
+            "href": "/self-host/",
             "docId": "self-host/self-host-index",
             "unlisted": false
           },
           {
             "type": "link",
             "label": "Docker Compose",
-            "href": "/docs/self-host/docker-compose",
+            "href": "/self-host/docker-compose",
             "docId": "self-host/docker-compose",
             "unlisted": false
           },
           {
             "type": "link",
             "label": "Backups",
-            "href": "/docs/self-host/backups",
+            "href": "/self-host/backups",
             "docId": "self-host/backups",
             "unlisted": false
           },
           {
             "type": "link",
             "label": "Config Reference",
-            "href": "/docs/self-host/config-reference",
+            "href": "/self-host/config-reference",
             "docId": "self-host/config-reference",
             "unlisted": false
           },
           {
             "type": "link",
             "label": "Ssl Certificates",
-            "href": "/docs/self-host/ssl-certificates",
+            "href": "/self-host/ssl-certificates",
             "docId": "self-host/ssl-certificates",
             "unlisted": false
           }
@@ -109,119 +109,119 @@
           {
             "type": "link",
             "label": "AI Overview",
-            "href": "/docs/features/ai-overview",
+            "href": "/features/ai-overview",
             "docId": "features/ai-overview",
             "unlisted": false
           },
           {
             "type": "link",
             "label": "Agents",
-            "href": "/docs/features/agents",
+            "href": "/features/agents",
             "docId": "features/agents",
             "unlisted": false
           },
           {
             "type": "link",
             "label": "Bar Charts",
-            "href": "/docs/features/bar-charts",
+            "href": "/features/bar-charts",
             "docId": "features/bar-charts",
             "unlisted": false
           },
           {
             "type": "link",
             "label": "Charts Overview",
-            "href": "/docs/features/charts-overview",
+            "href": "/features/charts-overview",
             "docId": "features/charts-overview",
             "unlisted": false
           },
           {
             "type": "link",
             "label": "Conversation Memory",
-            "href": "/docs/features/conversation-memory",
+            "href": "/features/conversation-memory",
             "docId": "features/conversation-memory",
             "unlisted": false
           },
           {
             "type": "link",
             "label": "Csv Excel",
-            "href": "/docs/features/csv-excel",
+            "href": "/features/csv-excel",
             "docId": "features/csv-excel",
             "unlisted": false
           },
           {
             "type": "link",
             "label": "Custom Prompts",
-            "href": "/docs/features/custom-prompts",
+            "href": "/features/custom-prompts",
             "docId": "features/custom-prompts",
             "unlisted": false
           },
           {
             "type": "link",
             "label": "Data Sources Overview",
-            "href": "/docs/features/data-sources-overview",
+            "href": "/features/data-sources-overview",
             "docId": "features/data-sources-overview",
             "unlisted": false
           },
           {
             "type": "link",
             "label": "Databases",
-            "href": "/docs/features/databases",
+            "href": "/features/databases",
             "docId": "features/databases",
             "unlisted": false
           },
           {
             "type": "link",
             "label": "Deep Analysis",
-            "href": "/docs/features/deep-analysis",
+            "href": "/features/deep-analysis",
             "docId": "features/deep-analysis",
             "unlisted": false
           },
           {
             "type": "link",
             "label": "Echarts Integration",
-            "href": "/docs/features/echarts-integration",
+            "href": "/features/echarts-integration",
             "docId": "features/echarts-integration",
             "unlisted": false
           },
           {
             "type": "link",
             "label": "Heatmaps",
-            "href": "/docs/features/heatmaps",
+            "href": "/features/heatmaps",
             "docId": "features/heatmaps",
             "unlisted": false
           },
           {
             "type": "link",
             "label": "Line Charts",
-            "href": "/docs/features/line-charts",
+            "href": "/features/line-charts",
             "docId": "features/line-charts",
             "unlisted": false
           },
           {
             "type": "link",
             "label": "Natural Language Queries",
-            "href": "/docs/features/natural-language-queries",
+            "href": "/features/natural-language-queries",
             "docId": "features/natural-language-queries",
             "unlisted": false
           },
           {
             "type": "link",
             "label": "Real Time Streams",
-            "href": "/docs/features/real-time-streams",
+            "href": "/features/real-time-streams",
             "docId": "features/real-time-streams",
             "unlisted": false
           },
           {
             "type": "link",
             "label": "Warehouses",
-            "href": "/docs/features/warehouses",
+            "href": "/features/warehouses",
             "docId": "features/warehouses",
             "unlisted": false
           },
           {
             "type": "link",
             "label": "What If Simulations",
-            "href": "/docs/features/what-if-simulations",
+            "href": "/features/what-if-simulations",
             "docId": "features/what-if-simulations",
             "unlisted": false
           }
@@ -237,7 +237,7 @@
           {
             "type": "link",
             "label": "Security Overview",
-            "href": "/docs/security/",
+            "href": "/security/",
             "docId": "security/security-overview",
             "unlisted": false
           }
@@ -252,7 +252,7 @@
           {
             "type": "link",
             "label": "Performance Overview",
-            "href": "/docs/performance/",
+            "href": "/performance/",
             "docId": "performance/performance-overview",
             "unlisted": false
           }
@@ -267,42 +267,42 @@
           {
             "type": "link",
             "label": "Developer Guide",
-            "href": "/docs/developer/",
+            "href": "/developer/",
             "docId": "developer/developer-index",
             "unlisted": false
           },
           {
             "type": "link",
             "label": "Architecture",
-            "href": "/docs/developer/architecture",
+            "href": "/developer/architecture",
             "docId": "developer/architecture",
             "unlisted": false
           },
           {
             "type": "link",
             "label": "Local Dev",
-            "href": "/docs/developer/local-dev",
+            "href": "/developer/local-dev",
             "docId": "developer/local-dev",
             "unlisted": false
           },
           {
             "type": "link",
             "label": "Plugin Architecture",
-            "href": "/docs/developer/plugin-architecture",
+            "href": "/developer/plugin-architecture",
             "docId": "developer/plugin-architecture",
             "unlisted": false
           },
           {
             "type": "link",
             "label": "Release Process",
-            "href": "/docs/developer/release-process",
+            "href": "/developer/release-process",
             "docId": "developer/release-process",
             "unlisted": false
           },
           {
             "type": "link",
             "label": "Writing Tests",
-            "href": "/docs/developer/writing-tests",
+            "href": "/developer/writing-tests",
             "docId": "developer/writing-tests",
             "unlisted": false
           }
@@ -317,42 +317,42 @@
           {
             "type": "link",
             "label": "Community",
-            "href": "/docs/community/",
+            "href": "/community/",
             "docId": "community/community-index",
             "unlisted": false
           },
           {
             "type": "link",
             "label": "Ambassador Program",
-            "href": "/docs/community/ambassador-program",
+            "href": "/community/ambassador-program",
             "docId": "community/ambassador-program",
             "unlisted": false
           },
           {
             "type": "link",
             "label": "Bi Weekly Calls",
-            "href": "/docs/community/bi-weekly-calls",
+            "href": "/community/bi-weekly-calls",
             "docId": "community/bi-weekly-calls",
             "unlisted": false
           },
           {
             "type": "link",
             "label": "Code Of Conduct",
-            "href": "/docs/community/code-of-conduct",
+            "href": "/community/code-of-conduct",
             "docId": "community/code-of-conduct",
             "unlisted": false
           },
           {
             "type": "link",
             "label": "Contributing",
-            "href": "/docs/community/contributing",
+            "href": "/community/contributing",
             "docId": "community/contributing",
             "unlisted": false
           },
           {
             "type": "link",
             "label": "Roadmap",
-            "href": "/docs/community/roadmap",
+            "href": "/community/roadmap",
             "docId": "community/roadmap",
             "unlisted": false
           }
@@ -367,14 +367,14 @@
           {
             "type": "link",
             "label": "API Reference",
-            "href": "/docs/reference/api-reference",
+            "href": "/reference/api-reference",
             "docId": "reference/api-reference",
             "unlisted": false
           },
           {
             "type": "link",
             "label": "Configuration",
-            "href": "/docs/reference/config-reference",
+            "href": "/reference/config-reference",
             "docId": "reference/config-reference",
             "unlisted": false
           }
@@ -389,7 +389,7 @@
           {
             "type": "link",
             "label": "Troubleshooting Overview",
-            "href": "/docs/troubleshooting/",
+            "href": "/troubleshooting/",
             "docId": "troubleshooting/troubleshooting-overview",
             "unlisted": false
           }
@@ -537,6 +537,11 @@
       "description": "Overview",
       "sidebar": "docs"
     },
+    "features/features": {
+      "id": "features/features",
+      "title": "Features Overview",
+      "description": "Complete overview of Aiser Platform features and capabilities"
+    },
     "features/heatmaps": {
       "id": "features/heatmaps",
       "title": "Heatmaps",
@@ -591,10 +596,10 @@
       "description": "Experience the power of AI-powered analytics by creating your first chart in just 2 minutes",
       "sidebar": "docs"
     },
-    "getting-started/getting-started-index": {
-      "id": "getting-started/getting-started-index",
-      "title": "Welcome to Aiser Platform",
-      "description": "Get started with Aiser Platform - the AI-first business intelligence platform that transforms how you interact with data",
+    "getting-started/getting-started": {
+      "id": "getting-started/getting-started",
+      "title": "Getting Started",
+      "description": "Quick start guide for Aiser Platform",
       "sidebar": "docs"
     },
     "getting-started/quick-start-docker": {

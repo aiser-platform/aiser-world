@@ -5,14 +5,14 @@
   "source": "@site/src/docs/features/charts-overview.md",
   "sourceDirName": "features",
   "slug": "/features/charts-overview",
-  "permalink": "/docs/features/charts-overview",
+  "permalink": "/features/charts-overview",
   "draft": false,
   "unlisted": false,
   "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/features/charts-overview.md",
   "tags": [],
   "version": "current",
-  "lastUpdatedAt": 1755570184,
-  "formattedLastUpdatedAt": "Aug 19, 2025",
+  "lastUpdatedAt": 1539502055,
+  "formattedLastUpdatedAt": "Oct 14, 2018",
   "frontMatter": {
     "id": "charts-overview",
     "title": "Charts Overview",
@@ -21,10 +21,10 @@
   "sidebar": "docs",
   "previous": {
     "title": "Bar Charts",
-    "permalink": "/docs/features/bar-charts"
+    "permalink": "/features/bar-charts"
   },
   "next": {
     "title": "Conversation Memory",
-    "permalink": "/docs/features/conversation-memory"
+    "permalink": "/features/conversation-memory"
   }
 }

@@ -5,14 +5,14 @@
   "source": "@site/src/docs/reference/config-reference.md",
   "sourceDirName": "reference",
   "slug": "/reference/config-reference",
-  "permalink": "/docs/reference/config-reference",
+  "permalink": "/reference/config-reference",
   "draft": false,
   "unlisted": false,
   "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/reference/config-reference.md",
   "tags": [],
   "version": "current",
-  "lastUpdatedAt": 1755622594,
-  "formattedLastUpdatedAt": "Aug 19, 2025",
+  "lastUpdatedAt": 1539502055,
+  "formattedLastUpdatedAt": "Oct 14, 2018",
   "frontMatter": {
     "id": "config-reference",
     "title": "Configuration Reference",
@@ -22,10 +22,10 @@
   "sidebar": "docs",
   "previous": {
     "title": "API Reference",
-    "permalink": "/docs/reference/api-reference"
+    "permalink": "/reference/api-reference"
   },
   "next": {
     "title": "Troubleshooting Overview",
-    "permalink": "/docs/troubleshooting/"
+    "permalink": "/troubleshooting/"
   }
 }

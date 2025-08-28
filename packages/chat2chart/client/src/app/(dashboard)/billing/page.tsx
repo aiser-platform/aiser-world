@@ -82,7 +82,7 @@ const BillingPage: React.FC = React.memo(() => {
             key: 'status',
             render: (status: string) => (
                 <Tag color={status === 'paid' ? 'green' : 'orange'}>
-                    {status.charAt(0).toUpperCase() + status.slice(1)}
+                    {status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Unknown'}
                 </Tag>
             )
         },
@@ -130,7 +130,7 @@ const BillingPage: React.FC = React.memo(() => {
                             />
                             <Statistic
                                 title="Plan Type"
-                                value={billingData.currentPlan.toUpperCase()}
+                                value={billingData.currentPlan?.toUpperCase() || 'UNKNOWN'}
                                 valueStyle={{ color: '#1890ff' }}
                             />
                         </Space>

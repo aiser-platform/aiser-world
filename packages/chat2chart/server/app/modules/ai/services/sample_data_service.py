@@ -11,6 +11,24 @@ from typing import Dict, List, Any, Optional
 import pandas as pd
 import io
 
+# Helper function to convert numpy types to Python types
+def _convert_numpy_types(obj):
+    """Convert numpy types to Python types for JSON serialization"""
+    if isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, np.bool_):
+        return bool(obj)
+    elif isinstance(obj, dict):
+        return {key: _convert_numpy_types(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [_convert_numpy_types(item) for item in obj]
+    else:
+        return obj
+
 class SampleDataService:
     """Service for generating realistic sample datasets for AI analysis"""
     
@@ -30,13 +48,16 @@ class SampleDataService:
         generator_func = self.sample_datasets[dataset_type]
         data = generator_func()
         
+        # Convert numpy types to Python types for JSON serialization
+        converted_data = _convert_numpy_types(data)
+        
         return {
             "success": True,
             "dataset_type": dataset_type,
-            "data": data,
-            "summary": self._generate_dataset_summary(dataset_type, data),
+            "data": converted_data,
+            "summary": _convert_numpy_types(self._generate_dataset_summary(dataset_type, data)),
             "sample_queries": self._get_sample_queries(dataset_type),
-            "echarts_examples": self._get_echarts_examples(dataset_type)
+            "echarts_examples": _convert_numpy_types(self._get_echarts_examples(dataset_type))
         }
     
     def _generate_bank_data(self) -> Dict[str, Any]:

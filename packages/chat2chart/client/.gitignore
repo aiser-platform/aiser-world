@@ -34,3 +34,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Permission fix script (temporary)
+fix-permissions.sh
+
+# Cache directories
+.cache/
+node_modules/.cache/

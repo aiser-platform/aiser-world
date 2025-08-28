@@ -31,6 +31,7 @@ import AiserLogo from '@/app/components/Logo/AiserLogo';
 import { apiService } from '@/services/apiService';
 import UniversalDataSourceModal from '@/app/components/UniversalDataSourceModal/UniversalDataSourceModal';
 import { IFileUpload } from '@/app/components/FileUpload/types';
+import { getBackendUrlForApi } from '@/utils/backendUrl';
 
 const { Title, Text } = Typography;
 
@@ -66,7 +67,7 @@ const DataSourcesPage: React.FC = () => {
     const loadDataSources = async () => {
         setLoading(true);
         try {
-            const response = await fetch('http://localhost:8000/data/sources');
+            const response = await fetch(`${getBackendUrlForApi()}/data/sources`);
             const result = await response.json();
             
             if (result.success) {
@@ -116,7 +117,7 @@ const DataSourcesPage: React.FC = () => {
 
     const handleDeleteDataSource = async (id: string) => {
         try {
-            const response = await fetch(`http://localhost:8000/data/sources/${id}`, {
+            const response = await fetch(`${getBackendUrlForApi()}/data/sources/${id}`, {
                 method: 'DELETE'
             });
             
@@ -216,7 +217,7 @@ const DataSourcesPage: React.FC = () => {
             key: 'type',
             render: (type: string) => (
                 <Tag color={type === 'file' ? 'blue' : 'green'}>
-                    {type.toUpperCase()}
+                    {type?.toUpperCase() || 'UNKNOWN'}
                 </Tag>
             )
         },
@@ -224,9 +225,9 @@ const DataSourcesPage: React.FC = () => {
             title: 'Status',
             dataIndex: 'status',
             key: 'status',
-            render: (status: string) => {
+            render: (status: 'connected' | 'disconnected' | 'error') => {
                 const color = status === 'connected' ? 'success' : status === 'error' ? 'error' : 'warning';
-                return <Tag color={color}>{status.toUpperCase()}</Tag>;
+                return <Tag color={color}>{status?.toUpperCase() || 'UNKNOWN'}</Tag>;
             }
         },
         {
@@ -290,7 +291,7 @@ const DataSourcesPage: React.FC = () => {
     ];
 
     return (
-        <div style={{ padding: '24px' }}>
+        <div style={{ padding: '24px', height: '100vh', overflowY: 'auto' }}>
             {/* Header */}
             <div style={{ marginBottom: '24px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -476,7 +477,7 @@ const DataSourcesPage: React.FC = () => {
                                 <Text strong>Type:</Text>
                                 <div>
                                     <Tag color={selectedDataSource.type === 'file' ? 'blue' : 'green'}>
-                                        {selectedDataSource.type.toUpperCase()}
+                                        {selectedDataSource.type?.toUpperCase() || 'UNKNOWN'}
                                     </Tag>
                                 </div>
                             </Col>
@@ -484,7 +485,7 @@ const DataSourcesPage: React.FC = () => {
                                 <Text strong>Status:</Text>
                                 <div>
                                     <Tag color={selectedDataSource.status === 'connected' ? 'success' : 'error'}>
-                                        {selectedDataSource.status.toUpperCase()}
+                                        {selectedDataSource.status?.toUpperCase() || 'UNKNOWN'}
                                     </Tag>
                                 </div>
                             </Col>

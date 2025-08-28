@@ -5,14 +5,14 @@
   "source": "@site/src/docs/community/index.md",
   "sourceDirName": "community",
   "slug": "/community/",
-  "permalink": "/docs/community/",
+  "permalink": "/community/",
   "draft": false,
   "unlisted": false,
   "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/community/index.md",
   "tags": [],
   "version": "current",
-  "lastUpdatedAt": 1755622594,
-  "formattedLastUpdatedAt": "Aug 19, 2025",
+  "lastUpdatedAt": 1539502055,
+  "formattedLastUpdatedAt": "Oct 14, 2018",
   "frontMatter": {
     "id": "community-index",
     "title": "Community & Contributing",
@@ -22,10 +22,10 @@
   "sidebar": "docs",
   "previous": {
     "title": "Writing Tests",
-    "permalink": "/docs/developer/writing-tests"
+    "permalink": "/developer/writing-tests"
   },
   "next": {
     "title": "Ambassador Program",
-    "permalink": "/docs/community/ambassador-program"
+    "permalink": "/community/ambassador-program"
   }
 }

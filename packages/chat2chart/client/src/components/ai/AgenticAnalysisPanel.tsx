@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Input, Button, Select, Space, Divider, Typography, Alert, Spin, Tag, Progress, Collapse } from 'antd';
-import { RobotOutlined, BrainOutlined, BulbOutlined, CheckCircleOutlined, ClockCircleOutlined } from '@ant-design/icons';
+import { RobotOutlined, BulbOutlined, CheckCircleOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import { unifiedAIService } from '@/services/unifiedAIService';
 
 const { TextArea } = Input;
@@ -160,7 +160,7 @@ const AgenticAnalysisPanel: React.FC = () => {
               <div>
                 <Text strong>Impact Level:</Text>
                 <Tag color={insights.business_impact.impact_level === 'high' ? 'red' : 'orange'} className="ml-2">
-                  {insights.business_impact.impact_level.toUpperCase()}
+                  {insights.business_impact.impact_level?.toUpperCase() || 'UNKNOWN'}
                 </Tag>
               </div>
               <div>
@@ -212,7 +212,7 @@ const AgenticAnalysisPanel: React.FC = () => {
                   <Paragraph className="mb-2">{rec.description}</Paragraph>
                   <div className="flex items-center space-x-4 text-sm">
                     <Tag color={rec.priority === 'high' ? 'red' : rec.priority === 'medium' ? 'orange' : 'green'}>
-                      {rec.priority.toUpperCase()}
+                      {rec.priority?.toUpperCase() || 'UNKNOWN'}
                     </Tag>
                     <Tag color="blue">{rec.effort}</Tag>
                     <div className="flex items-center">
@@ -251,7 +251,7 @@ const AgenticAnalysisPanel: React.FC = () => {
             <div>
               <Text strong>Priority:</Text>
               <Tag color={actionPlan.priority === 'high' ? 'red' : 'orange'} className="ml-2">
-                {actionPlan.priority.toUpperCase()}
+                {actionPlan.priority?.toUpperCase() || 'UNKNOWN'}
               </Tag>
             </div>
 
@@ -437,7 +437,7 @@ const AgenticAnalysisPanel: React.FC = () => {
           <Button
             type="primary"
             size="large"
-            icon={<BrainOutlined />}
+            icon={<BulbOutlined />}
             onClick={handleAnalysis}
             loading={isLoading}
             disabled={!request.query.trim()}

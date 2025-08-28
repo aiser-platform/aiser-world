@@ -10,6 +10,7 @@ import {
     CreditCardOutlined,
     UserOutlined,
     ExperimentOutlined,
+    DashboardOutlined,
 } from '@ant-design/icons';
 import { Button, Layout, Menu, MenuProps } from 'antd';
 import { useRouter } from "next/navigation";
@@ -49,6 +50,11 @@ const Navigation: React.FC<NavigationProps> = (props: NavigationProps) => {
             label: 'Chart Builder',
         },
         {
+            key: 'dashboard-builder',
+            icon: <DashboardOutlined />,
+            label: 'Dashboard Builder',
+        },
+        {
             key: 'data',
             icon: <DatabaseOutlined />,
             label: 'Data',
@@ -76,6 +82,9 @@ const Navigation: React.FC<NavigationProps> = (props: NavigationProps) => {
                 break;
             case 'chart-builder':
                 router.push('/chart-builder');
+                break;
+            case 'dashboard-builder':
+                router.push('/dashboard-builder');
                 break;
             case 'data':
                 router.push('/data');

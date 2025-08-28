@@ -173,7 +173,7 @@ const CubeIntegrationTest: React.FC = () => {
 
                     {cubeStatus ? (
                         <Alert
-                            message={`Cube.js Server: ${cubeStatus.status.toUpperCase()}`}
+                            message={`Cube.js Server: ${cubeStatus.status?.toUpperCase() || 'UNKNOWN'}`}
                             description={
                                 <div>
                                     {cubeStatus.status === 'connected' && (

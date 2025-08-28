@@ -5,7 +5,7 @@ import { Card, Row, Col, Typography, Form, Input, Button, Select, Switch, TimePi
 import { 
     GlobalOutlined, 
     BellOutlined, 
-    SecurityOutlined,
+    SecurityScanOutlined,
     SaveOutlined,
     ReloadOutlined
 } from '@ant-design/icons';

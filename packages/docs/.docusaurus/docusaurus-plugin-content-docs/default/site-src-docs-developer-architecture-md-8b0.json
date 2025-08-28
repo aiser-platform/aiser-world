@@ -5,14 +5,14 @@
   "source": "@site/src/docs/developer/architecture.md",
   "sourceDirName": "developer",
   "slug": "/developer/architecture",
-  "permalink": "/docs/developer/architecture",
+  "permalink": "/developer/architecture",
   "draft": false,
   "unlisted": false,
   "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/developer/architecture.md",
   "tags": [],
   "version": "current",
-  "lastUpdatedAt": 1755570184,
-  "formattedLastUpdatedAt": "Aug 19, 2025",
+  "lastUpdatedAt": 1539502055,
+  "formattedLastUpdatedAt": "Oct 14, 2018",
   "frontMatter": {
     "id": "architecture",
     "title": "Architecture",
@@ -21,10 +21,10 @@
   "sidebar": "docs",
   "previous": {
     "title": "Developer Guide",
-    "permalink": "/docs/developer/"
+    "permalink": "/developer/"
   },
   "next": {
     "title": "Local Dev",
-    "permalink": "/docs/developer/local-dev"
+    "permalink": "/developer/local-dev"
   }
 }

@@ -121,7 +121,7 @@ export default function TeamManagementPage() {
             key: 'role',
             render: (role: string) => (
                 <Tag color={getRoleColor(role)}>
-                    {role.charAt(0).toUpperCase() + role.slice(1)}
+                    {role ? role.charAt(0).toUpperCase() + role.slice(1) : 'Unknown'}
                 </Tag>
             ),
         },
@@ -131,7 +131,7 @@ export default function TeamManagementPage() {
             key: 'status',
             render: (status: string) => (
                 <Tag color={getStatusColor(status)}>
-                    {status.charAt(0).toUpperCase() + status.slice(1)}
+                    {status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Unknown'}
                 </Tag>
             ),
         },

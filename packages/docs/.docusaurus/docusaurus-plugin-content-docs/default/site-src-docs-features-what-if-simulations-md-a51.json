@@ -5,14 +5,14 @@
   "source": "@site/src/docs/features/what-if-simulations.md",
   "sourceDirName": "features",
   "slug": "/features/what-if-simulations",
-  "permalink": "/docs/features/what-if-simulations",
+  "permalink": "/features/what-if-simulations",
   "draft": false,
   "unlisted": false,
   "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/features/what-if-simulations.md",
   "tags": [],
   "version": "current",
-  "lastUpdatedAt": 1755570184,
-  "formattedLastUpdatedAt": "Aug 19, 2025",
+  "lastUpdatedAt": 1539502055,
+  "formattedLastUpdatedAt": "Oct 14, 2018",
   "frontMatter": {
     "id": "what-if-simulations",
     "title": "What If Simulations",
@@ -21,10 +21,10 @@
   "sidebar": "docs",
   "previous": {
     "title": "Warehouses",
-    "permalink": "/docs/features/warehouses"
+    "permalink": "/features/warehouses"
   },
   "next": {
     "title": "Security Overview",
-    "permalink": "/docs/security/"
+    "permalink": "/security/"
   }
 }

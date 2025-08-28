@@ -11,7 +11,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3005
-      - BASE_URL=/docs/
+      - BASE_URL=/
       - CUSTOM_DOMAIN=aiser-docs.dataticon.com
     volumes:
       - ./src:/app/src:ro
@@ -39,7 +39,7 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=3005
-      - BASE_URL=/docs/
+      - BASE_URL=/
       - DEBUG=true
       - WATCH=true
     volumes:

@@ -5,12 +5,14 @@
   "source": "@site/src/docs/index.md",
   "sourceDirName": ".",
   "slug": "/",
-  "permalink": "/docs/",
+  "permalink": "/",
   "draft": false,
   "unlisted": false,
   "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/index.md",
   "tags": [],
   "version": "current",
+  "lastUpdatedAt": 1539502055,
+  "formattedLastUpdatedAt": "Oct 14, 2018",
   "frontMatter": {
     "id": "index",
     "title": "Aiser Platform Documentation",
@@ -20,6 +22,6 @@
   "sidebar": "docs",
   "next": {
     "title": "Getting Started",
-    "permalink": "/docs/getting-started/"
+    "permalink": "/getting-started/"
   }
 }

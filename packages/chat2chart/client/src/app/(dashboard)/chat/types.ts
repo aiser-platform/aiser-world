@@ -131,6 +131,18 @@ export class IChatMessage {
     updated_at?: Date;
 
     chartData?: any; // For storing chart configuration data
+    
+    isStreaming?: boolean; // For streaming responses
+    
+    executionMetadata?: any; // For storing execution metadata, SQL queries, etc.
+
+    // Additional properties for backend persistence
+    content?: string; // Message content (query or answer)
+    role?: 'user' | 'assistant' | 'system'; // Message role
+    timestamp?: string; // ISO timestamp
+    messageType?: string; // Type of message (text, chart, etc.)
+    saved?: boolean; // Whether message is saved to backend
+    metadata?: any; // Additional metadata
 
     constructor(props: IChatMessage) {
         this.id = props.id;
@@ -139,6 +151,15 @@ export class IChatMessage {
         this.feedback = props.feedback;
         this.query = props.query;
         this.answer = props.answer;
+        this.chartData = props.chartData;
+        this.isStreaming = props.isStreaming;
+        this.executionMetadata = props.executionMetadata;
+        this.content = props.content;
+        this.role = props.role;
+        this.timestamp = props.timestamp;
+        this.messageType = props.messageType;
+        this.saved = props.saved;
+        this.metadata = props.metadata;
     }
 }
 

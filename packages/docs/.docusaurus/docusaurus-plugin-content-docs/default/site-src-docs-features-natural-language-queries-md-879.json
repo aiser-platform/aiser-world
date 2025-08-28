@@ -5,14 +5,14 @@
   "source": "@site/src/docs/features/natural-language-queries.md",
   "sourceDirName": "features",
   "slug": "/features/natural-language-queries",
-  "permalink": "/docs/features/natural-language-queries",
+  "permalink": "/features/natural-language-queries",
   "draft": false,
   "unlisted": false,
   "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/features/natural-language-queries.md",
   "tags": [],
   "version": "current",
-  "lastUpdatedAt": 1755570184,
-  "formattedLastUpdatedAt": "Aug 19, 2025",
+  "lastUpdatedAt": 1539502055,
+  "formattedLastUpdatedAt": "Oct 14, 2018",
   "frontMatter": {
     "id": "natural-language-queries",
     "title": "Natural Language Queries",
@@ -21,10 +21,10 @@
   "sidebar": "docs",
   "previous": {
     "title": "Line Charts",
-    "permalink": "/docs/features/line-charts"
+    "permalink": "/features/line-charts"
   },
   "next": {
     "title": "Real Time Streams",
-    "permalink": "/docs/features/real-time-streams"
+    "permalink": "/features/real-time-streams"
   }
 }

@@ -182,21 +182,56 @@ class CubeConnectorService:
                 'error': str(error)
             }
 
-    async def test_cube_connection(
-        self, 
-        connection_config: Dict[str, Any], 
-        tenant_id: str = 'default'
-    ) -> Dict[str, Any]:
+    async def test_connection(self, connection_config: Dict[str, Any], tenant_id: str = 'default') -> Dict[str, Any]:
         """Test database connection through Cube.js"""
         try:
-            cube_env = self._generate_cube_env_config(connection_config, tenant_id)
-            return await self._test_cube_connection(cube_env, tenant_id)
+            logger.info(f"🧪 Testing Cube.js connection: {connection_config.get('type')}")
             
-        except Exception as error:
-            logger.error(f"❌ Cube.js connection test failed: {str(error)}")
+            db_type = connection_config.get('type')
+            if db_type not in self.supported_databases:
+                return {
+                    'success': False,
+                    'error': f'Unsupported database type: {db_type}'
+                }
+            
+            # Validate connection configuration
+            try:
+                self._validate_connection_config(connection_config, db_type)
+            except ValueError as e:
+                return {
+                    'success': False,
+                    'error': str(e)
+                }
+            
+            # Generate Cube.js environment variables for this connection
+            cube_env = self._generate_cube_env_config(connection_config, tenant_id)
+            
+            # Test connection through Cube.js
+            connection_test = await self._test_cube_connection(cube_env, tenant_id)
+            
+            if connection_test['success']:
+                return {
+                    'success': True,
+                    'connection_info': {
+                        'type': db_type,
+                        'host': connection_config.get('host'),
+                        'port': connection_config.get('port'),
+                        'database': connection_config.get('database'),
+                        'status': 'connected',
+                        'driver': self.supported_databases[db_type]['driver']
+                    }
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': connection_test.get('error', 'Connection test failed')
+                }
+                
+        except Exception as e:
+            logger.error(f"❌ Connection test failed: {str(e)}")
             return {
                 'success': False,
-                'error': str(error)
+                'error': f'Connection test failed: {str(e)}'
             }
 
     def get_supported_databases(self) -> Dict[str, Any]:

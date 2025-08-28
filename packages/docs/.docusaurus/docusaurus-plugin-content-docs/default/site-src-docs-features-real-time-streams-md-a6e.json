@@ -5,14 +5,14 @@
   "source": "@site/src/docs/features/real-time-streams.md",
   "sourceDirName": "features",
   "slug": "/features/real-time-streams",
-  "permalink": "/docs/features/real-time-streams",
+  "permalink": "/features/real-time-streams",
   "draft": false,
   "unlisted": false,
   "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/features/real-time-streams.md",
   "tags": [],
   "version": "current",
-  "lastUpdatedAt": 1755570184,
-  "formattedLastUpdatedAt": "Aug 19, 2025",
+  "lastUpdatedAt": 1539502055,
+  "formattedLastUpdatedAt": "Oct 14, 2018",
   "frontMatter": {
     "id": "real-time-streams",
     "title": "Real Time Streams",
@@ -21,10 +21,10 @@
   "sidebar": "docs",
   "previous": {
     "title": "Natural Language Queries",
-    "permalink": "/docs/features/natural-language-queries"
+    "permalink": "/features/natural-language-queries"
   },
   "next": {
     "title": "Warehouses",
-    "permalink": "/docs/features/warehouses"
+    "permalink": "/features/warehouses"
   }
 }

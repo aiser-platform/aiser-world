@@ -5,14 +5,14 @@
   "source": "@site/src/docs/self-host/config-reference.md",
   "sourceDirName": "self-host",
   "slug": "/self-host/config-reference",
-  "permalink": "/docs/self-host/config-reference",
+  "permalink": "/self-host/config-reference",
   "draft": false,
   "unlisted": false,
   "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/self-host/config-reference.md",
   "tags": [],
   "version": "current",
-  "lastUpdatedAt": 1755570184,
-  "formattedLastUpdatedAt": "Aug 19, 2025",
+  "lastUpdatedAt": 1539502055,
+  "formattedLastUpdatedAt": "Oct 14, 2018",
   "frontMatter": {
     "id": "config-reference",
     "title": "Config Reference",
@@ -21,10 +21,10 @@
   "sidebar": "docs",
   "previous": {
     "title": "Backups",
-    "permalink": "/docs/self-host/backups"
+    "permalink": "/self-host/backups"
   },
   "next": {
     "title": "Ssl Certificates",
-    "permalink": "/docs/self-host/ssl-certificates"
+    "permalink": "/self-host/ssl-certificates"
   }
 }

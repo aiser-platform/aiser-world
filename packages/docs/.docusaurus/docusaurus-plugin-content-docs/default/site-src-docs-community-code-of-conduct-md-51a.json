@@ -5,14 +5,14 @@
   "source": "@site/src/docs/community/code-of-conduct.md",
   "sourceDirName": "community",
   "slug": "/community/code-of-conduct",
-  "permalink": "/docs/community/code-of-conduct",
+  "permalink": "/community/code-of-conduct",
   "draft": false,
   "unlisted": false,
   "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/community/code-of-conduct.md",
   "tags": [],
   "version": "current",
-  "lastUpdatedAt": 1755570184,
-  "formattedLastUpdatedAt": "Aug 19, 2025",
+  "lastUpdatedAt": 1539502055,
+  "formattedLastUpdatedAt": "Oct 14, 2018",
   "frontMatter": {
     "id": "code-of-conduct",
     "title": "Code Of Conduct",
@@ -21,10 +21,10 @@
   "sidebar": "docs",
   "previous": {
     "title": "Bi Weekly Calls",
-    "permalink": "/docs/community/bi-weekly-calls"
+    "permalink": "/community/bi-weekly-calls"
   },
   "next": {
     "title": "Contributing",
-    "permalink": "/docs/community/contributing"
+    "permalink": "/community/contributing"
   }
 }

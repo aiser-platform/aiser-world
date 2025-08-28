@@ -10,6 +10,7 @@ import {
 import { Button, Layout, theme, Tooltip } from 'antd';
 import UserProfileDropdown from '@/components/UserProfileDropdown';
 import { useDarkMode } from '@/hooks/useDarkMode';
+import ProjectSelector from '@/app/(dashboard)/chat/components/ProjectSelector/ProjectSelector';
 
 type Props = {
     isBreakpoint: boolean;
@@ -39,7 +40,7 @@ export const LayoutHeader: React.FC<Props> = ({
                 borderBottom: '1px solid #f0f0f0',
             }}
         >
-            <div className="flex items-center">
+            <div className="flex items-center space-x-4">
                 <Button
                     type="text"
                     icon={
@@ -58,6 +59,9 @@ export const LayoutHeader: React.FC<Props> = ({
                         height: 64,
                     }}
                 />
+                
+                {/* Project Selector - Left side near sidebar */}
+                <ProjectSelector isHeader={true} />
             </div>
             
             <div className="flex items-center space-x-2">

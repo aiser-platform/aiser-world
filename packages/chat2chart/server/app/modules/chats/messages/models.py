@@ -1,6 +1,7 @@
 from app.common.model import BaseModel
 from sqlalchemy import JSON, UUID, Column, ForeignKey, String, Text
 from sqlalchemy.orm import relationship
+import uuid
 
 
 class ChatMessage(BaseModel):
@@ -17,6 +18,9 @@ class ChatMessage(BaseModel):
     """
 
     __tablename__ = "message"
+
+    # Override the ID field to use UUID
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
     # Message content
     query = Column(Text, nullable=True)

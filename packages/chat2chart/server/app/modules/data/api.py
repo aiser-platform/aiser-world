@@ -93,8 +93,11 @@ async def test_database_connection(request: DatabaseConnectionRequest):
     try:
         logger.info(f"🔌 Testing database connection: {request.type}")
         
+        # Convert Pydantic model to dictionary
+        connection_config = request.model_dump()
+        
         # Test the connection using the service
-        result = await data_service.test_database_connection(request)
+        result = await data_service.test_database_connection(connection_config)
         
         if result['success']:
             return DatabaseTestResponse(
@@ -124,13 +127,16 @@ async def connect_database(request: DatabaseConnectionRequest):
     try:
         logger.info(f"🔌 Connecting to database: {request.type}")
         
+        # Convert Pydantic model to dictionary
+        connection_config = request.model_dump()
+        
         # Test connection first
-        test_result = await data_service.test_database_connection(request)
+        test_result = await data_service.test_database_connection(connection_config)
         if not test_result['success']:
             raise HTTPException(status_code=400, detail=f"Connection failed: {test_result.get('error')}")
         
         # Store the connection
-        connection_result = await data_service.store_database_connection(request)
+        connection_result = await data_service.store_database_connection(connection_config)
         
         return {
             "success": True,
@@ -158,6 +164,77 @@ async def get_data_sources(
         }
     except Exception as e:
         logger.error(f"❌ Failed to get data sources: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/sources/{source_id}")
+async def get_data_source_by_id(source_id: str):
+    """Get a specific data source by ID"""
+    try:
+        source = await data_service.get_data_source_by_id(source_id)
+        if source:
+            return {
+                "success": True,
+                "data_source": source
+            }
+        else:
+            raise HTTPException(status_code=404, detail=f"Data source {source_id} not found")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Failed to get data source {source_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/sources/{source_id}/data")
+async def get_data_from_source(source_id: str, limit: int = 100):
+    """Get data from a specific data source"""
+    try:
+        result = await data_service.get_data_from_source(source_id, limit)
+        if result.get('success'):
+            return result
+        else:
+            raise HTTPException(status_code=400, detail=result.get('error', 'Failed to get data'))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Failed to get data from source {source_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/sources/{source_id}/schema")
+async def get_source_schema(source_id: str):
+    """Get schema information for a specific data source"""
+    try:
+        result = await data_service.get_source_schema(source_id)
+        if result.get('success'):
+            return result
+        else:
+            raise HTTPException(status_code=400, detail=result.get('error', 'Failed to get schema'))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Failed to get schema for source {source_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/sources/{source_id}/query")
+async def execute_query_on_source(source_id: str, query_request: Dict[str, str]):
+    """Execute a custom query on a specific data source"""
+    try:
+        query = query_request.get('query', '')
+        if not query:
+            raise HTTPException(status_code=400, detail="Query is required")
+        
+        result = await data_service.execute_query_on_source(source_id, query)
+        if result.get('success'):
+            return result
+        else:
+            raise HTTPException(status_code=400, detail=result.get('error', 'Failed to execute query'))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Failed to execute query on source {source_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -286,7 +363,7 @@ async def list_data_sources():
 async def get_data_source(data_source_id: str):
     """Get data source information"""
     try:
-        result = data_service.get_data_source(data_source_id)
+        result = await data_service.get_data_source(data_source_id)
         
         if result['success']:
             return {
@@ -343,7 +420,7 @@ async def query_data_source(data_source_id: str, request: DataSourceQueryRequest
 async def delete_data_source(data_source_id: str):
     """Delete data source"""
     try:
-        result = data_service.delete_data_source(data_source_id)
+        result = await data_service.delete_data_source(data_source_id)
         
         if result['success']:
             return {
@@ -615,7 +692,7 @@ async def health_check():
         "success": True,
         "service": "data_connectivity",
         "status": "healthy",
-        "supported_formats": ["csv", "xlsx", "xls", "json", "tsv"],
+        "supported_formats": ["csv", "xlsx", "xls", "json", "tsv", "parquet", "parq", "snappy"],
         "max_file_size_mb": 50.0,
         "cube_integration": True,
         "litellm_integration": True,
@@ -629,7 +706,7 @@ async def get_data_source_data(data_source_id: str):
         logger.info(f"📊 Getting data for data source: {data_source_id}")
         
         # Get data source information from the service
-        data_source_info = data_service.get_data_source(data_source_id)
+        data_source_info = await data_service.get_data_source(data_source_id)
         if not data_source_info['success']:
             raise HTTPException(status_code=404, detail="Data source not found")
         
@@ -762,6 +839,30 @@ async def deploy_cube_schema(request: Dict[str, Any]):
         
     except Exception as e:
         logger.error(f"❌ Cube schema deployment failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/warehouse/test")
+async def test_warehouse_connection(request: Dict[str, Any]):
+    """Test warehouse connection without storing credentials"""
+    try:
+        connection_config = request.get('connection_config', {})
+        
+        if not connection_config:
+            raise HTTPException(status_code=400, detail="connection_config is required")
+        
+        # Test the connection using the modeling service
+        result = await cube_modeling_service._test_warehouse_connection(connection_config)
+        
+        return {
+            "success": result['success'],
+            "message": "Warehouse connection test completed",
+            "connection_info": result,
+            "error": None if result['success'] else result.get('error', 'Unknown error')
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Warehouse connection test failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -905,4 +1006,86 @@ async def get_deployed_cubes():
         raise
     except Exception as e:
         logger.error(f"❌ Failed to get deployed cubes: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/{data_source_id}/insights")
+async def generate_data_insights(data_source_id: str):
+    """Generate AI-powered insights for a data source"""
+    try:
+        logger.info(f"🔍 Generating AI insights for data source: {data_source_id}")
+        
+        # Get the data source
+        data_source = await data_service.get_data_source(data_source_id)
+        if not data_source:
+            raise HTTPException(status_code=404, detail="Data source not found")
+        
+        # Generate insights using AI
+        insights = await data_service.generate_data_insights(data_source_id)
+        
+        return {
+            "success": True,
+            "insights": insights,
+            "data_source_id": data_source_id
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Failed to generate insights: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/sources/{data_source_id}/schema")
+async def get_data_source_schema(data_source_id: str):
+    """Get schema information for a specific data source"""
+    try:
+        logger.info(f"🔍 Fetching schema for data source: {data_source_id}")
+        
+        # Get the data source first
+        from app.modules.data.models import DataSource
+        from app.db.session import get_async_session
+        
+        async with get_async_session() as db:
+            from sqlalchemy import select
+            
+            query = select(DataSource).where(DataSource.id == data_source_id)
+            result = await db.execute(query)
+            data_source = result.scalar_one_or_none()
+            
+            if not data_source:
+                raise HTTPException(status_code=404, detail="Data source not found")
+            
+            # If it's a database, get live schema
+            if data_source.type == 'database':
+                schema_result = await data_service.get_database_schema(data_source_id)
+                if schema_result['success']:
+                    return {
+                        "success": True,
+                        "schema": schema_result['schema'],
+                        "data_source": schema_result['data_source']
+                    }
+                else:
+                    raise HTTPException(status_code=500, detail=f"Failed to fetch schema: {schema_result.get('error')}")
+            
+            # For other types, return stored schema
+            try:
+                schema = json.loads(data_source.schema) if data_source.schema else {}
+            except json.JSONDecodeError:
+                schema = {}
+            
+            return {
+                "success": True,
+                "schema": schema,
+                "data_source": {
+                    "id": data_source.id,
+                    "name": data_source.name,
+                    "type": data_source.type,
+                    "format": data_source.format,
+                    "row_count": data_source.row_count
+                }
+            }
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Failed to get data source schema: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

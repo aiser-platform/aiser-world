@@ -6,9 +6,9 @@
 export default {
   "title": "Aiser Platform Documentation",
   "tagline": "AI-Powered Analytics Platform",
-  "favicon": "img/favicon.ico",
+  "favicon": "/favicon.ico",
   "url": "https://aiser-docs.dataticon.com",
-  "baseUrl": "/docs/",
+  "baseUrl": "/",
   "deploymentBranch": "gh-pages",
   "organizationName": "Aiser",
   "projectName": "aiser-world",

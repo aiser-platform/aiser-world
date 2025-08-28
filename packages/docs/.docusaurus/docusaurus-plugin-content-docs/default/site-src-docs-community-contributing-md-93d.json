@@ -5,14 +5,14 @@
   "source": "@site/src/docs/community/contributing.md",
   "sourceDirName": "community",
   "slug": "/community/contributing",
-  "permalink": "/docs/community/contributing",
+  "permalink": "/community/contributing",
   "draft": false,
   "unlisted": false,
   "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/community/contributing.md",
   "tags": [],
   "version": "current",
-  "lastUpdatedAt": 1755570184,
-  "formattedLastUpdatedAt": "Aug 19, 2025",
+  "lastUpdatedAt": 1539502055,
+  "formattedLastUpdatedAt": "Oct 14, 2018",
   "frontMatter": {
     "id": "contributing",
     "title": "Contributing",
@@ -21,10 +21,10 @@
   "sidebar": "docs",
   "previous": {
     "title": "Code Of Conduct",
-    "permalink": "/docs/community/code-of-conduct"
+    "permalink": "/community/code-of-conduct"
   },
   "next": {
     "title": "Roadmap",
-    "permalink": "/docs/community/roadmap"
+    "permalink": "/community/roadmap"
   }
 }

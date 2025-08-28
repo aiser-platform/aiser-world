@@ -5,14 +5,14 @@
   "source": "@site/src/docs/self-host/ssl-certificates.md",
   "sourceDirName": "self-host",
   "slug": "/self-host/ssl-certificates",
-  "permalink": "/docs/self-host/ssl-certificates",
+  "permalink": "/self-host/ssl-certificates",
   "draft": false,
   "unlisted": false,
   "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/self-host/ssl-certificates.md",
   "tags": [],
   "version": "current",
-  "lastUpdatedAt": 1755570184,
-  "formattedLastUpdatedAt": "Aug 19, 2025",
+  "lastUpdatedAt": 1539502055,
+  "formattedLastUpdatedAt": "Oct 14, 2018",
   "frontMatter": {
     "id": "ssl-certificates",
     "title": "Ssl Certificates",
@@ -21,10 +21,10 @@
   "sidebar": "docs",
   "previous": {
     "title": "Config Reference",
-    "permalink": "/docs/self-host/config-reference"
+    "permalink": "/self-host/config-reference"
   },
   "next": {
     "title": "AI Overview",
-    "permalink": "/docs/features/ai-overview"
+    "permalink": "/features/ai-overview"
   }
 }

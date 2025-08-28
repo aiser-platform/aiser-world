@@ -5,14 +5,14 @@
   "source": "@site/src/docs/features/data-sources-overview.md",
   "sourceDirName": "features",
   "slug": "/features/data-sources-overview",
-  "permalink": "/docs/features/data-sources-overview",
+  "permalink": "/features/data-sources-overview",
   "draft": false,
   "unlisted": false,
   "editUrl": "https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/features/data-sources-overview.md",
   "tags": [],
   "version": "current",
-  "lastUpdatedAt": 1755570184,
-  "formattedLastUpdatedAt": "Aug 19, 2025",
+  "lastUpdatedAt": 1539502055,
+  "formattedLastUpdatedAt": "Oct 14, 2018",
   "frontMatter": {
     "id": "data-sources-overview",
     "title": "Data Sources Overview",
@@ -21,10 +21,10 @@
   "sidebar": "docs",
   "previous": {
     "title": "Custom Prompts",
-    "permalink": "/docs/features/custom-prompts"
+    "permalink": "/features/custom-prompts"
   },
   "next": {
     "title": "Databases",
-    "permalink": "/docs/features/databases"
+    "permalink": "/features/databases"
   }
 }
