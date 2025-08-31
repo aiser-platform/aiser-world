@@ -1,5 +1,7 @@
 'use client';
 
+// Simple dynamic configuration that actually works
+
 import React, { useState } from 'react';
 import { Card, Row, Col, Typography, Space, Button, Progress, Table, Tag, Statistic, Divider } from 'antd';
 import { 

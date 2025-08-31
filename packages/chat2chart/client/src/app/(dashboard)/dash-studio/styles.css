@@ -1,5 +1,5 @@
-/* Enhanced Dashboard Builder Styles */
-.dashboard-builder {
+/* Enhanced Dashboard Studio Styles */
+.dash-studio {
     background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
     min-height: 100vh;
     color: #ffffff;
@@ -426,7 +426,7 @@
 }
 
 /* Dark Mode Enhancements */
-.dark-mode .dashboard-builder {
+.dark-mode .dash-studio {
     background: linear-gradient(135deg, #000000 0%, #1a1a1a 100%);
 }
 

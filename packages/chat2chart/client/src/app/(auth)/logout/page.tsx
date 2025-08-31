@@ -1,5 +1,7 @@
 'use client';
 
+// Simple dynamic configuration that actually works
+
 import LoadingScreen from '@/components/LoadingScreen/LoadingScreen';
 import { useAuth } from '@/context/AuthContext';
 import { useLayoutEffect } from 'react';

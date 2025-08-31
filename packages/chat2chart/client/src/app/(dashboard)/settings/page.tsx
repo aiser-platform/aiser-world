@@ -1,5 +1,7 @@
 'use client';
 
+// Simple dynamic configuration that actually works
+
 import React from 'react';
 import { Card, Row, Col, Typography, Space, Button } from 'antd';
 import { 

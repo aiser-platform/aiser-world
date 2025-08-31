@@ -50,9 +50,9 @@ const Navigation: React.FC<NavigationProps> = (props: NavigationProps) => {
             label: 'Chart Builder',
         },
         {
-            key: 'dashboard-builder',
+            key: 'dash-studio',
             icon: <DashboardOutlined />,
-            label: 'Dashboard Builder',
+            label: 'Dashboard Studio',
         },
         {
             key: 'data',
@@ -60,6 +60,7 @@ const Navigation: React.FC<NavigationProps> = (props: NavigationProps) => {
             label: 'Data',
         },
         {
+
             type: 'divider' as const,
         },
         {
@@ -83,8 +84,8 @@ const Navigation: React.FC<NavigationProps> = (props: NavigationProps) => {
             case 'chart-builder':
                 router.push('/chart-builder');
                 break;
-            case 'dashboard-builder':
-                router.push('/dashboard-builder');
+            case 'dash-studio':
+                router.push('/dash-studio');
                 break;
             case 'data':
                 router.push('/data');

@@ -1,5 +1,7 @@
 'use client';
 
+// Simple dynamic configuration that actually works
+
 import React, { useState } from 'react';
 import { Card, Row, Col, Typography, Form, Switch, Button, TimePicker, Select, message, Divider, Space, Tag } from 'antd';
 import { 

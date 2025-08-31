@@ -1,0 +1,152 @@
+/* Dashboard Studio Styles */
+.dashboard-canvas {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.dashboard-canvas.drag-over {
+  background: rgba(24, 144, 255, 0.1) !important;
+  border-color: #1890ff !important;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+}
+
+/* Widget Library Drag Styles */
+.widget-library .ant-card[draggable="true"] {
+  transition: all 0.2s ease;
+}
+
+.widget-library .ant-card[draggable="true"]:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.widget-library .ant-card[draggable="true"]:active {
+  transform: translateY(0);
+  cursor: grabbing;
+}
+
+/* Drag feedback */
+.drag-feedback {
+  opacity: 0.7;
+  transform: rotate(5deg);
+}
+
+.dashboard-widget {
+  transition: all 0.2s ease;
+}
+
+.dashboard-widget:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.dashboard-widget .ant-card {
+  height: 100%;
+  transition: all 0.2s ease;
+}
+
+.dashboard-widget .ant-card:hover {
+  border-color: #1890ff;
+}
+
+.dashboard-widget.selected .ant-card {
+  border-color: #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+}
+
+/* Grid Layout Customization */
+.react-grid-layout {
+  position: relative;
+  transition: height 200ms ease;
+}
+
+.react-grid-item {
+  transition: all 200ms ease;
+  transition-property: left, top, width, height;
+}
+
+.react-grid-item.cssTransforms {
+  transition-property: transform, width, height;
+}
+
+.react-grid-item.resizing {
+  z-index: 1;
+  will-change: width, height;
+}
+
+.react-grid-item.react-draggable-dragging {
+  transition: none;
+  z-index: 3;
+  will-change: transform;
+}
+
+.react-grid-item.react-grid-placeholder {
+  background: #1890ff;
+  opacity: 0.2;
+  transition-duration: 100ms;
+  z-index: 2;
+  border-radius: 4px;
+}
+
+.react-grid-item > .react-resizable-handle {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  bottom: 0;
+  right: 0;
+  cursor: se-resize;
+  z-index: 10;
+}
+
+.react-grid-item > .react-resizable-handle::after {
+  content: "";
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 5px;
+  height: 5px;
+  border-right: 2px solid rgba(0, 0, 0, 0.4);
+  border-bottom: 2px solid rgba(0, 0, 0, 0.4);
+}
+
+/* Dark mode adjustments */
+[data-theme="dark"] .react-grid-item > .react-resizable-handle::after {
+  border-right-color: rgba(255, 255, 255, 0.4);
+  border-bottom-color: rgba(255, 255, 255, 0.4);
+}
+
+/* Widget Library Styles */
+.widget-library {
+  height: 100%;
+  overflow-y: auto;
+}
+
+.widget-category {
+  margin-bottom: 20px;
+}
+
+.widget-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+/* Properties Panel Styles */
+.properties-panel {
+  height: 100%;
+  overflow-y: auto;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .dashboard-canvas {
+    padding: 8px;
+  }
+  
+  .widget-grid {
+    grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+    gap: 6px;
+  }
+}

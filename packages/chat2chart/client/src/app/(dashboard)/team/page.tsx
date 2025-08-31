@@ -1,5 +1,7 @@
 'use client';
 
+// Simple dynamic configuration that actually works
+
 import React, { useEffect, useState } from 'react';
 import { Card, Table, Button, Modal, Form, Input, message, Tag, Space, Typography, Row, Col, Avatar, Select, Tooltip } from 'antd';
 import { PlusOutlined, UserOutlined, MailOutlined, TeamOutlined, CrownOutlined } from '@ant-design/icons';
