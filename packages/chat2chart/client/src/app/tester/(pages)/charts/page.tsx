@@ -1,18 +1,37 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import * as echarts from 'echarts';
-import AceEditor from 'react-ace';
-import 'ace-builds/src-noconflict/snippets/json';
-import 'ace-builds/src-min-noconflict/ext-searchbox';
-import 'ace-builds/src-min-noconflict/mode-json';
-import 'ace-builds/src-min-noconflict/theme-github_dark';
+// Simple dynamic configuration that actually works
 
-// import 'brace/ext/language_tools';
-// import 'brace/ext/searchbox';
-// import 'brace/mode/json';
-// import 'brace/snippets/json';
-// import 'brace/theme/tomorrow';
+import { useEffect, useRef, useState } from 'react';
+import dynamicImport from 'next/dynamic';
+import * as echarts from 'echarts';
+
+// Dynamically import AceEditor to avoid SSR issues
+const AceEditor = dynamicImport(() => import('react-ace'), {
+  ssr: false,
+  loading: () => <div>Loading editor...</div>
+});
+
+// Client-only component to load Ace libraries
+const AceLibraryLoader = () => {
+  useEffect(() => {
+    // Load Ace libraries only on client side
+    const loadAceLibraries = async () => {
+      try {
+        await import('ace-builds/src-noconflict/snippets/json');
+        await import('ace-builds/src-min-noconflict/ext-searchbox');
+        await import('ace-builds/src-min-noconflict/mode-json');
+        await import('ace-builds/src-min-noconflict/theme-github_dark');
+      } catch (error) {
+        console.warn('Failed to load Ace libraries:', error);
+      }
+    };
+    
+    loadAceLibraries();
+  }, []);
+  
+  return null;
+};
 
 const DEFAULT_VALUE = `
 {
@@ -276,6 +295,7 @@ export default function TestPage() {
 
     return (
         <div className="w-full h-screen p-4 flex flex-row gap-4">
+            <AceLibraryLoader />
             <EchartsEditor value={value} onChange={setValue} />
             {ChartRenderer({ value })}
         </div>

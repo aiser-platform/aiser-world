@@ -1,43 +1,31 @@
-'use client';
 import { Providers } from '@/components/Providers/Providers';
+import type { Metadata } from 'next';
 import '@/styles/globals.css';
-import { usePathname } from 'next/navigation';
+
+export const metadata: Metadata = {
+  title: 'Aiser - AI-Powered Data Visualization',
+  description: 'AI-powered analytics platform',
+};
 
 export default function RootLayout({
-    children,
+  children,
 }: {
-    children: React.ReactNode;
+  children: React.ReactNode;
 }) {
-    const pathname = usePathname();
-
-    return (
-        <html lang="en">
-            <head>
-                <meta charSet="UTF-8" />
-                <meta
-                    name="viewport"
-                    content="width=device-width, initial-scale=1.0"
-                />
-                <title>
-                    {pathname === '/'
-                        ? 'Aiser - AI-Powered Data Visualization'
-                        : pathname === '/login'
-                          ? 'Login - Aiser'
-                          : pathname === '/logout'
-                            ? 'Logout - Aiser'
-                            : pathname.includes('test')
-                              ? 'Test - Aiser'
-                                                              : `${
-                                    pathname && pathname.length > 1
-                                        ? pathname.substring(1).charAt(0)?.toUpperCase() + pathname.slice(2)
-                                        : 'Dashboard'
-                                } - Aiser`}
-                </title>
-                <link rel="icon" href="/aiser-logo.png" />
-            </head>
-            <body>
-                <Providers>{children}</Providers>
-            </body>
-        </html>
-    );
+  return (
+    <html lang="en">
+      <head>
+        <meta charSet="UTF-8" />
+        <meta
+          name="viewport"
+          content="width=device-width, initial-scale=1.0"
+        />
+        <title>Aiser - AI-Powered Data Visualization</title>
+        <link rel="icon" href="/aiser-logo.png" />
+      </head>
+      <body>
+        <Providers>{children}</Providers>
+      </body>
+    </html>
+  );
 }

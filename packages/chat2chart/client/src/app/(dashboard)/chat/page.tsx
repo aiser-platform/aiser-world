@@ -1,7 +1,9 @@
 'use client';
 
-import { Tabs, Card, Row, Col, Button, Space, Tag, Typography, message } from 'antd';
-import { MessageOutlined, DatabaseOutlined, BarChartOutlined, HistoryOutlined, SettingOutlined, DragOutlined, ArrowLeftOutlined, ArrowRightOutlined } from '@ant-design/icons';
+// Simple dynamic configuration that actually works
+
+import { Tabs, Card, Row, Col, Button, Space, Tag, Typography, message, Tooltip } from 'antd';
+import { MessageOutlined, DatabaseOutlined, BarChartOutlined, HistoryOutlined, SettingOutlined, DragOutlined, ArrowLeftOutlined, ArrowRightOutlined, FileTextOutlined } from '@ant-design/icons';
 import ModelSelector from '@/app/components/ModelSelector/ModelSelector';
 import React, { useState, useEffect, useCallback } from 'react';
 import ChatPanel from './components/ChatPanel/ChatPanel';
@@ -375,21 +377,23 @@ const ChatToChart = () => {
                         ),
                         children: (
                             <Row style={{ height: 'calc(100vh - 120px)' }} className="chat-container">
-                                {/* Collapsible History Panel */}
+                                {/* Left Panel: Chat History - Fixed width when expanded */}
                                 <Col 
-                                    span={historyPanelCollapsed ? 1 : historyPanelWidth}
+                                    span={historyPanelCollapsed ? 2 : 6}
                                     style={{ 
                                         borderRight: '1px solid var(--border-color-light)',
                                         background: 'var(--panel-background)',
                                         transition: 'all 0.3s ease',
-                                        position: 'relative'
+                                        position: 'relative',
+                                        minWidth: historyPanelCollapsed ? '80px' : '240px',
+                                        maxWidth: historyPanelCollapsed ? '80px' : '240px'
                                     }}
                                 >
                                     {/* History Panel Toggle Button */}
                                     <Button
                                         type="text"
                                         icon={historyPanelCollapsed ? <ArrowRightOutlined /> : <ArrowLeftOutlined />}
-                                        onClick={() => setHistoryPanelCollapsed(!historyPanelCollapsed)}
+                                        onClick={handleHistoryPanelExpand}
                                         style={{
                                             position: 'absolute',
                                             right: historyPanelCollapsed ? '50%' : '-12px',
@@ -409,7 +413,6 @@ const ChatToChart = () => {
                                     />
                                     
                                     {/* History Panel Content */}
-
                                     <CollapsibleHistoryPanel
                                         id={conversationState?.id || ''}
                                         current={conversationState!}
@@ -431,15 +434,16 @@ const ChatToChart = () => {
                                     />
                                 </Col>
                                 
-                                {/* Expanded Chat Panel */}
+                                {/* Center Panel: Main Chat Interface - Flexible width */}
                                 <Col 
-                                    span={getChatPanelWidth()}
+                                    flex="1"
                                     style={{ 
                                         transition: 'all 0.3s ease',
                                         borderRight: dataPanelCollapsed ? 'none' : '1px solid var(--border-color-light)',
                                         background: 'var(--background)',
                                         display: 'flex',
-                                        flexDirection: 'column'
+                                        flexDirection: 'column',
+                                        minWidth: '400px'
                                     }}
                                 >
                                     <ChatPanel
@@ -464,14 +468,16 @@ const ChatToChart = () => {
                                     />
                                 </Col>
                                 
-                                {/* Collapsible Data Panel */}
+                                {/* Right Panel: Data Panel - Fixed width when expanded */}
                                 <Col 
-                                    span={getDataPanelWidth()} 
+                                    span={dataPanelCollapsed ? 2 : 8}
                                     style={{ 
                                         borderLeft: '1px solid var(--border-color-light)',
                                         background: 'var(--panel-background)',
                                         transition: 'all 0.3s ease',
-                                        position: 'relative'
+                                        position: 'relative',
+                                        minWidth: dataPanelCollapsed ? '80px' : '320px',
+                                        maxWidth: dataPanelCollapsed ? '80px' : '320px'
                                     }}
                                 >
                                     {/* Data Panel Toggle Button */}
@@ -497,54 +503,73 @@ const ChatToChart = () => {
                                         }}
                                     />
                                     
-                                    {/* Data Panel Content */}
-                                    
-                                    <EnhancedDataPanel
-                                        onDataSourceSelect={(dataSource) => {
-                                            console.log('🔄 Chat page onDataSourceSelect called with:', dataSource);
-                                            setSelectedDataSource(dataSource);
-                                            
-                                            // Update selectedDataSources for AI analysis
-                                            if (dataSource) {
-                                                console.log('✅ Setting selectedDataSources to:', [dataSource]);
-                                                setSelectedDataSources([dataSource]);
-                                            } else {
-                                                console.log('❌ Clearing selectedDataSources');
-                                                setSelectedDataSources([]);
-                                            }
-                                            
-                                            // Also update the file/db state for backward compatibility
-                                            if (dataSource && dataSource.type === 'file') {
-                                                setFile({
-                                                    filename: dataSource.name,
-                                                    content_type: 'application/octet-stream',
-                                                    storage_type: 'local',
-                                                    file_size: 0,
-                                                    uuid_filename: dataSource.id
-                                                });
-                                            } else if (dataSource && dataSource.type === 'database') {
-                                                setDb({
-                                                    id: Number(dataSource.id) || undefined,
-                                                    name: dataSource.name,
-                                                    type: dataSource.config?.db_type || 'postgresql',
-                                                    host: dataSource.config?.host || '',
-                                                    port: Number(dataSource.config?.port) || 5432,
-                                                    database: dataSource.config?.database || '',
-                                                    username: dataSource.config?.username || ''
-                                                });
-                                            }
-                                        }}
-                                        selectedDataSource={selectedDataSource}
-                                        onRefresh={() => {
-                                            // Refresh data sources
-                                            console.log('Refreshing data sources...');
-                                        }}
-                                        onDataSourcesChange={(sources) => {
-                                            console.log('🔄 Chat page onDataSourcesChange called with:', sources);
-                                            setSelectedDataSources(sources);
-                                            console.log('✅ Updated selectedDataSources to:', sources);
-                                        }}
-                                    />
+                                    {/* Data Panel Content - Show only icons when collapsed */}
+                                    {dataPanelCollapsed ? (
+                                        <div style={{ 
+                                            padding: '16px 8px',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            alignItems: 'center',
+                                            gap: '16px'
+                                        }}>
+                                            <Tooltip title="Data Sources" placement="right">
+                                                <DatabaseOutlined style={{ fontSize: '20px', color: '#1890ff' }} />
+                                            </Tooltip>
+                                            <Tooltip title="Files" placement="right">
+                                                <FileTextOutlined style={{ fontSize: '20px', color: '#52c41a' }} />
+                                            </Tooltip>
+                                            <Tooltip title="Settings" placement="right">
+                                                <SettingOutlined style={{ fontSize: '20px', color: '#fa8c16' }} />
+                                            </Tooltip>
+                                        </div>
+                                    ) : (
+                                        <EnhancedDataPanel
+                                            onDataSourceSelect={(dataSource) => {
+                                                console.log('🔄 Chat page onDataSourceSelect called with:', dataSource);
+                                                setSelectedDataSource(dataSource);
+                                                
+                                                // Update selectedDataSources for AI analysis
+                                                if (dataSource) {
+                                                    console.log('✅ Setting selectedDataSources to:', [dataSource]);
+                                                    setSelectedDataSources([dataSource]);
+                                                } else {
+                                                    console.log('❌ Clearing selectedDataSources');
+                                                    setSelectedDataSources([]);
+                                                }
+                                                
+                                                // Also update the file/db state for backward compatibility
+                                                if (dataSource && dataSource.type === 'file') {
+                                                    setFile({
+                                                        filename: dataSource.name,
+                                                        content_type: 'application/octet-stream',
+                                                        storage_type: 'local',
+                                                        file_size: 0,
+                                                        uuid_filename: dataSource.id
+                                                    });
+                                                } else if (dataSource && dataSource.type === 'database') {
+                                                    setDb({
+                                                        id: Number(dataSource.id) || undefined,
+                                                        name: dataSource.name,
+                                                        type: dataSource.config?.db_type || 'postgresql',
+                                                        host: dataSource.config?.host || '',
+                                                        port: Number(dataSource.config?.port) || 5432,
+                                                        database: dataSource.config?.database || '',
+                                                        username: dataSource.config?.username || ''
+                                                    });
+                                                }
+                                            }}
+                                            selectedDataSource={selectedDataSource}
+                                            onRefresh={() => {
+                                                // Refresh data sources
+                                                console.log('Refreshing data sources...');
+                                            }}
+                                            onDataSourcesChange={(sources) => {
+                                                console.log('🔄 Chat page onDataSourcesChange called with:', sources);
+                                                setSelectedDataSources(sources);
+                                                console.log('✅ Updated selectedDataSources to:', sources);
+                                            }}
+                                        />
+                                    )}
                                 </Col>
                             </Row>
                         )

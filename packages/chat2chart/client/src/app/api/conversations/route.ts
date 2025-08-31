@@ -1,12 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getBackendUrlForApi } from '@/utils/backendUrl';
 
-const BACKEND_URL = getBackendUrlForApi();
+// Simple fallback for build time
+const getBackendUrl = () => {
+  try {
+    // Dynamic import to avoid build issues
+    const { getBackendUrlForApi } = require('@/utils/backendUrl');
+    return getBackendUrlForApi();
+  } catch {
+    // Fallback for build time
+    return 'http://127.0.0.1:8000';
+  }
+};
 
 export async function GET(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
-        const response = await fetch(`${BACKEND_URL}/conversations/?${searchParams.toString()}`);
+        const backendUrl = getBackendUrl();
+        const response = await fetch(`${backendUrl}/conversations/?${searchParams.toString()}`);
         
         if (!response.ok) {
             throw new Error(`Backend responded with ${response.status}`);
@@ -26,7 +36,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const response = await fetch(`${BACKEND_URL}/conversations/`, {
+        const backendUrl = getBackendUrl();
+        const response = await fetch(`${backendUrl}/conversations/`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

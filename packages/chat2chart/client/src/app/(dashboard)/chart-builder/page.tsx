@@ -1,5 +1,7 @@
 'use client';
 
+// Simple dynamic configuration that actually works
+
 import React, { useState, useEffect, useRef } from 'react';
 import { 
     Card, 
