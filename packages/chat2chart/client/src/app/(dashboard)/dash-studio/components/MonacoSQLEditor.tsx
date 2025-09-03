@@ -20,7 +20,9 @@ import {
   Collapse,
   Badge,
   Divider,
-  Alert
+  Alert,
+  Modal,
+  Form
 } from 'antd';
 import { Editor } from '@monaco-editor/react';
 import { 
@@ -56,10 +58,12 @@ import {
   SyncOutlined,
   ThunderboltOutlined
 } from '@ant-design/icons';
+import { getBackendUrlForApi } from '@/utils/backendUrl';
 import { dashboardDataService } from '../services/DashboardDataService';
 import { dashboardAPIService } from '../services/DashboardAPIService';
 import { workingQueryService } from '../services/WorkingQueryService';
 import ChartWidget from './ChartWidget';
+import UniversalDataSourceModal from '@/app/components/UniversalDataSourceModal/UniversalDataSourceModal';
 
 
 const { Sider, Content } = Layout;
@@ -166,11 +170,16 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
   onDataSourceChange 
 }) => {
   const [sqlQuery, setSqlQuery] = useState('SELECT * FROM sales_data LIMIT 100;');
-  const [selectedDatabase, setSelectedDatabase] = useState('duckdb');
+  const [selectedDatabase, setSelectedDatabase] = useState('');
   const [selectedSchema, setSelectedSchema] = useState('public');
   const [selectedTable, setSelectedTable] = useState('sales_data');
   const [isExecuting, setExecuting] = useState(false);
   const [activeTab, setActiveTab] = useState('results');
+  // Query tabs
+  const [queryTabs, setQueryTabs] = useState<{ key: string; title: string; sql: string }[]>([
+    { key: 'q-1', title: 'Query 1', sql: 'SELECT * FROM sales_data LIMIT 100;' }
+  ]);
+  const [activeQueryKey, setActiveQueryKey] = useState<string>('q-1');
   const [previewChart, setPreviewChart] = useState<any>(null);
   const [openTableTabs, setOpenTableTabs] = useState<string[]>(['sales_data', 'user_analytics']);
   const [selectedTables, setSelectedTables] = useState<string[]>(['sales_data', 'user_analytics']);
@@ -185,6 +194,18 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
   const [schemas, setSchemas] = useState<SchemaInfo[]>([]);
   const [isLoadingDataSources, setIsLoadingDataSources] = useState(false);
   const [isRefreshingSchema, setIsRefreshingSchema] = useState(false);
+  const [showConnectDataModal, setShowConnectDataModal] = useState(false);
+  const [hasCube, setHasCube] = useState(false);
+  const [uiSchemas, setUiSchemas] = useState<{ value: string; label: string; description?: string; tables: string[] }[]>([]);
+  const [uiTables, setUiTables] = useState<TableInfo[]>([]);
+  const [editingTabKey, setEditingTabKey] = useState<string | null>(null);
+  const [titleDraft, setTitleDraft] = useState<string>('');
+  const [showSavedModal, setShowSavedModal] = useState(false);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [savedQueries, setSavedQueries] = useState<any[]>([]);
+  const [schedules, setSchedules] = useState<any[]>([]);
+  const [isSavingTabs, setIsSavingTabs] = useState(false);
+  
 
 
   // Enhanced data sources with real integration capabilities
@@ -322,6 +343,126 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
     loadDataSources();
   }, []);
 
+  // Load persisted tabs and active key
+  useEffect(() => {
+    (async () => {
+      // try local first
+      try {
+        const raw = localStorage.getItem('qe_tabs');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed.tabs) && parsed.tabs.length) {
+            setQueryTabs(parsed.tabs);
+            setActiveQueryKey(parsed.activeKey || parsed.tabs[0].key);
+            const found = parsed.tabs.find((t: any) => t.key === (parsed.activeKey || parsed.tabs[0].key));
+            if (found) setSqlQuery(found.sql);
+          }
+        }
+      } catch {}
+      // then attempt backend
+      try {
+        const res = await fetch(`${getBackendUrlForApi()}/api/queries/tabs`);
+        if (res.ok) {
+          const j = await res.json();
+          if (Array.isArray(j.tabs) && j.tabs.length) {
+            setQueryTabs(j.tabs);
+            const active = j.active_key || j.tabs[0].key;
+            setActiveQueryKey(active);
+            const found = j.tabs.find((t: any) => t.key === active);
+            if (found?.sql) setSqlQuery(found.sql);
+          }
+        }
+      } catch {}
+    })();
+  }, []);
+
+  // Persist tabs on change
+  useEffect(() => {
+    try {
+      localStorage.setItem('qe_tabs', JSON.stringify({ tabs: queryTabs, activeKey: activeQueryKey }));
+    } catch {}
+  }, [queryTabs, activeQueryKey]);
+
+  // Ctrl+S save shortcut with backend persistence
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        try { localStorage.setItem('qe_tabs', JSON.stringify({ tabs: queryTabs, activeKey: activeQueryKey })); } catch {}
+        (async () => {
+          try {
+            setIsSavingTabs(true);
+            const res = await fetch(`${getBackendUrlForApi()}/api/queries/tabs`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ tabs: queryTabs, active_key: activeQueryKey })
+            });
+            if (!res.ok) throw new Error('Failed');
+            message.success('Query tabs saved');
+          } catch {
+            message.error('Failed to save query tabs');
+          } finally {
+            setIsSavingTabs(false);
+          }
+        })();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [queryTabs, activeQueryKey]);
+
+  // Check Cube server status
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('http://localhost:8000/data/cube/status');
+        if (res.ok) {
+          const j = await res.json();
+          setHasCube(!!j?.connected || j?.status === 'connected');
+        }
+      } catch {
+        setHasCube(false);
+      }
+    })();
+  }, []);
+
+  // Load schema for selected database
+  useEffect(() => {
+    const loadSchema = async () => {
+      if (!selectedDatabase) return;
+      setIsRefreshingSchema(true);
+      try {
+        if (selectedDatabase === 'cube') {
+          const res = await fetch('http://localhost:8000/data/cube/schema');
+          if (res.ok) {
+            const j = await res.json();
+            const schemas = (j?.schemas || []).map((s: any) => ({ value: s.name, label: s.name, description: s.description, tables: s.tables || [] }));
+            setUiSchemas(schemas);
+            const tables = (j?.tables || []).map((t: any) => ({ name: t.name, fields: (t.fields||[]).map((f:any)=>({ name:f.name, type:f.type })), rowCount: t.row_count, size: t.size }));
+            setUiTables(tables);
+            if (schemas[0]) setSelectedSchema(schemas[0].value);
+            if (tables[0]) setSelectedTable(tables[0].name);
+          } else { setUiSchemas([]); setUiTables([]); }
+        } else {
+          const res = await fetch(`http://localhost:8000/data/sources/${selectedDatabase}/schema`);
+          if (res.ok) {
+            const j = await res.json();
+            const schemaRoot = j?.schema || j;
+            const tables = (schemaRoot?.tables || []).map((t: any) => ({ name: t.name, fields: (t.columns||t.fields||[]).map((c:any)=>({ name:c.name, type:c.type })), rowCount: t.row_count, size: t.size }));
+            const schemaName = schemaRoot?.database || 'public';
+            const schemas = [{ value: schemaName, label: schemaName, description: schemaRoot?.description, tables: tables.map((t:any)=>t.name) }];
+            setUiSchemas(schemas);
+            setUiTables(tables);
+            if (schemas[0]) setSelectedSchema(schemas[0].value);
+            if (tables[0]) setSelectedTable(tables[0].name);
+          } else { setUiSchemas([]); setUiTables([]); }
+        }
+      } catch { setUiSchemas([]); setUiTables([]); }
+      finally { setIsRefreshingSchema(false); }
+    };
+    loadSchema();
+  }, [selectedDatabase]);
+
   const loadDataSources = async () => {
     setIsLoadingDataSources(true);
     try {
@@ -342,6 +483,9 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
           size: ds.size?.toString(),
           description: `${ds.type} data source`,
         })));
+        // Set default selected database to first connected
+        const firstConnected = (result || []).find((ds: any) => ds.status === 'connected');
+        if (firstConnected) setSelectedDatabase(firstConnected.id);
       } else {
         throw new Error(result.error || 'Failed to load data sources');
       }
@@ -398,6 +542,8 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
       ];
       
       setDataSources(sampleDataSources);
+      const firstConnected = sampleDataSources[0];
+      if (firstConnected) setSelectedDatabase(firstConnected.id);
     } finally {
       setIsLoadingDataSources(false);
     }
@@ -887,37 +1033,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
       background: isDarkMode ? '#141414' : '#ffffff',
       color: isDarkMode ? '#ffffff' : '#000000'
     }}>
-      {/* Top Bar */}
-      <div style={{
-        padding: '12px 16px',
-        borderBottom: `1px solid ${isDarkMode ? '#303030' : '#d9d9d9'}`,
-        background: isDarkMode ? '#1a1a1a' : '#ffffff',
-        flexShrink: 0
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <DatabaseOutlined style={{ fontSize: '18px', color: isDarkMode ? '#1890ff' : '#1890ff' }} />
-            <Title level={5} style={{ margin: 0, color: isDarkMode ? '#ffffff' : '#000000' }}>
-              Query Editor Studio
-            </Title>
-            <Badge count={dataSources.length} style={{ backgroundColor: isDarkMode ? '#1890ff' : '#1890ff' }} />
-        </div>
-          
-          <Space>
-            <Tooltip title="Connect to new data source">
-              <Button 
-                size="small" 
-                type="text" 
-                icon={<PlusOutlined />}
-                onClick={() => {
-                  // Link to universal data source modal
-                  window.open('/data', '_blank');
-                }}
-              />
-            </Tooltip>
-          </Space>
-        </div>
-      </div>
+      {/* Top Bar removed per UX request */}
 
 
 
@@ -964,6 +1080,15 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                     loading={isLoadingDataSources}
                     style={{ fontSize: '10px', padding: '2px 4px' }}
                   />
+                  <Tooltip title="Connect Data">
+                    <Button 
+                      size="small" 
+                      type="text" 
+                      icon={<DatabaseOutlined />} 
+                      onClick={() => setShowConnectDataModal(true)}
+                      style={{ fontSize: '10px', padding: '2px 4px' }}
+                    />
+                  </Tooltip>
                 </div>
                 
                 <Select
@@ -972,15 +1097,20 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                   style={{ width: '100%' }}
                   size="small"
                   placeholder="Select database"
-                  options={enhancedDatabases.map(db => ({
-                    value: db.value,
-                    label: (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        {db.icon}
-                        <span>{db.label}</span>
-                      </div>
-                    )
-                  }))}
+                  options={(() => {
+                    const connected = dataSources.filter(ds => ds.status === 'connected');
+                    const iconFor = (t: string) => t === 'database' ? <DatabaseOutlined /> : t === 'warehouse' ? <CloudOutlined /> : t === 'api' ? <ApiOutlined /> : <FileOutlined />;
+                    const base = connected.map(ds => ({
+                      value: ds.id,
+                      label: (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {iconFor(ds.type)}
+                          <span>{ds.name}</span>
+                        </div>
+                      )
+                    }));
+                    return hasCube ? [{ value: 'cube', label: (<div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><ThunderboltOutlined /><span>Cube.js OLAP</span></div>) }, ...base] : base;
+                  })()}
                 />
                 
                 {/* Quick status indicator */}
@@ -1025,7 +1155,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
             <Select
               value={selectedSchema}
               onChange={setSelectedSchema}
-              options={enhancedSchemas.map(schema => ({
+              options={(uiSchemas.length ? uiSchemas : enhancedSchemas).map(schema => ({
                 value: schema.value,
                 label: (
                   <Tooltip title={schema.description} placement="right">
@@ -1054,7 +1184,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
               placeholder="Select table to view"
               style={{ width: '100%', marginBottom: '12px' }}
               size="small"
-              options={enhancedTables.map(table => ({
+              options={(uiTables.length ? uiTables : enhancedTables).map(table => ({
                 value: table.name,
                 label: (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1073,7 +1203,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                   ghost
                 >
                   {openTableTabs.map((tableName, index) => {
-                    const table = enhancedTables.find(t => t.name === tableName);
+                    const table = (uiTables.length ? uiTables : enhancedTables).find(t => t.name === tableName);
                     if (!table) return null;
                     
                     return (
@@ -1159,6 +1289,54 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
             </div>
           </div>
 
+          {/* Query Tabs above editor */}
+          <div style={{ padding: '8px 16px', borderBottom: `1px solid ${isDarkMode ? '#303030' : '#d9d9d9'}`, background: isDarkMode ? '#1a1a1a' : '#ffffff' }}>
+            <Tabs
+              size="small"
+              type="editable-card"
+              hideAdd={false}
+              activeKey={activeQueryKey}
+              onChange={(key) => {
+                setActiveQueryKey(key);
+                const tab = queryTabs.find(t => t.key === key);
+                if (tab) setSqlQuery(tab.sql);
+              }}
+              onEdit={(targetKey, action) => {
+                if (action === 'add') {
+                  const newKey = `q-${Date.now()}`;
+                  const newTab = { key: newKey, title: `Query ${queryTabs.length + 1}`, sql: 'SELECT * FROM sales_data LIMIT 100;' };
+                  setQueryTabs(prev => [...prev, newTab]);
+                  setActiveQueryKey(newKey);
+                  setSqlQuery(newTab.sql);
+                } else if (action === 'remove') {
+                  const key = String(targetKey);
+                  const idx = queryTabs.findIndex(t => t.key === key);
+                  const newTabs = queryTabs.filter(t => t.key !== key);
+                  setQueryTabs(newTabs);
+                  if (activeQueryKey === key && newTabs.length) {
+                    const next = newTabs[Math.max(0, idx - 1)];
+                    setActiveQueryKey(next.key);
+                    setSqlQuery(next.sql);
+                  }
+                }
+              }}
+              items={queryTabs.map(t => ({ key: t.key, label: (
+                editingTabKey === t.key ? (
+                  <input
+                    value={titleDraft}
+                    autoFocus
+                    onChange={e => setTitleDraft(e.target.value)}
+                    onBlur={() => { setQueryTabs(prev => prev.map(x => x.key === t.key ? { ...x, title: titleDraft || x.title } : x)); setEditingTabKey(null); }}
+                    onKeyDown={e => { if (e.key === 'Enter') { (e.target as HTMLInputElement).blur(); } }}
+                    style={{ width: 100 }}
+                  />
+                ) : (
+                  <span onDoubleClick={() => { setEditingTabKey(t.key); setTitleDraft(t.title); }}>{t.title}</span>
+                )
+              ) }))}
+            />
+          </div>
+
           {/* SQL Editor */}
           <div style={{ 
             flex: 1, 
@@ -1173,7 +1351,11 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
               language="sql"
               theme={isDarkMode ? 'vs-dark' : 'vs-light'}
               value={sqlQuery}
-              onChange={(value) => setSqlQuery(value || '')}
+              onChange={(value) => {
+                const v = value || '';
+                setSqlQuery(v);
+                setQueryTabs(prev => prev.map(t => t.key === activeQueryKey ? { ...t, sql: v } : t));
+              }}
               options={{
                 minimap: { enabled: false },
                 fontSize: 14,
@@ -1223,18 +1405,6 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                   Execute Query
                 </Button>
                 
-                <Button 
-                  icon={<DatabaseOutlined />} 
-                  size="large"
-                  onClick={() => {
-                    // TODO: Open universal data source modal
-                    message.info('Connect Data modal will open here');
-                  }}
-                  title="Connect to Data Source"
-                >
-                  Connect Data
-                </Button>
-                
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Text style={{ fontSize: '12px' }}>Row Limit:</Text>
                   <Select
@@ -1276,52 +1446,30 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Dropdown
-                  overlay={
-                    <Menu>
-                      <Menu.Item key="save" icon={<SaveOutlined />}>Save</Menu.Item>
-                      <Menu.Item key="save-as" icon={<SaveOutlined />}>Save As...</Menu.Item>
-                    </Menu>
-                  }
-                  trigger={['click']}
-                >
-                  <Button size="small" icon={<SaveOutlined />}>Save</Button>
-                </Dropdown>
-                
-                <Tooltip title="Sample Data Query">
-                  <Button 
-                    size="small" 
-                    icon={<PlayCircleOutlined />} 
-                    onClick={() => {
-                      const activeTable = selectedTables[0] || 'sales_data';
-                      setSqlQuery(`SELECT * FROM ${activeTable} LIMIT 100;`);
-                      message.success(`Generated sample query for ${activeTable}`);
-                    }}
-                  />
+                <Tooltip title="Saved Queries">
+                  <Button size="small" icon={<SaveOutlined />} onClick={async () => {
+                    try {
+                      const res = await fetch(`${getBackendUrlForApi()}/api/queries/saved-queries`);
+                      if (res.ok) {
+                        const j = await res.json();
+                        setSavedQueries(Array.isArray(j.items) ? j.items : []);
+                        setShowSavedModal(true);
+                      } else { message.error('Failed to load saved queries'); }
+                    } catch { message.error('Failed to load saved queries'); }
+                  }} />
                 </Tooltip>
-                
-                <Tooltip title="Copy SQL Query">
-                  <Button 
-                    size="small" 
-                    icon={<CopyOutlined />} 
-                    onClick={() => {
-                      navigator.clipboard.writeText(sqlQuery);
-                      message.success('SQL query copied to clipboard');
-                    }}
-                  />
+                <Tooltip title="Schedule Query">
+                  <Button size="small" icon={<ClockCircleOutlined />} onClick={async () => {
+                    try {
+                      const res = await fetch(`${getBackendUrlForApi()}/api/queries/schedules`);
+                      if (res.ok) {
+                        const j = await res.json();
+                        setSchedules(Array.isArray(j.items) ? j.items : []);
+                        setShowScheduleModal(true);
+                      } else { message.error('Failed to load schedules'); }
+                    } catch { message.error('Failed to load schedules'); }
+                  }} />
                 </Tooltip>
-                
-                <Dropdown
-                  overlay={
-                    <Menu>
-                      <Menu.Item key="autocomplete">Autocomplete: ON</Menu.Item>
-                      <Menu.Item key="schedule">Schedule</Menu.Item>
-                    </Menu>
-                  }
-                  trigger={['click']}
-                >
-                  <Button size="small" icon={<MoreOutlined />} />
-                </Dropdown>
               </div>
             </div>
 
@@ -1331,19 +1479,6 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
               onChange={setActiveTab}
               size="small"
               style={{ marginTop: '16px' }}
-              tabBarExtraContent={
-                <Button 
-                  size="small" 
-                  type="text" 
-                  icon={<PlusOutlined />}
-                  onClick={() => {
-                    const newTabKey = `query-${Date.now()}`;
-                    setActiveTab(newTabKey);
-                    message.success('New query tab added');
-                  }}
-                  title="Add New Query Tab"
-                />
-              }
             >
               <TabPane tab="Query Results" key="results">
                 <div style={{ marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1453,7 +1588,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                             onClick={() => {
                               if (previewChart && onChartCreate) {
                                 onChartCreate(previewChart);
-                                setPreviewChart(null);
+                                // keep preview visible
                                 message.success('Chart added to dashboard!');
                               }
                             }}
@@ -1538,6 +1673,110 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
         </div>
       </div>
 
+      {/* Connect Data Modal */}
+      <UniversalDataSourceModal
+        isOpen={showConnectDataModal}
+        onClose={() => setShowConnectDataModal(false)}
+        onDataSourceCreated={() => {
+          setShowConnectDataModal(false);
+          loadDataSources();
+        }}
+      />
+
+      {/* Saved Queries Modal */}
+      <Modal
+        open={showSavedModal}
+        title="Saved Queries"
+        onCancel={() => setShowSavedModal(false)}
+        footer={null}
+        width={720}
+      >
+        <div style={{ marginBottom: 12, display: 'flex', gap: 8 }}>
+          <Input placeholder="Name" style={{ width: 240 }} id="save-query-name" />
+          <Button
+            type="primary"
+            icon={<SaveOutlined />}
+            onClick={async () => {
+              const nameInput = document.getElementById('save-query-name') as HTMLInputElement | null;
+              const name = nameInput?.value?.trim();
+              if (!name) { message.warning('Please enter a name'); return; }
+              try {
+                const res = await fetch(`${getBackendUrlForApi()}/api/queries/saved-queries`, {
+                  method: 'POST', headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ name, sql: sqlQuery, metadata: { activeQueryKey } })
+                });
+                if (!res.ok) throw new Error('Failed');
+                message.success('Saved');
+                const reload = await fetch(`${getBackendUrlForApi()}/api/queries/saved-queries`);
+                if (reload.ok) { const j = await reload.json(); setSavedQueries(Array.isArray(j.items) ? j.items : []); }
+                if (nameInput) nameInput.value = '';
+              } catch { message.error('Save failed'); }
+            }}
+          >Save Current</Button>
+        </div>
+        <Table
+          dataSource={savedQueries}
+          rowKey={(r) => r.id}
+          size="small"
+          pagination={false}
+          columns={[
+            { title: 'Name', dataIndex: 'name', key: 'name' },
+            { title: 'Created', dataIndex: 'created_at', key: 'created_at', render: (v: string) => v ? new Date(v).toLocaleString() : '-' },
+            { title: 'Actions', key: 'actions', render: (_: any, r: any) => (
+              <Space>
+                <Button size="small" onClick={() => { setSqlQuery(r.sql); setShowSavedModal(false); }}>Load</Button>
+              </Space>
+            ) }
+          ]}
+          style={{ maxHeight: 320, overflow: 'auto' }}
+        />
+      </Modal>
+
+      {/* Schedule Modal */}
+      <Modal
+        open={showScheduleModal}
+        title="Schedule Query"
+        onCancel={() => setShowScheduleModal(false)}
+        footer={null}
+        width={640}
+      >
+        <Form layout="inline" onFinish={async (vals) => {
+          try {
+            const res = await fetch(`${getBackendUrlForApi()}/api/queries/schedules`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name: vals.name, sql: sqlQuery, cron: vals.cron, enabled: true })
+            });
+            if (!res.ok) throw new Error('Failed');
+            message.success('Scheduled');
+            const reload = await fetch(`${getBackendUrlForApi()}/api/queries/schedules`);
+            if (reload.ok) { const j = await reload.json(); setSchedules(Array.isArray(j.items) ? j.items : []); }
+          } catch { message.error('Schedule failed'); }
+        }}>
+          <Form.Item name="name" rules={[{ required: true }]}>
+            <Input placeholder="Schedule name" />
+          </Form.Item>
+          <Form.Item name="cron" rules={[{ required: true }]}>
+            <Input placeholder="Cron (e.g., 0 9 * * 1)" />
+          </Form.Item>
+          <Form.Item>
+            <Button type="primary" htmlType="submit">Create</Button>
+          </Form.Item>
+        </Form>
+        <Divider />
+        <Table
+          dataSource={schedules}
+          rowKey={(r) => r.id}
+          size="small"
+          pagination={false}
+          columns={[
+            { title: 'Name', dataIndex: 'name', key: 'name' },
+            { title: 'Cron', dataIndex: 'cron', key: 'cron' },
+            { title: 'Enabled', dataIndex: 'enabled', key: 'enabled', render: (v: boolean) => v ? 'Yes' : 'No' },
+            { title: 'Last Run', dataIndex: 'last_run_at', key: 'last_run_at', render: (v: string) => v ? new Date(v).toLocaleString() : '-' }
+          ]}
+          style={{ maxHeight: 300, overflow: 'auto' }}
+        />
+      </Modal>
 
     </div>
   );
