@@ -129,4 +129,4 @@ client_node_modules/
 client_next_build/
 
 # Kiro IDE settings (may contain sensitive project info)
-.kiro/settings/
+.kiro/settings/sshsv.pub
