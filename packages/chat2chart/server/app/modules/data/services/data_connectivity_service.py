@@ -578,7 +578,7 @@ class DataConnectivityService:
                         schema=data_source.get('schema'),
                         file_path=data_source.get('file_path'),
                         original_filename=data_source.get('original_filename'),
-                        user_id='default',  # TODO: Get from auth context
+                        user_id=self._get_current_user_id(),  # Get from auth context
                         tenant_id='default'
                     )
                     db.add(new_data_source)
@@ -1848,3 +1848,245 @@ class DataConnectivityService:
             logger.error(f"❌ Failed to initialize demo data: {str(e)}")
             import traceback
             logger.error(f"❌ Traceback: {traceback.format_exc()}")
+    
+    def _get_current_user_id(self) -> int:
+        """Get current user ID from auth context"""
+        try:
+            # TODO: Implement proper auth context extraction
+            # For now, return 1 as default user
+            # In production, this should extract user_id from JWT token or request context
+            return 1
+        except Exception as e:
+            logger.warning(f"Failed to get current user ID: {e}, using default")
+            return 1
+
+    # 🏗️ PROJECT-SCOPED DATA SOURCE METHODS
+
+    async def get_project_data_sources(
+        self, 
+        organization_id: str, 
+        project_id: str, 
+        user_id: str = None, 
+        offset: int = 0, 
+        limit: int = 100
+    ) -> List[Dict[str, Any]]:
+        """Get data sources for a specific project (project-scoped)"""
+        try:
+            logger.info(f"🔍 Getting project data sources for project {project_id} in organization {organization_id}")
+            
+            from app.modules.data.models import DataSource
+            from app.modules.projects.models import ProjectDataSource
+            from app.db.session import get_async_session
+            
+            async with get_async_session() as db:
+                from sqlalchemy import select, join
+                
+                # Join data sources with project data sources
+                query = (
+                    select(DataSource)
+                    .join(ProjectDataSource, DataSource.id == ProjectDataSource.data_source_id)
+                    .where(
+                        ProjectDataSource.project_id == int(project_id),
+                        DataSource.is_active == True,
+                        ProjectDataSource.is_active == True
+                    )
+                    .offset(offset)
+                    .limit(limit)
+                )
+                
+                result = await db.execute(query)
+                data_sources = result.scalars().all()
+                
+                return [
+                    {
+                        'id': ds.id,
+                        'name': ds.name,
+                        'type': ds.type,
+                        'format': ds.format,
+                        'size': ds.size,
+                        'row_count': ds.row_count,
+                        'schema': ds.schema,
+                        'organization_id': organization_id,
+                        'project_id': project_id,
+                        'created_at': ds.created_at.isoformat() if ds.created_at else None,
+                        'updated_at': ds.updated_at.isoformat() if ds.updated_at else None,
+                        'last_accessed': ds.last_accessed.isoformat() if ds.last_accessed else None
+                    }
+                    for ds in data_sources
+                ]
+        except Exception as e:
+            logger.error(f"❌ Failed to get project data sources: {str(e)}")
+            return []
+
+    async def create_project_data_source(
+        self, 
+        organization_id: str, 
+        project_id: str, 
+        data_source_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Create a new data source for a specific project"""
+        try:
+            logger.info(f"📊 Creating project data source for project {project_id} in organization {organization_id}")
+            
+            from app.modules.data.models import DataSource
+            from app.modules.projects.models import ProjectDataSource
+            from app.db.session import get_async_session
+            
+            async with get_async_session() as db:
+                # Create the data source
+                data_source = DataSource(
+                    id=f"ds_{organization_id}_{project_id}_{int(datetime.now().timestamp())}",
+                    name=data_source_data['name'],
+                    type=data_source_data['type'],
+                    format=data_source_data.get('format'),
+                    description=data_source_data.get('description'),
+                    metadata=json.dumps(data_source_data.get('metadata', {})),
+                    user_id=organization_id,  # Using organization_id as user_id for now
+                    tenant_id=organization_id,
+                    is_active=True,
+                    created_at=datetime.now(),
+                    updated_at=datetime.now()
+                )
+                
+                db.add(data_source)
+                await db.flush()  # Get the ID
+                
+                # Link to project
+                project_data_source = ProjectDataSource(
+                    project_id=int(project_id),
+                    data_source_id=data_source.id,
+                    data_source_type=data_source_data['type'],
+                    is_active=True,
+                    added_at=datetime.now()
+                )
+                
+                db.add(project_data_source)
+                await db.commit()
+                
+                return {
+                    'success': True,
+                    'data_source': {
+                        'id': data_source.id,
+                        'name': data_source.name,
+                        'type': data_source.type,
+                        'organization_id': organization_id,
+                        'project_id': project_id
+                    },
+                    'message': 'Data source created successfully'
+                }
+        except Exception as e:
+            logger.error(f"❌ Failed to create project data source: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+
+    async def get_project_data_source(
+        self, 
+        organization_id: str, 
+        project_id: str, 
+        data_source_id: str
+    ) -> Dict[str, Any]:
+        """Get a specific data source for a project"""
+        try:
+            logger.info(f"🔍 Getting project data source {data_source_id} for project {project_id}")
+            
+            from app.modules.data.models import DataSource
+            from app.modules.projects.models import ProjectDataSource
+            from app.db.session import get_async_session
+            
+            async with get_async_session() as db:
+                from sqlalchemy import select, join
+                
+                query = (
+                    select(DataSource)
+                    .join(ProjectDataSource, DataSource.id == ProjectDataSource.data_source_id)
+                    .where(
+                        DataSource.id == data_source_id,
+                        ProjectDataSource.project_id == int(project_id),
+                        DataSource.is_active == True,
+                        ProjectDataSource.is_active == True
+                    )
+                )
+                
+                result = await db.execute(query)
+                data_source = result.scalar_one_or_none()
+                
+                if data_source:
+                    return {
+                        'success': True,
+                        'data_source': {
+                            'id': data_source.id,
+                            'name': data_source.name,
+                            'type': data_source.type,
+                            'format': data_source.format,
+                            'size': data_source.size,
+                            'row_count': data_source.row_count,
+                            'schema': data_source.schema,
+                            'organization_id': organization_id,
+                            'project_id': project_id,
+                            'created_at': data_source.created_at.isoformat() if data_source.created_at else None,
+                            'updated_at': data_source.updated_at.isoformat() if data_source.updated_at else None
+                        }
+                    }
+                else:
+                    return {
+                        'success': False,
+                        'error': 'Data source not found'
+                    }
+        except Exception as e:
+            logger.error(f"❌ Failed to get project data source: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+
+    async def execute_project_data_source_query(
+        self, 
+        organization_id: str, 
+        project_id: str, 
+        data_source_id: str, 
+        query: str
+    ) -> Dict[str, Any]:
+        """Execute a query on a project data source"""
+        try:
+            logger.info(f"🔍 Executing project data source query for {data_source_id}")
+            
+            # First verify the data source belongs to the project
+            data_source_result = await self.get_project_data_source(organization_id, project_id, data_source_id)
+            if not data_source_result['success']:
+                return data_source_result
+            
+            # Execute the query using the existing method
+            return await self.execute_query_on_source(data_source_id, query)
+        except Exception as e:
+            logger.error(f"❌ Failed to execute project data source query: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+
+    async def get_project_data_source_data(
+        self, 
+        organization_id: str, 
+        project_id: str, 
+        data_source_id: str, 
+        limit: int = 100
+    ) -> Dict[str, Any]:
+        """Get data from a project data source"""
+        try:
+            logger.info(f"📊 Getting project data source data for {data_source_id}")
+            
+            # First verify the data source belongs to the project
+            data_source_result = await self.get_project_data_source(organization_id, project_id, data_source_id)
+            if not data_source_result['success']:
+                return data_source_result
+            
+            # Get the data using the existing method
+            return await self.get_data_from_source(data_source_id, limit)
+        except Exception as e:
+            logger.error(f"❌ Failed to get project data source data: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e)
+            }

@@ -67,14 +67,14 @@ export const BasicConfigPanel: React.FC = () => {
           <span>Title</span>
         </div>
         <Input
-          value={basic.title}
-          onChange={(e) => handleBasicUpdate({ title: e.target.value })}
+          value={basic.title.text}
+          onChange={(e) => handleBasicUpdate({ title: { ...basic.title, text: e.target.value } })}
           placeholder="Chart title"
           size="small"
         />
         <Input
-          value={basic.subtitle || ''}
-          onChange={(e) => handleBasicUpdate({ subtitle: e.target.value })}
+          value={basic.title.subtext || ''}
+          onChange={(e) => handleBasicUpdate({ title: { ...basic.title, subtext: e.target.value } })}
           placeholder="Subtitle (optional)"
           size="small"
           style={{ marginTop: 8 }}
@@ -130,16 +130,14 @@ export const BasicConfigPanel: React.FC = () => {
           <span>Colors</span>
         </div>
         <div className="color-palette">
-          {basic.basicStyling.colors.map((color, index) => (
+          {basic.color.map((color, index) => (
             <ColorPicker
               key={index}
               value={color}
               onChange={(color) => {
-                const newColors = [...basic.basicStyling.colors];
+                const newColors = [...basic.color];
                 newColors[index] = color.toHexString();
-                handleBasicUpdate({
-                  basicStyling: { ...basic.basicStyling, colors: newColors }
-                });
+                handleBasicUpdate({ color: newColors });
               }}
               size="small"
             />
@@ -148,10 +146,8 @@ export const BasicConfigPanel: React.FC = () => {
             icon={<PlusOutlined />}
             size="small"
             onClick={() => {
-              const newColors = [...basic.basicStyling.colors, '#000000'];
-              handleBasicUpdate({
-                basicStyling: { ...basic.basicStyling, colors: newColors }
-              });
+              const newColors = [...basic.color, '#000000'];
+              handleBasicUpdate({ color: newColors });
             }}
           />
         </div>
@@ -160,17 +156,17 @@ export const BasicConfigPanel: React.FC = () => {
           <Slider
             min={8}
             max={24}
-            value={basic.basicStyling.fontSize}
+            value={basic.legend.textStyle?.fontSize || 12}
             onChange={(value) => handleBasicUpdate({
-              basicStyling: { ...basic.basicStyling, fontSize: value }
+              legend: { ...basic.legend, textStyle: { ...basic.legend.textStyle, fontSize: value } }
             })}
             style={{ width: 100 }}
           />
         </div>
         <Switch
-          checked={basic.basicStyling.showLegend}
+          checked={basic.legend.show !== false}
           onChange={(checked) => handleBasicUpdate({
-            basicStyling: { ...basic.basicStyling, showLegend: checked }
+            legend: { ...basic.legend, show: checked }
           })}
           size="small"
         />

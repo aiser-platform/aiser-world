@@ -1,0 +1,388 @@
+# Azure SaaS Deployment Configuration
+# This file defines the Azure infrastructure for Aiser SaaS hosting
+
+apiVersion: 2021-04-01
+location: eastus
+name: aiser-saas
+schemaVersion: v1.0.0
+metadata:
+  description: Aiser Platform SaaS Infrastructure on Azure
+  version: 1.0.0
+
+resources:
+  # Resource Group
+  - type: Microsoft.Resources/resourceGroups
+    apiVersion: 2021-04-01
+    name: aiser-saas-rg
+    location: eastus
+    tags:
+      Environment: Production
+      Application: Aiser
+      Type: SaaS
+
+  # Azure Database for PostgreSQL (Flexible Server)
+  - type: Microsoft.DBforPostgreSQL/flexibleServers
+    apiVersion: 2021-06-01
+    name: aiser-postgres-saas
+    location: eastus
+    dependsOn:
+      - aiser-saas-rg
+    properties:
+      administratorLogin: aiser_admin
+      administratorLoginPassword: ${POSTGRES_ADMIN_PASSWORD}
+      version: 15
+      storage:
+        storageSizeGB: 100
+        autoGrow: Enabled
+      backup:
+        backupRetentionDays: 7
+        geoRedundantBackup: Enabled
+      highAvailability:
+        mode: ZoneRedundant
+      maintenanceWindow:
+        customWindow: Enabled
+        dayOfWeek: 0
+        startHour: 2
+        startMinute: 0
+    sku:
+      name: GP_Standard_D2s_v3
+      tier: GeneralPurpose
+
+  # Azure Database for PostgreSQL Database
+  - type: Microsoft.DBforPostgreSQL/flexibleServers/databases
+    apiVersion: 2021-06-01
+    name: aiser_world
+    dependsOn:
+      - aiser-postgres-saas
+    properties: {}
+
+  # Azure Cache for Redis
+  - type: Microsoft.Cache/Redis
+    apiVersion: 2021-06-01
+    name: aiser-redis-saas
+    location: eastus
+    dependsOn:
+      - aiser-saas-rg
+    properties:
+      sku:
+        name: Premium
+        family: P
+        capacity: 1
+      enableNonSslPort: false
+      minimumTlsVersion: 1.2
+      redisConfiguration:
+        maxmemory-policy: allkeys-lru
+    sku:
+      name: Premium
+      family: P
+      capacity: 1
+
+  # Azure Container Registry
+  - type: Microsoft.ContainerRegistry/registries
+    apiVersion: 2021-06-01
+    name: aiseracrsaas
+    location: eastus
+    dependsOn:
+      - aiser-saas-rg
+    properties:
+      adminUserEnabled: true
+      sku:
+        name: Premium
+      policies:
+        quarantinePolicy:
+          status: enabled
+        trustPolicy:
+          type: Notary
+          status: enabled
+        retentionPolicy:
+          days: 30
+          status: enabled
+
+  # Azure Container Apps Environment
+  - type: Microsoft.App/managedEnvironments
+    apiVersion: 2022-03-01
+    name: aiser-container-env
+    location: eastus
+    dependsOn:
+      - aiser-saas-rg
+    properties:
+      appLogsConfiguration:
+        destination: log-analytics
+        logAnalyticsConfiguration:
+          customerId: ${LOG_ANALYTICS_WORKSPACE_ID}
+          sharedKey: ${LOG_ANALYTICS_SHARED_KEY}
+      vnetConfiguration:
+        infrastructureSubnetId: ${VNET_SUBNET_ID}
+        internal: false
+
+  # Backend API Container App
+  - type: Microsoft.App/managedEnvironments/apps
+    apiVersion: 2022-03-01
+    name: aiser-backend-saas
+    location: eastus
+    dependsOn:
+      - aiser-container-env
+      - aiser-postgres-saas
+      - aiser-redis-saas
+    properties:
+      environmentId: ${CONTAINER_ENV_ID}
+      configuration:
+        ingress:
+          external: true
+          targetPort: 8000
+          transport: http
+        registries:
+          - server: aiseracrsaas.azurecr.io
+            username: aiseracrsaas
+            passwordSecretRef: acr-password
+        secrets:
+          - name: acr-password
+            value: ${ACR_PASSWORD}
+          - name: postgres-connection
+            value: ${POSTGRES_CONNECTION_STRING}
+          - name: redis-connection
+            value: ${REDIS_CONNECTION_STRING}
+          - name: api-secret
+            value: ${API_SECRET_KEY}
+      template:
+        containers:
+          - name: backend
+            image: aiseracrsaas.azurecr.io/aiser-backend:latest
+            resources:
+              cpu: 1.0
+              memory: 2Gi
+            env:
+              - name: POSTGRES_CONNECTION_STRING
+                secretRef: postgres-connection
+              - name: REDIS_CONNECTION_STRING
+                secretRef: redis-connection
+              - name: API_SECRET_KEY
+                secretRef: api-secret
+              - name: ENVIRONMENT
+                value: production
+              - name: AZURE_STORAGE_CONNECTION_STRING
+                value: ${AZURE_STORAGE_CONNECTION_STRING}
+        scale:
+          minReplicas: 2
+          maxReplicas: 10
+          rules:
+            - name: http-rule
+              http:
+                metadata:
+                  concurrentRequests: 100
+
+  # Frontend Container App
+  - type: Microsoft.App/managedEnvironments/apps
+    apiVersion: 2022-03-01
+    name: aiser-frontend-saas
+    location: eastus
+    dependsOn:
+      - aiser-container-env
+    properties:
+      environmentId: ${CONTAINER_ENV_ID}
+      configuration:
+        ingress:
+          external: true
+          targetPort: 3000
+          transport: http
+        registries:
+          - server: aiseracrsaas.azurecr.io
+            username: aiseracrsaas
+            passwordSecretRef: acr-password
+      template:
+        containers:
+          - name: frontend
+            image: aiseracrsaas.azurecr.io/aiser-frontend:latest
+            resources:
+              cpu: 0.5
+              memory: 1Gi
+            env:
+              - name: NEXT_PUBLIC_API_URL
+                value: https://aiser-backend-saas.${CONTAINER_ENV_DOMAIN}
+              - name: NEXT_PUBLIC_ENVIRONMENT
+                value: production
+        scale:
+          minReplicas: 2
+          maxReplicas: 5
+
+  # Azure Application Gateway
+  - type: Microsoft.Network/applicationGateways
+    apiVersion: 2021-05-01
+    name: aiser-app-gateway
+    location: eastus
+    dependsOn:
+      - aiser-saas-rg
+    properties:
+      sku:
+        name: WAF_v2
+        tier: WAF_v2
+        capacity: 2
+      gatewayIPConfigurations:
+        - name: appGatewayIpConfig
+          subnet:
+            id: ${APP_GATEWAY_SUBNET_ID}
+      frontendIPConfigurations:
+        - name: appGatewayFrontendIP
+          publicIPAddress:
+            id: ${PUBLIC_IP_ID}
+      frontendPorts:
+        - name: port_80
+          port: 80
+        - name: port_443
+          port: 443
+      backendAddressPools:
+        - name: backend-pool
+          backendAddresses:
+            - fqdn: aiser-backend-saas.${CONTAINER_ENV_DOMAIN}
+            - fqdn: aiser-frontend-saas.${CONTAINER_ENV_DOMAIN}
+      backendHttpSettingsCollection:
+        - name: backend-settings
+          port: 80
+          protocol: Http
+          cookieBasedAffinity: Disabled
+          requestTimeout: 30
+      httpListeners:
+        - name: listener
+          frontendIPConfiguration:
+            id: ${FRONTEND_IP_CONFIG_ID}
+          frontendPort:
+            id: ${FRONTEND_PORT_ID}
+          protocol: Http
+      requestRoutingRules:
+        - name: routing-rule
+          httpListener:
+            id: ${HTTP_LISTENER_ID}
+          backendAddressPool:
+            id: ${BACKEND_POOL_ID}
+          backendHttpSettings:
+            id: ${BACKEND_SETTINGS_ID}
+      webApplicationFirewallConfiguration:
+        enabled: true
+        firewallMode: Prevention
+        ruleSetType: OWASP
+        ruleSetVersion: 3.2
+
+  # Azure Key Vault
+  - type: Microsoft.KeyVault/vaults
+    apiVersion: 2021-10-01
+    name: aiser-keyvault-saas
+    location: eastus
+    dependsOn:
+      - aiser-saas-rg
+    properties:
+      sku:
+        name: standard
+        family: A
+      tenantId: ${AZURE_TENANT_ID}
+      accessPolicies:
+        - tenantId: ${AZURE_TENANT_ID}
+          objectId: ${MANAGED_IDENTITY_OBJECT_ID}
+          permissions:
+            keys: [get, list, create, delete, update, import, backup, restore, recover]
+            secrets: [get, list, set, delete, backup, restore, recover]
+            certificates: [get, list, create, delete, update, import, backup, restore, managecontacts, manageissuers, getissuers, listissuers, setissuers, deleteissuers]
+      enabledForDeployment: false
+      enabledForDiskEncryption: false
+      enabledForTemplateDeployment: true
+      enableSoftDelete: true
+      softDeleteRetentionInDays: 90
+      enableRbacAuthorization: true
+
+  # Azure Monitor Log Analytics Workspace
+  - type: Microsoft.OperationalInsights/workspaces
+    apiVersion: 2021-12-01
+    name: aiser-logs-saas
+    location: eastus
+    dependsOn:
+      - aiser-saas-rg
+    properties:
+      sku:
+        name: PerGB2018
+      retentionInDays: 30
+      features:
+        searchVersion: 1
+        legacy: 0
+        enableLogAccessUsingOnlyResourcePermissions: true
+
+  # Azure Application Insights
+  - type: Microsoft.Insights/components
+    apiVersion: 2020-02-02
+    name: aiser-insights-saas
+    location: eastus
+    dependsOn:
+      - aiser-saas-rg
+      - aiser-logs-saas
+    properties:
+      Application_Type: web
+      WorkspaceResourceId: ${LOG_ANALYTICS_WORKSPACE_ID}
+      RetentionInDays: 90
+      IngestionMode: LogAnalytics
+
+  # Azure Storage Account
+  - type: Microsoft.Storage/storageAccounts
+    apiVersion: 2021-09-01
+    name: aiserstorage${UNIQUE_SUFFIX}
+    location: eastus
+    dependsOn:
+      - aiser-saas-rg
+    properties:
+      sku:
+        name: Standard_LRS
+        tier: Standard
+      kind: StorageV2
+      accessTier: Hot
+      allowBlobPublicAccess: false
+      minimumTlsVersion: TLS1_2
+      supportsHttpsTrafficOnly: true
+      networkAcls:
+        defaultAction: Deny
+        bypass: AzureServices
+      encryption:
+        services:
+          blob:
+            enabled: true
+            keyType: Account
+          file:
+            enabled: true
+            keyType: Account
+        keySource: Microsoft.Storage
+
+  # Azure CDN Profile
+  - type: Microsoft.Cdn/profiles
+    apiVersion: 2021-06-01
+    name: aiser-cdn-saas
+    location: global
+    dependsOn:
+      - aiser-saas-rg
+    properties:
+      sku:
+        name: Standard_Microsoft
+    tags:
+      Environment: Production
+      Application: Aiser
+
+  # Azure CDN Endpoint
+  - type: Microsoft.Cdn/profiles/endpoints
+    apiVersion: 2021-06-01
+    name: aiser-cdn-endpoint
+    dependsOn:
+      - aiser-cdn-saas
+    properties:
+      originHostHeader: aiser-frontend-saas.${CONTAINER_ENV_DOMAIN}
+      origins:
+        - name: frontend-origin
+          hostName: aiser-frontend-saas.${CONTAINER_ENV_DOMAIN}
+          httpPort: 80
+          httpsPort: 443
+      isHttpAllowed: false
+      isHttpsAllowed: true
+      queryStringCachingBehavior: IgnoreQueryString
+      contentTypesToCompress:
+        - application/javascript
+        - application/json
+        - application/xml
+        - text/css
+        - text/html
+        - text/javascript
+        - text/plain
+      isCompressionEnabled: true

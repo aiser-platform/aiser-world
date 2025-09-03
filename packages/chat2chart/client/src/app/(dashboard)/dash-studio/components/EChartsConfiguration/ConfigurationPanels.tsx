@@ -156,15 +156,15 @@ export const BasicConfigPanel: React.FC = () => {
           <span className="field-label">Title:</span>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <Input
-              value={basic.title}
-              onChange={(e) => handleBasicUpdate({ title: e.target.value })}
+              value={basic.title.text}
+              onChange={(e) => handleBasicUpdate({ title: { ...basic.title, text: e.target.value } })}
               placeholder="Chart title"
               size="small"
               style={{ flex: 1 }}
             />
             <Select
-              value={basic.titlePosition || 'center'}
-              onChange={(value) => handleBasicUpdate({ titlePosition: value })}
+              value={basic.title.left || 'center'}
+              onChange={(value) => handleBasicUpdate({ title: { ...basic.title, left: value } })}
               size="small"
               style={{ width: '80px' }}
             >
@@ -178,15 +178,15 @@ export const BasicConfigPanel: React.FC = () => {
           <span className="field-label">Subtitle:</span>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <Input
-              value={basic.subtitle || ''}
-              onChange={(e) => handleBasicUpdate({ subtitle: e.target.value })}
+              value={basic.title.subtext || ''}
+              onChange={(e) => handleBasicUpdate({ title: { ...basic.title, subtext: e.target.value } })}
               placeholder="Subtitle (optional)"
               size="small"
               style={{ flex: 1 }}
             />
             <Select
-              value={basic.subtitlePosition || 'center'}
-              onChange={(value) => handleBasicUpdate({ subtitlePosition: value })}
+              value={basic.title.left || 'center'}
+              onChange={(value) => handleBasicUpdate({ title: { ...basic.title, left: value } })}
               size="small"
               style={{ width: '80px' }}
             >
@@ -355,7 +355,7 @@ export const BasicConfigPanel: React.FC = () => {
         <div className="color-palette-section">
           <div className="palette-header">Color Palette</div>
           <Select
-            value={basic.basicStyling.colorPalette || 'default'}
+            value="default"
             onChange={(value) => {
               const palettes = {
                 'default': ['#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de'],
@@ -366,16 +366,12 @@ export const BasicConfigPanel: React.FC = () => {
                 'echarts-essos': ['#893448', '#d95850', '#eb8146', '#f4e874', '#f1f9c4', '#c8b273', '#c6e6c1', '#65cda3', '#55b4a8'],
                 'echarts-wonderland': ['#4ea397', '#22c3aa', '#7bd9a5', '#d0648a', '#f58db2', '#f2b3c9', '#e6c7bf', '#e8d4b2', '#cee8ae'],
                 'echarts-macarons': ['#2ec7c9', '#b6a2de', '#5ab1ef', '#ffb980', '#d87a80', '#8d98b3', '#e5cf0d', '#97b552', '#95706d'],
-                'custom': basic.basicStyling.colors
+                'custom': basic.color
               };
               
               if (value !== 'custom') {
                 handleBasicUpdate({
-                  basicStyling: { 
-                    ...basic.basicStyling, 
-                    colors: palettes[value as keyof typeof palettes],
-                    colorPalette: value
-                  }
+                  color: palettes[value as keyof typeof palettes]
                 });
               }
             }}
@@ -466,7 +462,7 @@ export const BasicConfigPanel: React.FC = () => {
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span>Custom</span>
                 <div style={{ display: 'flex', gap: '2px' }}>
-                  {basic.basicStyling.colors.slice(0, 5).map((color, i) => (
+                  {basic.color.slice(0, 5).map((color, i) => (
                     <div key={i} style={{ width: '12px', height: '12px', backgroundColor: color, borderRadius: '2px' }} />
                   ))}
                 </div>
@@ -475,19 +471,17 @@ export const BasicConfigPanel: React.FC = () => {
           </Select>
           
           {/* Custom Color Picker */}
-          {basic.basicStyling.colorPalette === 'custom' && (
+          {true && (
             <div className="custom-colors">
               <div className="color-palette">
-                {basic.basicStyling.colors.map((color, index) => (
+                {basic.color.map((color, index) => (
                   <ColorPicker
                     key={index}
                     value={color}
                     onChange={(color) => {
-                      const newColors = [...basic.basicStyling.colors];
+                      const newColors = [...basic.color];
                       newColors[index] = color.toHexString();
-                      handleBasicUpdate({
-                        basicStyling: { ...basic.basicStyling, colors: newColors }
-                      });
+                      handleBasicUpdate({ color: newColors });
                     }}
                     size="small"
                   />
@@ -496,21 +490,17 @@ export const BasicConfigPanel: React.FC = () => {
                   icon={<PlusOutlined />}
                   size="small"
                   onClick={() => {
-                    const newColors = [...basic.basicStyling.colors, '#000000'];
-                    handleBasicUpdate({
-                      basicStyling: { ...basic.basicStyling, colors: newColors }
-                    });
+                    const newColors = [...basic.color, '#000000'];
+                    handleBasicUpdate({ color: newColors });
                   }}
                 />
-                {basic.basicStyling.colors.length > 1 && (
+                {basic.color.length > 1 && (
                   <Button
                     icon={<MinusOutlined />}
                     size="small"
                     onClick={() => {
-                      const newColors = basic.basicStyling.colors.slice(0, -1);
-                      handleBasicUpdate({
-                        basicStyling: { ...basic.basicStyling, colors: newColors }
-                      });
+                      const newColors = basic.color.slice(0, -1);
+                      handleBasicUpdate({ color: newColors });
                     }}
                   />
                 )}
@@ -525,9 +515,9 @@ export const BasicConfigPanel: React.FC = () => {
           <Slider
             min={8}
             max={24}
-            value={basic.basicStyling.fontSize}
+            value={basic.legend.textStyle?.fontSize || 12}
             onChange={(value) => handleBasicUpdate({
-              basicStyling: { ...basic.basicStyling, fontSize: value }
+              legend: { ...basic.legend, textStyle: { ...basic.legend.textStyle, fontSize: value } }
             })}
             style={{ width: 100 }}
           />
@@ -536,9 +526,9 @@ export const BasicConfigPanel: React.FC = () => {
         {/* Legend Toggle */}
         <div className="legend-control">
           <Switch
-            checked={basic.basicStyling.showLegend}
+            checked={basic.legend.show !== false}
             onChange={(checked) => handleBasicUpdate({
-              basicStyling: { ...basic.basicStyling, showLegend: checked }
+              legend: { ...basic.legend, show: checked }
             })}
             size="small"
           />
@@ -559,7 +549,7 @@ export const StandardConfigPanel: React.FC = () => {
   };
 
   // Initialize standard config if not exists
-  if (!standard.axis || !standard.series || !standard.legend || !standard.tooltip) {
+  if (!standard.axis || !standard.seriesConfig || !standard.legend || !standard.tooltip) {
     dispatch({
       type: 'UPDATE_STANDARD',
       payload: {
@@ -567,7 +557,7 @@ export const StandardConfigPanel: React.FC = () => {
           xAxis: { show: true, labelRotation: 0, labelColor: '#54555a', gridLines: true },
           yAxis: { show: true, labelColor: '#54555a', gridLines: true, format: '' },
         },
-        series: {
+        seriesConfig: {
           showLabels: false,
           labelPosition: 'top',
           smooth: false,
@@ -575,15 +565,22 @@ export const StandardConfigPanel: React.FC = () => {
           symbolSize: 6,
         },
         legend: {
-          position: 'bottom',
-          orientation: 'horizontal',
-          textColor: '#54555a',
+          data: [],
+          bottom: 0,
+          orient: 'horizontal',
+          show: true,
+          textStyle: {
+            color: '#54555a',
+            fontSize: 12
+          }
         },
         tooltip: {
-          show: true,
           trigger: 'axis',
           backgroundColor: 'rgba(50, 50, 50, 0.9)',
-          textColor: '#fff',
+          borderColor: '#333',
+          textStyle: {
+            color: '#fff'
+          }
         },
         gridSpacing: 5,
       },
@@ -603,9 +600,12 @@ export const StandardConfigPanel: React.FC = () => {
             <Row gutter={[8, 8]}>
               <Col span={12}>
                 <Switch
-                  checked={standard.axis.xAxis.show}
+                  checked={standard.axis?.xAxis.show}
                   onChange={(checked) => handleStandardUpdate({
-                    axis: { ...standard.axis, xAxis: { ...standard.axis.xAxis, show: checked } }
+                    axis: {
+                      xAxis: { ...standard.axis?.xAxis, show: checked },
+                      yAxis: { ...standard.axis?.yAxis }
+                    }
                   })}
                   size="small"
                 />
@@ -616,18 +616,24 @@ export const StandardConfigPanel: React.FC = () => {
                 <Slider
                   min={-90}
                   max={90}
-                  value={standard.axis.xAxis.labelRotation}
+                  value={standard.axis?.xAxis.labelRotation}
                   onChange={(value) => handleStandardUpdate({
-                    axis: { ...standard.axis, xAxis: { ...standard.axis.xAxis, labelRotation: value } }
+                    axis: {
+                      xAxis: { ...standard.axis?.xAxis, labelRotation: value },
+                      yAxis: { ...standard.axis?.yAxis }
+                    }
                   })}
                   style={{ width: 80 }}
                 />
               </Col>
             </Row>
             <ColorPicker
-              value={standard.axis.xAxis.labelColor}
+              value={standard.axis?.xAxis.labelColor}
               onChange={(color) => handleStandardUpdate({
-                axis: { ...standard.axis, xAxis: { ...standard.axis.xAxis, labelColor: color.toHexString() } }
+                axis: {
+                  xAxis: { ...standard.axis?.xAxis, labelColor: color.toHexString() },
+                  yAxis: { ...standard.axis?.yAxis }
+                }
               })}
               size="small"
             />
@@ -641,9 +647,9 @@ export const StandardConfigPanel: React.FC = () => {
             <Row gutter={[8, 8]}>
               <Col span={12}>
                 <Switch
-                  checked={standard.series.showLabels}
+                  checked={standard.seriesConfig?.showLabels}
                   onChange={(checked) => handleStandardUpdate({
-                    series: { ...standard.series, showLabels: checked }
+                    seriesConfig: { ...standard.seriesConfig, showLabels: checked }
                   })}
                   size="small"
                 />
@@ -652,9 +658,9 @@ export const StandardConfigPanel: React.FC = () => {
               <Col span={12}>
                 <span>Position:</span>
                 <Select
-                  value={standard.series.labelPosition}
+                  value={standard.seriesConfig?.labelPosition}
                   onChange={(value) => handleStandardUpdate({
-                    series: { ...standard.series, labelPosition: value }
+                    seriesConfig: { ...standard.seriesConfig, labelPosition: value }
                   })}
                   size="small"
                   style={{ width: 80 }}
@@ -670,9 +676,9 @@ export const StandardConfigPanel: React.FC = () => {
             <Row gutter={[8, 8]}>
               <Col span={12}>
                 <Switch
-                  checked={standard.series.smooth}
+                  checked={standard.seriesConfig?.smooth}
                   onChange={(checked) => handleStandardUpdate({
-                    series: { ...standard.series, smooth: checked }
+                    seriesConfig: { ...standard.seriesConfig, smooth: checked }
                   })}
                   size="small"
                 />
@@ -683,9 +689,9 @@ export const StandardConfigPanel: React.FC = () => {
                 <Slider
                   min={2}
                   max={20}
-                  value={standard.series.symbolSize}
+                  value={standard.seriesConfig?.symbolSize || 6}
                   onChange={(value) => handleStandardUpdate({
-                    series: { ...standard.series, symbolSize: value }
+                    seriesConfig: { ...standard.seriesConfig, symbolSize: value }
                   })}
                   style={{ width: 80 }}
                 />
@@ -701,10 +707,20 @@ export const StandardConfigPanel: React.FC = () => {
               <Col span={12}>
                 <span>Position:</span>
                 <Select
-                  value={standard.legend.position}
-                  onChange={(value) => handleStandardUpdate({
-                    legend: { ...standard.legend, position: value }
-                  })}
+                  value={standard.legend.bottom !== undefined ? 'bottom' : 
+                        standard.legend.top !== undefined ? 'top' : 
+                        standard.legend.left !== undefined ? 'left' : 'right'}
+                  onChange={(value) => {
+                    const newLegend = { ...standard.legend };
+                    // Clear all position properties first
+                    delete newLegend.bottom;
+                    delete newLegend.top;
+                    delete newLegend.left;
+                    delete newLegend.right;
+                    // Set the new position
+                    (newLegend as any)[value] = 0;
+                    handleStandardUpdate({ legend: newLegend });
+                  }}
                   size="small"
                   style={{ width: 80 }}
                 >
@@ -717,9 +733,9 @@ export const StandardConfigPanel: React.FC = () => {
               <Col span={12}>
                 <span>Orientation:</span>
                 <Select
-                  value={standard.legend.orientation}
+                  value={standard.legend.orient || 'horizontal'}
                   onChange={(value) => handleStandardUpdate({
-                    legend: { ...standard.legend, orientation: value }
+                    legend: { ...standard.legend, orient: value }
                   })}
                   size="small"
                   style={{ width: 80 }}
@@ -738,9 +754,14 @@ export const StandardConfigPanel: React.FC = () => {
             <Row gutter={[8, 8]}>
               <Col span={12}>
                 <Switch
-                  checked={standard.tooltip.show}
+                  checked={standard.tooltip?.trigger !== 'none'}
                   onChange={(checked) => handleStandardUpdate({
-                    tooltip: { ...standard.tooltip, show: checked }
+                    tooltip: {
+                      trigger: checked ? 'axis' : 'none',
+                      backgroundColor: standard.tooltip?.backgroundColor,
+                      borderColor: standard.tooltip?.borderColor,
+                      textStyle: standard.tooltip?.textStyle,
+                    }
                   })}
                   size="small"
                 />
@@ -749,7 +770,7 @@ export const StandardConfigPanel: React.FC = () => {
               <Col span={12}>
                 <span>Trigger:</span>
                 <Select
-                  value={standard.tooltip.trigger}
+                  value={standard.tooltip?.trigger}
                   onChange={(value) => handleStandardUpdate({
                     tooltip: { ...standard.tooltip, trigger: value }
                   })}
@@ -782,9 +803,12 @@ export const StandardConfigPanel: React.FC = () => {
             <Row gutter={[8, 8]}>
               <Col span={12}>
                 <Switch
-                  checked={standard.axis.xAxis.gridLines}
+                  checked={standard.axis?.xAxis.gridLines}
                   onChange={(checked) => handleStandardUpdate({
-                    axis: { ...standard.axis, xAxis: { ...standard.axis.xAxis, gridLines: checked } }
+                    axis: {
+                      xAxis: { ...standard.axis?.xAxis, gridLines: checked },
+                      yAxis: { ...standard.axis?.yAxis }
+                    }
                   })}
                   size="small"
                 />
@@ -792,9 +816,12 @@ export const StandardConfigPanel: React.FC = () => {
               </Col>
               <Col span={12}>
                 <Switch
-                  checked={standard.axis.yAxis.gridLines}
+                  checked={standard.axis?.yAxis.gridLines}
                   onChange={(checked) => handleStandardUpdate({
-                    axis: { ...standard.axis, yAxis: { ...standard.axis.yAxis, gridLines: checked } }
+                    axis: {
+                      xAxis: { ...standard.axis?.xAxis },
+                      yAxis: { ...standard.axis?.yAxis, gridLines: checked }
+                    }
                   })}
                   size="small"
                 />
@@ -926,9 +953,9 @@ export const AdvancedConfigPanel: React.FC = () => {
               <Col span={12}>
                 <span>Duration:</span>
                 <InputNumber
-                  value={state.advanced.animation.duration}
+                  value={state.advanced.animation?.duration || 1000}
                   onChange={(value) => handleAdvancedUpdate({
-                    animation: { ...state.advanced.animation, duration: value || 1000 }
+                    animation: { show: true, duration: value || 1000, easing: 'cubicOut', delay: state.advanced.animation?.delay || 0 }
                   })}
                   size="small"
                   style={{ width: 80 }}
@@ -939,9 +966,9 @@ export const AdvancedConfigPanel: React.FC = () => {
               <Col span={12}>
                 <span>Delay:</span>
                 <InputNumber
-                  value={state.advanced.animation.delay}
+                  value={state.advanced.animation?.delay || 0}
                   onChange={(value) => handleAdvancedUpdate({
-                    animation: { ...state.advanced.animation, delay: value || 0 }
+                    animation: { show: true, duration: state.advanced.animation?.duration || 1000, easing: 'cubicOut', delay: value || 0 }
                   })}
                   size="small"
                   style={{ width: 80 }}
@@ -957,19 +984,19 @@ export const AdvancedConfigPanel: React.FC = () => {
         <Panel header="Data Zoom" key="dataZoom">
           <div className="config-section">
             <Switch
-              checked={state.advanced.dataZoom.show}
+              checked={state.advanced.dataZoom?.show || false}
               onChange={(checked) => handleAdvancedUpdate({
-                dataZoom: { ...state.advanced.dataZoom, show: checked }
+                dataZoom: { show: checked, type: state.advanced.dataZoom?.type || 'slider', start: state.advanced.dataZoom?.start || 0, end: state.advanced.dataZoom?.end || 100 }
               })}
               size="small"
             />
             <span style={{ marginLeft: 8 }}>Enable Data Zoom</span>
-            {state.advanced.dataZoom.show && (
+            {state.advanced.dataZoom?.show && (
               <div style={{ marginTop: 8 }}>
                 <Select
-                  value={state.advanced.dataZoom.type}
+                  value={state.advanced.dataZoom?.type || 'slider'}
                   onChange={(value) => handleAdvancedUpdate({
-                    dataZoom: { ...state.advanced.dataZoom, type: value }
+                    dataZoom: { ...state.advanced.dataZoom!, type: value }
                   })}
                   size="small"
                   style={{ width: 120 }}
@@ -987,9 +1014,9 @@ export const AdvancedConfigPanel: React.FC = () => {
         <Panel header="Toolbox" key="toolbox">
           <div className="config-section">
             <Switch
-              checked={state.advanced.toolbox.show}
+              checked={state.advanced.toolbox?.show || false}
               onChange={(checked) => handleAdvancedUpdate({
-                toolbox: { ...state.advanced.toolbox, show: checked }
+                toolbox: { show: checked, features: state.advanced.toolbox?.features || [] }
               })}
               size="small"
             />
@@ -1195,8 +1222,8 @@ export const BasicConfigPanelNoTypeSelection: React.FC = () => {
         <div className="config-row">
           <label>Chart Title:</label>
           <Input
-            value={basic.title}
-            onChange={(e) => handleBasicUpdate({ title: e.target.value })}
+            value={basic.title.text}
+            onChange={(e) => handleBasicUpdate({ title: { ...basic.title, text: e.target.value } })}
             placeholder="Enter chart title"
             size="small"
           />
@@ -1205,8 +1232,8 @@ export const BasicConfigPanelNoTypeSelection: React.FC = () => {
         <div className="config-row">
           <label>Subtitle:</label>
           <Input
-            value={basic.subtitle || ''}
-            onChange={(e) => handleBasicUpdate({ subtitle: e.target.value })}
+            value={basic.title.subtext || ''}
+            onChange={(e) => handleBasicUpdate({ title: { ...basic.title, subtext: e.target.value } })}
             placeholder="Enter subtitle"
             size="small"
           />
@@ -1215,8 +1242,8 @@ export const BasicConfigPanelNoTypeSelection: React.FC = () => {
         <div className="config-row">
           <label>Title Position:</label>
           <Select
-            value={basic.titlePosition || 'center'}
-            onChange={(value) => handleBasicUpdate({ titlePosition: value })}
+            value={basic.title.left || 'center'}
+            onChange={(value) => handleBasicUpdate({ title: { ...basic.title, left: value } })}
             size="small"
             style={{ width: '100%' }}
           >
@@ -1282,9 +1309,9 @@ export const BasicConfigPanelNoTypeSelection: React.FC = () => {
         <div className="config-row">
           <label>Font Size:</label>
           <InputNumber
-            value={basic.basicStyling.fontSize}
+            value={basic.legend.textStyle?.fontSize || 12}
             onChange={(value) => handleBasicUpdate({ 
-              basicStyling: { ...basic.basicStyling, fontSize: value || 12 }
+              legend: { ...basic.legend, textStyle: { ...basic.legend.textStyle, fontSize: value || 12 } }
             })}
             min={8}
             max={24}
@@ -1296,9 +1323,9 @@ export const BasicConfigPanelNoTypeSelection: React.FC = () => {
         <div className="config-row">
           <label>Show Legend:</label>
           <Switch
-            checked={basic.basicStyling.showLegend}
-            onChange={(checked) => handleBasicUpdate({ 
-              basicStyling: { ...basic.basicStyling, showLegend: checked }
+                        checked={basic.legend.show !== false}
+            onChange={(checked) => handleBasicUpdate({
+              legend: { ...basic.legend, show: checked }
             })}
             size="small"
           />
@@ -1307,10 +1334,10 @@ export const BasicConfigPanelNoTypeSelection: React.FC = () => {
         <div className="config-row">
           <label>Color Palette:</label>
           <Select
-            value={basic.basicStyling.colorPalette || 'default'}
-            onChange={(value) => handleBasicUpdate({ 
-              basicStyling: { ...basic.basicStyling, colorPalette: value }
-            })}
+            value="default"
+            onChange={(value) => {
+              // Handle color palette change if needed
+            }}
             size="small"
             style={{ width: '100%' }}
           >
@@ -1324,3 +1351,5 @@ export const BasicConfigPanelNoTypeSelection: React.FC = () => {
     </div>
   );
 };
+
+

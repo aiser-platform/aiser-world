@@ -1,22 +1,27 @@
-// ECharts Configuration Components
-export { EChartsConfigProvider, useEChartsConfig } from './EChartsConfigProvider';
-export { EChartsOptionGenerator } from './EChartsOptionGenerator';
+// ECharts Configuration Components - Optimized exports
 export { 
-  BasicConfigPanel, 
-  StandardConfigPanel, 
-  AdvancedConfigPanel, 
-  EChartsConfigurationPanel,
-  PropertiesConfigPanel
-} from './ConfigurationPanels';
-export { EChartsConfigDemo } from './EChartsConfigDemo';
+  EChartsConfigProvider, 
+  useEChartsConfig,
+  CHART_TEMPLATES 
+} from './EChartsConfigProvider';
 
-// Types
+// Export the EChartsOptionGenerator class
+export { EChartsOptionGenerator } from './EChartsOptionGenerator';
+
+// Lazy export heavy components
+export { 
+  PropertiesConfigPanel,
+  EChartsConfigurationPanel,
+  BasicConfigPanel,
+  StandardConfigPanel,
+  AdvancedConfigPanel
+} from './ConfigurationPanels';
+
+// Re-export types
 export type { 
-  ConfigLevel, 
   BasicChartConfig, 
   StandardChartConfig, 
-  AdvancedChartConfig, 
-  ChartTemplate,
-  EChartsConfigState,
-  EChartsConfigAction 
+  AdvancedChartConfig,
+  ConfigLevel,
+  ChartTemplate
 } from './EChartsConfigProvider';

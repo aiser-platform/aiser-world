@@ -1,0 +1,383 @@
+# Real Data Source Connection Templates
+# Production-ready data source configurations for Aiser Platform
+
+# Database Connections
+databases:
+  postgresql:
+    name: "PostgreSQL Database"
+    type: "database"
+    format: "postgresql"
+    description: "PostgreSQL database connection"
+    connection_config:
+      host: "postgres"
+      port: 5432
+      database: "aiser_production"
+      username: "aiser_admin"
+      password: "${POSTGRES_PASSWORD}"
+      ssl_mode: "require"
+      connection_pool_size: 20
+      max_overflow: 30
+      pool_timeout: 30
+      pool_recycle: 3600
+    features:
+      - "sql_queries"
+      - "schema_browsing"
+      - "real_time_data"
+      - "transactions"
+      - "stored_procedures"
+
+  mysql:
+    name: "MySQL Database"
+    type: "database"
+    format: "mysql"
+    description: "MySQL database connection"
+    connection_config:
+      host: "mysql"
+      port: 3306
+      database: "aiser_data"
+      username: "aiser_user"
+      password: "${MYSQL_PASSWORD}"
+      ssl_mode: "require"
+      charset: "utf8mb4"
+      connection_pool_size: 20
+    features:
+      - "sql_queries"
+      - "schema_browsing"
+      - "real_time_data"
+      - "transactions"
+
+  sqlserver:
+    name: "SQL Server Database"
+    type: "database"
+    format: "sqlserver"
+    description: "Microsoft SQL Server database connection"
+    connection_config:
+      host: "sqlserver"
+      port: 1433
+      database: "aiser_data"
+      username: "aiser_user"
+      password: "${SQLSERVER_PASSWORD}"
+      driver: "ODBC Driver 17 for SQL Server"
+      trust_server_certificate: true
+      connection_pool_size: 20
+    features:
+      - "sql_queries"
+      - "schema_browsing"
+      - "real_time_data"
+      - "stored_procedures"
+
+# Cloud Data Warehouses
+data_warehouses:
+  snowflake:
+    name: "Snowflake Data Warehouse"
+    type: "data_warehouse"
+    format: "snowflake"
+    description: "Snowflake cloud data warehouse connection"
+    connection_config:
+      account: "${SNOWFLAKE_ACCOUNT}"
+      username: "${SNOWFLAKE_USERNAME}"
+      password: "${SNOWFLAKE_PASSWORD}"
+      warehouse: "${SNOWFLAKE_WAREHOUSE}"
+      database: "${SNOWFLAKE_DATABASE}"
+      schema: "${SNOWFLAKE_SCHEMA}"
+      role: "${SNOWFLAKE_ROLE}"
+      ssl: true
+    features:
+      - "sql_queries"
+      - "schema_browsing"
+      - "real_time_data"
+      - "data_sharing"
+      - "time_travel"
+
+  bigquery:
+    name: "Google BigQuery"
+    type: "data_warehouse"
+    format: "bigquery"
+    description: "Google BigQuery data warehouse connection"
+    connection_config:
+      project_id: "${BIGQUERY_PROJECT_ID}"
+      dataset_id: "${BIGQUERY_DATASET_ID}"
+      credentials_path: "${BIGQUERY_CREDENTIALS_PATH}"
+      location: "US"
+      use_legacy_sql: false
+    features:
+      - "sql_queries"
+      - "schema_browsing"
+      - "real_time_data"
+      - "ml_integration"
+
+  redshift:
+    name: "Amazon Redshift"
+    type: "data_warehouse"
+    format: "redshift"
+    description: "Amazon Redshift data warehouse connection"
+    connection_config:
+      host: "${REDSHIFT_HOST}"
+      port: 5439
+      database: "${REDSHIFT_DATABASE}"
+      username: "${REDSHIFT_USERNAME}"
+      password: "${REDSHIFT_PASSWORD}"
+      ssl: true
+      cluster_identifier: "${REDSHIFT_CLUSTER_ID}"
+    features:
+      - "sql_queries"
+      - "schema_browsing"
+      - "real_time_data"
+      - "columnar_storage"
+
+# File Storage
+file_storage:
+  s3:
+    name: "Amazon S3 Storage"
+    type: "file_storage"
+    format: "s3"
+    description: "Amazon S3 file storage connection"
+    connection_config:
+      bucket: "${S3_BUCKET}"
+      region: "${S3_REGION}"
+      access_key_id: "${AWS_ACCESS_KEY_ID}"
+      secret_access_key: "${AWS_SECRET_ACCESS_KEY}"
+      endpoint_url: null
+      ssl: true
+    features:
+      - "file_upload"
+      - "file_download"
+      - "csv_import"
+      - "excel_import"
+      - "json_import"
+
+  azure_blob:
+    name: "Azure Blob Storage"
+    type: "file_storage"
+    format: "azure_blob"
+    description: "Azure Blob Storage connection"
+    connection_config:
+      account_name: "${AZURE_STORAGE_ACCOUNT}"
+      account_key: "${AZURE_STORAGE_KEY}"
+      container: "${AZURE_STORAGE_CONTAINER}"
+      sas_token: "${AZURE_STORAGE_SAS_TOKEN}"
+    features:
+      - "file_upload"
+      - "file_download"
+      - "csv_import"
+      - "excel_import"
+      - "json_import"
+
+  gcs:
+    name: "Google Cloud Storage"
+    type: "file_storage"
+    format: "gcs"
+    description: "Google Cloud Storage connection"
+    connection_config:
+      bucket: "${GCS_BUCKET}"
+      project_id: "${GCP_PROJECT_ID}"
+      credentials_path: "${GCP_CREDENTIALS_PATH}"
+      location: "US"
+    features:
+      - "file_upload"
+      - "file_download"
+      - "csv_import"
+      - "excel_import"
+      - "json_import"
+
+# API Connections
+api_connections:
+  rest_api:
+    name: "REST API"
+    type: "api"
+    format: "rest"
+    description: "REST API connection"
+    connection_config:
+      base_url: "${API_BASE_URL}"
+      api_key: "${API_KEY}"
+      auth_type: "bearer"
+      headers:
+        "Content-Type": "application/json"
+        "Accept": "application/json"
+      timeout: 30
+      retry_attempts: 3
+    features:
+      - "api_calls"
+      - "data_fetching"
+      - "real_time_data"
+      - "webhook_support"
+
+  graphql:
+    name: "GraphQL API"
+    type: "api"
+    format: "graphql"
+    description: "GraphQL API connection"
+    connection_config:
+      endpoint: "${GRAPHQL_ENDPOINT}"
+      api_key: "${GRAPHQL_API_KEY}"
+      auth_type: "bearer"
+      headers:
+        "Content-Type": "application/json"
+      timeout: 30
+    features:
+      - "graphql_queries"
+      - "data_fetching"
+      - "real_time_data"
+      - "subscriptions"
+
+# Real-time Data Sources
+real_time:
+  kafka:
+    name: "Apache Kafka"
+    type: "streaming"
+    format: "kafka"
+    description: "Apache Kafka streaming data connection"
+    connection_config:
+      bootstrap_servers: "${KAFKA_BOOTSTRAP_SERVERS}"
+      security_protocol: "SASL_SSL"
+      sasl_mechanism: "PLAIN"
+      sasl_username: "${KAFKA_USERNAME}"
+      sasl_password: "${KAFKA_PASSWORD}"
+      group_id: "aiser_platform"
+      auto_offset_reset: "latest"
+    features:
+      - "real_time_streaming"
+      - "data_processing"
+      - "event_sourcing"
+      - "message_queuing"
+
+  redis:
+    name: "Redis Cache"
+    type: "cache"
+    format: "redis"
+    description: "Redis cache and data store connection"
+    connection_config:
+      host: "redis"
+      port: 6379
+      password: "${REDIS_PASSWORD}"
+      db: 0
+      ssl: true
+      connection_pool_size: 20
+      timeout: 5
+    features:
+      - "caching"
+      - "session_storage"
+      - "real_time_data"
+      - "pub_sub"
+
+# Business Applications
+business_apps:
+  salesforce:
+    name: "Salesforce CRM"
+    type: "crm"
+    format: "salesforce"
+    description: "Salesforce CRM connection"
+    connection_config:
+      instance_url: "${SALESFORCE_INSTANCE_URL}"
+      username: "${SALESFORCE_USERNAME}"
+      password: "${SALESFORCE_PASSWORD}"
+      security_token: "${SALESFORCE_SECURITY_TOKEN}"
+      api_version: "v58.0"
+      sandbox: false
+    features:
+      - "crm_data"
+      - "sales_analytics"
+      - "lead_tracking"
+      - "opportunity_management"
+
+  hubspot:
+    name: "HubSpot CRM"
+    type: "crm"
+    format: "hubspot"
+    description: "HubSpot CRM connection"
+    connection_config:
+      api_key: "${HUBSPOT_API_KEY}"
+      base_url: "https://api.hubapi.com"
+      api_version: "v3"
+      timeout: 30
+    features:
+      - "crm_data"
+      - "marketing_analytics"
+      - "lead_tracking"
+      - "contact_management"
+
+  shopify:
+    name: "Shopify Store"
+    type: "ecommerce"
+    format: "shopify"
+    description: "Shopify e-commerce store connection"
+    connection_config:
+      shop_domain: "${SHOPIFY_SHOP_DOMAIN}"
+      access_token: "${SHOPIFY_ACCESS_TOKEN}"
+      api_version: "2023-10"
+      timeout: 30
+    features:
+      - "ecommerce_data"
+      - "sales_analytics"
+      - "inventory_tracking"
+      - "customer_analytics"
+
+# Analytics Platforms
+analytics:
+  google_analytics:
+    name: "Google Analytics"
+    type: "analytics"
+    format: "google_analytics"
+    description: "Google Analytics data connection"
+    connection_config:
+      property_id: "${GA_PROPERTY_ID}"
+      credentials_path: "${GA_CREDENTIALS_PATH}"
+      start_date: "2023-01-01"
+      end_date: "2023-12-31"
+    features:
+      - "web_analytics"
+      - "traffic_data"
+      - "conversion_tracking"
+      - "audience_insights"
+
+  mixpanel:
+    name: "Mixpanel Analytics"
+    type: "analytics"
+    format: "mixpanel"
+    description: "Mixpanel analytics data connection"
+    connection_config:
+      project_id: "${MIXPANEL_PROJECT_ID}"
+      api_secret: "${MIXPANEL_API_SECRET}"
+      base_url: "https://mixpanel.com/api/2.0"
+      timeout: 30
+    features:
+      - "event_analytics"
+      - "user_behavior"
+      - "funnel_analysis"
+      - "cohort_analysis"
+
+# Data Processing
+data_processing:
+  spark:
+    name: "Apache Spark"
+    type: "processing"
+    format: "spark"
+    description: "Apache Spark data processing engine"
+    connection_config:
+      master: "${SPARK_MASTER}"
+      app_name: "AiserPlatform"
+      executor_memory: "2g"
+      driver_memory: "1g"
+      max_result_size: "1g"
+      spark_home: "${SPARK_HOME}"
+    features:
+      - "big_data_processing"
+      - "etl_pipelines"
+      - "machine_learning"
+      - "stream_processing"
+
+  dask:
+    name: "Dask Distributed"
+    type: "processing"
+    format: "dask"
+    description: "Dask distributed computing framework"
+    connection_config:
+      scheduler_address: "${DASK_SCHEDULER_ADDRESS}"
+      client_timeout: 30
+      worker_memory_limit: "2GB"
+      n_workers: 4
+    features:
+      - "parallel_computing"
+      - "data_processing"
+      - "machine_learning"
+      - "scalable_analytics"

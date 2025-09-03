@@ -21,33 +21,31 @@ RUN npm ci --ignore-scripts
 COPY packages/shared/ ./packages/shared/
 
 # Create a standalone tsconfig for Docker build to avoid dependency on root tsconfig
-RUN cd packages/shared && cat > tsconfig.build.json << 'EOF'
-{
-  "compilerOptions": {
-    "target": "ES2022",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "allowJs": true,
-    "skipLibCheck": true,
-    "strict": true,
-    "forceConsistentCasingInFileNames": true,
-    "noEmit": false,
-    "esModuleInterop": true,
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "jsx": "preserve",
-    "incremental": true,
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true
-  },
-  "include": ["src/**/*"],
-  "exclude": ["dist", "node_modules", "**/*.test.ts", "**/*.spec.ts"]
-}
-EOF
+RUN cd packages/shared && echo '{ \
+  "compilerOptions": { \
+    "target": "ES2022", \
+    "lib": ["ES2022", "DOM", "DOM.Iterable"], \
+    "allowJs": true, \
+    "skipLibCheck": true, \
+    "strict": true, \
+    "forceConsistentCasingInFileNames": true, \
+    "noEmit": false, \
+    "esModuleInterop": true, \
+    "module": "ESNext", \
+    "moduleResolution": "bundler", \
+    "resolveJsonModule": true, \
+    "isolatedModules": true, \
+    "jsx": "preserve", \
+    "incremental": true, \
+    "outDir": "./dist", \
+    "rootDir": "./src", \
+    "declaration": true, \
+    "declarationMap": true, \
+    "sourceMap": true \
+  }, \
+  "include": ["src/**/*"], \
+  "exclude": ["dist", "node_modules", "**/*.test.ts", "**/*.spec.ts"] \
+}' > tsconfig.build.json
 
 # Build using the standalone tsconfig
 RUN cd packages/shared && npx tsc -p tsconfig.build.json

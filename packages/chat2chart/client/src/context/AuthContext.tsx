@@ -41,10 +41,63 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     useEffect(() => {
         async function loadUserFromCookies() {
             console.log('Loading user from cookies...');
+            const accessToken = Cookies.get('access_token');
             const userInfo = Cookies.get(AUTH_COOKIE_KEYS[2]);
+            
+            console.log('Access token from cookies:', accessToken);
             console.log('User info from cookies:', userInfo);
-            if (userInfo) {
-                setUser(JSON.parse(userInfo));
+            
+            if (accessToken) {
+                try {
+                    // Try enterprise endpoint first
+                    let response = await fetch('http://localhost:5000/api/v1/enterprise/auth/me', {
+                        headers: {
+                            'Authorization': `Bearer ${accessToken}`,
+                            'Content-Type': 'application/json',
+                        },
+                    });
+                    
+                    if (!response.ok) {
+                        // Try standard endpoint
+                        response = await fetch('http://localhost:5000/users/me', {
+                            headers: {
+                                'Authorization': `Bearer ${accessToken}`,
+                                'Content-Type': 'application/json',
+                            },
+                        });
+                    }
+                    
+                    if (response.ok) {
+                        const userData = await response.json();
+                        setUser(userData);
+                        console.log('User authenticated successfully');
+                    } else {
+                        // Token is invalid, clear cookies
+                        console.log('Token validation failed, clearing cookies');
+                        for (const key of AUTH_COOKIE_KEYS) {
+                            Cookies.remove(key, { path: '/' });
+                        }
+                        Cookies.remove('access_token', { path: '/' });
+                        setUser(null);
+                    }
+                } catch (error) {
+                    console.error('Token validation error:', error);
+                    // For now, if we have a token, assume it's valid to avoid constant relogin
+                    // This is a temporary fix until backend is properly configured
+                    if (userInfo) {
+                        try {
+                            setUser(JSON.parse(userInfo));
+                            console.log('Using cached user info');
+                        } catch (parseError) {
+                            console.error('Error parsing user info:', parseError);
+                            setUser(null);
+                        }
+                    } else {
+                        setUser(null);
+                    }
+                }
+            } else {
+                setUser(null);
             }
             setLoading(false);
             console.log('Auth loading complete');
@@ -72,6 +125,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 const data = await response.json();
                 // Set the access token cookie for enterprise login
                 Cookies.set('access_token', data.access_token, { expires: 7, path: '/' });
+                // Also set user info in cookie for persistence
+                Cookies.set('user', JSON.stringify(data.user), { expires: 7, path: '/' });
                 setUser(data.user);
                 setLoginError(null);
                 router.push('/');
@@ -99,6 +154,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             // Set the access token cookie for standard login
             if (data.access_token) {
                 Cookies.set('access_token', data.access_token, { expires: 7, path: '/' });
+                // Also set user info in cookie for persistence
+                Cookies.set('user', JSON.stringify(data.user), { expires: 7, path: '/' });
             }
             setUser(data.user);
             setLoginError(null);

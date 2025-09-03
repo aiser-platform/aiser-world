@@ -203,6 +203,48 @@ class OrganizationService(BaseService[Organization, OrganizationCreate, Organiza
     def __init__(self):
         repository = OrganizationRepository()
         super().__init__(repository)
+    
+    async def get_all(self) -> List[OrganizationResponse]:
+        """Get all organizations"""
+        try:
+            async with get_async_session() as db:
+                organizations = await self.repository.get_all(db)
+                return [OrganizationResponse.model_validate(org.__dict__) for org in organizations]
+        except Exception as e:
+            logger.error(f"Failed to get organizations: {str(e)}")
+            raise e
+    
+    async def get(self, organization_id: str) -> Optional[OrganizationResponse]:
+        """Get organization by ID"""
+        try:
+            async with get_async_session() as db:
+                organization = await self.repository.get(organization_id, db)
+                if organization:
+                    return OrganizationResponse.model_validate(organization.__dict__)
+                return None
+        except Exception as e:
+            logger.error(f"Failed to get organization: {str(e)}")
+            raise e
+    
+    async def create(self, organization_data: OrganizationCreate) -> OrganizationResponse:
+        """Create a new organization"""
+        try:
+            async with get_async_session() as db:
+                organization = await self.repository.create(organization_data.model_dump(), db)
+                return OrganizationResponse.model_validate(organization.__dict__)
+        except Exception as e:
+            logger.error(f"Failed to create organization: {str(e)}")
+            raise e
+    
+    async def update(self, organization_id: str, organization_data: OrganizationUpdate) -> OrganizationResponse:
+        """Update organization"""
+        try:
+            async with get_async_session() as db:
+                organization = await self.repository.update(organization_id, organization_data.model_dump(), db)
+                return OrganizationResponse.model_validate(organization.__dict__)
+        except Exception as e:
+            logger.error(f"Failed to update organization: {str(e)}")
+            raise e
 
     async def create_default_organization(self, user_id: str) -> OrganizationResponse:
         """Create a default organization for a new user"""

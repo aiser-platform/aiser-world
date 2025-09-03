@@ -223,7 +223,25 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
             const savedSources = JSON.parse(localStorage.getItem('aiser_data_sources') || '[]');
             setDataSources(savedSources);
             
-            // TODO: Load from backend when API is ready
+            // Load from backend using project-scoped API
+            try {
+                               const organizationId = 'aiser-dev-org'; // Real development organization
+               const projectId = 'development-project'; // Real development project
+                
+                const response = await fetch(`http://localhost:8000/data/api/organizations/${organizationId}/projects/${projectId}/data-sources`);
+                if (response.ok) {
+                    const result = await response.json();
+                    const backendSources = result.data_sources || [];
+                    
+                    // Merge with localStorage sources
+                    const allSources = [...savedSources, ...backendSources];
+                    setDataSources(allSources);
+                    console.log('Loaded data sources from backend:', backendSources);
+                }
+            } catch (backendError) {
+                console.log('Backend data sources not available, using localStorage only');
+            }
+            
             console.log('Loaded saved data sources:', savedSources);
         } catch (error) {
             console.error('Failed to load saved data sources:', error);
@@ -3033,21 +3051,65 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
     };
 
     // Create a new data source based on the active tab
-    const createDataSource = () => {
-        const newDataSource = {
-            id: `ds_${Date.now()}`,
-            name: dataSourceConfig.name || `New ${activeTab}`,
-            type: activeTab, // Use the active tab to determine the type
-            status: 'pending' as const,
-            config: {},
-            createdAt: new Date().toISOString()
-        };
-        
-        setDataSources(prev => [...prev, newDataSource]);
-        setActiveDataSourceId(newDataSource.id);
-        
-        // Auto-advance to next step
-        goToNextStep();
+    const createDataSource = async () => {
+        try {
+                           const organizationId = 'aiser-dev-org'; // Real development organization
+               const projectId = 'development-project'; // Real development project
+            
+            const newDataSource = {
+                id: `ds_${Date.now()}`,
+                name: dataSourceConfig.name || `New ${activeTab}`,
+                type: activeTab, // Use the active tab to determine the type
+                status: 'pending' as const,
+                config: {},
+                createdAt: new Date().toISOString()
+            };
+            
+            // Try to create in backend first
+            try {
+                const response = await fetch(`http://localhost:8000/data/api/organizations/${organizationId}/projects/${projectId}/data-sources`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        name: newDataSource.name,
+                        type: newDataSource.type,
+                        format: activeTab === 'file' ? 'csv' : undefined,
+                        description: `Data source created via universal modal`,
+                        metadata: {
+                            created_via: 'universal_modal',
+                            config: newDataSource.config
+                        }
+                    }),
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.success && result.data_source) {
+                        newDataSource.id = result.data_source.id;
+                        console.log('✅ Data source created in backend:', result.data_source);
+                    }
+                }
+            } catch (backendError) {
+                console.log('Backend creation failed, using local storage only');
+            }
+            
+            // Update local state
+            setDataSources(prev => [...prev, newDataSource]);
+            setActiveDataSourceId(newDataSource.id);
+            
+            // Save to localStorage as backup
+            const updatedSources = [...dataSources, newDataSource];
+            localStorage.setItem('aiser_data_sources', JSON.stringify(updatedSources));
+            
+            // Auto-advance to next step
+            goToNextStep();
+            
+        } catch (error) {
+            console.error('Failed to create data source:', error);
+            message.error('Failed to create data source');
+        }
     };
 
     return (

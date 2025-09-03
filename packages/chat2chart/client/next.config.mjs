@@ -5,19 +5,18 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   
-  // Disable static generation
+  // Simplified experimental features
   experimental: {
     serverComponentsExternalPackages: ['@prisma/client'],
-    // Disable ISR completely
-    isrFlushToDisk: false
   },
   
-  // Force host binding for Docker
+  // Basic webpack configuration to fix module issues
   webpack: (config, { isServer }) => {
-    if (isServer) {
-      config.externals = config.externals || [];
-      config.externals.push('@prisma/client');
-    }
+    // Fix for CommonJS/ESM module conflicts
+    config.resolve.extensionAlias = {
+      '.js': ['.js', '.ts', '.tsx'],
+      '.jsx': ['.jsx', '.tsx'],
+    };
     
     // Fix for client-side modules
     if (!isServer) {
@@ -32,34 +31,8 @@ const nextConfig = {
     return config;
   },
   
-  // CORS and security headers for development
-  async headers() {
-    return [
-      {
-        source: '/(.*)',
-        headers: [
-          {
-            key: 'Access-Control-Allow-Origin',
-            value: '*'
-          },
-          {
-            key: 'Access-Control-Allow-Methods',
-            value: 'GET, POST, PUT, DELETE, OPTIONS'
-          },
-          {
-            key: 'Access-Control-Allow-Headers',
-            value: 'Content-Type, Authorization'
-          }
-        ]
-      }
-    ];
-  },
-  
   // Ensure proper page generation
   trailingSlash: false,
-  
-  // Fix for static generation issues - disable static export
-  output: 'standalone'
 };
 
 export default nextConfig;

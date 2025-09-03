@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useReducer, ReactNode, useEffect } from 'react';
+import { dashboardAPIService } from '../../services/DashboardAPIService';
 
 // Dashboard Configuration Types
 export interface DashboardLayout {
@@ -39,6 +40,136 @@ export interface DashboardWidget {
   refreshInterval?: number;
   isVisible: boolean;
   isLocked: boolean;
+  
+  // Layout & Style Properties (Tableau-style)
+  layout?: {
+    // Positioning
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    minWidth?: number;
+    minHeight?: number;
+    maxWidth?: number;
+    maxHeight?: number;
+    
+    // Responsive behavior
+    responsive: boolean;
+    breakpoints?: {
+      xs?: { w: number; h: number };
+      sm?: { w: number; h: number };
+      md?: { w: number; h: number };
+      lg?: { w: number; h: number };
+      xl?: { w: number; h: number };
+    };
+    
+    // Grid behavior
+    static?: boolean;
+    isDraggable?: boolean;
+    isResizable?: boolean;
+    isBounded?: boolean;
+    
+    // Container properties
+    containerPadding?: [number, number];
+    margin?: [number, number];
+  };
+  
+  style?: {
+    // Background & Borders
+    backgroundColor?: string;
+    backgroundImage?: string;
+    backgroundSize?: 'cover' | 'contain' | 'auto';
+    backgroundPosition?: string;
+    backgroundRepeat?: 'repeat' | 'no-repeat' | 'repeat-x' | 'repeat-y';
+    
+    borderColor?: string;
+    borderWidth?: number;
+    borderStyle?: 'solid' | 'dashed' | 'dotted' | 'none';
+    borderRadius?: number;
+    
+    // Shadows & Effects
+    boxShadow?: string;
+    opacity?: number;
+    zIndex?: number;
+    
+    // Spacing
+    padding?: number | [number, number] | [number, number, number, number];
+    margin?: number | [number, number] | [number, number, number, number];
+    
+    // Typography (for text-based widgets)
+    fontFamily?: string;
+    fontSize?: number;
+    fontWeight?: 'normal' | 'bold' | 'lighter' | 'bolder' | number;
+    fontStyle?: 'normal' | 'italic' | 'oblique';
+    textAlign?: 'left' | 'center' | 'right' | 'justify';
+    textDecoration?: 'none' | 'underline' | 'line-through';
+    textTransform?: 'none' | 'uppercase' | 'lowercase' | 'capitalize';
+    lineHeight?: number;
+    letterSpacing?: number;
+    color?: string;
+    
+    // Layout
+    display?: 'block' | 'inline' | 'flex' | 'grid' | 'none';
+    flexDirection?: 'row' | 'column' | 'row-reverse' | 'column-reverse';
+    justifyContent?: 'flex-start' | 'flex-end' | 'center' | 'space-between' | 'space-around' | 'space-evenly';
+    alignItems?: 'flex-start' | 'flex-end' | 'center' | 'baseline' | 'stretch';
+    flexWrap?: 'nowrap' | 'wrap' | 'wrap-reverse';
+    
+    // Overflow
+    overflow?: 'visible' | 'hidden' | 'scroll' | 'auto';
+    overflowX?: 'visible' | 'hidden' | 'scroll' | 'auto';
+    overflowY?: 'visible' | 'hidden' | 'scroll' | 'auto';
+  };
+  
+  // Animation & Transitions
+  animation?: {
+    enabled: boolean;
+    duration?: number;
+    easing?: 'ease' | 'ease-in' | 'ease-out' | 'ease-in-out' | 'linear';
+    delay?: number;
+    type?: 'fade' | 'slide' | 'zoom' | 'bounce' | 'none';
+  };
+  
+  // Interaction & Behavior
+  behavior?: {
+    clickable?: boolean;
+    hoverable?: boolean;
+    selectable?: boolean;
+    draggable?: boolean;
+    resizable?: boolean;
+    onHover?: 'highlight' | 'tooltip' | 'none';
+    onClick?: 'select' | 'drill' | 'navigate' | 'none';
+  };
+  
+  // Data & Refresh
+  data?: {
+    source?: string;
+    query?: string;
+    refreshInterval?: number;
+    autoRefresh?: boolean;
+    cache?: boolean;
+    cacheTimeout?: number;
+  };
+  
+  // Widget-specific properties
+  chart?: {
+    type: 'bar' | 'line' | 'pie' | 'area' | 'scatter' | 'radar' | 'heatmap' | 'funnel' | 'gauge';
+    options?: any;
+    colors?: string[];
+    animation?: boolean;
+    legend?: boolean;
+    tooltip?: boolean;
+    grid?: boolean;
+  };
+  
+  filter?: {
+    type: 'dropdown' | 'dateRange' | 'slider' | 'search' | 'checkbox';
+    field: string;
+    options?: any[];
+    defaultValue?: any;
+    isGlobal?: boolean;
+    affects?: string[];
+  };
 }
 
 export interface DashboardFilter {
@@ -410,11 +541,12 @@ const DashboardConfigContext = createContext<{
   state: DashboardConfigState;
   dispatch: React.Dispatch<DashboardConfigAction>;
   addWidget: (type: string, position: { x: number; y: number; w: number; h: number }) => void;
-  updateWidget: (id: string, updates: Partial<DashboardWidget>) => void;
-  removeWidget: (id: string) => void;
+  updateWidget: (id: string, updates: Partial<DashboardWidget>) => Promise<void>;
+  removeWidget: (id: string) => Promise<void>;
   addFilter: (filter: DashboardFilter) => void;
   updateFilter: (id: string, updates: Partial<DashboardFilter>) => void;
   removeFilter: (id: string) => void;
+  autoSaveDashboard: () => Promise<void>;
   canUndo: boolean;
   canRedo: boolean;
 } | null>(null);
@@ -425,25 +557,210 @@ export const DashboardConfigProvider: React.FC<{ children: ReactNode }> = ({ chi
 
   // Helper functions
   const addWidget = (type: string, position: { x: number; y: number; w: number; h: number }) => {
+    // Generate widget configuration based on type
+    const generateWidgetConfig = (widgetType: string) => {
+      switch (widgetType) {
+        case 'chart':
+          return {
+            chartType: 'bar',
+            title: {
+              text: 'New Bar Chart',
+              subtext: '',
+              left: 'left', // Left alignment as requested
+              textStyle: {
+                color: '#333333',
+                fontSize: 16,
+                fontFamily: 'Arial'
+              },
+              subtextStyle: {
+                color: '#666666',
+                fontSize: 12,
+                fontFamily: 'Arial'
+              }
+            },
+            tooltip: {
+              trigger: 'axis',
+              backgroundColor: 'rgba(255,255,255,0.9)',
+              borderColor: '#d9d9d9',
+              textStyle: {
+                color: '#333333'
+              }
+            },
+            legend: {
+              data: [],
+              bottom: 10,
+              orient: 'horizontal',
+              textStyle: {
+                color: '#333333',
+                fontSize: 12
+              }
+            },
+            color: [
+              '#5470c6',
+              '#91cc75',
+              '#fac858',
+              '#ee6666',
+              '#73c0de'
+            ],
+            animation: true,
+            grid: {
+              top: 60,
+              right: 40,
+              bottom: 60,
+              left: 60,
+              backgroundColor: 'transparent',
+              show: true
+            },
+            xAxis: {
+              type: 'category',
+              data: [],
+              axisLine: {
+                show: true,
+                lineStyle: {
+                  color: '#d9d9d9'
+                }
+              },
+              axisTick: {
+                show: true
+              },
+              axisLabel: {
+                show: true,
+                color: '#666666',
+                fontSize: 12,
+                fontFamily: 'Arial'
+              },
+              splitLine: {
+                show: true,
+                lineStyle: {
+                  color: '#f0f0f0'
+                }
+              }
+            },
+            yAxis: {
+              type: 'value',
+              axisLine: {
+                show: true,
+                lineStyle: {
+                  color: '#d9d9d9'
+                }
+              },
+              axisTick: {
+                show: true
+              },
+              axisLabel: {
+                show: true,
+                color: '#666666',
+                fontSize: 12,
+                fontFamily: 'Arial'
+              },
+              splitLine: {
+                show: true,
+                lineStyle: {
+                  color: '#f0f0f0'
+                }
+              }
+            },
+            series: []
+          };
+
+        case 'markdown':
+          return {
+            content: '# New Markdown Widget\n\nAdd your markdown content here...',
+            enableHtml: false,
+            syntaxHighlighting: false
+          };
+
+        case 'image':
+          return {
+            imageUrl: '',
+            altText: 'Image widget',
+            fitMode: 'contain'
+          };
+
+        case 'table':
+          return {
+            columns: ['Column 1', 'Column 2', 'Column 3'],
+            dataSource: 'sample',
+            pagination: true,
+            pageSize: 10
+          };
+
+        case 'metric':
+          return {
+            value: '0',
+            format: 'number',
+            prefix: '',
+            suffix: '',
+            showTrend: false
+          };
+
+        case 'text':
+          return {
+            content: 'New Text Widget\n\nAdd your text content here...',
+            fontSize: 14,
+            fontWeight: 'normal',
+            color: '#333333'
+          };
+
+        default:
+          return {};
+      }
+    };
+
     const newWidget: DashboardWidget = {
       id: `widget-${Date.now()}`,
       type: type as any,
       title: `New ${type.charAt(0).toUpperCase() + type.slice(1)}`,
       subtitle: '',
       position,
-      config: {},
+      config: generateWidgetConfig(type),
       isVisible: true,
       isLocked: false,
     };
+    
+    console.log('Creating new widget:', newWidget);
     dispatch({ type: 'ADD_WIDGET', payload: newWidget });
   };
 
-  const updateWidget = (id: string, updates: Partial<DashboardWidget>) => {
+  const updateWidget = async (id: string, updates: Partial<DashboardWidget>) => {
     dispatch({ type: 'UPDATE_WIDGET', payload: { id, updates } });
+    
+    // Auto-save widget changes to backend
+    try {
+      const widget = state.currentDashboard.widgets.find(w => w.id === id);
+      if (widget) {
+        await dashboardAPIService.updateWidget(
+          state.currentDashboard.id,
+          id,
+          { ...widget, ...updates }
+        );
+      }
+    } catch (error) {
+      console.error('Failed to auto-save widget:', error);
+    }
   };
 
-  const removeWidget = (id: string) => {
+  const removeWidget = async (id: string) => {
     dispatch({ type: 'REMOVE_WIDGET', payload: id });
+    
+    // Auto-save widget removal to backend
+    try {
+      await dashboardAPIService.deleteWidget(state.currentDashboard.id, id);
+    } catch (error) {
+      console.error('Failed to auto-save widget removal:', error);
+    }
+  };
+
+  // Auto-save dashboard changes
+  const autoSaveDashboard = async () => {
+    try {
+      await dashboardAPIService.updateDashboard(
+        state.currentDashboard.id,
+        state.currentDashboard
+      );
+    } catch (error) {
+      console.error('Failed to auto-save dashboard:', error);
+    }
   };
 
   const addFilter = (filter: DashboardFilter) => {
@@ -472,6 +789,7 @@ export const DashboardConfigProvider: React.FC<{ children: ReactNode }> = ({ chi
         addFilter,
         updateFilter,
         removeFilter,
+        autoSaveDashboard,
         canUndo,
         canRedo,
       }}

@@ -2,6 +2,17 @@ from typing import Annotated, List, Dict, Any, Optional
 from app.modules.charts.schemas import (
     ChartConfiguration,
     ChatVisualizationResponseSchema,
+    DashboardCreateSchema,
+    DashboardUpdateSchema,
+    DashboardResponseSchema,
+    DashboardWidgetCreateSchema,
+    DashboardWidgetUpdateSchema,
+    DashboardWidgetResponseSchema,
+    DashboardShareCreateSchema,
+    DashboardShareResponseSchema,
+    DashboardExportRequest,
+    DashboardExportResponse,
+    PlanLimitsResponse,
 )
 from app.modules.charts.services import ChatVisualizationService, ChartGenerationService, MCPEChartsService
 from app.modules.charts.services.integrated_chat2chart_service import IntegratedChat2ChartService
@@ -650,3 +661,715 @@ async def share_chart(chart_data: Dict[str, Any]):
     except Exception as e:
         logger.error(f"❌ Failed to share chart: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to share chart: {str(e)}")
+
+
+# 🏗️ PROJECT-SCOPED DASHBOARD ENDPOINTS
+
+@router.get("/api/organizations/{organization_id}/projects/{project_id}/dashboards")
+async def get_project_dashboards(
+    organization_id: str,
+    project_id: str,
+    user_id: str = None,
+    limit: int = 50,
+    offset: int = 0
+):
+    """Get dashboards for a specific project (project-scoped)"""
+    try:
+        logger.info(f"📊 Getting dashboards for project {project_id} in organization {organization_id}")
+        
+        # Mock implementation - replace with actual database service
+        mock_dashboards = [
+            {
+                "id": f"dashboard_{project_id}_1",
+                "name": "Project Sales Dashboard",
+                "description": f"Sales dashboard for project {project_id}",
+                "project_id": int(project_id),
+                "organization_id": int(organization_id),
+                "layout_config": {"grid_size": 12, "widgets": []},
+                "theme_config": {"primary_color": "#1890ff"},
+                "global_filters": {},
+                "refresh_interval": 300,
+                "is_public": False,
+                "is_template": False,
+                "created_by": int(user_id) if user_id else 1,
+                "max_widgets": 10,
+                "max_pages": 5,
+                "created_at": "2025-01-10T00:00:00Z",
+                "updated_at": "2025-01-10T00:00:00Z",
+                "last_viewed_at": "2025-01-10T00:00:00Z"
+            }
+        ]
+        
+        return {
+            "success": True,
+            "dashboards": mock_dashboards[offset:offset + limit],
+            "organization_id": organization_id,
+            "project_id": project_id,
+            "total": len(mock_dashboards),
+            "limit": limit,
+            "offset": offset
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to get project dashboards: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/api/organizations/{organization_id}/projects/{project_id}/dashboards")
+async def create_project_dashboard(
+    organization_id: str,
+    project_id: str,
+    dashboard: DashboardCreateSchema
+):
+    """Create a new dashboard for a specific project"""
+    try:
+        logger.info(f"🏗️ Creating dashboard for project {project_id} in organization {organization_id}: {dashboard.name}")
+        
+        # Mock implementation - replace with actual database service
+        dashboard_data = {
+            "id": f"dashboard_{project_id}_{hash(dashboard.name)}",
+            "name": dashboard.name,
+            "description": dashboard.description,
+            "project_id": int(project_id),
+            "organization_id": int(organization_id),
+            "layout_config": dashboard.layout_config,
+            "theme_config": dashboard.theme_config,
+            "global_filters": dashboard.global_filters,
+            "refresh_interval": dashboard.refresh_interval,
+            "is_public": dashboard.is_public,
+            "is_template": dashboard.is_template,
+            "created_by": 1,  # TODO: Get from auth context
+            "max_widgets": 10,
+            "max_pages": 5,
+            "created_at": "2025-01-10T00:00:00Z",
+            "updated_at": None,
+            "last_viewed_at": None
+        }
+        
+        return {
+            "success": True,
+            "message": "Dashboard created successfully",
+            "dashboard": dashboard_data
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to create project dashboard: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/api/organizations/{organization_id}/projects/{project_id}/dashboards/{dashboard_id}")
+async def get_project_dashboard(
+    organization_id: str,
+    project_id: str,
+    dashboard_id: str
+):
+    """Get a specific dashboard for a project"""
+    try:
+        logger.info(f"📊 Getting dashboard {dashboard_id} for project {project_id} in organization {organization_id}")
+        
+        # Mock implementation - replace with actual database service
+        mock_dashboard = {
+            "id": dashboard_id,
+            "name": f"Dashboard {dashboard_id}",
+            "description": f"Dashboard for project {project_id}",
+            "project_id": int(project_id),
+            "organization_id": int(organization_id),
+            "layout_config": {"grid_size": 12, "widgets": []},
+            "theme_config": {"primary_color": "#1890ff"},
+            "global_filters": {},
+            "refresh_interval": 300,
+            "is_public": False,
+            "is_template": False,
+            "created_by": 1,
+            "max_widgets": 10,
+            "max_pages": 5,
+            "created_at": "2025-01-10T00:00:00Z",
+            "updated_at": "2025-01-10T00:00:00Z",
+            "last_viewed_at": None
+        }
+        
+        return {
+            "success": True,
+            "dashboard": mock_dashboard
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to get project dashboard: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/api/organizations/{organization_id}/projects/{project_id}/dashboards/{dashboard_id}")
+async def update_project_dashboard(
+    organization_id: str,
+    project_id: str,
+    dashboard_id: str,
+    dashboard: DashboardUpdateSchema
+):
+    """Update a dashboard for a specific project"""
+    try:
+        logger.info(f"✏️ Updating dashboard {dashboard_id} for project {project_id} in organization {organization_id}")
+        
+        # Mock implementation - replace with actual database service
+        updated_dashboard = {
+            "id": dashboard_id,
+            "name": dashboard.name or f"Dashboard {dashboard_id}",
+            "description": dashboard.description,
+            "project_id": int(project_id),
+            "organization_id": int(organization_id),
+            "layout_config": dashboard.layout_config,
+            "theme_config": dashboard.theme_config,
+            "global_filters": dashboard.global_filters,
+            "refresh_interval": dashboard.refresh_interval,
+            "is_public": dashboard.is_public,
+            "is_template": dashboard.is_template,
+            "created_by": 1,
+            "max_widgets": 10,
+            "max_pages": 5,
+            "created_at": "2025-01-10T00:00:00Z",
+            "updated_at": "2025-01-10T00:00:00Z",
+            "last_viewed_at": None
+        }
+        
+        return {
+            "success": True,
+            "message": "Dashboard updated successfully",
+            "dashboard": updated_dashboard
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to update project dashboard: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/api/organizations/{organization_id}/projects/{project_id}/dashboards/{dashboard_id}")
+async def delete_project_dashboard(
+    organization_id: str,
+    project_id: str,
+    dashboard_id: str
+):
+    """Delete a dashboard for a specific project"""
+    try:
+        logger.info(f"🗑️ Deleting dashboard {dashboard_id} for project {project_id} in organization {organization_id}")
+        
+        # Mock implementation - replace with actual database service
+        
+        return {
+            "success": True,
+            "message": "Dashboard deleted successfully",
+            "dashboard_id": dashboard_id
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to delete project dashboard: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# 🏗️ Dashboard Studio API Endpoints (Global - for backward compatibility)
+@router.post("/dashboards/", response_model=DashboardResponseSchema)
+async def create_dashboard(dashboard: DashboardCreateSchema):
+    """
+    Create a new dashboard
+    """
+    try:
+        logger.info(f"🏗️ Creating dashboard: {dashboard.name}")
+        
+        # Mock implementation - replace with actual database service
+        dashboard_data = {
+            "id": f"dashboard_{hash(dashboard.name)}",
+            "name": dashboard.name,
+            "description": dashboard.description,
+            "project_id": dashboard.project_id,
+            "layout_config": dashboard.layout_config,
+            "theme_config": dashboard.theme_config,
+            "global_filters": dashboard.global_filters,
+            "refresh_interval": dashboard.refresh_interval,
+            "is_public": dashboard.is_public,
+            "is_template": dashboard.is_template,
+            "created_by": 1,  # TODO: Get from auth context
+            "max_widgets": 10,
+            "max_pages": 5,
+            "created_at": "2025-01-10T00:00:00Z",
+            "updated_at": None,
+            "last_viewed_at": None
+        }
+        
+        return dashboard_data
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to create dashboard: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to create dashboard: {str(e)}")
+
+
+@router.get("/dashboards/", response_model=List[DashboardResponseSchema])
+async def list_dashboards(
+    user_id: str = None,
+    project_id: int = None,
+    limit: int = 50,
+    offset: int = 0
+):
+    """
+    List dashboards with optional filtering
+    """
+    try:
+        logger.info(f"📋 Listing dashboards for user: {user_id}")
+        
+        # Mock implementation - replace with actual database service
+        mock_dashboards = [
+            {
+                "id": "dashboard_1",
+                "name": "Sales Dashboard",
+                "description": "Monthly sales performance dashboard",
+                "project_id": project_id or 1,
+                "layout_config": {"grid_size": 12, "widgets": []},
+                "theme_config": {"primary_color": "#1890ff"},
+                "global_filters": {},
+                "refresh_interval": 300,
+                "is_public": False,
+                "is_template": False,
+                "created_by": int(user_id) if user_id else 1,
+                "max_widgets": 10,
+                "max_pages": 5,
+                "created_at": "2025-01-10T00:00:00Z",
+                "updated_at": "2025-01-10T00:00:00Z",
+                "last_viewed_at": "2025-01-10T00:00:00Z"
+            },
+            {
+                "id": "dashboard_2",
+                "name": "Marketing Analytics",
+                "description": "Marketing campaign performance",
+                "project_id": project_id or 1,
+                "layout_config": {"grid_size": 12, "widgets": []},
+                "theme_config": {"primary_color": "#52c41a"},
+                "global_filters": {},
+                "refresh_interval": 600,
+                "is_public": True,
+                "is_template": False,
+                "created_by": int(user_id) if user_id else 1,
+                "max_widgets": 20,
+                "max_pages": 3,
+                "created_at": "2025-01-10T00:00:00Z",
+                "updated_at": "2025-01-10T00:00:00Z",
+                "last_viewed_at": None
+            }
+        ]
+        
+        return mock_dashboards[offset:offset + limit]
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to list dashboards: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to list dashboards: {str(e)}")
+
+
+@router.get("/dashboards/{dashboard_id}", response_model=DashboardResponseSchema)
+async def get_dashboard(dashboard_id: str):
+    """
+    Get a specific dashboard by ID
+    """
+    try:
+        logger.info(f"📊 Getting dashboard: {dashboard_id}")
+        
+        # Mock implementation - replace with actual database service
+        mock_dashboard = {
+            "id": dashboard_id,
+            "name": f"Dashboard {dashboard_id}",
+            "description": "Sample dashboard description",
+            "project_id": 1,
+            "layout_config": {"grid_size": 12, "widgets": []},
+            "theme_config": {"primary_color": "#1890ff"},
+            "global_filters": {},
+            "refresh_interval": 300,
+            "is_public": False,
+            "is_template": False,
+            "created_by": 1,
+            "max_widgets": 10,
+            "max_pages": 5,
+            "created_at": "2025-01-10T00:00:00Z",
+            "updated_at": "2025-01-10T00:00:00Z",
+            "last_viewed_at": None
+        }
+        
+        return mock_dashboard
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to get dashboard {dashboard_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get dashboard: {str(e)}")
+
+
+@router.put("/dashboards/{dashboard_id}", response_model=DashboardResponseSchema)
+async def update_dashboard(dashboard_id: str, dashboard: DashboardUpdateSchema):
+    """
+    Update an existing dashboard
+    """
+    try:
+        logger.info(f"✏️ Updating dashboard: {dashboard_id}")
+        
+        # Mock implementation - replace with actual database service
+        updated_dashboard = {
+            "id": dashboard_id,
+            "name": dashboard.name or f"Dashboard {dashboard_id}",
+            "description": dashboard.description,
+            "project_id": dashboard.project_id,
+            "layout_config": dashboard.layout_config,
+            "theme_config": dashboard.theme_config,
+            "global_filters": dashboard.global_filters,
+            "refresh_interval": dashboard.refresh_interval,
+            "is_public": dashboard.is_public,
+            "is_template": dashboard.is_template,
+            "created_by": 1,
+            "max_widgets": 10,
+            "max_pages": 5,
+            "created_at": "2025-01-10T00:00:00Z",
+            "updated_at": "2025-01-10T00:00:00Z",
+            "last_viewed_at": None
+        }
+        
+        return updated_dashboard
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to update dashboard {dashboard_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to update dashboard: {str(e)}")
+
+
+@router.delete("/dashboards/{dashboard_id}")
+async def delete_dashboard(dashboard_id: str):
+    """
+    Delete a dashboard
+    """
+    try:
+        logger.info(f"🗑️ Deleting dashboard: {dashboard_id}")
+        
+        # Mock implementation - replace with actual database service
+        
+        return {
+            "success": True,
+            "message": "Dashboard deleted successfully",
+            "dashboard_id": dashboard_id
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to delete dashboard {dashboard_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete dashboard: {str(e)}")
+
+
+# 🧩 Widget Management Endpoints
+@router.post("/dashboards/{dashboard_id}/widgets", response_model=DashboardWidgetResponseSchema)
+async def create_widget(dashboard_id: str, widget: DashboardWidgetCreateSchema):
+    """
+    Create a new widget in a dashboard
+    """
+    try:
+        logger.info(f"🧩 Creating widget in dashboard {dashboard_id}: {widget.name}")
+        
+        # Mock implementation - replace with actual database service
+        widget_data = {
+            "id": f"widget_{hash(widget.name)}",
+            "dashboard_id": dashboard_id,
+            "name": widget.name,
+            "widget_type": widget.widget_type,
+            "chart_type": widget.chart_type,
+            "config": widget.config,
+            "data_config": widget.data_config,
+            "style_config": widget.style_config,
+            "x": widget.x,
+            "y": widget.y,
+            "width": widget.width,
+            "height": widget.height,
+            "z_index": widget.z_index,
+            "is_visible": widget.is_visible,
+            "is_locked": widget.is_locked,
+            "is_resizable": widget.is_resizable,
+            "is_draggable": widget.is_draggable,
+            "created_at": "2025-01-10T00:00:00Z",
+            "updated_at": None
+        }
+        
+        return widget_data
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to create widget: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to create widget: {str(e)}")
+
+
+@router.get("/dashboards/{dashboard_id}/widgets", response_model=List[DashboardWidgetResponseSchema])
+async def list_widgets(dashboard_id: str):
+    """
+    List all widgets in a dashboard
+    """
+    try:
+        logger.info(f"📋 Listing widgets for dashboard: {dashboard_id}")
+        
+        # Mock implementation - replace with actual database service
+        mock_widgets = [
+            {
+                "id": "widget_1",
+                "dashboard_id": dashboard_id,
+                "name": "Sales Chart",
+                "widget_type": "chart",
+                "chart_type": "bar",
+                "config": {"title": "Monthly Sales"},
+                "data_config": {"data_source": "sales_data"},
+                "style_config": {"color": "#1890ff"},
+                "x": 0,
+                "y": 0,
+                "width": 6,
+                "height": 4,
+                "z_index": 0,
+                "is_visible": True,
+                "is_locked": False,
+                "is_resizable": True,
+                "is_draggable": True,
+                "created_at": "2025-01-10T00:00:00Z",
+                "updated_at": None
+            },
+            {
+                "id": "widget_2",
+                "dashboard_id": dashboard_id,
+                "name": "Revenue Table",
+                "widget_type": "table",
+                "chart_type": None,
+                "config": {"columns": ["Month", "Revenue"]},
+                "data_config": {"data_source": "revenue_data"},
+                "style_config": {"theme": "light"},
+                "x": 6,
+                "y": 0,
+                "width": 6,
+                "height": 4,
+                "z_index": 0,
+                "is_visible": True,
+                "is_locked": False,
+                "is_resizable": True,
+                "is_draggable": True,
+                "created_at": "2025-01-10T00:00:00Z",
+                "updated_at": None
+            }
+        ]
+        
+        return mock_widgets
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to list widgets: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to list widgets: {str(e)}")
+
+
+@router.put("/dashboards/{dashboard_id}/widgets/{widget_id}", response_model=DashboardWidgetResponseSchema)
+async def update_widget(dashboard_id: str, widget_id: str, widget: DashboardWidgetUpdateSchema):
+    """
+    Update a widget
+    """
+    try:
+        logger.info(f"✏️ Updating widget {widget_id} in dashboard {dashboard_id}")
+        
+        # Mock implementation - replace with actual database service
+        updated_widget = {
+            "id": widget_id,
+            "dashboard_id": dashboard_id,
+            "name": widget.name or f"Widget {widget_id}",
+            "widget_type": widget.widget_type,
+            "chart_type": widget.chart_type,
+            "config": widget.config,
+            "data_config": widget.data_config,
+            "style_config": widget.style_config,
+            "x": widget.x,
+            "y": widget.y,
+            "width": widget.width,
+            "height": widget.height,
+            "z_index": widget.z_index,
+            "is_visible": widget.is_visible,
+            "is_locked": widget.is_locked,
+            "is_resizable": widget.is_resizable,
+            "is_draggable": widget.is_draggable,
+            "created_at": "2025-01-10T00:00:00Z",
+            "updated_at": "2025-01-10T00:00:00Z"
+        }
+        
+        return updated_widget
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to update widget {widget_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to update widget: {str(e)}")
+
+
+@router.delete("/dashboards/{dashboard_id}/widgets/{widget_id}")
+async def delete_widget(dashboard_id: str, widget_id: str):
+    """
+    Delete a widget
+    """
+    try:
+        logger.info(f"🗑️ Deleting widget {widget_id} from dashboard {dashboard_id}")
+        
+        # Mock implementation - replace with actual database service
+        
+        return {
+            "success": True,
+            "message": "Widget deleted successfully",
+            "widget_id": widget_id
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to delete widget {widget_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete widget: {str(e)}")
+
+
+# 📤 Export and Sharing Endpoints
+@router.post("/dashboards/{dashboard_id}/export", response_model=DashboardExportResponse)
+async def export_dashboard(dashboard_id: str, export_request: DashboardExportRequest):
+    """
+    Export dashboard in various formats
+    """
+    try:
+        logger.info(f"📤 Exporting dashboard {dashboard_id} as {export_request.format}")
+        
+        # Mock implementation - replace with actual export service
+        export_url = f"/exports/dashboard_{dashboard_id}_{export_request.format}.{export_request.format}"
+        
+        return {
+            "success": True,
+            "export_url": export_url,
+            "file_size": 1024000,  # Mock file size
+            "format": export_request.format,
+            "message": f"Dashboard exported successfully as {export_request.format.upper()}"
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to export dashboard {dashboard_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to export dashboard: {str(e)}")
+
+
+@router.post("/dashboards/{dashboard_id}/share", response_model=DashboardShareResponseSchema)
+async def share_dashboard(dashboard_id: str, share_request: DashboardShareCreateSchema):
+    """
+    Share dashboard with other users
+    """
+    try:
+        logger.info(f"🔗 Sharing dashboard {dashboard_id}")
+        
+        # Mock implementation - replace with actual sharing service
+        share_data = {
+            "id": f"share_{hash(dashboard_id)}",
+            "dashboard_id": dashboard_id,
+            "shared_by": 1,  # TODO: Get from auth context
+            "shared_with": share_request.shared_with,
+            "permission": share_request.permission,
+            "expires_at": share_request.expires_at,
+            "is_active": share_request.is_active,
+            "share_token": f"token_{hash(dashboard_id)}",
+            "access_count": 0,
+            "last_accessed_at": None,
+            "created_at": "2025-01-10T00:00:00Z",
+            "updated_at": None
+        }
+        
+        return share_data
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to share dashboard {dashboard_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to share dashboard: {str(e)}")
+
+
+# 📊 Plan and Limits Endpoints
+@router.get("/plans/limits", response_model=PlanLimitsResponse)
+async def get_plan_limits(plan: str = "free"):
+    """
+    Get plan limits and current usage
+    """
+    try:
+        logger.info(f"📊 Getting plan limits for: {plan}")
+        
+        # Import plan limits from models
+        from app.modules.charts.models import PLAN_LIMITS
+        
+        limits = PLAN_LIMITS.get(plan, PLAN_LIMITS["free"])
+        
+        # Mock current usage - replace with actual usage calculation
+        current_usage = {
+            "dashboards": 2,
+            "widgets": 5,
+            "shared_dashboards": 0,
+            "storage_gb": 1.5
+        }
+        
+        return {
+            "plan": plan,
+            "limits": limits,
+            "current_usage": current_usage
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to get plan limits: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get plan limits: {str(e)}")
+
+
+@router.get("/dashboards/templates")
+async def get_dashboard_templates():
+    """
+    Get available dashboard templates
+    """
+    try:
+        logger.info("📋 Getting dashboard templates")
+        
+        # Mock templates - replace with actual template service
+        templates = [
+            {
+                "id": "template_1",
+                "name": "Sales Dashboard",
+                "description": "Complete sales performance dashboard",
+                "category": "sales",
+                "preview_image": "/templates/sales_dashboard.png",
+                "required_plan": "free",
+                "widgets": [
+                    {"type": "chart", "chart_type": "bar", "name": "Monthly Sales"},
+                    {"type": "chart", "chart_type": "line", "name": "Sales Trend"},
+                    {"type": "table", "name": "Top Products"}
+                ]
+            },
+            {
+                "id": "template_2",
+                "name": "Marketing Analytics",
+                "description": "Marketing campaign performance dashboard",
+                "category": "marketing",
+                "preview_image": "/templates/marketing_dashboard.png",
+                "required_plan": "pro",
+                "widgets": [
+                    {"type": "chart", "chart_type": "pie", "name": "Campaign Distribution"},
+                    {"type": "chart", "chart_type": "scatter", "name": "ROI Analysis"},
+                    {"type": "gauge", "name": "Conversion Rate"}
+                ]
+            }
+        ]
+        
+        return {
+            "success": True,
+            "templates": templates
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to get dashboard templates: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get dashboard templates: {str(e)}")
+
+
+@router.post("/dashboards/from-template")
+async def create_dashboard_from_template(template_id: str, dashboard_name: str):
+    """
+    Create a new dashboard from a template
+    """
+    try:
+        logger.info(f"🏗️ Creating dashboard from template {template_id}: {dashboard_name}")
+        
+        # Mock implementation - replace with actual template service
+        dashboard_data = {
+            "id": f"dashboard_{hash(dashboard_name)}",
+            "name": dashboard_name,
+            "description": f"Dashboard created from template {template_id}",
+            "template_id": template_id,
+            "created_at": "2025-01-10T00:00:00Z"
+        }
+        
+        return {
+            "success": True,
+            "message": "Dashboard created from template successfully",
+            "dashboard": dashboard_data
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to create dashboard from template: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to create dashboard from template: {str(e)}")
