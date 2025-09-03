@@ -130,3 +130,6 @@ client_next_build/
 
 # Kiro IDE settings (may contain sensitive project info)
 .kiro/settings/sshsv.pub
+sshsv
+sshsv.pub
+packages/chat2chart/client/src/app/(dashboard)/dash-studio/components/GridSystemComparison.md
