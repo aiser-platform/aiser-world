@@ -60,16 +60,13 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({
     const router = useRouter();
 
     // Default project change handler for header usage
-    const handleProjectChange = (projectId: string | number) => {
-        // Convert string to number if needed
-        const numericProjectId = typeof projectId === 'string' ? parseInt(projectId, 10) : projectId;
-        
+    const handleProjectChange = (v: any) => {
+        const value = (v && typeof v === 'object') ? v.value : v;
+        const numericProjectId = typeof value === 'string' ? parseInt(value, 10) : value;
         if (onProjectChange) {
             onProjectChange(numericProjectId);
         } else if (isHeader) {
-            // For header usage, just log the change or store in localStorage
-            console.log('Project changed to:', numericProjectId);
-            localStorage.setItem('currentProjectId', numericProjectId.toString());
+            localStorage.setItem('currentProjectId', String(numericProjectId));
         }
     };
 
@@ -238,13 +235,15 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({
             <Space size="small">
                 <Tooltip title={isHeader ? "Double-click project to edit" : "Select Project"}>
                     <Select
-                        value={currentProjectId?.toString() || currentProject?.id?.toString()}
+                        labelInValue
+                        value={currentProject ? { value: currentProject.id.toString(), label: currentProject.name } : undefined}
                         onChange={handleProjectChange}
                         loading={loading}
                         style={{ minWidth: 200 }}
                         placeholder={projects.length === 0 ? "No Projects" : (currentProject ? currentProject.name : "Select Project")}
                         suffixIcon={<FolderOutlined />}
                         disabled={projects.length === 0}
+                        optionLabelProp="label"
                     >
                         {projects.length === 0 ? (
                             <Option value="" disabled>
@@ -252,7 +251,7 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({
                             </Option>
                         ) : (
                             projects.map(project => (
-                                <Option key={project.id} value={project.id}>
+                                <Option key={project.id} value={project.id} label={project.name}>
                                     <div 
                                         style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
                                         onDoubleClick={() => handleDoubleClickEdit(project)}

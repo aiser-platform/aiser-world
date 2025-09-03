@@ -9,6 +9,7 @@ from app.modules.ai.api import router as ai_router
 from app.modules.cube.api import router as cube_router
 from app.modules.projects.api import router as projects_router
 from app.modules.onboarding.api import router as onboarding_router
+from app.modules.queries.api import router as queries_router
 from fastapi import APIRouter
 
 api_router = APIRouter()
@@ -90,6 +91,13 @@ api_router.include_router(
     router=onboarding_router,
     prefix="/api/onboarding",
     tags=["onboarding"],
+    responses={404: {"description": "Not found"}},
+)
+
+api_router.include_router(
+    router=queries_router,
+    prefix="/api/queries",
+    tags=["queries"],
     responses={404: {"description": "Not found"}},
 )
 
