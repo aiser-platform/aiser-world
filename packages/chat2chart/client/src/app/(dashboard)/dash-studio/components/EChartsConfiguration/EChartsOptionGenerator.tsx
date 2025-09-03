@@ -24,62 +24,32 @@ export class EChartsOptionGenerator {
   }
 
   private static generateBaseOption(config: BasicChartConfig, data: any[]): EChartsOption {
-    const { chartType, title, subtitle, dataBinding, basicStyling } = config;
+    const { chartType, title, tooltip, legend, color, grid, xAxis, yAxis, dataBinding } = config;
     
     // Process data based on binding
-    const processedData = this.processData(data, dataBinding, chartType);
+    const processedData = this.processData(
+      data,
+      dataBinding || { xField: '', yFields: [], seriesField: undefined },
+      chartType
+    );
     
     const baseOption: EChartsOption = {
       title: {
-        text: title,
-        subtext: subtitle,
-        left: config.titlePosition || 'center',
-        textStyle: {
-          fontSize: basicStyling.fontSize + 4,
-          fontWeight: 'bold',
-        },
-        subtextStyle: {
-          fontSize: basicStyling.fontSize,
-        },
+        text: title.text,
+        subtext: title.subtext,
+        left: title.left || 'center',
+        textStyle: title.textStyle,
+        subtextStyle: title.subtextStyle
       },
-      color: basicStyling.colors,
-      tooltip: {
-        trigger: 'axis',
-        backgroundColor: 'rgba(50, 50, 50, 0.9)',
-        textStyle: {
-          color: '#fff',
-        },
-      },
-      legend: {
-        show: basicStyling.showLegend,
-        top: 'bottom',
-        textStyle: {
-          fontSize: basicStyling.fontSize,
-        },
-      },
-      grid: {
-        left: '10%',
-        right: '10%',
-        top: '15%',
-        bottom: '20%',
-        containLabel: true,
-      },
+      tooltip: tooltip,
+      legend: legend,
+      color: color,
+      grid: grid,
       xAxis: {
-        type: 'category',
+        ...xAxis,
         data: processedData.xAxis,
-        show: true,
-        axisLine: { show: true },
-        axisTick: { show: true },
-        axisLabel: { show: true },
       },
-      yAxis: {
-        type: 'value',
-        show: true,
-        axisLine: { show: true },
-        axisTick: { show: true },
-        axisLabel: { show: true },
-        splitLine: { show: true },
-      },
+      yAxis: yAxis,
     };
 
     // Add chart-specific options
@@ -399,7 +369,7 @@ export class EChartsOptionGenerator {
   }
 
   private static mergeStandardOptions(baseOption: EChartsOption, config: StandardChartConfig): EChartsOption {
-    const { axis, series, legend, tooltip, gridSpacing } = config;
+    const { axis, seriesConfig, legend, tooltip, gridSpacing } = config as any;
     
     // Ensure axis configuration exists with defaults
     if (!axis || !axis.xAxis || !axis.yAxis) {
@@ -445,30 +415,28 @@ export class EChartsOptionGenerator {
       series: (baseOption.series as any[])?.map(s => ({
         ...s,
         label: {
-          show: series?.showLabels || false,
-          position: series?.labelPosition || 'top',
+          show: seriesConfig?.showLabels || false,
+          position: seriesConfig?.labelPosition || 'top',
         },
-        smooth: series?.smooth || false,
-        areaStyle: series?.areaStyle ? { opacity: 0.3 } : undefined,
-        symbolSize: series?.symbolSize || 6,
+        smooth: seriesConfig?.smooth || false,
+        areaStyle: seriesConfig?.areaStyle ? { opacity: 0.3 } : undefined,
+        symbolSize: seriesConfig?.symbolSize || 6,
       })),
       legend: {
         ...baseOption.legend,
-        orient: legend?.orientation || 'horizontal',
-        left: legend?.position === 'left' ? 'left' : legend?.position === 'right' ? 'right' : 'center',
-        top: legend?.position === 'top' ? 'top' : legend?.position === 'bottom' ? 'bottom' : 'middle',
-        textStyle: {
-          color: legend?.textColor || '#54555a',
-        },
+        orient: legend?.orient || 'horizontal',
+        top: (legend?.top ?? (legend?.bottom !== undefined ? undefined : undefined)) as any,
+        bottom: legend?.bottom as any,
+        left: legend?.left as any,
+        right: legend?.right as any,
+        textStyle: legend?.textStyle || (baseOption.legend as any)?.textStyle,
       },
       tooltip: {
         ...baseOption.tooltip,
-        show: tooltip?.show !== false,
-        trigger: tooltip?.trigger || 'axis',
-        backgroundColor: tooltip?.backgroundColor || 'rgba(50, 50, 50, 0.9)',
-        textStyle: {
-          color: tooltip?.textColor || '#ffffff',
-        },
+        trigger: tooltip?.trigger || (baseOption.tooltip as any)?.trigger || 'axis',
+        backgroundColor: tooltip?.backgroundColor || (baseOption.tooltip as any)?.backgroundColor,
+        borderColor: tooltip?.borderColor || (baseOption.tooltip as any)?.borderColor,
+        textStyle: tooltip?.textStyle || (baseOption.tooltip as any)?.textStyle,
       },
       grid: {
         ...baseOption.grid,

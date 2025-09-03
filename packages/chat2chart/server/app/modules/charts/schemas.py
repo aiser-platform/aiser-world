@@ -9,22 +9,34 @@ from pydantic import BaseModel, Field
 class ChatVisualizationBaseSchema(BaseModel):
     """Base schema for chat visualization with detailed field validation"""
 
-    title: str = Field(..., description="Chart title", min_length=1, max_length=255)
-    form_data: Dict = Field(
-        ...,
+    title: Optional[str] = Field(None, description="Chart title", max_length=255)
+    chart_type: Optional[str] = Field(None, description="Chart type (bar, line, pie, etc.)", max_length=100)
+    chart_library: str = Field('echarts', description="Chart library used", max_length=50)
+    status: str = Field('pending', description="Chart status", max_length=50)
+    complexity_score: int = Field(5, description="Chart complexity score", ge=1, le=10)
+    data_source: Optional[str] = Field(None, description="Data source identifier", max_length=255)
+    
+    # Chat integration fields
+    form_data: Optional[Dict] = Field(
+        None,
         description="Chart configuration including metrics, dimensions, and visualization settings",
     )
-    datasource: Dict = Field(
-        ...,
+    datasource: Optional[Dict] = Field(
+        None,
         description="Data source configuration (file or database connection details)",
     )
-    result: Dict = Field(
-        ..., description="Generated chart configuration and rendering data"
+    result: Optional[Dict] = Field(
+        None, description="Generated chart configuration and rendering data"
     )
-    message_id: Union[str, UUID] = Field(
-        ...,
+    message_id: Optional[Union[str, UUID]] = Field(
+        None,
         description="Reference to the chat message that generated this visualization",
     )
+    
+    # User and organization fields
+    user_id: Optional[int] = Field(None, description="User ID who created the chart")
+    conversation_id: Optional[Union[str, UUID]] = Field(None, description="Conversation ID")
+    tenant_id: str = Field('default', description="Tenant ID for multi-tenancy", max_length=50)
 
 
 class ChatVisualizationCreateSchema(ChatVisualizationBaseSchema):
@@ -392,3 +404,123 @@ class EchartsConfig(BaseModel):
     backgroundColor: Optional[str] = Field(
         None, description="Background color of the chart container."
     )
+
+
+# Dashboard Schemas
+class DashboardBaseSchema(BaseModel):
+    """Base schema for dashboard"""
+    name: str = Field(..., description="Dashboard name", min_length=1, max_length=255)
+    description: Optional[str] = Field(None, description="Dashboard description")
+    project_id: Optional[int] = Field(None, description="Associated project ID")
+    layout_config: Optional[Dict] = Field(None, description="Grid layout configuration")
+    theme_config: Optional[Dict] = Field(None, description="Theme and styling")
+    global_filters: Optional[Dict] = Field(None, description="Global filter configuration")
+    refresh_interval: int = Field(300, description="Auto-refresh interval in seconds", ge=10)
+    is_public: bool = Field(False, description="Whether dashboard is public")
+    is_template: bool = Field(False, description="Whether dashboard is a template")
+
+
+class DashboardCreateSchema(DashboardBaseSchema):
+    pass
+
+
+class DashboardUpdateSchema(DashboardBaseSchema):
+    name: Optional[str] = Field(None, description="Dashboard name", min_length=1, max_length=255)
+
+
+class DashboardResponseSchema(DashboardBaseSchema, BaseSchema):
+    id: str
+    created_by: Optional[int] = None  # Changed to int to match users table
+    max_widgets: int = 10
+    max_pages: int = 5
+    created_at: str
+    updated_at: Optional[str] = None
+    deleted_at: Optional[str] = None
+    is_deleted: bool = False
+    last_viewed_at: Optional[str] = None
+
+
+class DashboardWidgetBaseSchema(BaseModel):
+    """Base schema for dashboard widget"""
+    name: str = Field(..., description="Widget name", min_length=1, max_length=255)
+    widget_type: str = Field(..., description="Widget type (chart, table, text, image)")
+    chart_type: Optional[str] = Field(None, description="Chart type (bar, line, pie, etc.)")
+    config: Optional[Dict] = Field(None, description="Widget-specific configuration")
+    data_config: Optional[Dict] = Field(None, description="Data source and query configuration")
+    style_config: Optional[Dict] = Field(None, description="Styling and appearance")
+    x: int = Field(0, description="X position", ge=0)
+    y: int = Field(0, description="Y position", ge=0)
+    width: int = Field(4, description="Widget width", ge=1, le=12)
+    height: int = Field(3, description="Widget height", ge=1, le=12)
+    z_index: int = Field(0, description="Z-index for layering")
+    is_visible: bool = Field(True, description="Whether widget is visible")
+    is_locked: bool = Field(False, description="Whether widget is locked")
+    is_resizable: bool = Field(True, description="Whether widget is resizable")
+    is_draggable: bool = Field(True, description="Whether widget is draggable")
+
+
+class DashboardWidgetCreateSchema(DashboardWidgetBaseSchema):
+    dashboard_id: str = Field(..., description="Dashboard ID")
+
+
+class DashboardWidgetUpdateSchema(DashboardWidgetBaseSchema):
+    name: Optional[str] = Field(None, description="Widget name", min_length=1, max_length=255)
+
+
+class DashboardWidgetResponseSchema(DashboardWidgetBaseSchema, BaseSchema):
+    id: str
+    dashboard_id: str
+    created_at: str
+    updated_at: Optional[str] = None
+    deleted_at: Optional[str] = None
+    is_deleted: bool = False
+
+
+class DashboardShareBaseSchema(BaseModel):
+    """Base schema for dashboard sharing"""
+    permission: str = Field("view", description="Share permission (view, edit, admin)")
+    expires_at: Optional[str] = Field(None, description="Expiration date")
+    is_active: bool = Field(True, description="Whether share is active")
+
+
+class DashboardShareCreateSchema(DashboardShareBaseSchema):
+    dashboard_id: str = Field(..., description="Dashboard ID")
+    shared_with: Optional[int] = Field(None, description="User ID to share with")  # Changed to int
+
+
+class DashboardShareResponseSchema(DashboardShareBaseSchema, BaseSchema):
+    id: str
+    dashboard_id: str
+    shared_by: int  # Changed to int
+    shared_with: Optional[int] = None  # Changed to int
+    share_token: Optional[str] = None
+    access_count: int = 0
+    last_accessed_at: Optional[str] = None
+    created_at: str
+    updated_at: Optional[str] = None
+    deleted_at: Optional[str] = None
+    is_deleted: bool = False
+
+
+class DashboardExportRequest(BaseModel):
+    """Dashboard export request"""
+    dashboard_id: str = Field(..., description="Dashboard ID")
+    format: str = Field(..., description="Export format (png, pdf, html, excel)")
+    include_data: bool = Field(True, description="Whether to include data in export")
+    theme: Optional[str] = Field(None, description="Export theme")
+
+
+class DashboardExportResponse(BaseModel):
+    """Dashboard export response"""
+    success: bool
+    export_url: Optional[str] = None
+    file_size: Optional[int] = None
+    format: str
+    message: str
+
+
+class PlanLimitsResponse(BaseModel):
+    """Plan limits response"""
+    plan: str
+    limits: Dict[str, Any]
+    current_usage: Dict[str, int]

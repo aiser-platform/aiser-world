@@ -29,6 +29,11 @@ class Organization(BaseModel):
     max_users = Column(Integer, default=100)
     max_projects = Column(Integer, default=1)  # Free users get 1 project
     max_storage_gb = Column(Integer, default=100)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, onupdate=func.now())
+    
+    # Override BaseModel columns that don't exist in actual table
+    deleted_at = None  # This column doesn't exist in the actual table
     
     # Relationships
     projects = relationship("Project", back_populates="organization", cascade="all, delete-orphan")

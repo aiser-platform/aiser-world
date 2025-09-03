@@ -14,9 +14,11 @@ from .services.data_connectivity_service import DataConnectivityService
 from .services.intelligent_data_modeling_service import IntelligentDataModelingService
 from .services.cube_integration_service import CubeIntegrationService
 from .services.cube_data_modeling_service import CubeDataModelingService
-from app.modules.data.services.cube_integration_service import CubeIntegrationService
-from app.modules.data.services.cube_connector_service import CubeConnectorService
-from app.modules.data.services.cube_data_modeling_service import CubeDataModelingService
+from .services.cube_connector_service import CubeConnectorService
+from .services.real_cube_integration_service import RealCubeIntegrationService
+from .services.multi_engine_query_service import MultiEngineQueryService, QueryEngine
+from .services.enterprise_connectors_service import EnterpriseConnectorsService, ConnectionConfig, ConnectorType
+from .services.yaml_schema_service import YAMLSchemaService
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +27,12 @@ data_service = DataConnectivityService()
 modeling_service = IntelligentDataModelingService()
 cube_service = CubeIntegrationService()
 cube_modeling_service = CubeDataModelingService()
+
+# Real production services
+real_cube_service = RealCubeIntegrationService()
+multi_engine_service = MultiEngineQueryService()
+enterprise_connectors_service = EnterpriseConnectorsService()
+yaml_schema_service = YAMLSchemaService()
 
 
 # Request/Response Models
@@ -155,7 +163,7 @@ async def get_data_sources(
     offset: int = 0,
     limit: int = 100
 ):
-    """Get all data sources"""
+    """Get all data sources (global - for backward compatibility)"""
     try:
         sources = await data_service.get_data_sources(offset, limit)
         return {
@@ -167,30 +175,135 @@ async def get_data_sources(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/sources/{source_id}")
-async def get_data_source_by_id(source_id: str):
-    """Get a specific data source by ID"""
+# 🏗️ PROJECT-SCOPED DATA SOURCE ENDPOINTS
+
+@router.get("/api/organizations/{organization_id}/projects/{project_id}/data-sources")
+async def get_project_data_sources(
+    organization_id: str,
+    project_id: str,
+    user_id: str = None,
+    offset: int = 0,
+    limit: int = 100
+):
+    """Get data sources for a specific project (project-scoped)"""
     try:
-        source = await data_service.get_data_source_by_id(source_id)
-        if source:
-            return {
-                "success": True,
-                "data_source": source
-            }
-        else:
-            raise HTTPException(status_code=404, detail=f"Data source {source_id} not found")
-    except HTTPException:
-        raise
+        logger.info(f"📊 Getting data sources for project {project_id} in organization {organization_id}")
+        
+        # Get project-scoped data sources
+        sources = await data_service.get_project_data_sources(
+            organization_id=organization_id,
+            project_id=project_id,
+            user_id=user_id,
+            offset=offset,
+            limit=limit
+        )
+        
+        return {
+            "success": True,
+            "data_sources": sources,
+            "organization_id": organization_id,
+            "project_id": project_id,
+            "count": len(sources)
+        }
     except Exception as e:
-        logger.error(f"❌ Failed to get data source {source_id}: {str(e)}")
+        logger.error(f"❌ Failed to get project data sources: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/sources/{source_id}/data")
-async def get_data_from_source(source_id: str, limit: int = 100):
-    """Get data from a specific data source"""
+@router.post("/api/organizations/{organization_id}/projects/{project_id}/data-sources")
+async def create_project_data_source(
+    organization_id: str,
+    project_id: str,
+    request: DataSourceCreateRequest
+):
+    """Create a new data source for a specific project"""
     try:
-        result = await data_service.get_data_from_source(source_id, limit)
+        logger.info(f"📊 Creating data source for project {project_id} in organization {organization_id}")
+        
+        result = await data_service.create_project_data_source(
+            organization_id=organization_id,
+            project_id=project_id,
+            data_source_data=request.model_dump()
+        )
+        
+        return result
+    except Exception as e:
+        logger.error(f"❌ Failed to create project data source: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/api/organizations/{organization_id}/projects/{project_id}/data-sources/{data_source_id}")
+async def get_project_data_source(
+    organization_id: str,
+    project_id: str,
+    data_source_id: str
+):
+    """Get a specific data source for a project"""
+    try:
+        result = await data_service.get_project_data_source(
+            organization_id=organization_id,
+            project_id=project_id,
+            data_source_id=data_source_id
+        )
+        
+        if result.get('success'):
+            return result
+        else:
+            raise HTTPException(status_code=404, detail=result.get('error', 'Data source not found'))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Failed to get project data source: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/api/organizations/{organization_id}/projects/{project_id}/data-sources/{data_source_id}/query")
+async def execute_project_data_source_query(
+    organization_id: str,
+    project_id: str,
+    data_source_id: str,
+    query_request: Dict[str, str]
+):
+    """Execute a query on a project data source"""
+    try:
+        query = query_request.get('query', '')
+        if not query:
+            raise HTTPException(status_code=400, detail="Query is required")
+        
+        result = await data_service.execute_project_data_source_query(
+            organization_id=organization_id,
+            project_id=project_id,
+            data_source_id=data_source_id,
+            query=query
+        )
+        
+        if result.get('success'):
+            return result
+        else:
+            raise HTTPException(status_code=400, detail=result.get('error', 'Query execution failed'))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Failed to execute project data source query: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/api/organizations/{organization_id}/projects/{project_id}/data-sources/{data_source_id}/data")
+async def get_project_data_source_data(
+    organization_id: str,
+    project_id: str,
+    data_source_id: str,
+    limit: int = 100
+):
+    """Get data from a project data source"""
+    try:
+        result = await data_service.get_project_data_source_data(
+            organization_id=organization_id,
+            project_id=project_id,
+            data_source_id=data_source_id,
+            limit=limit
+        )
+        
         if result.get('success'):
             return result
         else:
@@ -198,44 +311,11 @@ async def get_data_from_source(source_id: str, limit: int = 100):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Failed to get data from source {source_id}: {str(e)}")
+        logger.error(f"❌ Failed to get project data source data: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/sources/{source_id}/schema")
-async def get_source_schema(source_id: str):
-    """Get schema information for a specific data source"""
-    try:
-        result = await data_service.get_source_schema(source_id)
-        if result.get('success'):
-            return result
-        else:
-            raise HTTPException(status_code=400, detail=result.get('error', 'Failed to get schema'))
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"❌ Failed to get schema for source {source_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/sources/{source_id}/query")
-async def execute_query_on_source(source_id: str, query_request: Dict[str, str]):
-    """Execute a custom query on a specific data source"""
-    try:
-        query = query_request.get('query', '')
-        if not query:
-            raise HTTPException(status_code=400, detail="Query is required")
-        
-        result = await data_service.execute_query_on_source(source_id, query)
-        if result.get('success'):
-            return result
-        else:
-            raise HTTPException(status_code=400, detail=result.get('error', 'Failed to execute query'))
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"❌ Failed to execute query on source {source_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+# Removed redundant endpoints with {source_id} - using {data_source_id} for consistency
 
 
 @router.post("/upload")
@@ -314,19 +394,20 @@ async def connect_database(request: DatabaseConnectionRequest):
             if request.type.lower() == 'postgresql':
                 # Use the data connectivity service to test the connection
                 from app.modules.data.services.data_connectivity_service import DataConnectivityService
+                from app.core.real_data_sources import real_data_source_manager
                 data_service_instance = DataConnectivityService()
                 
-                # Test connection through the service
-                test_result = await data_service_instance.create_database_connection(config)
+                # Test connection using real data source manager
+                test_result = await real_data_source_manager.test_connection(data_source)
                 
-                if test_result['success']:
+                if test_result.success:
                     return {
                         "success": True,
-                        "data_source": test_result['data_source'],
+                        "data_source": data_source,
                         "message": "Database connection created successfully"
                     }
                 else:
-                    raise HTTPException(status_code=400, detail=f"Database connection failed: {test_result.get('error', 'Unknown error')}")
+                    raise HTTPException(status_code=400, detail=f"Database connection failed: {test_result.message}")
             else:
                 raise HTTPException(status_code=400, detail=f"Database type {request.type} not supported yet")
                 
@@ -616,7 +697,7 @@ async def get_learned_patterns():
 async def get_cube_status():
     """Get Cube.js connection status"""
     try:
-        status = cube_service.get_connection_status()
+        status = await cube_service.get_connection_status()
         return {
             "success": True,
             "cube_status": status
@@ -938,19 +1019,7 @@ async def get_modeling_types():
         logger.error(f"❌ Get modeling types failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/cube-status")
-async def get_cube_status():
-    """Get Cube.js server connection status"""
-    try:
-        cube_service = CubeIntegrationService()
-        status = await cube_service.get_connection_status()
-        return {
-            "success": True,
-            "cube_status": status
-        }
-    except Exception as e:
-        logger.error(f"❌ Failed to get Cube.js status: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+# Removed duplicate cube-status endpoint - using /cube/status for consistency
 
 @router.post("/cube-deploy")
 async def deploy_cube_schema(request: dict):
@@ -1088,4 +1157,372 @@ async def get_data_source_schema(data_source_id: str):
         raise
     except Exception as e:
         logger.error(f"❌ Failed to get data source schema: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# 🚀 REAL ENTERPRISE CONNECTIVITY ENDPOINTS
+
+@router.post("/enterprise/connections/test")
+async def test_enterprise_connection(request: Dict[str, Any]):
+    """Test enterprise data source connection"""
+    try:
+        logger.info(f"🔌 Testing enterprise connection: {request.get('type')}")
+        
+        # Create connection config
+        config = ConnectionConfig(
+            connector_type=ConnectorType(request['type']),
+            name=request.get('name', f"{request['type']}_connection"),
+            host=request.get('host'),
+            port=request.get('port'),
+            database=request.get('database'),
+            username=request.get('username'),
+            password=request.get('password'),
+            token=request.get('token'),
+            api_key=request.get('api_key'),
+            connection_string=request.get('connection_string'),
+            ssl_enabled=request.get('ssl_enabled', True),
+            timeout=request.get('timeout', 30),
+            metadata=request.get('metadata', {})
+        )
+        
+        # Test connection
+        result = await enterprise_connectors_service.test_connection(config)
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"❌ Enterprise connection test failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/enterprise/connections")
+async def create_enterprise_connection(request: Dict[str, Any]):
+    """Create enterprise data source connection"""
+    try:
+        logger.info(f"🔌 Creating enterprise connection: {request.get('type')}")
+        
+        # Create connection config
+        config = ConnectionConfig(
+            connector_type=ConnectorType(request['type']),
+            name=request.get('name', f"{request['type']}_connection"),
+            host=request.get('host'),
+            port=request.get('port'),
+            database=request.get('database'),
+            username=request.get('username'),
+            password=request.get('password'),
+            token=request.get('token'),
+            api_key=request.get('api_key'),
+            connection_string=request.get('connection_string'),
+            ssl_enabled=request.get('ssl_enabled', True),
+            timeout=request.get('timeout', 30),
+            metadata=request.get('metadata', {})
+        )
+        
+        # Create connection
+        result = await enterprise_connectors_service.create_connection(config)
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"❌ Enterprise connection creation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/enterprise/connections")
+async def list_enterprise_connections():
+    """List all enterprise connections"""
+    try:
+        connections = await enterprise_connectors_service.list_connections()
+        return {
+            "success": True,
+            "connections": connections,
+            "count": len(connections)
+        }
+    except Exception as e:
+        logger.error(f"❌ Failed to list enterprise connections: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/enterprise/connections/{connection_id}/query")
+async def execute_enterprise_query(connection_id: str, request: Dict[str, Any]):
+    """Execute query on enterprise connection"""
+    try:
+        query = request.get('query', '')
+        params = request.get('params')
+        
+        if not query:
+            raise HTTPException(status_code=400, detail="Query is required")
+        
+        result = await enterprise_connectors_service.execute_query(connection_id, query, params)
+        
+        return {
+            "success": result.success,
+            "data": result.data,
+            "columns": result.columns,
+            "row_count": result.row_count,
+            "execution_time": result.execution_time,
+            "query_id": result.query_id,
+            "error": result.error
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Enterprise query execution failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/enterprise/connections/{connection_id}/schema")
+async def get_enterprise_schema(connection_id: str, table_name: Optional[str] = None):
+    """Get schema from enterprise connection"""
+    try:
+        result = await enterprise_connectors_service.get_schema(connection_id, table_name)
+        return result
+    except Exception as e:
+        logger.error(f"❌ Failed to get enterprise schema: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# 🎯 MULTI-ENGINE QUERY EXECUTION ENDPOINTS
+
+@router.post("/query/execute")
+async def execute_multi_engine_query(request: Dict[str, Any]):
+    """Execute query using optimal engine"""
+    try:
+        query = request.get('query', '')
+        data_source_id = request.get('data_source_id')
+        engine = request.get('engine')  # Optional: 'duckdb', 'cube', 'spark', 'direct_sql', 'pandas'
+        optimization = request.get('optimization', True)
+        
+        if not query or not data_source_id:
+            raise HTTPException(status_code=400, detail="Query and data_source_id are required")
+        
+        # Get data source
+        data_source = await data_service.get_data_source_by_id(data_source_id)
+        if not data_source:
+            raise HTTPException(status_code=404, detail="Data source not found")
+        
+        # Select engine if specified
+        selected_engine = None
+        if engine:
+            try:
+                selected_engine = QueryEngine(engine)
+            except ValueError:
+                raise HTTPException(status_code=400, detail=f"Invalid engine: {engine}")
+        
+        # Execute query
+        result = await multi_engine_service.execute_query(
+            query=query,
+            data_source=data_source,
+            engine=selected_engine,
+            optimization=optimization
+        )
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Multi-engine query execution failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/query/parallel")
+async def execute_parallel_queries(request: Dict[str, Any]):
+    """Execute multiple queries in parallel"""
+    try:
+        queries = request.get('queries', [])
+        data_source_id = request.get('data_source_id')
+        
+        if not queries or not data_source_id:
+            raise HTTPException(status_code=400, detail="Queries and data_source_id are required")
+        
+        # Get data source
+        data_source = await data_service.get_data_source_by_id(data_source_id)
+        if not data_source:
+            raise HTTPException(status_code=404, detail="Data source not found")
+        
+        # Execute parallel queries
+        results = await multi_engine_service.execute_parallel_queries(queries, data_source)
+        
+        return {
+            "success": True,
+            "results": results,
+            "total_queries": len(queries),
+            "completed_queries": len([r for r in results if r.get('success')])
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Parallel query execution failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# 🏗️ REAL CUBE.JS INTEGRATION ENDPOINTS
+
+@router.post("/cube/initialize")
+async def initialize_cube_server():
+    """Initialize real Cube.js server with connectors"""
+    try:
+        result = await real_cube_service.initialize_cube_server()
+        return result
+    except Exception as e:
+        logger.error(f"❌ Cube.js server initialization failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/cube/connections")
+async def create_cube_database_connection(request: Dict[str, Any]):
+    """Create real database connection for Cube.js"""
+    try:
+        result = await real_cube_service.create_database_connection(request)
+        return result
+    except Exception as e:
+        logger.error(f"❌ Cube.js database connection creation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/cube/connections/{connection_id}/query")
+async def execute_cube_query(connection_id: str, request: Dict[str, Any]):
+    """Execute query using real database connection"""
+    try:
+        query = request.get('query', '')
+        params = request.get('params')
+        
+        if not query:
+            raise HTTPException(status_code=400, detail="Query is required")
+        
+        result = await real_cube_service.execute_query(connection_id, query, params)
+        
+        return {
+            "success": result['success'],
+            "data": result.get('data', []),
+            "columns": result.get('columns', []),
+            "row_count": result.get('row_count', 0),
+            "execution_time": result.get('execution_time', 0),
+            "connection_id": connection_id
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Cube.js query execution failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/cube/connections/{connection_id}/schema")
+async def get_cube_database_schema(connection_id: str):
+    """Get real database schema for Cube.js"""
+    try:
+        result = await real_cube_service.get_database_schema(connection_id)
+        return result
+    except Exception as e:
+        logger.error(f"❌ Cube.js schema retrieval failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/cube/connections/{connection_id}/schema")
+async def create_cube_schema(connection_id: str, request: Dict[str, Any]):
+    """Create real Cube.js schema from database connection"""
+    try:
+        schema_config = request.get('schema_config', {})
+        result = await real_cube_service.create_cube_schema(connection_id, schema_config)
+        return result
+    except Exception as e:
+        logger.error(f"❌ Cube.js schema creation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# 📋 YAML SCHEMA MANAGEMENT ENDPOINTS
+
+@router.post("/schema/generate")
+async def generate_yaml_schema(request: Dict[str, Any]):
+    """Generate YAML schema from data source"""
+    try:
+        data_source_id = request.get('data_source_id')
+        data_source_type = request.get('data_source_type', 'database')
+        user_preferences = request.get('user_preferences', {})
+        
+        if not data_source_id:
+            raise HTTPException(status_code=400, detail="data_source_id is required")
+        
+        # Get raw schema from data source
+        schema_result = await data_service.get_source_schema(data_source_id)
+        if not schema_result.get('success'):
+            raise HTTPException(status_code=400, detail=f"Failed to get schema: {schema_result.get('error')}")
+        
+        raw_schema = schema_result.get('schema', {})
+        
+        # Generate YAML schema
+        result = await yaml_schema_service.generate_yaml_schema(
+            data_source_id=data_source_id,
+            data_source_type=data_source_type,
+            raw_schema=raw_schema,
+            user_preferences=user_preferences
+        )
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ YAML schema generation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/schema/validate")
+async def validate_yaml_schema(request: Dict[str, Any]):
+    """Validate YAML schema structure and content"""
+    try:
+        schema_content = request.get('schema_content')
+        
+        if not schema_content:
+            raise HTTPException(status_code=400, detail="schema_content is required")
+        
+        result = await yaml_schema_service.validate_yaml_schema(schema_content)
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ YAML schema validation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/schema/{data_source_id}/verification")
+async def get_schema_for_verification(data_source_id: str):
+    """Get YAML schema for user verification"""
+    try:
+        result = await yaml_schema_service.get_schema_for_verification(data_source_id)
+        return result
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to get schema for verification: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/schema/{data_source_id}/verify")
+async def update_schema_from_verification(data_source_id: str, request: Dict[str, Any]):
+    """Update schema based on user verification feedback"""
+    try:
+        user_feedback = request.get('user_feedback', {})
+        
+        result = await yaml_schema_service.update_schema_from_verification(
+            data_source_id=data_source_id,
+            user_feedback=user_feedback
+        )
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"❌ Schema verification update failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/schema/{data_source_id}/export")
+async def export_schema(data_source_id: str, format: str = 'yaml'):
+    """Export schema in various formats"""
+    try:
+        result = await yaml_schema_service.export_schema(data_source_id, format)
+        return result
+        
+    except Exception as e:
+        logger.error(f"❌ Schema export failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

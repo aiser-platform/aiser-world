@@ -52,8 +52,15 @@ import {
   SettingOutlined,
   BulbOutlined,
   RocketOutlined,
-  BarChartOutlined
+  BarChartOutlined,
+  SyncOutlined,
+  ThunderboltOutlined
 } from '@ant-design/icons';
+import { dashboardDataService } from '../services/DashboardDataService';
+import { dashboardAPIService } from '../services/DashboardAPIService';
+import { workingQueryService } from '../services/WorkingQueryService';
+import ChartWidget from './ChartWidget';
+
 
 const { Sider, Content } = Layout;
 const { Title, Text, Paragraph } = Typography;
@@ -105,6 +112,10 @@ const suggestChartTypes = (results: any[]) => {
 
 interface MonacoSQLEditorProps {
   isDarkMode?: boolean;
+  onQueryResult?: (result: any) => void;
+  onChartCreate?: (chartData: any) => void;
+  selectedDataSource?: string;
+  onDataSourceChange?: (dataSourceId: string) => void;
 }
 
 interface DataSource {
@@ -147,19 +158,28 @@ interface FieldInfo {
   sampleValues?: any[];
 }
 
-const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({ isDarkMode = false }) => {
+const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({ 
+  isDarkMode = false, 
+  onQueryResult, 
+  onChartCreate, 
+  selectedDataSource,
+  onDataSourceChange 
+}) => {
   const [sqlQuery, setSqlQuery] = useState('SELECT * FROM sales_data LIMIT 100;');
   const [selectedDatabase, setSelectedDatabase] = useState('duckdb');
   const [selectedSchema, setSelectedSchema] = useState('public');
   const [selectedTable, setSelectedTable] = useState('sales_data');
   const [isExecuting, setExecuting] = useState(false);
   const [activeTab, setActiveTab] = useState('results');
+  const [previewChart, setPreviewChart] = useState<any>(null);
   const [openTableTabs, setOpenTableTabs] = useState<string[]>(['sales_data', 'user_analytics']);
   const [selectedTables, setSelectedTables] = useState<string[]>(['sales_data', 'user_analytics']);
   const [showTableSchema, setShowTableSchema] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [executionTime, setExecutionTime] = useState<number | null>(null);
   const [results, setResults] = useState<any[]>([]);
+  const [executionStatus, setExecutionStatus] = useState<string>('');
+  const [selectedEngine, setSelectedEngine] = useState<string>('');
   const [queryHistory, setQueryHistory] = useState<any[]>([]);
   const [dataSources, setDataSources] = useState<DataSource[]>([]);
   const [schemas, setSchemas] = useState<SchemaInfo[]>([]);
@@ -305,17 +325,25 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({ isDarkMode = false })
   const loadDataSources = async () => {
     setIsLoadingDataSources(true);
     try {
-      // Fetch real data sources from the Universal Data Modal API
-      const response = await fetch('/api/data/sources');
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success) {
-          setDataSources(result.data_sources || []);
-        } else {
-          throw new Error(result.message || 'Failed to load data sources');
-        }
+      // Use real data sources API
+      const response = await fetch('http://localhost:8000/data/sources');
+      const result = await response.json();
+      
+      if (result && Array.isArray(result)) {
+        setDataSources(result.map(ds => ({
+          id: ds.id || ds.Index,
+          name: ds.name || `Data Source ${ds.Index}`,
+          type: ds.type as 'file' | 'database' | 'warehouse' | 'api',
+          status: ds.status as 'connected' | 'disconnected' | 'error' | 'testing',
+          connection_info: ds.metadata,
+          lastUsed: ds.last_used,
+          rowCount: ds.rowCount,
+          columns: ds.columns || [],
+          size: ds.size?.toString(),
+          description: `${ds.type} data source`,
+        })));
       } else {
-        throw new Error('Failed to fetch data sources');
+        throw new Error(result.error || 'Failed to load data sources');
       }
     } catch (error) {
       console.error('Failed to load data sources:', error);
@@ -430,46 +458,268 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({ isDarkMode = false })
     document.body.removeChild(link);
   };
 
+  const handleCreateChart = (chartType: string, data: any[]) => {
+    if (!data || data.length === 0) {
+      message.warning('No data available to create chart');
+      return;
+    }
+
+    // Generate chart data based on chart type and actual query results
+    const firstRow = data[0];
+    const columns = Object.keys(firstRow);
+    const numericColumns = columns.filter(col => 
+      typeof firstRow[col] === 'number' || 
+      !isNaN(Number(firstRow[col]))
+    );
+    const textColumns = columns.filter(col => 
+      typeof firstRow[col] === 'string' && 
+      isNaN(Number(firstRow[col]))
+    );
+
+    // Use actual query results data
+    const actualData = data; // Use the real query results
+
+    let chartData: any = {};
+    let chartConfig: any = {};
+
+    switch (chartType.toLowerCase()) {
+      case 'bar chart':
+      case 'column chart':
+        chartData = {
+          xAxis: actualData.map(row => String(row[textColumns[0] || columns[0]])),
+          yAxis: actualData.map(row => Number(row[numericColumns[0] || columns[1]]) || 0)
+        };
+        chartConfig = {
+          chartType: 'bar',
+          title: { text: `${textColumns[0] || columns[0]} vs ${numericColumns[0] || columns[1]}` },
+          showTitle: true,
+          showLegend: true,
+          showTooltip: true,
+          showGrid: true
+        };
+        break;
+      case 'line chart':
+        chartData = {
+          xAxis: actualData.map(row => String(row[textColumns[0] || columns[0]])),
+          yAxis: actualData.map(row => Number(row[numericColumns[0] || columns[1]]) || 0)
+        };
+        chartConfig = {
+          chartType: 'line',
+          title: { text: `${textColumns[0] || columns[0]} Trend` },
+          showTitle: true,
+          showLegend: true,
+          showTooltip: true,
+          showGrid: true
+        };
+        break;
+      case 'pie chart':
+        chartData = {
+          series: actualData.map(row => ({
+            name: String(row[textColumns[0] || columns[0]]),
+            value: Number(row[numericColumns[0] || columns[1]]) || 0
+          }))
+        };
+        chartConfig = {
+          chartType: 'pie',
+          title: { text: `${textColumns[0] || columns[0]} Distribution` },
+          showTitle: true,
+          showLegend: true,
+          showTooltip: true
+        };
+        break;
+      case 'scatter plot':
+        chartData = {
+          series: actualData.map(row => ({
+            value: [
+              Number(row[numericColumns[0] || columns[0]]) || 0, 
+              Number(row[numericColumns[1] || columns[1]]) || 0
+            ],
+            name: `${row[numericColumns[0] || columns[0]]}, ${row[numericColumns[1] || columns[1]]}`
+          }))
+        };
+        chartConfig = {
+          chartType: 'scatter',
+          title: { text: `${numericColumns[0] || columns[0]} vs ${numericColumns[1] || columns[1]}` },
+          showTitle: true,
+          showLegend: true,
+          showTooltip: true,
+          showGrid: true
+        };
+        break;
+      default:
+        chartData = {
+          xAxis: actualData.map(row => String(row[columns[0]])),
+          yAxis: actualData.map(row => Number(row[columns[1]]) || 0)
+        };
+        chartConfig = {
+          chartType: 'bar',
+          title: { text: 'Chart from Query Results' },
+          showTitle: true,
+          showLegend: true,
+          showTooltip: true,
+          showGrid: true
+        };
+    }
+
+    // Create chart widget data
+    const chartWidget = {
+      type: chartConfig.chartType,
+      name: chartConfig.title.text,
+      title: chartConfig.title.text,
+      config: chartConfig,
+      data: chartData,
+      query: sqlQuery,
+      dataSourceId: selectedDataSource,
+      // Add raw data for reference
+      rawData: actualData
+    };
+
+    // Set preview chart instead of immediately creating widget
+    setPreviewChart(chartWidget);
+    setActiveTab('preview'); // Switch to preview tab
+    message.success(`Chart "${chartConfig.title.text}" preview created!`);
+  };
+
+  const handleChartGenerate = (chartConfig: any) => {
+    if (onChartCreate) {
+      const chartWidget = {
+        type: chartConfig.chartType,
+        name: chartConfig.title.text,
+        title: chartConfig.title.text,
+        config: chartConfig,
+        data: chartConfig.data,
+        query: sqlQuery,
+        dataSourceId: selectedDataSource,
+        rawData: chartConfig.rawData
+      };
+      onChartCreate(chartWidget);
+    }
+  };
+
   const handleExecuteQuery = async () => {
     setExecuting(true);
     setExecutionTime(null);
+    setExecutionStatus('Analyzing query...');
+    setSelectedEngine('');
     
     try {
-      // Simulate query execution
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const startTime = Date.now();
       
-      const mockResults = [
-        { total_num_boys: 125000, total_num_girls: 118000, total_births: 243000, avg_per_state: 4860 },
-        { total_num_boys: 118000, total_num_girls: 112000, total_births: 230000, avg_per_state: 4600 },
-        { total_num_boys: 132000, total_num_girls: 125000, total_births: 257000, avg_per_state: 5140 }
-      ];
+      // Find the selected data source
+      const selectedDataSource = dataSources.find(ds => ds.name.toLowerCase().includes(selectedDatabase.toLowerCase()));
       
-      setResults(mockResults);
-      setExecutionTime(1000);
+      if (selectedDataSource) {
+        setExecutionStatus('Executing query...');
+        
+        // Execute query using working query service with proper SQL parsing
+        const result = await workingQueryService.executeQuery(selectedDataSource.id, sqlQuery);
+        
+        const executionTime = Date.now() - startTime;
+        
+        if (result.success && result.data) {
+          setResults(result.data);
+          setExecutionTime(result.executionTime);
+          setSelectedEngine('client-side'); // Using client-side SQL parsing
+          setExecutionStatus('Query completed successfully');
+          
+          // Notify parent component of query result
+          if (onQueryResult) {
+            onQueryResult({
+              data: result.data,
+              columns: result.columns,
+              rowCount: result.rowCount,
+              executionTime: result.executionTime,
+              query: sqlQuery,
+              dataSourceId: selectedDataSource.id
+            });
+          }
+          
+          // Add to query history
+          const historyItem = {
+            id: Date.now(),
+            state: 'success',
+            started: new Date().toLocaleTimeString(),
+            duration: `00:00:${(executionTime / 1000).toFixed(2)}`,
+            progress: 100,
+            rows: result.rowCount,
+            sql: sqlQuery,
+            status: 'success',
+            database: selectedDatabase,
+            schema: selectedSchema,
+            user: 'current_user',
+            queryType: sqlQuery.trim().toUpperCase().split(' ')[0],
+            engine: 'client-side'
+          };
+          
+          setQueryHistory(prev => [historyItem, ...prev.slice(0, 49)]);
+          
+          message.success(`Query executed successfully using client-side engine. ${result.rowCount} rows returned in ${(result.executionTime / 1000).toFixed(2)}s.`);
+        } else {
+          setExecutionStatus('Query failed');
+          setSelectedEngine('unknown');
+          throw new Error(result.error || 'Query execution failed');
+        }
+      } else {
+        // Fallback to mock execution for demo data
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        const mockResults = [
+          { total_num_boys: 125000, total_num_girls: 118000, total_births: 243000, avg_per_state: 4860 },
+          { total_num_boys: 118000, total_num_girls: 112000, total_births: 230000, avg_per_state: 4600 },
+          { total_num_boys: 132000, total_num_girls: 125000, total_births: 257000, avg_per_state: 5140 }
+        ];
+        
+        setResults(mockResults);
+        setExecutionTime(1000);
+        
+        // Add to query history
+        const historyItem = {
+          id: Date.now(),
+          state: 'success',
+          started: new Date().toLocaleTimeString(),
+          duration: '00:00:01.00',
+          progress: 100,
+          rows: mockResults.length,
+          sql: sqlQuery,
+          status: 'success',
+          database: selectedDatabase,
+          schema: selectedSchema,
+          user: 'current_user',
+          queryType: sqlQuery.trim().toUpperCase().split(' ')[0],
+          engine: 'demo'
+        };
+        
+        setQueryHistory(prev => [historyItem, ...prev.slice(0, 49)]);
+        
+        message.success(`Query executed successfully using demo engine. ${mockResults.length} rows returned.`);
+      }
       
-      // Add to query history
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Query execution failed';
+      setExecutionStatus('Connection error');
+      setSelectedEngine('unknown');
+      message.error(`Query execution failed: ${errorMessage}`);
+      console.error('Query execution error:', error);
+      
+      // Add failed query to history
       const historyItem = {
         id: Date.now(),
-        state: 'success',
+        state: 'error',
         started: new Date().toLocaleTimeString(),
-        duration: '00:00:01.00',
-        progress: 100,
-        rows: mockResults.length,
+        duration: '00:00:00.00',
+        progress: 0,
+        rows: 0,
         sql: sqlQuery,
-        status: 'success',
+        status: 'error',
         database: selectedDatabase,
         schema: selectedSchema,
         user: 'current_user',
-        queryType: sqlQuery.trim().toUpperCase().split(' ')[0]
+        queryType: sqlQuery.trim().toUpperCase().split(' ')[0],
+        engine: 'error',
+        error: errorMessage
       };
       
       setQueryHistory(prev => [historyItem, ...prev.slice(0, 49)]);
-      
-      message.success(`Query executed successfully. ${mockResults.length} rows returned.`);
-      
-    } catch (error) {
-      message.error('Query execution failed');
-      console.error('Query execution error:', error);
     } finally {
       setExecuting(false);
     }
@@ -552,6 +802,31 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({ isDarkMode = false })
       render: (value: number) => value?.toLocaleString()
     },
     { 
+      title: 'Engine', 
+      dataIndex: 'engine', 
+      key: 'engine', 
+      render: (value: string) => {
+        const getEngineIcon = (engine: string) => {
+          switch (engine) {
+            case 'duckdb': return '🦆';
+            case 'cube': return '📊';
+            case 'spark': return '⚡';
+            case 'direct_sql': return '🗄️';
+            case 'pandas': return '🐼';
+            case 'demo': return '🎯';
+            case 'error': return '❌';
+            default: return '🔧';
+          }
+        };
+        
+        return (
+          <span style={{ fontSize: '11px' }}>
+            {getEngineIcon(value)} {value}
+          </span>
+        );
+      }
+    },
+    { 
       title: 'User', 
       dataIndex: 'user', 
       key: 'user', 
@@ -589,15 +864,15 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({ isDarkMode = false })
               size="small" 
               type="text" 
               icon={<EditOutlined />} 
-            onClick={() => handleHistoryItemClick(record.sql)}
-            title="Load Query"
+              onClick={() => handleHistoryItemClick(record.sql)}
+              title="Load Query"
             />
             <Button 
               size="small" 
               type="text" 
               danger 
               icon={<DeleteOutlined />} 
-            title="Delete History"
+              title="Delete History"
             />
         </Space>
       )
@@ -948,6 +1223,18 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({ isDarkMode = false })
                   Execute Query
                 </Button>
                 
+                <Button 
+                  icon={<DatabaseOutlined />} 
+                  size="large"
+                  onClick={() => {
+                    // TODO: Open universal data source modal
+                    message.info('Connect Data modal will open here');
+                  }}
+                  title="Connect to Data Source"
+                >
+                  Connect Data
+                </Button>
+                
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Text style={{ fontSize: '12px' }}>Row Limit:</Text>
                   <Select
@@ -968,6 +1255,24 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({ isDarkMode = false })
                     {executionTime ? `00:00:${(executionTime / 1000).toFixed(2)}` : '00:00:00.00'}
                   </Text>
                 </div>
+
+                {isExecuting && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <SyncOutlined spin style={{ fontSize: '14px', color: '#1890ff' }} />
+                    <Text style={{ fontSize: '12px', color: '#1890ff' }}>
+                      {executionStatus}
+                    </Text>
+                  </div>
+                )}
+
+                {selectedEngine && !isExecuting && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <ThunderboltOutlined style={{ fontSize: '14px', color: '#52c41a' }} />
+                    <Text style={{ fontSize: '12px', color: '#52c41a' }}>
+                      Engine: {selectedEngine}
+                    </Text>
+                  </div>
+                )}
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1026,6 +1331,19 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({ isDarkMode = false })
               onChange={setActiveTab}
               size="small"
               style={{ marginTop: '16px' }}
+              tabBarExtraContent={
+                <Button 
+                  size="small" 
+                  type="text" 
+                  icon={<PlusOutlined />}
+                  onClick={() => {
+                    const newTabKey = `query-${Date.now()}`;
+                    setActiveTab(newTabKey);
+                    message.success('New query tab added');
+                  }}
+                  title="Add New Query Tab"
+                />
+              }
             >
               <TabPane tab="Query Results" key="results">
                 <div style={{ marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1035,6 +1353,22 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({ isDarkMode = false })
                     )}
                   </div>
                   <Space size="small">
+                    <Button 
+                      size="small" 
+                      type="primary"
+                      icon={<BarChartOutlined />}
+                      onClick={() => {
+                        if (results && results.length > 0) {
+                          const chartTypes = suggestChartTypes(results);
+                          if (chartTypes.length > 0) {
+                            handleCreateChart(chartTypes[0].name, results);
+                          }
+                        }
+                      }}
+                      disabled={results.length === 0}
+                    >
+                      Generate Chart
+                    </Button>
                     <Button 
                       size="small" 
                       icon={<DownloadOutlined />} 
@@ -1064,76 +1398,122 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({ isDarkMode = false })
                 </div>
               </TabPane>
               
-              <TabPane tab="Chart" key="chart">
-                <div style={{ marginBottom: '16px' }}>
-                  {results.length > 0 ? (
+              {/* Chart Preview Tab */}
+              <TabPane tab="Chart Preview" key="preview">
+                <div style={{ height: '400px', display: 'flex', flexDirection: 'column' }}>
+                  {previewChart ? (
                     <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                        <Text strong style={{ color: isDarkMode ? '#ffffff' : '#000000' }}>
-                          📊 Chart from Query Results
-                        </Text>
-                        <Button 
-                          type="primary" 
-                          icon={<BarChartOutlined />}
-                          onClick={() => {
-                            // Navigate to Chart Tab in Dashboard Studio
-                            const url = new URL(window.location.href);
-                            url.searchParams.set('tab', 'chart');
-                            window.history.pushState({}, '', url.toString());
-                            // Trigger tab change event
-                            window.dispatchEvent(new CustomEvent('tabChange', { detail: 'chart' }));
-                          }}
-                        >
-                          Open in Chart Designer
-                        </Button>
-                      </div>
-                      
-                      {/* Auto-generated Chart Preview */}
                       <div style={{ 
-                        height: '300px', 
-                        background: isDarkMode ? '#1a1a1a' : '#fafafa',
-                        border: `1px solid ${isDarkMode ? '#303030' : '#d9d9d9'}`,
-                        borderRadius: '8px',
-                        padding: '16px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center'
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center', 
+                        marginBottom: '16px',
+                        padding: '12px',
+                        background: isDarkMode ? '#1f1f1f' : '#f5f5f5',
+                        borderRadius: '6px',
+                        border: `1px solid ${isDarkMode ? '#303030' : '#d9d9d9'}`
                       }}>
-                        <div style={{ textAlign: 'center', marginBottom: '16px' }}>
-                          <BarChartOutlined style={{ fontSize: '48px', color: isDarkMode ? '#1890ff' : '#1890ff', marginBottom: '8px' }} />
-                          <Text style={{ color: isDarkMode ? '#ffffff' : '#000000' }}>
-                            Chart Preview
+                        <div>
+                          <Title level={5} style={{ margin: 0, color: isDarkMode ? '#ffffff' : '#000000' }}>
+                            {previewChart.title}
+                          </Title>
+                          <Text type="secondary" style={{ fontSize: '12px' }}>
+                            {previewChart.config.chartType} Chart Preview
                           </Text>
                         </div>
-                        
-                        {/* Chart Type Suggestions */}
-                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
-                          {suggestChartTypes(results).map((chartType, index) => (
-                            <Tag key={index} color="blue" style={{ cursor: 'pointer' }}>
-                              {chartType.icon} {chartType.name}
-                            </Tag>
-                          ))}
-                        </div>
-                        
-                        <Text style={{ 
-                          fontSize: '12px', 
-                          color: isDarkMode ? '#999' : '#666', 
-                          marginTop: '16px',
-                          textAlign: 'center'
-                        }}>
-                          Click "Open in Chart Designer" to customize this chart
-                        </Text>
+                        <Space>
+                          <Select
+                            size="small"
+                            defaultValue={previewChart.config.chartType}
+                            style={{ width: 100 }}
+                            onChange={(value) => {
+                              const newChartWidget = {
+                                ...previewChart,
+                                config: { ...previewChart.config, chartType: value },
+                                type: value
+                              };
+                              setPreviewChart(newChartWidget);
+                            }}
+                          >
+                            <Select.Option value="bar">Bar</Select.Option>
+                            <Select.Option value="line">Line</Select.Option>
+                            <Select.Option value="pie">Pie</Select.Option>
+                            <Select.Option value="scatter">Scatter</Select.Option>
+                          </Select>
+                          <Button 
+                            size="small" 
+                            onClick={() => setPreviewChart(null)}
+                          >
+                            Cancel
+                          </Button>
+                          <Button 
+                            type="primary" 
+                            size="small"
+                            icon={<BarChartOutlined />}
+                            onClick={() => {
+                              if (previewChart && onChartCreate) {
+                                onChartCreate(previewChart);
+                                setPreviewChart(null);
+                                message.success('Chart added to dashboard!');
+                              }
+                            }}
+                          >
+                            Add to Dashboard
+                          </Button>
+                          
+                          <Button 
+                            size="small"
+                            icon={<SaveOutlined />}
+                            onClick={async () => {
+                              if (previewChart) {
+                                try {
+                                  const result = await dashboardAPIService.createChart(previewChart);
+                                  message.success('Chart saved successfully!');
+                                  console.log('Saved chart:', result);
+                                } catch (error) {
+                                  console.error('Failed to save chart:', error);
+                                  message.error('Failed to save chart. Please try again.');
+                                }
+                              }
+                            }}
+                          >
+                            Save Chart
+                          </Button>
+                        </Space>
+                      </div>
+                      
+                      <div style={{ 
+                        height: '300px',
+                        background: isDarkMode ? '#1a1a1a' : '#ffffff',
+                        border: `1px solid ${isDarkMode ? '#303030' : '#d9d9d9'}`,
+                        borderRadius: '6px',
+                        padding: '12px'
+                      }}>
+                        <ChartWidget
+                          widget={previewChart}
+                          config={previewChart.config}
+                          data={previewChart.data}
+                          isDarkMode={isDarkMode}
+                          showEditableTitle={false}
+                        />
                       </div>
                     </div>
                   ) : (
                     <div style={{ 
-                      textAlign: 'center', 
-                      padding: '40px 20px',
+                      height: '100%', 
+                      display: 'flex', 
+                      flexDirection: 'column',
+                      alignItems: 'center', 
+                      justifyContent: 'center',
                       color: isDarkMode ? '#999' : '#666'
                     }}>
-                      <BarChartOutlined style={{ fontSize: '48px', marginBottom: '16px' }} />
-                      <div>Execute a query to see chart suggestions</div>
+                      <BarChartOutlined style={{ fontSize: '48px', marginBottom: '16px', opacity: 0.5 }} />
+                      <Title level={4} style={{ color: isDarkMode ? '#999' : '#666', marginBottom: '8px' }}>
+                        No Chart Preview
+                      </Title>
+                      <Text style={{ color: isDarkMode ? '#666' : '#999' }}>
+                        Execute a query and click "Generate Chart" to see a preview
+                      </Text>
                     </div>
                   )}
                 </div>
@@ -1157,6 +1537,8 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({ isDarkMode = false })
           </div>
         </div>
       </div>
+
+
     </div>
   );
 };

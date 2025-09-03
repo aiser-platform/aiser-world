@@ -12,6 +12,7 @@ import {
   SaveOutlined,
   EditOutlined,
   EyeOutlined,
+  EyeInvisibleOutlined,
   BarChartOutlined,
   DatabaseOutlined,
   FilterOutlined,
@@ -40,11 +41,34 @@ import {
   CalendarOutlined,
   DownOutlined,
   MenuOutlined,
-  MoreOutlined
+  MoreOutlined,
+  SyncOutlined
 } from '@ant-design/icons';
-import { PropertiesConfigPanel, EChartsConfigProvider } from './EChartsConfiguration';
-import ChartWidget from './ChartWidget';
-import MonacoSQLEditor from './MonacoSQLEditor';
+import { EChartsConfigProvider } from './EChartsConfiguration';
+import { WidgetRenderer } from './WidgetSystem/WidgetRenderer';
+import { DashboardWidget } from './DashboardConfiguration/DashboardConfigProvider';
+import { dashboardDataService, WidgetDataConfig } from '../services/DashboardDataService';
+
+import { dashboardAPIService } from '../services/DashboardAPIService';
+
+import AdvancedDashboardCanvas from './AdvancedDashboardCanvas';
+import dynamic from 'next/dynamic';
+
+// Lazy load heavy components to reduce initial bundle size
+const UnifiedDesignPanel = dynamic(() => import('./UnifiedDesignPanel'), {
+  loading: () => <div>Loading design panel...</div>,
+  ssr: false
+});
+
+const ChartWidget = dynamic(() => import('./ChartWidget'), {
+  loading: () => <div>Loading chart...</div>,
+  ssr: false
+});
+
+const MonacoSQLEditor = dynamic(() => import('./MonacoSQLEditor'), {
+  loading: () => <div>Loading SQL editor...</div>,
+  ssr: false
+});
 import './DashboardStudio.css';
 
 const { Header, Sider, Content } = Layout;
@@ -56,18 +80,7 @@ const { Panel } = Collapse;
 
 interface DashboardStudioProps {}
 
-interface DashboardWidget {
-  id: string;
-  type: string;
-  name: string;
-  icon: React.ReactNode;
-  category: string;
-  tooltip: string;
-  position: { x: number; y: number };
-  size: { width: number; height: number };
-  config?: any;
-  data?: any;
-}
+
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
 
@@ -134,6 +147,7 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [isEditing, setIsEditing] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [showWidgetLibrary, setShowWidgetLibrary] = useState(true);
   const [showProperties, setShowProperties] = useState(true);
@@ -147,6 +161,72 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [dashboardTitle, setDashboardTitle] = useState('My Dashboard');
   const [dashboardSubtitle, setDashboardSubtitle] = useState('Professional BI Dashboard');
+  const [dashboardId, setDashboardId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [currentQueryResult, setCurrentQueryResult] = useState<any>(null);
+  const [selectedDataSource, setSelectedDataSource] = useState<string>('');
+
+
+
+
+  // Generate widget configuration based on type
+  const generateWidgetConfig = (type: string) => {
+    switch (type) {
+      case 'chart':
+        return {
+          chartType: 'bar',
+          title: {
+            text: 'New Bar Chart',
+            subtext: '',
+            left: 'left'
+          },
+          tooltip: { trigger: 'axis' },
+          legend: { data: [] },
+          color: ['#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de'],
+          animation: true,
+          grid: { top: 60, right: 40, bottom: 60, left: 60 },
+          xAxis: { type: 'category', data: [] },
+          yAxis: { type: 'value' },
+          series: []
+        };
+      case 'markdown':
+        return {
+          content: '# New Markdown Widget\n\nAdd your markdown content here...',
+          enableHtml: false,
+          syntaxHighlighting: false
+        };
+      case 'image':
+        return {
+          imageUrl: '',
+          altText: 'Image widget',
+          fitMode: 'contain'
+        };
+      case 'table':
+        return {
+          columns: ['Column 1', 'Column 2', 'Column 3'],
+          dataSource: 'sample',
+          pagination: true,
+          pageSize: 10
+        };
+      case 'metric':
+        return {
+          value: '0',
+          format: 'number',
+          prefix: '',
+          suffix: '',
+          showTrend: false
+        };
+      case 'text':
+        return {
+          content: 'New Text Widget\n\nAdd your text content here...',
+          fontSize: 14,
+          fontWeight: 'normal',
+          color: '#333333'
+        };
+      default:
+        return {};
+    }
+  };
 
   // Ensure component is mounted before rendering (SSR fix)
   useEffect(() => {
@@ -748,11 +828,78 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
     }
   ];
 
-  const handleSave = () => message.success('Dashboard saved!');
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      const dashboardData = {
+        title: dashboardTitle,
+        subtitle: dashboardSubtitle,
+        widgets: dashboardWidgets,
+        layout: layout,
+        metadata: {
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          version: '1.0.0'
+        }
+      };
+
+      let result;
+      if (dashboardId) {
+        // Update existing dashboard
+        result = await dashboardAPIService.updateDashboard(dashboardId, dashboardData);
+        message.success('Dashboard updated successfully!');
+      } else {
+        // Create new dashboard
+        result = await dashboardAPIService.createDashboard(dashboardData);
+        setDashboardId(result.id);
+        message.success('Dashboard created successfully!');
+      }
+    } catch (error) {
+      console.error('Failed to save dashboard:', error);
+      message.error('Failed to save dashboard. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
   const handleUndo = () => message.info('Undo action');
   const handleRedo = () => message.info('Redo action');
-  const handleShare = () => message.info('Share dashboard');
-  const handleExport = () => message.info('Export dashboard');
+  const handleShare = async () => {
+    if (!dashboardId) {
+      message.warning('Please save the dashboard first before sharing.');
+      return;
+    }
+    
+    try {
+      const shareData = {
+        permissions: ['view'],
+        expires_at: null,
+        public: false
+      };
+      
+      const result = await dashboardAPIService.shareDashboard(dashboardId, shareData);
+      message.success('Dashboard shared successfully!');
+      console.log('Share result:', result);
+    } catch (error) {
+      console.error('Failed to share dashboard:', error);
+      message.error('Failed to share dashboard. Please try again.');
+    }
+  };
+
+  const handleExport = async (format: string = 'json') => {
+    if (!dashboardId) {
+      message.warning('Please save the dashboard first before exporting.');
+      return;
+    }
+    
+    try {
+      const result = await dashboardAPIService.exportDashboard(dashboardId, format);
+      message.success(`Dashboard exported as ${format.toUpperCase()} successfully!`);
+      console.log('Export result:', result);
+    } catch (error) {
+      console.error('Failed to export dashboard:', error);
+      message.error('Failed to export dashboard. Please try again.');
+    }
+  };
   
   const handleExportPNG = () => {
     // Export dashboard as PNG (dashboard canvas only)
@@ -777,6 +924,13 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
     setSelectedWidget(widget);
   };
 
+  const handleCanvasWidgetSelect = (widgetId: string) => {
+    const widget = dashboardWidgets.find(w => w.id === widgetId);
+    if (widget) {
+      setSelectedWidget(widget);
+    }
+  };
+
   const handleOpenProperties = (widget: any) => {
     setSelectedWidget(widget);
     setShowProperties(true);
@@ -785,22 +939,428 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
     // The PropertiesConfigPanel will handle this per-widget
   };
 
-  // Update widget configuration
+  // Update widget configuration with real-time updates
   const handleWidgetConfigUpdate = (widgetId: string, config: any) => {
-    setDashboardWidgets(prev => prev.map(widget => 
-      widget.id === widgetId 
-        ? { ...widget, config: { ...widget.config, ...config } }
-        : widget
-    ));
+    setDashboardWidgets(prev => prev.map(widget => {
+      if (widget.id === widgetId) {
+        const updatedWidget = { ...widget };
+        
+        // Handle different types of config updates
+        if (config.title !== undefined) {
+          updatedWidget.title = config.title;
+        }
+        if (config.style !== undefined) {
+          updatedWidget.style = { ...updatedWidget.style, ...config.style };
+        }
+        if (config.isVisible !== undefined) {
+          updatedWidget.isVisible = config.isVisible;
+        }
+        if (config.isLocked !== undefined) {
+          updatedWidget.isLocked = config.isLocked;
+        }
+        if (config.refreshInterval !== undefined) {
+          updatedWidget.refreshInterval = config.refreshInterval;
+        }
+        if (config.layout !== undefined) {
+          updatedWidget.layout = { ...updatedWidget.layout, ...config.layout };
+        }
+        if (config.behavior !== undefined) {
+          updatedWidget.behavior = { ...updatedWidget.behavior, ...config.behavior };
+        }
+        if (config.animation !== undefined) {
+          updatedWidget.animation = { ...updatedWidget.animation, ...config.animation };
+        }
+        if (config.data !== undefined) {
+          updatedWidget.data = { ...updatedWidget.data, ...config.data };
+        }
+        
+        // Update the main config object
+        updatedWidget.config = { ...updatedWidget.config, ...config };
+        
+        return updatedWidget;
+      }
+      return widget;
+    }));
+    
+    // Update selected widget if it's the one being configured
+    if (selectedWidget?.id === widgetId) {
+      setSelectedWidget(prev => {
+        if (prev) {
+          const updatedWidget = { ...prev };
+          
+          if (config.title !== undefined) {
+            updatedWidget.title = config.title;
+          }
+          if (config.style !== undefined) {
+            updatedWidget.style = { ...updatedWidget.style, ...config.style };
+          }
+          if (config.isVisible !== undefined) {
+            updatedWidget.isVisible = config.isVisible;
+          }
+          if (config.isLocked !== undefined) {
+            updatedWidget.isLocked = config.isLocked;
+          }
+          if (config.refreshInterval !== undefined) {
+            updatedWidget.refreshInterval = config.refreshInterval;
+          }
+          if (config.layout !== undefined) {
+            updatedWidget.layout = { ...updatedWidget.layout, ...config.layout };
+          }
+          if (config.behavior !== undefined) {
+            updatedWidget.behavior = { ...updatedWidget.behavior, ...config.behavior };
+          }
+          if (config.animation !== undefined) {
+            updatedWidget.animation = { ...updatedWidget.animation, ...config.animation };
+          }
+          if (config.data !== undefined) {
+            updatedWidget.data = { ...updatedWidget.data, ...config.data };
+          }
+          
+          updatedWidget.config = { ...updatedWidget.config, ...config };
+          
+          return updatedWidget;
+        }
+        return prev;
+      });
+    }
   };
 
-  const handleAddToDashboard = (widget: any) => {
-    const newWidget: DashboardWidget = {
-      ...widget,
-      id: `widget-${Date.now()}`,
-      position: { x: 0, y: 0 },
-      size: { width: 6, height: 4 }
+  const handleAddToDashboard = async (widget: any) => {
+    // Map specific widget types to allowed types
+    const mapWidgetType = (type: string) => {
+      switch (type) {
+        case 'bar':
+        case 'line':
+        case 'pie':
+        case 'area':
+        case 'scatter':
+        case 'radar':
+        case 'heatmap':
+        case 'funnel':
+        case 'gauge':
+          return 'chart';
+        case 'markdown':
+        case 'text':
+          return 'text';
+        case 'image':
+          return 'image';
+        case 'table':
+        case 'pivot':
+          return 'table';
+        case 'kpi':
+        case 'metric':
+        case 'trend':
+          return 'metric';
+        case 'dateFilter':
+        case 'dropdownFilter':
+        case 'sliderFilter':
+        case 'searchFilter':
+          return 'filter';
+        default:
+          return 'text';
+      }
     };
+
+    // Get real data for widget (with fallback to sample data)
+    const getWidgetData = async (type: string, dataSourceId?: string, query?: string) => {
+      // If we have a real data source and query, use it
+      if (dataSourceId && query) {
+        try {
+          const result = await dashboardDataService.executeWidgetQuery({
+            dataSourceId,
+            query,
+            cache: true,
+            cacheTimeout: 300000 // 5 minutes
+          });
+          
+          if (result.success) {
+            return dashboardDataService.generateChartData(result, type);
+          }
+        } catch (error) {
+          console.error('Failed to execute real query, falling back to sample data:', error);
+        }
+      }
+
+      // Fallback to sample data
+      switch (type) {
+        case 'bar':
+        case 'line':
+        case 'area':
+          return {
+            xAxis: ['Product A', 'Product B', 'Product C', 'Product D', 'Product E'],
+            yAxis: [120, 200, 150, 80, 300]
+          };
+        case 'pie':
+        case 'doughnut':
+          return {
+            series: [
+              { value: 335, name: 'Direct' },
+              { value: 310, name: 'Email' },
+              { value: 234, name: 'Union Ads' },
+              { value: 135, name: 'Video Ads' },
+              { value: 1548, name: 'Search Engine' }
+            ]
+          };
+        case 'scatter':
+          return {
+            series: [
+              { value: [10, 20], name: 'Point 1' },
+              { value: [20, 30], name: 'Point 2' },
+              { value: [30, 40], name: 'Point 3' },
+              { value: [40, 50], name: 'Point 4' },
+              { value: [50, 60], name: 'Point 5' }
+            ]
+          };
+        case 'radar':
+          return {
+            indicators: [
+              { name: 'Sales', max: 6500 },
+              { name: 'Administration', max: 16000 },
+              { name: 'Information Technology', max: 30000 },
+              { name: 'Customer Support', max: 38000 },
+              { name: 'Development', max: 52000 },
+              { name: 'Marketing', max: 25000 }
+            ],
+            data: [4300, 10000, 28000, 35000, 50000, 19000]
+          };
+        case 'gauge':
+          return {
+            value: 75,
+            name: 'Performance'
+          };
+        default:
+          return [];
+      }
+    };
+
+    // Define default configurations for each widget type
+    const getDefaultConfig = (type: string) => {
+      const mappedType = mapWidgetType(type);
+      
+      switch (mappedType) {
+        case 'chart':
+          return {
+            chartType: type, // Keep original type for chart rendering
+            title: { 
+              text: `${widget.name || widget.title} Chart`, 
+              subtext: 'Professional visualization',
+              textStyle: { fontSize: 16, fontWeight: 'bold', color: '#333' },
+              subtextStyle: { fontSize: 12, color: '#666' }
+            },
+            showTitle: true,
+            showSubtitle: true,
+            showLegend: true,
+            showTooltip: true,
+            showGrid: true,
+            showContainer: true,
+            colors: ['#1890ff', '#52c41a', '#faad14', '#f5222d', '#722ed1', '#13c2c2', '#eb2f96'],
+            animation: true,
+            // Professional styling
+            backgroundColor: '#ffffff',
+            borderColor: '#e8e8e8',
+            borderRadius: 8,
+            padding: 16,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+          };
+        case 'table':
+          return {
+            title: { 
+              text: 'Professional Data Table', 
+              subtext: 'Clean and organized data display',
+              textStyle: { fontSize: 16, fontWeight: 'bold', color: '#333' }
+            },
+            showTitle: true,
+            showSubtitle: true,
+            pagination: true,
+            pageSize: 10,
+            showBorder: true,
+            showContainer: true,
+            striped: true,
+            hoverable: true,
+            sortable: true,
+            filterable: true,
+            // Professional styling
+            backgroundColor: '#ffffff',
+            borderColor: '#e8e8e8',
+            borderRadius: 8,
+            padding: 16,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+          };
+        case 'metric':
+          return {
+            title: { 
+              text: 'Key Performance Metric', 
+              subtext: 'Real-time business indicator',
+              textStyle: { fontSize: 14, fontWeight: '500', color: '#666' }
+            },
+            showTitle: true,
+            showSubtitle: true,
+            value: '1,234',
+            format: 'number',
+            prefix: '',
+            suffix: '',
+            showTrend: true,
+            trendValue: '+12.5%',
+            showContainer: true,
+            // Professional styling
+            backgroundColor: '#ffffff',
+            borderColor: '#e8e8e8',
+            borderRadius: 8,
+            padding: 20,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+            valueStyle: { fontSize: 32, fontWeight: 'bold', color: '#1890ff' },
+            trendStyle: { fontSize: 14, color: '#52c41a' }
+          };
+        case 'text':
+          return {
+            title: { 
+              text: type === 'markdown' ? 'Rich Content Widget' : 'Text Widget', 
+              subtext: type === 'markdown' ? 'Markdown support included' : 'Simple text display',
+              textStyle: { fontSize: 16, fontWeight: 'bold', color: '#333' }
+            },
+            showTitle: true,
+            showSubtitle: true,
+            content: type === 'markdown' 
+              ? '# Welcome to Your Dashboard\n\nThis is a **professional markdown widget** with:\n\n- *Italic text*\n- **Bold text**\n- `Code snippets`\n- Lists and more\n\nCustomize this content to fit your needs.'
+              : 'Welcome to your professional dashboard! This text widget provides a clean and elegant way to display important information, announcements, or instructions to your users.',
+            fontSize: 14,
+            fontWeight: 'normal',
+            color: '#333',
+            textAlign: 'left',
+            lineHeight: 1.6,
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            showContainer: true,
+            // Professional styling
+            backgroundColor: '#ffffff',
+            borderColor: '#e8e8e8',
+            borderRadius: 8,
+            padding: 20,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+          };
+        case 'image':
+          return {
+            title: { text: 'Image Widget', subtext: '' },
+            showTitle: true,
+            showSubtitle: false,
+            imageUrl: '',
+            altText: 'Image',
+            fitMode: 'contain',
+            showContainer: false
+          };
+        case 'filter':
+          return {
+            title: { text: 'Filter Widget', subtext: '' },
+            showTitle: true,
+            showSubtitle: false,
+            filterType: type === 'dateFilter' ? 'dateRange' : 
+                       type === 'dropdownFilter' ? 'dropdown' :
+                       type === 'sliderFilter' ? 'slider' :
+                       type === 'searchFilter' ? 'search' : 'dropdown',
+            showContainer: false
+          };
+        default:
+          return {
+            title: { text: widget.name || widget.title || 'Widget', subtext: '' },
+            showTitle: true,
+            showSubtitle: false,
+            showContainer: false
+          };
+      }
+    };
+
+    const newWidget: DashboardWidget = {
+      id: `widget-${Date.now()}`,
+      type: mapWidgetType(widget.type), // Use mapped type
+      title: widget.name || widget.title || 'Untitled',
+      position: { x: 0, y: 0, w: 6, h: 4 }, // Use correct position format
+      config: getDefaultConfig(widget.type),
+      dataSource: undefined,
+      refreshInterval: undefined,
+      isVisible: true,
+      isLocked: false,
+      
+      // Enhanced layout properties (Tableau-style)
+      layout: {
+        x: 0,
+        y: 0,
+        width: 6,
+        height: 4,
+        minWidth: 2,
+        minHeight: 2,
+        maxWidth: 12,
+        maxHeight: 20,
+        responsive: true,
+        isDraggable: true,
+        isResizable: true,
+        isBounded: true,
+        static: false,
+        containerPadding: [16, 16],
+        margin: [8, 8]
+      },
+      
+      // Enhanced style properties (Tableau-style)
+      style: {
+        backgroundColor: isDarkMode ? '#1f1f1f' : '#ffffff',
+        borderColor: isDarkMode ? '#303030' : '#d9d9d9',
+        borderWidth: 1,
+        borderStyle: 'solid',
+        borderRadius: 8,
+        padding: 16,
+        margin: 8,
+        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+        opacity: 1,
+        zIndex: 1,
+        fontSize: 14,
+        fontWeight: 'normal',
+        textAlign: 'left',
+        color: isDarkMode ? '#ffffff' : '#000000',
+        fontFamily: 'system-ui, -apple-system, sans-serif',
+        lineHeight: 1.5,
+        overflow: 'auto'
+      },
+      
+      // Animation properties
+      animation: {
+        enabled: true,
+        duration: 300,
+        easing: 'ease-in-out',
+        delay: 0,
+        type: 'fade'
+      },
+      
+      // Behavior properties
+      behavior: {
+        clickable: true,
+        hoverable: true,
+        selectable: true,
+        draggable: true,
+        resizable: true,
+        onHover: 'highlight',
+        onClick: 'select'
+      },
+      
+      // Data properties
+      data: {
+        source: undefined,
+        query: undefined,
+        refreshInterval: undefined,
+        autoRefresh: false,
+        cache: true,
+        cacheTimeout: 300
+      }
+    };
+
+    // Get initial data for the widget (async, non-blocking)
+    getWidgetData(widget.type, newWidget.dataSource, newWidget.data?.query).then(initialData => {
+      // Update widget data after it's loaded
+      setDashboardWidgets(prev => prev.map(w => 
+        w.id === newWidget.id 
+          ? { ...w, data: { ...w.data, ...initialData } }
+          : w
+      ));
+    }).catch(error => {
+      console.error('Failed to load initial widget data:', error);
+    });
     
     const newLayout = {
       i: newWidget.id,
@@ -818,10 +1378,14 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
     
     setDashboardWidgets(prev => [...prev, newWidget]);
     setLayout(prev => [...prev, newLayout]);
-    message.success(`${widget.name} added to dashboard`);
+    
+    // Automatically select the newly added widget for configuration
+    setSelectedWidget(newWidget);
+    
+    message.success(`${widget.name || widget.title} added to dashboard`);
   };
 
-  const handleLayoutChange = (newLayout: any[], layouts: any) => {
+  const handleLayoutChange = (newLayout: any[]) => {
     setLayout(newLayout);
     // Update widget positions based on layout changes
     const updatedWidgets = dashboardWidgets.map(widget => {
@@ -829,8 +1393,7 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
       if (layoutItem) {
         return {
           ...widget,
-          position: { x: layoutItem.x, y: layoutItem.y },
-          size: { width: layoutItem.w, height: layoutItem.h }
+          position: { x: layoutItem.x, y: layoutItem.y, w: layoutItem.w, h: layoutItem.h }
         };
       }
       return widget;
@@ -848,7 +1411,7 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
       if (widget.id === newItem.i) {
         return {
           ...widget,
-          size: { width: newItem.w, height: newItem.h }
+          position: { ...widget.position, w: newItem.w, h: newItem.h }
         };
       }
       return widget;
@@ -862,7 +1425,7 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
       if (widget.id === newItem.i) {
         return {
           ...widget,
-          position: { x: newItem.x, y: newItem.y }
+          position: { ...widget.position, x: newItem.x, y: newItem.y }
         };
       }
       return widget;
@@ -874,15 +1437,15 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
     const newWidget: DashboardWidget = {
       ...widget,
       id: `widget-${Date.now()}`,
-      position: { x: widget.position.x + 1, y: widget.position.y + 1 }
+      position: { ...widget.position, x: widget.position.x + 1, y: widget.position.y + 1 }
     };
     
     const newLayout = {
       i: newWidget.id,
       x: widget.position.x + 1,
       y: widget.position.y + 1,
-      w: widget.size.width,
-      h: widget.size.height,
+      w: widget.position.w,
+      h: widget.position.h,
       minW: 2,
       minH: 2,
       maxW: 12,
@@ -893,7 +1456,7 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
     
     setDashboardWidgets(prev => [...prev, newWidget]);
     setLayout(prev => [...prev, newLayout]);
-    message.success(`${widget.name} duplicated`);
+    message.success(`${widget.title} duplicated`);
   };
 
   const handleDeleteWidget = (widgetId: string) => {
@@ -902,7 +1465,125 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
     if (selectedWidget?.id === widgetId) {
       setSelectedWidget(null);
     }
-    message.success('Widget deleted');
+  };
+
+
+
+  // Handle query results from MonacoSQLEditor
+  const handleQueryResult = (result: any) => {
+    setCurrentQueryResult(result);
+    message.success(`Query executed: ${result.rowCount} rows returned`);
+  };
+
+  // Handle chart creation from MonacoSQLEditor
+  const handleChartCreate = async (chartData: any) => {
+    try {
+      // Create a new widget from the chart data
+      const newWidget: DashboardWidget = {
+        id: `widget-${Date.now()}`,
+        type: 'chart',
+        title: chartData.title,
+        position: { x: 0, y: 0, w: 6, h: 4 },
+        config: chartData.config,
+        dataSource: chartData.dataSourceId,
+        refreshInterval: undefined,
+        isVisible: true,
+        isLocked: false,
+        
+        // Enhanced properties
+        layout: {
+          x: 0,
+          y: 0,
+          width: 6,
+          height: 4,
+          minWidth: 2,
+          minHeight: 2,
+          maxWidth: 12,
+          maxHeight: 20,
+          responsive: true,
+          isDraggable: true,
+          isResizable: true,
+          isBounded: true,
+          static: false,
+          containerPadding: [16, 16],
+          margin: [8, 8]
+        },
+        
+        style: {
+          backgroundColor: isDarkMode ? '#1f1f1f' : '#ffffff',
+          borderColor: isDarkMode ? '#303030' : '#d9d9d9',
+          borderWidth: 1,
+          borderStyle: 'solid',
+          borderRadius: 8,
+          padding: 16,
+          margin: 8,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+          opacity: 1,
+          zIndex: 1,
+          fontSize: 14,
+          fontWeight: 'normal',
+          textAlign: 'left',
+          color: isDarkMode ? '#ffffff' : '#000000',
+          fontFamily: 'system-ui, -apple-system, sans-serif',
+          lineHeight: 1.5,
+          overflow: 'auto'
+        },
+        
+        animation: {
+          enabled: true,
+          duration: 300,
+          easing: 'ease-in-out',
+          delay: 0,
+          type: 'fade'
+        },
+        
+        behavior: {
+          clickable: true,
+          hoverable: true,
+          selectable: true,
+          draggable: true,
+          resizable: true,
+          onHover: 'highlight',
+          onClick: 'select'
+        },
+        
+        data: {
+          source: chartData.dataSourceId,
+          query: chartData.query,
+          refreshInterval: undefined,
+          autoRefresh: false,
+          cache: true,
+          cacheTimeout: 300,
+          ...chartData.data
+        }
+      };
+
+      // Add to layout
+      const newLayout = {
+        i: newWidget.id,
+        x: 0,
+        y: 0,
+        w: 6,
+        h: 4,
+        minW: 2,
+        minH: 2,
+        maxW: 12,
+        maxH: 8,
+        isResizable: true,
+        isDraggable: true
+      };
+
+      setDashboardWidgets(prev => [...prev, newWidget]);
+      setLayout(prev => [...prev, newLayout]);
+      
+      // Automatically select the newly created chart
+      setSelectedWidget(newWidget);
+      
+      message.success(`Chart "${chartData.title}" added to dashboard`);
+    } catch (error) {
+      console.error('Failed to create chart widget:', error);
+      message.error('Failed to create chart widget');
+    }
   };
 
   // Keyboard shortcuts
@@ -911,179 +1592,30 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
   const renderDashboardTab = () => {
     return (
       <div style={{ padding: '20px', minHeight: '600px' }}>
-        <div style={{ marginBottom: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-            <Title level={4} style={{ margin: 0, color: isDarkMode ? '#ffffff' : '#000000' }}>
-              Dashboard Canvas
-            </Title>
-            <Tooltip title="Build your dashboard by selecting chart types from the library">
-              <span style={{ color: isDarkMode ? '#666' : '#999', cursor: 'help', fontSize: '16px' }}>ℹ️</span>
-            </Tooltip>
-          </div>
-          
-          {/* Dashboard Controls */}
-          <div style={{ marginTop: '8px' }}>
-            <Space>
-              <Button 
-                size="small" 
-                icon={<PlusOutlined />}
-                onClick={() => setShowWidgetLibrary(true)}
-              >
-                Add Widget
-              </Button>
-              <Button 
-                size="small" 
-                icon={<SettingOutlined />}
-                onClick={() => setShowProperties(true)}
-                disabled={!selectedWidget}
-              >
-                Configure
-              </Button>
-              <Button 
-                size="small" 
-                icon={<SaveOutlined />}
-                onClick={handleSave}
-              >
-                Save Layout
-              </Button>
-            </Space>
-          </div>
+        <div style={{ marginBottom: '8px' }}>
+          <Title level={4} style={{ margin: 0, color: isDarkMode ? '#ffffff' : '#000000' }}>
+            Dashboard Canvas
+          </Title>
         </div>
         
-        {dashboardWidgets.length === 0 ? (
-          <div 
-            className={`dashboard-canvas ${isDragOver ? 'drag-over' : ''}`}
-            style={{ 
-              textAlign: 'center', 
-              padding: '60px 20px',
-              border: `2px dashed ${isDragOver ? '#1890ff' : isDarkMode ? '#303030' : '#d9d9d9'}`,
-              borderRadius: '8px',
-              background: isDragOver ? 'rgba(24, 144, 255, 0.05)' : isDarkMode ? '#1a1a1a' : '#fafafa',
-              minHeight: '400px',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.2s ease'
-            }}
-            onDragOver={(e) => {
-              e.preventDefault();
-              e.dataTransfer.dropEffect = 'copy';
-              setIsDragOver(true);
-            }}
-            onDragLeave={(e) => {
-              e.preventDefault();
-              setIsDragOver(false);
-            }}
-            onDrop={(e) => {
-              e.preventDefault();
-              setIsDragOver(false);
-              try {
-                const widgetData = JSON.parse(e.dataTransfer.getData('application/json'));
-                handleAddToDashboard(widgetData);
-              } catch (error) {
-                console.error('Failed to parse dropped widget data:', error);
-              }
-            }}
-          >
-            <BarChartOutlined style={{ fontSize: '48px', color: isDragOver ? '#1890ff' : isDarkMode ? '#666' : '#ccc', marginBottom: '16px' }} />
-            <Title level={5} style={{ color: isDragOver ? '#1890ff' : isDarkMode ? '#666' : '#999' }}>
-              {isDragOver ? 'Drop Chart Here!' : 'Empty Dashboard'}
-            </Title>
-            <Text style={{ color: isDragOver ? '#1890ff' : isDarkMode ? '#666' : '#999' }}>
-              {isDragOver 
-                ? 'Release to add this chart to your dashboard' 
-                : 'Drag chart types from the Widget Library, or click the button below'
-              }
-            </Text>
-            <Button 
-              type="primary" 
-              icon={<AppstoreOutlined />} 
-              style={{ marginTop: '16px' }}
-              onClick={() => setShowWidgetLibrary(true)}
-            >
-              Open Widget Library
-            </Button>
-          </div>
-        ) : (
-          <div 
-            className={`dashboard-canvas ${isDragOver ? 'drag-over' : ''}`}
-            style={{ 
-              background: isDarkMode ? '#1a1a1a' : '#fafafa',
-              border: `1px solid ${isDarkMode ? '#303030' : '#d9d9d9'}`,
-              borderRadius: '8px',
-              padding: '16px',
-              minHeight: '600px'
-            }}
-            onDragOver={(e) => {
-              e.preventDefault();
-              e.dataTransfer.dropEffect = 'copy';
-              setIsDragOver(true);
-            }}
-            onDragLeave={(e) => {
-              e.preventDefault();
-              setIsDragOver(false);
-            }}
-            onDrop={(e) => {
-              e.preventDefault();
-              setIsDragOver(false);
-              try {
-                const widgetData = JSON.parse(e.dataTransfer.getData('application/json'));
-                handleAddToDashboard(widgetData);
-              } catch (error) {
-                console.error('Failed to parse dropped widget data:', error);
-              }
-            }}
-          >
-            <ResponsiveGridLayout
-              className="layout"
-              layouts={{ lg: layout }}
-              breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
-              cols={{ lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 }}
-              rowHeight={60}
-              onLayoutChange={handleLayoutChange}
-              onBreakpointChange={handleBreakpointChange}
-              onResize={handleWidgetResize}
-              isDraggable={true}
-              isResizable={true}
-              useCSSTransforms={true}
-              compactType="vertical"
-              preventCollision={false}
-              margin={[16, 16]}
-              containerPadding={[16, 16]}
-            >
-              {dashboardWidgets.map((widget) => (
-                <div 
-                  key={widget.id} 
-                  className={`dashboard-widget ${selectedWidget?.id === widget.id ? 'selected' : ''}`}
-                >
-                  <ChartWidget
-                    widget={widget}
-                    config={widget.config || {}}
-                    data={widget.data || {}}
-                    onConfigUpdate={(config) => handleWidgetConfigUpdate(widget.id, config)}
-                    onWidgetClick={() => setSelectedWidget(widget)}
-                    onDelete={handleDeleteWidget}
-                    isSelected={selectedWidget?.id === widget.id}
-                    isDarkMode={isDarkMode}
-                    showEditableTitle={true}
-                    onTitleChange={(title, subtitle) => {
-                      // Update the widget with new title/subtitle
-                      handleWidgetConfigUpdate(widget.id, {
-                        ...widget.config,
-                        basic: {
-                          ...widget.config?.basic,
-                          title,
-                          subtitle
-                        }
-                      });
-                    }}
-                  />
-                </div>
-              ))}
-            </ResponsiveGridLayout>
-          </div>
-        )}
+        <AdvancedDashboardCanvas
+          widgets={dashboardWidgets}
+          layout={layout}
+          selectedWidget={selectedWidget}
+          isDarkMode={isDarkMode}
+          onLayoutChange={handleLayoutChange}
+          onWidgetSelect={setSelectedWidget}
+          onWidgetUpdate={handleWidgetConfigUpdate}
+          onWidgetDelete={handleDeleteWidget}
+          onWidgetDuplicate={handleDuplicateWidget}
+          onWidgetConfigUpdate={handleWidgetConfigUpdate}
+          onAddWidget={handleAddToDashboard}
+          dashboardTitle={dashboardTitle}
+          dashboardSubtitle={dashboardSubtitle}
+          onTitleChange={setDashboardTitle}
+          onSubtitleChange={setDashboardSubtitle}
+        />
+
       </div>
     );
   };
@@ -1129,7 +1661,13 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
           flex: 1,
           minHeight: '500px'
         }}>
-          <MonacoSQLEditor isDarkMode={isDarkMode} />
+          <MonacoSQLEditor 
+            isDarkMode={isDarkMode}
+            onQueryResult={handleQueryResult}
+            onChartCreate={handleChartCreate}
+            selectedDataSource={selectedDataSource}
+            onDataSourceChange={setSelectedDataSource}
+          />
         </div>
       </div>
     );
@@ -1172,10 +1710,10 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
                 marginBottom: '16px'
               }}>
                 <div style={{ fontSize: '24px' }}>
-                  {React.isValidElement(selectedWidget.icon) ? selectedWidget.icon : <BarChartOutlined />}
+                  <BarChartOutlined />
                 </div>
                 <Title level={4} style={{ margin: 0, color: isDarkMode ? '#ffffff' : '#000000' }}>
-                  {selectedWidget.name} Preview
+                  {selectedWidget.title} Preview
                 </Title>
               </div>
               
@@ -1230,7 +1768,7 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
                   size="large"
                   onClick={() => handleAddToDashboard(selectedWidget)}
                 >
-                  Add {selectedWidget.name} to Dashboard
+                  Add {selectedWidget.title} to Dashboard
                 </Button>
                 
                 <Button 
@@ -1474,344 +2012,218 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
     );
   };
 
+  // Properties panel is now handled by UnifiedDesignPanel
+
+  // Onboarding is now handled by PlatformOnboardingModal in the main app
+
   // Main component return
   return (
     <div className={`dashboard-studio ${isDarkMode ? 'dark' : 'light'}`}>
-          {/* Header with Breadcrumbs and Actions */}
-          <Header className="dashboard-header" style={{ 
-            background: isDarkMode ? '#001529' : '#ffffff',
-            borderBottom: `1px solid ${isDarkMode ? '#303030' : '#d9d9d9'}`,
-            padding: '0 24px',
-            height: '64px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between'
-          }}>
-            <div className="header-left">
-              <Breadcrumb
-                items={[
-                  { title: <HomeOutlined />, href: '/' },
-                  { title: 'Dashboards', href: '/dashboard' },
-                  { title: 'Aiser Dashboard Studio' }
-                ]}
-                style={{ color: isDarkMode ? '#ffffff' : '#000000' }}
-              />
-            </div>
-            
-            <div className="header-center">
-              <div style={{ textAlign: 'center' }}>
-                <Title level={4} style={{ margin: 0, color: isDarkMode ? '#ffffff' : '#000000' }}>
-                  Aiser Dashboard Studio
-                </Title>
-                {activeTab === 'dashboard' && (
-                  <div style={{ marginTop: '4px' }}>
-                    <Input
-                      placeholder="Dashboard Title"
-                      value={dashboardTitle}
-                      onChange={(e) => setDashboardTitle(e.target.value)}
-                      style={{ 
-                        width: '200px', 
-                        textAlign: 'center',
-                        border: 'none',
-                        background: 'transparent',
-                        color: isDarkMode ? '#ffffff' : '#000000',
-                        fontSize: '16px',
-                        fontWeight: 'bold'
-                      }}
-                      size="small"
-                    />
-                    <br />
-                    <Input
-                      placeholder="Dashboard Subtitle"
-                      value={dashboardSubtitle}
-                      onChange={(e) => setDashboardSubtitle(e.target.value)}
-                      style={{ 
-                        width: '200px', 
-                        textAlign: 'center',
-                        border: 'none',
-                        background: 'transparent',
-                        color: isDarkMode ? '#999' : '#666',
-                        fontSize: '12px'
-                      }}
-                      size="small"
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="header-right">
-              <Space>
-                {/* Widget Library Toggle */}
-                <Tooltip title={showWidgetLibrary ? "Hide Widget Library" : "Show Widget Library"}>
-                  <Button
-                    type="text"
-                    icon={<AppstoreOutlined />}
-                    onClick={() => setShowWidgetLibrary(!showWidgetLibrary)}
-                    style={{
-                      color: showWidgetLibrary ? (isDarkMode ? '#1890ff' : '#1890ff') : (isDarkMode ? '#666' : '#999'),
-                      background: showWidgetLibrary ? (isDarkMode ? 'rgba(24, 144, 255, 0.1)' : 'rgba(24, 144, 255, 0.05)') : 'transparent'
-                    }}
-                  />
-                </Tooltip>
-                
-                {/* Properties Panel Toggle */}
-                <Tooltip title={showProperties ? "Hide Properties Panel" : "Show Properties Panel"}>
-                  <Button
-                    type="text"
-                    icon={<SettingOutlined />}
-                    onClick={() => setShowProperties(!showProperties)}
-                    style={{
-                      color: showProperties ? (isDarkMode ? '#1890ff' : '#1890ff') : (isDarkMode ? '#666' : '#999'),
-                      background: showProperties ? (isDarkMode ? 'rgba(24, 144, 255, 0.1)' : 'rgba(24, 144, 255, 0.05)') : 'transparent'
-                    }}
-                  />
-                </Tooltip>
-                
-                <Button
-                  icon={isEditing ? <EyeOutlined /> : <EditOutlined />}
-                  onClick={() => setIsEditing(!isEditing)}
-                  type={isEditing ? 'default' : 'primary'}
-                >
-                  {isEditing ? 'Preview' : 'Edit'}
-                </Button>
-                
-                <Button icon={<UndoOutlined />} disabled={!canUndo} onClick={handleUndo} />
-                <Button icon={<RedoOutlined />} disabled={!canRedo} onClick={handleRedo} />
-                <Button icon={isFullscreen ? <CompressOutlined /> : <FullscreenOutlined />} onClick={handleToggleFullscreen} />
-                <Button icon={<SaveOutlined />} type="primary" onClick={handleSave}>Save</Button>
-                
-                <Dropdown
-                  overlay={
-                    <Menu>
-                      <Menu.Item key="export-png" icon={<DownloadOutlined />} onClick={handleExportPNG}>
-                        Export as PNG
-                      </Menu.Item>
-                      <Menu.Item key="export-pdf" icon={<DownloadOutlined />} onClick={handleExportPDF}>
-                        Export as PDF
-                      </Menu.Item>
-                      <Menu.Item key="export-html" icon={<DownloadOutlined />} onClick={handleExportHTML}>
-                        Export as HTML
-                      </Menu.Item>
-                    </Menu>
-                  }
-                  trigger={['click']}
-                >
-                  <Button icon={<DownloadOutlined />}>
-                    Export
-                  </Button>
-                </Dropdown>
-                
-                <Button icon={<SettingOutlined />} onClick={handleShare}>
-                  Share
-                </Button>
-              </Space>
-            </div>
-          </Header>
-
-          <Layout style={{ height: 'calc(100vh - 64px)' }}>
-            {/* Left Sidebar - Widget Library */}
-            {showWidgetLibrary && (
-              <Sider
-                width={380}
-                theme={isDarkMode ? 'dark' : 'light'}
-                style={{ 
-                  borderRight: `1px solid ${isDarkMode ? '#303030' : '#d9d9d9'}`,
-                  background: isDarkMode ? '#141414' : '#ffffff'
-                }}
-              >
-                <div className="widget-library" style={{ padding: '16px' }}>
-                  <div style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center',
-                    marginBottom: '16px'
-                  }}>
-                    <Title level={5} style={{ margin: 0, color: isDarkMode ? '#ffffff' : '#000000' }}>Widget Library</Title>
-                    <Button
-                      icon={<CloseOutlined />}
-                      size="small"
-                      onClick={() => setShowWidgetLibrary(false)}
-                    />
-                  </div>
-
-                  <Tabs
-                    defaultActiveKey="charts"
-                    size="small"
-                    items={widgetCategories.map(category => ({
-                      key: category.key,
-                      label: (
-                        <span>
-                          {category.icon} {category.label}
-                        </span>
-                      ),
-                      children: (
-                        <div style={{ padding: '8px 0' }}>
-                          {category.content}
-                        </div>
-                      )
-                    }))}
-                  />
-                </div>
-              </Sider>
-            )}
-
-            {/* Main Content with Tabs */}
-            <Content style={{ 
-              background: isDarkMode ? '#000000' : '#f5f5f5',
-              padding: '16px',
-              overflow: 'auto'
-            }}>
-                          <div className="dashboard-content" style={{ 
-              background: isDarkMode ? '#141414' : '#ffffff',
-              borderRadius: '8px',
-              minHeight: '100%',
-              position: 'relative'
-            }}>
-              <Tabs
-                activeKey={activeTab}
-                onChange={handleTabChange}
-                type="card"
-                size="large"
-                style={{ padding: '16px' }}
-                  items={[
-                    {
-                      key: 'dashboard',
-                      label: (
-                        <span>
-                          <DashboardOutlined /> Dashboard
-                        </span>
-                      ),
-                      children: renderDashboardTab()
-                    },
-                    {
-                      key: 'query-editor',
-                      label: (
-                        <span>
-                          <DatabaseOutlined /> Query Editor
-                        </span>
-                      ),
-                      children: renderDataTab()
-                    },
-                    {
-                      key: 'chart',
-                      label: (
-                        <span>
-                          <BarChartOutlined /> Chart
-                        </span>
-                      ),
-                      children: renderChartsTab()
-                    },
-                    {
-                      key: 'filter',
-                      label: (
-                        <span>
-                          <FilterOutlined /> Filter
-                        </span>
-                      ),
-                      children: renderFilterTab()
-                    }
-                  ]}
-                />
-              </div>
-            </Content>
-
-            {/* Right Sidebar - Properties Panel */}
-            {showProperties && (
-              <Sider
-                width={320}
-                theme={isDarkMode ? 'dark' : 'light'}
-                style={{ 
-                  borderLeft: `1px solid ${isDarkMode ? '#303030' : '#d9d9d9'}`,
-                  background: isDarkMode ? '#141414' : '#ffffff'
-                }}
-              >
-                <div className="properties-panel" style={{ padding: '16px' }}>
-                  <div style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center',
-                    marginBottom: '16px'
-                  }}>
-                    <Title level={5} style={{ margin: 0, color: isDarkMode ? '#ffffff' : '#000000' }}>Properties</Title>
-                    <Button
-                      icon={<CloseOutlined />}
-                      size="small"
-                      onClick={() => setShowProperties(false)}
-                    />
-                  </div>
-                  
-                  {selectedWidget ? (
-                    <div>
-                      <Title level={5} style={{ color: isDarkMode ? '#ffffff' : '#000000' }}>
-                        {selectedWidget.name} Properties
-                      </Title>
-                      {selectedWidget.type && Object.values(COMPREHENSIVE_CHART_TYPES)
-                          .flatMap(cat => cat.charts)
-                          .some(c => c.type === selectedWidget.type) ? (
-                        <div style={{ maxHeight: '500px', overflow: 'auto' }}>
-                          <PropertiesConfigPanel 
-                            chartType={selectedWidget.type} 
-                            widgetId={selectedWidget.id}
-                            onConfigUpdate={handleWidgetConfigUpdate}
-                          />
-                        </div>
-                      ) : (
-                        <div style={{ textAlign: 'center', padding: '20px' }}>
-                          <Text style={{ color: isDarkMode ? '#ffffff' : '#000000' }}>
-                            Configure {selectedWidget.name} properties
-                          </Text>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div style={{ textAlign: 'center', padding: '20px' }}>
-                      <Text style={{ color: isDarkMode ? '#ffffff' : '#000000' }}>
-                        Select a chart type from Widget Library to configure
-                      </Text>
-                    </div>
-                  )}
-                </div>
-              </Sider>
-            )}
-          </Layout>
-
-          {/* Floating Action Buttons */}
-          {!showWidgetLibrary && (
-            <Button
-              type="primary"
-              icon={<AppstoreOutlined />}
-              onClick={() => setShowWidgetLibrary(true)}
-              style={{
-                position: 'fixed',
-                left: '20px',
-                top: '80px',
-                zIndex: 1000,
-                borderRadius: '50%',
-                width: '56px',
-                height: '56px'
-              }}
-            />
-          )}
-
-          {!showProperties && (
-            <Button
-              type="primary"
-              icon={<SettingOutlined />}
-              onClick={() => setShowProperties(true)}
-              style={{
-                position: 'fixed',
-                right: '20px',
-                top: '80px',
-                zIndex: 1000,
-                borderRadius: '50%',
-                width: '56px',
-                height: '56px'
-              }}
-            />
-          )}
+      {/* Onboarding is now handled by PlatformOnboardingModal in the main app */}
+      {/* Header with Breadcrumbs and Actions */}
+      <Header className="dashboard-header" style={{ 
+        background: isDarkMode ? '#001529' : '#ffffff',
+        borderBottom: `1px solid ${isDarkMode ? '#303030' : '#d9d9d9'}`,
+        padding: '0 24px',
+        height: '64px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between'
+      }}>
+        <div className="header-left">
+          <Breadcrumb
+            items={[
+              { title: <HomeOutlined />, href: '/' },
+              { title: 'Dashboards', href: '/dashboard' },
+              { title: 'Aiser Dashboard Studio' }
+            ]}
+            style={{ color: isDarkMode ? '#ffffff' : '#000000' }}
+          />
         </div>
-              );
-      };
+        
+        <div className="header-center">
+          <div style={{ textAlign: 'center' }}>
+            <Title level={4} style={{ margin: 0, color: isDarkMode ? '#ffffff' : '#000000' }}>
+              Aiser Dashboard Studio
+            </Title>
+
+          </div>
+        </div>
+
+        <div className="header-right">
+          <Space>
+            {/* Widget Library Toggle */}
+            <Tooltip title={showWidgetLibrary ? "Hide Widget Library" : "Show Widget Library"}>
+              <Button
+                type="text"
+                icon={<AppstoreOutlined />}
+                onClick={() => setShowWidgetLibrary(!showWidgetLibrary)}
+                style={{
+                  color: showWidgetLibrary ? (isDarkMode ? '#1890ff' : '#1890ff') : (isDarkMode ? '#666' : '#999'),
+                  background: showWidgetLibrary ? (isDarkMode ? 'rgba(24, 144, 255, 0.1)' : 'rgba(24, 144, 255, 0.05)') : 'transparent'
+                }}
+              />
+            </Tooltip>
+            
+                            {/* Properties are now integrated in the Unified Design Panel */}
+            
+            <Button
+              icon={isEditing ? <EyeOutlined /> : <EditOutlined />}
+              onClick={() => setIsEditing(!isEditing)}
+              type={isEditing ? 'default' : 'primary'}
+            >
+              {isEditing ? 'Preview' : 'Edit'}
+            </Button>
+            
+            <Button icon={<UndoOutlined />} disabled={!canUndo} onClick={handleUndo} />
+            <Button icon={<RedoOutlined />} disabled={!canRedo} onClick={handleRedo} />
+            <Button icon={isFullscreen ? <CompressOutlined /> : <FullscreenOutlined />} onClick={handleToggleFullscreen} />
+            <Button 
+              icon={<SaveOutlined />} 
+              type="primary" 
+              loading={isSaving}
+              onClick={handleSave}
+            >
+              Save
+            </Button>
+            
+            <Dropdown
+              overlay={
+                <Menu>
+                  <Menu.Item key="export-png" icon={<DownloadOutlined />} onClick={handleExportPNG}>
+                    Export as PNG
+                  </Menu.Item>
+                  <Menu.Item key="export-pdf" icon={<DownloadOutlined />} onClick={() => handleExport('pdf')}>
+                    Export as PDF
+                  </Menu.Item>
+                  <Menu.Item key="export-json" icon={<DownloadOutlined />} onClick={() => handleExport('json')}>
+                    Export as JSON
+                  </Menu.Item>
+                </Menu>
+              }
+              trigger={['click']}
+            >
+              <Button icon={<DownloadOutlined />}>
+                Export
+              </Button>
+            </Dropdown>
+            
+            <Button icon={<SettingOutlined />} onClick={handleShare}>
+              Share
+            </Button>
+          </Space>
+        </div>
+      </Header>
+
+      <Layout style={{ height: 'calc(100vh - 64px)' }}>
+        {/* Left Sidebar - Unified Design Panel */}
+        {showWidgetLibrary && (
+          <Sider
+            width={300}
+            theme={isDarkMode ? 'dark' : 'light'}
+            style={{ 
+              borderRight: `1px solid ${isDarkMode ? '#303030' : '#d9d9d9'}`,
+              background: isDarkMode ? '#141414' : '#ffffff'
+            }}
+          >
+            <UnifiedDesignPanel
+              selectedWidget={selectedWidget}
+              onConfigUpdate={handleWidgetConfigUpdate}
+              onWidgetSelect={handleWidgetSelect}
+              onAddWidget={handleAddToDashboard}
+              isDarkMode={isDarkMode}
+              showPanel={showWidgetLibrary}
+              onClose={() => setShowWidgetLibrary(false)}
+            />
+          </Sider>
+        )}
+
+        {/* Main Content with Tabs */}
+        <Content style={{ 
+          background: isDarkMode ? '#000000' : '#f5f5f5',
+          padding: '8px',
+          overflow: 'auto'
+        }}>
+          <div className="dashboard-content" style={{ 
+            background: isDarkMode ? '#141414' : '#ffffff',
+            borderRadius: '8px',
+            minHeight: '100%',
+            position: 'relative'
+          }}>
+            <Tabs
+              activeKey={activeTab}
+              onChange={handleTabChange}
+              type="card"
+              size="large"
+              style={{ padding: '8px' }}
+              items={[
+                {
+                  key: 'dashboard',
+                  label: (
+                    <span>
+                      <DashboardOutlined /> Dashboard
+                    </span>
+                  ),
+                  children: renderDashboardTab()
+                },
+                {
+                  key: 'query-editor',
+                  label: (
+                    <span>
+                      <DatabaseOutlined /> Query Editor
+                    </span>
+                  ),
+                  children: renderDataTab()
+                },
+                {
+                  key: 'chart',
+                  label: (
+                    <span>
+                      <BarChartOutlined /> Chart
+                    </span>
+                  ),
+                  children: renderChartsTab()
+                },
+                {
+                  key: 'filter',
+                  label: (
+                    <span>
+                      <FilterOutlined /> Filter
+                    </span>
+                  ),
+                  children: renderFilterTab()
+                }
+              ]}
+            />
+          </div>
+        </Content>
+
+        {/* Properties are now handled by the Unified Design Panel */}
+      </Layout>
+
+      {/* Floating Action Buttons */}
+      {!showWidgetLibrary && (
+        <Button
+          type="primary"
+          icon={<AppstoreOutlined />}
+          onClick={() => setShowWidgetLibrary(true)}
+          style={{
+            position: 'fixed',
+            left: '20px',
+            top: '80px',
+            zIndex: 1000,
+            borderRadius: '50%',
+            width: '56px',
+            height: '56px'
+          }}
+        />
+      )}
+
+      {/* Properties button removed - now integrated in Unified Design Panel */}
+      
+      {/* Onboarding is now handled by PlatformOnboardingModal in the main app */}
+    </div>
+  );
+};
 
 export default DashboardStudio;

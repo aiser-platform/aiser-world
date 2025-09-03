@@ -362,7 +362,7 @@ def initialize_cache():
     
     # Use Redis URL from environment or fallback to Docker service name
     redis_url = settings.REDIS_URL
-    if redis_url == "redis://localhost:6379":
+    if redis_url == "redis://localhost:6379" or "localhost" in redis_url:
         # Fallback to Docker service name for containerized environments
         redis_url = f"redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}/{settings.REDIS_DB}"
     

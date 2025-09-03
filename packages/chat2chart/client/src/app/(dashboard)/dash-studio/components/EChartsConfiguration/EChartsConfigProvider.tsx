@@ -6,13 +6,111 @@ import { EChartsOption } from 'echarts';
 // Configuration complexity levels
 export type ConfigLevel = 'basic' | 'standard' | 'advanced';
 
-// Core configuration interfaces
+// Core configuration interfaces - Enhanced to match comprehensive ECharts config
 export interface BasicChartConfig {
   chartType: string;
-  title: string;
-  subtitle?: string;
-  titlePosition?: 'left' | 'center' | 'right';
-  subtitlePosition?: 'left' | 'center' | 'right';
+  title: {
+    text: string;
+    subtext?: string;
+    left?: 'left' | 'center' | 'right';
+    textStyle?: {
+      color?: string;
+      fontSize?: number;
+      fontFamily?: string;
+    };
+    subtextStyle?: {
+      color?: string;
+      fontSize?: number;
+      fontFamily?: string;
+    };
+  };
+  tooltip: {
+    trigger?: 'axis' | 'item' | 'none';
+    backgroundColor?: string;
+    borderColor?: string;
+    textStyle?: {
+      color?: string;
+    };
+  };
+  legend: {
+    data?: string[];
+    top?: number | string;
+    bottom?: number | string;
+    left?: number | string;
+    right?: number | string;
+    orient?: 'horizontal' | 'vertical';
+    show?: boolean;
+    textStyle?: {
+      color?: string;
+      fontSize?: number;
+    };
+  };
+  color: string[];
+  animation?: boolean | {
+    show?: boolean;
+    duration?: number;
+    easing?: 'linear' | 'quadraticIn' | 'quadraticOut' | 'quadraticInOut' | 'cubicIn' | 'cubicOut' | 'cubicInOut' | 'quarticIn' | 'quarticOut' | 'quarticInOut' | 'quinticIn' | 'quinticOut' | 'quinticInOut' | 'sinusoidalIn' | 'sinusoidalOut' | 'sinusoidalInOut' | 'exponentialIn' | 'exponentialOut' | 'exponentialInOut' | 'circularIn' | 'circularOut' | 'circularInOut' | 'elasticIn' | 'elasticOut' | 'elasticInOut' | 'backIn' | 'backOut' | 'backInOut' | 'bounceIn' | 'bounceOut' | 'bounceInOut';
+    delay?: number;
+  };
+  grid: {
+    top?: number | string;
+    right?: number | string;
+    bottom?: number | string;
+    left?: number | string;
+    backgroundColor?: string;
+    show?: boolean;
+    containLabel?: boolean;
+  };
+  xAxis: {
+    type?: 'category' | 'value' | 'time' | 'log';
+    data?: any[];
+    axisLine?: {
+      show?: boolean;
+      lineStyle?: {
+        color?: string;
+      };
+    };
+    axisTick?: {
+      show?: boolean;
+    };
+    axisLabel?: {
+      show?: boolean;
+      color?: string;
+      fontSize?: number;
+      fontFamily?: string;
+    };
+    splitLine?: {
+      show?: boolean;
+      lineStyle?: {
+        color?: string;
+      };
+    };
+  };
+  yAxis: {
+    type?: 'category' | 'value' | 'time' | 'log';
+    axisLine?: {
+      show?: boolean;
+      lineStyle?: {
+        color?: string;
+      };
+    };
+    axisTick?: {
+      show?: boolean;
+    };
+    axisLabel?: {
+      show?: boolean;
+      color?: string;
+      fontSize?: number;
+      fontFamily?: string;
+    };
+    splitLine?: {
+      show?: boolean;
+      lineStyle?: {
+        color?: string;
+      };
+    };
+  };
+  series?: any[];
   dataBinding: {
     xField: string;
     yFields: string[];
@@ -22,75 +120,51 @@ export interface BasicChartConfig {
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
   };
-  basicStyling: {
-    colors: string[];
-    fontSize: number;
-    showLegend: boolean;
-    colorPalette?: string;
-  };
 }
 
 export interface StandardChartConfig extends BasicChartConfig {
-  axis: {
+  axis?: {
     xAxis: {
-      show: boolean;
-      labelRotation: number;
-      labelColor: string;
-      gridLines: boolean;
+      show?: boolean;
+      labelRotation?: number;
+      labelColor?: string;
+      gridLines?: boolean;
     };
     yAxis: {
-      show: boolean;
-      labelColor: string;
-      gridLines: boolean;
-      format: string;
+      show?: boolean;
+      labelColor?: string;
+      gridLines?: boolean;
+      format?: string;
     };
   };
-  series: {
-    showLabels: boolean;
-    labelPosition: 'top' | 'bottom' | 'left' | 'right' | 'inside';
-    smooth: boolean;
-    areaStyle: boolean;
-    symbolSize: number;
-  };
-  legend: {
-    position: 'top' | 'bottom' | 'left' | 'right';
-    orientation: 'horizontal' | 'vertical';
-    textColor: string;
-  };
-  tooltip: {
-    show: boolean;
-    trigger: 'item' | 'axis' | 'none';
-    backgroundColor: string;
-    textColor: string;
+  seriesConfig?: {
+    showLabels?: boolean;
+    labelPosition?: 'top' | 'bottom' | 'left' | 'right' | 'inside';
+    smooth?: boolean;
+    areaStyle?: boolean;
+    symbolSize?: number;
   };
   gridSpacing?: number;
 }
 
 export interface AdvancedChartConfig extends StandardChartConfig {
-  grid: {
-    left: string | number;
-    right: string | number;
-    top: string | number;
-    bottom: string | number;
-    containLabel: boolean;
-  };
-  animation: {
+  animation?: {
     show: boolean;
     duration: number;
     easing: 'linear' | 'quadraticIn' | 'quadraticOut' | 'quadraticInOut' | 'cubicIn' | 'cubicOut' | 'cubicInOut' | 'quarticIn' | 'quarticOut' | 'quarticInOut' | 'quinticIn' | 'quinticOut' | 'quinticInOut' | 'sinusoidalIn' | 'sinusoidalOut' | 'sinusoidalInOut' | 'exponentialIn' | 'exponentialOut' | 'exponentialInOut' | 'circularIn' | 'circularOut' | 'circularInOut' | 'elasticIn' | 'elasticOut' | 'elasticInOut' | 'backIn' | 'backOut' | 'backInOut' | 'bounceIn' | 'bounceOut' | 'bounceInOut';
     delay: number;
   };
-  dataZoom: {
+  dataZoom?: {
     show: boolean;
     type: 'slider' | 'inside' | 'select';
     start: number;
     end: number;
   };
-  toolbox: {
+  toolbox?: {
     show: boolean;
     features: string[];
   };
-  customOptions: Record<string, any>;
+  customOptions?: Record<string, any>;
 }
 
 export interface ChartTemplate {
@@ -152,10 +226,104 @@ export class SmartChartConfigurator {
     
     return {
       chartType,
-      title: `New ${chartType.charAt(0).toUpperCase() + chartType.slice(1)} Chart`,
-      subtitle: '',
-      titlePosition: 'center',
-      subtitlePosition: 'center',
+      title: {
+        text: `New ${chartType.charAt(0).toUpperCase() + chartType.slice(1)} Chart`,
+        subtext: '',
+        left: 'center',
+        textStyle: {
+          color: '#ffffff',
+          fontSize: 18,
+          fontFamily: 'Arial'
+        },
+        subtextStyle: {
+          color: '#cccccc',
+          fontSize: 12.6,
+          fontFamily: 'Arial'
+        }
+      },
+      tooltip: {
+        trigger: 'axis',
+        backgroundColor: 'rgba(255,255,255,0.9)',
+        borderColor: '#d9d9d9',
+        textStyle: {
+          color: '#ffffff'
+        }
+      },
+      legend: {
+        data: [],
+        bottom: 10,
+        orient: 'horizontal',
+        textStyle: {
+          color: '#ffffff',
+          fontSize: 12
+        }
+      },
+      color: [
+        '#5470c6',
+        '#91cc75',
+        '#fac858',
+        '#ee6666',
+        '#73c0de'
+      ],
+      animation: true,
+      grid: {
+        top: 60,
+        right: 40,
+        bottom: 60,
+        left: 60,
+        backgroundColor: '#1f1f1f',
+        show: true
+      },
+      xAxis: {
+        type: 'category',
+        data: [],
+        axisLine: {
+          show: true,
+          lineStyle: {
+            color: '#333333'
+          }
+        },
+        axisTick: {
+          show: true
+        },
+        axisLabel: {
+          show: true,
+          color: '#cccccc',
+          fontSize: 12,
+          fontFamily: 'Arial'
+        },
+        splitLine: {
+          show: true,
+          lineStyle: {
+            color: '#333333'
+          }
+        }
+      },
+      yAxis: {
+        type: 'value',
+        axisLine: {
+          show: true,
+          lineStyle: {
+            color: '#333333'
+          }
+        },
+        axisTick: {
+          show: true
+        },
+        axisLabel: {
+          show: true,
+          color: '#cccccc',
+          fontSize: 12,
+          fontFamily: 'Arial'
+        },
+        splitLine: {
+          show: true,
+          lineStyle: {
+            color: '#333333'
+          }
+        }
+      },
+      series: [],
       dataBinding: {
         xField: fields[0] || '',
         yFields: fields.slice(1, 2) || [],
@@ -164,23 +332,105 @@ export class SmartChartConfigurator {
         dataLimit: 100,
         sortBy: '',
         sortOrder: 'desc'
-      },
-      basicStyling: {
-        colors: ['#5070dd', '#b6d634', '#505372', '#ff994d', '#0ca8df'],
-        fontSize: 12,
-        showLegend: true,
-        colorPalette: 'default'
-      },
+      }
     };
   }
 
   static generateStandardDefaults(): StandardChartConfig {
     return {
       chartType: 'bar',
-      title: 'Chart',
-      subtitle: '',
-      titlePosition: 'center',
-      subtitlePosition: 'center',
+      title: {
+        text: 'Chart',
+        subtext: '',
+        left: 'center',
+        textStyle: {
+          color: '#ffffff',
+          fontSize: 18,
+          fontFamily: 'Arial'
+        },
+        subtextStyle: {
+          color: '#cccccc',
+          fontSize: 12.6,
+          fontFamily: 'Arial'
+        }
+      },
+      tooltip: {
+        trigger: 'axis',
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        borderColor: '#333',
+        textStyle: {
+          color: '#fff'
+        }
+      },
+      legend: {
+        data: [],
+        bottom: 0,
+        orient: 'horizontal',
+        show: true,
+        textStyle: {
+          color: '#ffffff',
+          fontSize: 12
+        }
+      },
+      color: ['#5070dd', '#b6d634', '#505372', '#ff994d', '#0ca8df'],
+      animation: true,
+      grid: {
+        top: 60,
+        right: 30,
+        bottom: 60,
+        left: 60,
+        backgroundColor: 'transparent',
+        show: true
+      },
+      xAxis: {
+        type: 'category',
+        data: [],
+        axisLine: {
+          show: true,
+          lineStyle: {
+            color: '#666'
+          }
+        },
+        axisTick: {
+          show: true
+        },
+        axisLabel: {
+          show: true,
+          color: '#ffffff',
+          fontSize: 12,
+          fontFamily: 'Arial'
+        },
+        splitLine: {
+          show: false,
+          lineStyle: {
+            color: '#333'
+          }
+        }
+      },
+      yAxis: {
+        type: 'value',
+        axisLine: {
+          show: true,
+          lineStyle: {
+            color: '#666'
+          }
+        },
+        axisTick: {
+          show: true
+        },
+        axisLabel: {
+          show: true,
+          color: '#ffffff',
+          fontSize: 12,
+          fontFamily: 'Arial'
+        },
+        splitLine: {
+          show: true,
+          lineStyle: {
+            color: '#333'
+          }
+        }
+      },
       dataBinding: {
         xField: '',
         yFields: [],
@@ -189,12 +439,6 @@ export class SmartChartConfigurator {
         dataLimit: 100,
         sortBy: '',
         sortOrder: 'desc'
-      },
-      basicStyling: {
-        colors: ['#5070dd', '#b6d634', '#505372', '#ff994d', '#0ca8df'],
-        fontSize: 12,
-        showLegend: true,
-        colorPalette: 'default'
       },
       axis: {
         xAxis: {
@@ -210,24 +454,14 @@ export class SmartChartConfigurator {
           format: '',
         },
       },
-      series: {
+      seriesConfig: {
         showLabels: false,
         labelPosition: 'top',
         smooth: false,
         areaStyle: false,
         symbolSize: 6,
       },
-      legend: {
-        position: 'top',
-        orientation: 'horizontal',
-        textColor: '#54555a',
-      },
-      tooltip: {
-        show: true,
-        trigger: 'axis',
-        backgroundColor: 'rgba(50, 50, 50, 0.9)',
-        textColor: '#ffffff',
-      },
+      // legend and tooltip already defined earlier in this object; avoid duplicates
       gridSpacing: 10,
     };
   }
@@ -270,7 +504,7 @@ export class SmartChartConfigurator {
     const errors: string[] = [];
     const warnings: string[] = [];
 
-    if (!config.title?.trim()) {
+    if (!config.title?.text || config.title.text.trim() === '') {
       errors.push('Chart title is required');
     }
 
@@ -297,11 +531,98 @@ export const CHART_TEMPLATES: ChartTemplate[] = [
     description: 'Simple bar chart for comparing values across categories',
     config: {
       chartType: 'bar',
-      basicStyling: {
-        colors: ['#5070dd', '#b6d634', '#505372'],
-        fontSize: 12,
-        showLegend: true,
+      title: {
+        text: 'Basic Bar Chart',
+        subtext: '',
+        left: 'center',
+        textStyle: {
+          color: '#ffffff',
+          fontSize: 18,
+          fontFamily: 'Arial'
+        },
+        subtextStyle: {
+          color: '#cccccc',
+          fontSize: 12.6,
+          fontFamily: 'Arial'
+        }
       },
+      tooltip: {
+        trigger: 'axis',
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        borderColor: '#333',
+        textStyle: {
+          color: '#fff'
+        }
+      },
+      legend: {
+        data: [],
+        bottom: 0,
+        orient: 'horizontal',
+        show: true,
+        textStyle: {
+          color: '#ffffff',
+          fontSize: 12
+        }
+      },
+      color: ['#5070dd', '#b6d634', '#505372'],
+      // remove boolean animation to satisfy AdvancedChartConfig typing in templates
+      grid: {
+        top: 60,
+        right: 30,
+        bottom: 60,
+        left: 60,
+        backgroundColor: 'transparent',
+        show: true
+      },
+      xAxis: {
+        type: 'category',
+        data: [],
+        axisLine: {
+          show: true,
+          lineStyle: {
+            color: '#666'
+          }
+        },
+        axisTick: {
+          show: true
+        },
+        axisLabel: {
+          show: true,
+          color: '#ffffff',
+          fontSize: 12,
+          fontFamily: 'Arial'
+        },
+        splitLine: {
+          show: false,
+          lineStyle: {
+            color: '#333'
+          }
+        }
+      },
+      yAxis: {
+        type: 'value',
+        axisLine: {
+          show: true,
+          lineStyle: {
+            color: '#666'
+          }
+        },
+        axisTick: {
+          show: true
+        },
+        axisLabel: {
+          show: true,
+          color: '#ffffff',
+          fontSize: 12,
+          fontFamily: 'Arial'
+        },
+        splitLine: {
+          show: true,
+          lineStyle: {
+            color: '#333'
+          }
+        }
+      }
     },
     dataRequirements: {
       minFields: 2,
@@ -318,7 +639,7 @@ export const CHART_TEMPLATES: ChartTemplate[] = [
     description: 'Line chart for showing trends over time',
     config: {
       chartType: 'line',
-      series: {
+      seriesConfig: {
         smooth: true,
         showLabels: false,
         labelPosition: 'top',
@@ -341,7 +662,7 @@ export const CHART_TEMPLATES: ChartTemplate[] = [
     description: 'Pie chart for showing parts of a whole',
     config: {
       chartType: 'pie',
-      series: {
+      seriesConfig: {
         showLabels: true,
         labelPosition: 'inside',
         smooth: false,
@@ -349,9 +670,9 @@ export const CHART_TEMPLATES: ChartTemplate[] = [
         symbolSize: 6,
       },
       legend: {
-        position: 'right',
-        orientation: 'vertical',
-        textColor: '#54555a',
+        right: 0,
+        orient: 'vertical',
+        textStyle: { color: '#54555a' },
       },
     },
     dataRequirements: {

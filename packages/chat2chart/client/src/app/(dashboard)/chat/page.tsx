@@ -11,6 +11,7 @@ import EnhancedDataPanel from './components/DataPanel/EnhancedDataPanel';
 import ChatHistoryPanel from './components/HistoryPanel/HistoryPanel';
 import CollapsibleHistoryPanel from './components/HistoryPanel/CollapsibleHistoryPanel';
 import UniversalDataSourceModal from '@/app/components/UniversalDataSourceModal/UniversalDataSourceModal';
+import PlatformOnboardingModal from '@/app/components/PlatformOnboardingModal/PlatformOnboardingModal';
 import { ExtendedTable, IConversation, IDatabase } from './types';
 import { IFileUpload } from '@/app/components/FileUpload/types';
 import { useSearchParams } from 'next/navigation';
@@ -595,6 +596,9 @@ const ChatToChart = () => {
                 initialDataSourceType="file"
                 isChatIntegration={true}
             />
+
+            {/* Platform Onboarding Modal */}
+            <PlatformOnboardingModal />
         </div>
     );
 };
