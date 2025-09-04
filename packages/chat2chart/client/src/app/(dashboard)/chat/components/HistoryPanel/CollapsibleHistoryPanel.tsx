@@ -36,38 +36,20 @@ const CollapsibleHistoryPanel: React.FC<CollapsibleHistoryPanelProps> = ({
         return (
             <div className="history-panel-collapsed">
                 <div className="collapsed-controls">
-                    <Tooltip title="New Conversation" placement="right">
-                        <Button
-                            type="primary"
-                            icon={<PlusOutlined />}
-                            onClick={onNewChat}
-                            style={{ 
-                                marginBottom: 8,
-                                width: '100%'
-                            }}
-                        />
-                    </Tooltip>
-                    
-                    <Tooltip title="Chat History" placement="right">
-                        <Button
-                            type="text"
-                            icon={<HistoryOutlined />}
-                            style={{ 
-                                marginBottom: 8,
-                                width: '100%'
-                            }}
-                        />
-                    </Tooltip>
-                    
-                    <Tooltip title="Expand Panel" placement="right">
+                    <Tooltip title="Expand" placement="right">
                         <Button
                             type="text"
                             icon={<ExpandOutlined />}
                             onClick={() => onCollapsedChange?.(false)}
-                            style={{ 
-                                width: '100%',
-                                transform: 'rotate(90deg)'
-                            }}
+                            style={{ width: '100%' }}
+                        />
+                    </Tooltip>
+                    <Tooltip title="New Conversation" placement="right">
+                        <Button
+                            type="text"
+                            icon={<PlusOutlined />}
+                            onClick={onNewChat}
+                            style={{ width: '100%' }}
                         />
                     </Tooltip>
                 </div>

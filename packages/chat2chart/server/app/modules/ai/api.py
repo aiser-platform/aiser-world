@@ -30,6 +30,7 @@ class ChatAnalysisRequest(BaseModel):
     business_context: Optional[str] = None
     data_source_context: Optional[Dict[str, Any]] = None  # Enhanced context
     user_context: Optional[Dict[str, Any]] = None  # User preferences and history
+    selected_data_sources: Optional[List[Dict[str, Any]]] = None  # Multi-source context
 
 class EChartsGenerationRequest(BaseModel):
     query: str
@@ -46,6 +47,8 @@ class SchemaGenerationRequest(BaseModel):
     data_source_type: str
     connection_details: Dict[str, Any]
     business_context: Optional[str] = None
+    # Optional schema-level scope to limit generation (avoid whole DB when not desired)
+    scope: Optional[Dict[str, Any]] = None  # { "schemas": ["public"], "tables": ["sales", ...] }
 
 class ChatRequest(BaseModel):
     message: str
@@ -76,12 +79,38 @@ async def analyze_chat_query(request: ChatAnalysisRequest) -> Dict[str, Any]:
     Analyze chat query and provide intelligent response with data insights
     """
     try:
-        # Use the enhanced AI Orchestrator for comprehensive analysis
+        # Short, generic greetings → return a concise, well-formatted welcome with suggestions
+        q = (request.query or "").strip()
+        q_lower = q.lower()
+        if len(q) <= 6 and any(g in q_lower for g in ["hi", "hello", "hey", "yo", "hola", "hiya", "sup"]):
+            welcome = (
+                "Hi! I'm your AI data analyst. I can help you analyze data, generate charts, and suggest SQL.\n\n"
+                "Try: \n"
+                "- Show sales trend by month this year\n"
+                "- Compare revenue by region\n"
+                "- Top 10 products by profit\n\n"
+                "Connect a data source or upload a file to get started, or just ask a question."
+            )
+            return {
+                "success": True,
+                "query": request.query,
+                "analysis": welcome,
+                "execution_metadata": {"status": "success", "timestamp": str(datetime.datetime.now())},
+                "data_insights": {"recommendations": [
+                    "Connect a data source to unlock full analysis",
+                    "Ask for a specific chart or metric",
+                    "Request SQL for deeper analysis"
+                ]},
+                "ai_engine": "Enhanced AI Orchestrator",
+            }
+
+        # Build primary and selected data sources context
         ai_orchestrator = AIOrchestrator()
-        
-        # Convert the request to the format expected by AI Orchestrator
-        data_sources = []
-        if request.data_source_id:
+        data_sources: List[Dict[str, Any]] = []
+        if request.selected_data_sources:
+            # Trust client-provided selection but enrich where possible
+            data_sources = request.selected_data_sources
+        elif request.data_source_id:
             # Get all data sources and find the specific one
             async with httpx.AsyncClient() as client:
                 try:
@@ -117,7 +146,11 @@ async def analyze_chat_query(request: ChatAnalysisRequest) -> Dict[str, Any]:
                 except Exception as data_error:
                     logger.warning(f"Data source fetch failed: {data_error}")
         
-        # Use AI Orchestrator for enhanced analysis
+        # Build comprehensive context for accurate analysis
+        data_context = await _build_comprehensive_data_context(request)
+        system_context = await _build_enhanced_system_context(request, data_context)
+
+        # Primary analysis via AI Orchestrator (LLM + tools)
         result = await ai_orchestrator.analyze_data_with_context(
             user_query=request.query,
             data_sources=data_sources,
@@ -125,34 +158,81 @@ async def analyze_chat_query(request: ChatAnalysisRequest) -> Dict[str, Any]:
             analysis_type="data_analysis",
             user_context={
                 "selected_data_source_id": request.data_source_id,
-                "active_data_sources": [request.data_source_id] if request.data_source_id else [],
+                "active_data_sources": [s.get('id') for s in (request.selected_data_sources or [])] or ([request.data_source_id] if request.data_source_id else []),
                 "business_context": request.business_context,
                 "data_source_context": request.data_source_context,
-                "user_context": request.user_context
+                "user_context": request.user_context,
+                "data_context_summary": data_context.get("summary", {})
             }
         )
         
         if result.get("success"):
+            # Process AI text for consistency
+            from .services.litellm_service import LiteLLMService
+            litellm = LiteLLMService()
+            # Prefer orchestrator insights; fallback to LLM clean-up if needed
+            raw_analysis = result.get("analysis", {}).get("ai_insights") or result.get("content") or ""
+            # Coerce to string safely before normalization
+            if isinstance(raw_analysis, (dict, list)):
+                import json as _json
+                analysis_text = _json.dumps(raw_analysis, ensure_ascii=False, indent=2)
+            else:
+                analysis_text = str(raw_analysis)
+            if not analysis_text:
+                cleaned = await litellm.generate_completion(
+                    prompt=request.query,
+                    system_context=system_context,
+                    max_tokens=600,
+                    temperature=0.3
+                )
+                analysis_text = cleaned.get("content", "Analysis completed successfully.")
+
+            # Normalize whitespace and list formatting at source to avoid run-on lines
+            import re
+            txt = analysis_text or ""
+            # normalize newlines
+            txt = txt.replace("\r\n", "\n")
+            # ensure headings have a blank line after
+            txt = re.sub(r"^(#{1,6} .+?)\n(?!\n)", r"\1\n\n", txt, flags=re.MULTILINE)
+            # insert missing newlines before numbered items and bullets when stuck to previous text
+            txt = re.sub(r"([^\n])(\d+\.\s)", r"\1\n\2", txt)
+            txt = re.sub(r"([^\n])(\u2022\s)", r"\1\n\2", txt)  # • bullet
+            # collapse 3+ newlines to two
+            txt = re.sub(r"\n{3,}", "\n\n", txt)
+            # remove double blank lines
+            txt = re.sub(r"\n\n+", "\n", txt)
+            analysis_text = txt.strip()
+            processed = await _process_ai_response(analysis_text, request.query, data_context)
+            echarts_config, chart_data = _auto_generate_chart_from_context(request.query, data_context)
+            # Prefer orchestrator visualization config if provided
+            orch_viz = result.get("analysis", {}).get("visualization_config") if isinstance(result.get("analysis"), dict) else None
+            if orch_viz:
+                echarts_config = orch_viz
+
+            sql_suggestions = []
+            if data_context.get("data_source_type") in ["database", "warehouse"]:
+                sql = _suggest_sql_query_from_context(request.query, data_context)
+                if sql:
+                    sql_suggestions.append(sql)
+
             return {
                 "success": True,
                 "query": request.query,
-                "analysis": result.get("analysis", {}).get("ai_insights", "Analysis completed successfully."),
-                "execution_metadata": result.get("execution_metadata", {}),
-                "data_insights": {
-                    "key_findings": ["AI-powered analysis completed"],
-                    "patterns": ["Enhanced data analysis"],
-                    "recommendations": ["Use the insights for decision making"]
-                },
-                "chart_recommendations": result.get("analysis", {}).get("visualization_config"),
-                "model": result.get("execution_metadata", {}).get("model_used", "AI Orchestrator"),
+                "analysis": processed.get("analysis"),
+                "execution_metadata": {**result.get("execution_metadata", {}), **processed.get("execution_metadata", {})},
+                "data_insights": processed.get("data_insights"),
+                "echarts_config": echarts_config,
+                "chart_data": chart_data,
+                "sql_suggestions": sql_suggestions,
+                "model": result.get("execution_metadata", {}).get("model_used", litellm.default_model if hasattr(litellm, 'default_model') else "AI Orchestrator"),
                 "data_source_id": request.data_source_id,
                 "ai_engine": "Enhanced AI Orchestrator",
-                "capabilities": ["data_analysis", "insights_generation", "chart_recommendations", "cube_integration"],
+                "capabilities": ["data_analysis", "insights_generation", "echarts_generation", "cube_integration"],
                 "data_context_summary": result.get("context_summary", "Data analysis completed")
             }
         else:
             # Enhanced fallback with data context
-            fallback_response = await _generate_enhanced_fallback(request.query, {"data_source_id": request.data_source_id})
+            fallback_response = await _generate_enhanced_fallback(request.query, data_context)
             return {
                 "success": True,
                 "query": request.query,
@@ -328,26 +408,7 @@ async def stream_chat_analysis(request: ChatAnalysisRequest):
         logger.error(f"❌ Streaming chat analysis failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Streaming failed: {str(e)}")
 
-@router.post("/chat/stream")
-async def streaming_chat(
-    request: ChatRequest,
-    current_user: User = Depends(get_current_user)
-):
-    """Streaming chat completion endpoint"""
-    try:
-        ai_orchestrator = AIOrchestrator()
-        
-        # For streaming, we'll use the standard chat completion for now
-        # In a full implementation, you'd implement proper streaming
-        result = await ai_orchestrator.chat_completion(
-            messages=[{"role": "user", "content": request.message}]
-        )
-        
-        return result
-        
-    except Exception as e:
-        logger.error(f"Streaming chat failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Streaming chat failed: {str(e)}")
+# Deprecated duplicate: removed extra /chat/stream handler (use the SSE version above)
 
 @router.post("/echarts/generate")
 async def generate_echarts(request: EChartsGenerationRequest) -> Dict[str, Any]:
@@ -636,6 +697,8 @@ async def generate_ai_schema(request: SchemaGenerationRequest) -> Dict[str, Any]
 
 Data Source Type: {request.data_source_type}
 Business Context: {request.business_context or 'general analytics'}
+{('Focus Schemas: ' + ', '.join(request.scope.get('schemas', []))) if getattr(request, 'scope', None) and isinstance(request.scope, dict) and request.scope.get('schemas') else ''}
+{('Focus Tables: ' + ', '.join(request.scope.get('tables', []))) if getattr(request, 'scope', None) and isinstance(request.scope, dict) and request.scope.get('tables') else ''}
 
 Generate:
 1. YAML schema definition (with sample data structure)
@@ -656,7 +719,7 @@ IMPORTANT:
 - Use clear, professional language"""
 
         ai_response = await service.generate_completion(
-            prompt="Generate a comprehensive data schema and Cube.js model for this data source",
+            prompt="Generate a comprehensive data schema and Cube.js model for this data source (respect focus schemas/tables if provided)",
             system_context=system_context,
             max_tokens=2000,
             temperature=0.6
@@ -766,25 +829,7 @@ async def health_check():
         "service": "AI Orchestrator"
     }
 
-@router.get("/test-config")
-async def test_config() -> Dict[str, Any]:
-    """Test configuration endpoint"""
-    try:
-        from .services.litellm_service import LiteLLMService
-        service = LiteLLMService()
-        config_status = {"status": "connected", "model": "gpt-5-mini"}
-        return {
-            "success": True,
-            "config_status": config_status,
-            "service": "ai_services"
-        }
-    except Exception as e:
-        logger.error(f"Config test failed: {str(e)}")
-        return {
-            "success": False,
-            "error": str(e),
-            "service": "ai_services"
-        }
+# Deprecated duplicate: removed secondary /test-config endpoint (keep the one above)
 
 # Comprehensive Data Context Builder
 async def _build_comprehensive_data_context(request: ChatAnalysisRequest) -> Dict[str, Any]:
@@ -800,6 +845,7 @@ async def _build_comprehensive_data_context(request: ChatAnalysisRequest) -> Dic
     }
     
     try:
+        # Load primary source
         if request.data_source_id:
             # Try to get data source info from data API
             async with httpx.AsyncClient() as client:
@@ -857,7 +903,14 @@ async def _build_comprehensive_data_context(request: ChatAnalysisRequest) -> Dic
                                 
                 except Exception as data_error:
                     logger.warning(f"Data source fetch failed: {data_error}")
-                    
+        # Merge selected additional sources for multi-source context
+        if request.selected_data_sources:
+            data_context["selected_sources"] = [s.get("id") for s in request.selected_data_sources]
+            # Add files as additional context for LLM
+            data_context["file_sources"] = [s for s in request.selected_data_sources if s.get("type") == "file"]
+            # Add cube/databases for semantic hints
+            data_context["db_sources"] = [s for s in request.selected_data_sources if s.get("type") in ["database","warehouse","cube"]]
+
     except Exception as e:
         logger.error(f"Data context building failed: {e}")
     
@@ -1180,6 +1233,55 @@ def _generate_chart_recommendations(query: str, data_context: Dict[str, Any]) ->
         })
     
     return recommendations
+
+def _auto_generate_chart_from_context(query: str, data_context: Dict[str, Any]) -> (Dict[str, Any], List[Dict[str, Any]]):
+    """Generate a reasonable ECharts config and optional chart data from context."""
+    try:
+        # Prefer time series when time dimension present
+        has_time = False
+        if data_context.get("data_source_type") == "file":
+            cols = data_context.get("schema", {}).get("columns", [])
+            has_time = any((c.get("type") == "date" or 'time' in (c.get('name','').lower())) for c in cols)
+        elif data_context.get("data_source_type") in ["database","warehouse"]:
+            tables = data_context.get("schema", {}).get("tables", [])
+            for t in tables:
+                for c in t.get("columns", []):
+                    if (c.get("type") in ["timestamp","datetime","date"] or 'time' in (c.get('name','').lower())):
+                        has_time = True
+                        break
+                if has_time:
+                    break
+
+        if has_time:
+            config = {
+                "title": {"text": "Time Series", "left": "center"},
+                "tooltip": {"trigger": "axis"},
+                "xAxis": {"type": "time"},
+                "yAxis": {"type": "value"},
+                "series": [{"type": "line", "name": "Value", "data": []}]
+            }
+        else:
+            config = _generate_fallback_echarts_config(query)
+        return config, []
+    except Exception:
+        return _generate_fallback_echarts_config(query), []
+
+def _suggest_sql_query_from_context(query: str, data_context: Dict[str, Any]) -> Optional[str]:
+    """Suggest a basic SQL query based on schema for DB sources."""
+    try:
+        if data_context.get("data_source_type") not in ["database","warehouse"]:
+            return None
+        tables = data_context.get("schema", {}).get("tables", [])
+        if not tables:
+            return None
+        table = tables[0]
+        cols = [c.get("name") for c in table.get("columns", []) if c.get("name")]
+        if not cols:
+            return None
+        limit = 100
+        return f"SELECT {', '.join(cols[:5])} FROM {table.get('schema','public')}.{table.get('name')} LIMIT {limit};"
+    except Exception:
+        return None
 
 # Helper Functions
 def _generate_fallback_echarts_config(query: str) -> Dict[str, Any]:

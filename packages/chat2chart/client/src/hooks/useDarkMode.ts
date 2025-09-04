@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 export const useDarkMode = () => {
     const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -12,27 +12,11 @@ export const useDarkMode = () => {
         return false;
     });
 
-    useEffect(() => {
-        localStorage.setItem('darkMode', JSON.stringify(isDarkMode));
-        
-        // Apply theme class to document root
-        const root = document.documentElement;
-        if (isDarkMode) {
-            root.classList.add('dark');
-        } else {
-            root.classList.remove('dark');
-        }
-    }, [isDarkMode]);
-
-    // Apply initial theme on mount
-    useEffect(() => {
-        const root = document.documentElement;
-        if (isDarkMode) {
-            root.classList.add('dark');
-        } else {
-            root.classList.remove('dark');
-        }
-    }, []);
+    // Persist preference only; DOM class toggling handled centrally in ThemeProvider
+    // This avoids double-toggling and visual race conditions during mode switches
+    if (typeof window !== 'undefined') {
+        try { localStorage.setItem('darkMode', JSON.stringify(isDarkMode)); } catch {}
+    }
 
     return [isDarkMode, setIsDarkMode] as const;
 };

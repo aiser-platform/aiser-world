@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Modal, Tabs, Upload, Button, Form, Input, Select, message, Card, Space, Tag, Typography, Alert, Progress, Steps, Spin, Divider, Radio, List, Badge, Tooltip, Row, Col, Collapse } from 'antd';
+import { Modal, Tabs, Upload, Button, Form, Input, Select, message, Card, Space, Tag, Typography, Alert, Progress, Steps, Spin, Divider, Radio, List, Badge, Tooltip, Row, Col, Collapse, Checkbox } from 'antd';
 import { 
     InboxOutlined, 
     DatabaseOutlined, 
@@ -191,15 +191,18 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
 
     // AI Data Modeling state
     const [aiDataModeling, setAiDataModeling] = useState({
+        semanticModels: [],
+        businessInsights: [],
+        dataRelationships: [],
+        recommendedMetrics: [],
         isGenerating: false,
         yamlSchema: '',
         visualSchema: null,
         insights: null,
         error: null,
-        semanticModels: [] as any[],
-        businessInsights: [] as string[],
-        dataRelationships: [] as string[],
-        recommendedMetrics: [] as string[]
+        visualMap: null,
+        preAggSuggestions: [],
+        preAggSelections: []
     });
 
     // User review state
@@ -396,7 +399,7 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
             const connectionPayload = buildDatabaseConnectionPayload(dbConnection);
             
             // Call the backend API to save the connection
-            const response = await fetch('http://localhost:8000/data/database/connect', {
+            const response = await fetch(`${environment.api.baseUrl}/data/database/connect`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -924,24 +927,24 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
     const workflowSteps: WorkflowStep[] = [
         {
             key: 'connect',
-            title: 'Connect Data Source',
-            description: 'Upload files or connect to databases, warehouses, or APIs',
+            title: 'Configure',
+            description: 'Minimal setup for files, databases, warehouses, or APIs',
             isRequired: true,
             isCompleted: false,
             canSkip: false
         },
         {
             key: 'analyze',
-            title: 'AI Analysis & Modeling',
-            description: 'GPT-5 Mini analyzes data quality and generates semantic models',
+            title: 'Model',
+            description: 'Auto schema → optional AI enhance → visual verify',
             isRequired: true,
             isCompleted: false,
             canSkip: false
         },
         {
             key: 'deploy',
-            title: 'Deploy & Ready',
-            description: 'Deploy to analytics platform and start analyzing',
+            title: 'Deploy',
+            description: 'Deploy semantic model and start analyzing',
             isRequired: true,
             isCompleted: false,
             canSkip: false
@@ -1373,7 +1376,10 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
                 yamlSchema: '',
                 visualSchema: null,
                 insights: null,
-                error: null
+                error: null,
+                visualMap: null,
+                preAggSuggestions: [],
+                preAggSelections: []
             });
             }
     }, [isOpen, initialDataSourceType]);
@@ -1381,7 +1387,7 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
     // Step validation
     const canProceedToNext = (): boolean => {
         switch (currentStep) {
-            case 1: // Connect Data Source
+            case 1: // Configure
                 return !!getActiveDataSource() && getActiveDataSource()?.status === 'connected';
             case 2: // AI Analysis & Modeling
                 return aiDataModeling.semanticModels.length > 0 || !!aiDataModeling.yamlSchema;
@@ -1473,7 +1479,7 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
                     const formData = new FormData();
                     formData.append('file', actualFile);
                     
-                    const uploadResponse = await fetch('http://localhost:8000/data/upload', {
+                    const uploadResponse = await fetch(`${environment.api.baseUrl}/data/upload`, {
                         method: 'POST',
                         body: formData
                     });
@@ -1611,7 +1617,7 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
             // Enhanced AI insights generation for large datasets
             if (activeSource.type === 'file' && activeSource.config.connectionDetails?.backend_id) {
                 try {
-                    const insightsResponse = await fetch(`http://localhost:8000/data/${activeSource.config.connectionDetails.backend_id}/insights`, {
+                    const insightsResponse = await fetch(`${environment.api.baseUrl}/data/${activeSource.config.connectionDetails.backend_id}/insights`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -1672,6 +1678,15 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
                     table_complexity: activeSource.config.connectionDetails?.table_complexity || 'medium'
                 },
                 business_context: dataSourceConfig.businessContext || 'enterprise analytics',
+                // Schema-level scope: default to selected schema, include selected table/view when applicable
+                scope: activeSource.type === 'database' ? ((): any => {
+                    const currentSchema: string = (activeSource.config?.connectionDetails?.schema || 'public');
+                    const currentTable: string | undefined = undefined;
+                    return {
+                        schemas: currentSchema ? [currentSchema] : [],
+                        tables: currentTable ? [currentTable] : []
+                    };
+                })() : undefined,
                 schema_generation_config: {
                     optimization_level: 'enterprise', // 'basic', 'standard', 'enterprise'
                     handle_large_datasets: true,
@@ -1684,7 +1699,7 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
                 }
             };
 
-            const response = await fetch('http://localhost:8000/ai/schema/generate', {
+            const response = await fetch(`${environment.api.baseUrl}/ai/schema/generate`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1737,7 +1752,45 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
         generateAISchema();
     };
 
-    // Deploy schema to Cube.js with real deployment capabilities
+    // Auto-generate from source, build visual map, then deploy via backend
+    const autoGenerateFromSource = async () => {
+        const activeSource = getActiveDataSource();
+        if (!activeSource) {
+            message.error('No active data source found');
+            return;
+        }
+        const res = await fetch(`${environment.api.baseUrl}/cube/schema/auto`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ data_source_id: activeSource.id })
+        });
+        if (!res.ok) {
+            message.error('Failed to auto-generate schema');
+            return;
+        }
+        const j = await res.json();
+        if (j.success && j.yaml_schema) {
+            setAiDataModeling(prev => ({ ...prev, yamlSchema: j.yaml_schema }));
+            message.success('Auto-generated YAML schema from source');
+        }
+    };
+
+    const buildVisualMap = async () => {
+        if (!aiDataModeling.yamlSchema) return;
+        try {
+            const res = await fetch(`${environment.api.baseUrl}/cube/schema/visual-map`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ yaml_schema: aiDataModeling.yamlSchema })
+            });
+            if (res.ok) {
+                const j = await res.json();
+                setAiDataModeling(prev => ({ ...prev, visualMap: j } as any));
+            }
+        } catch {}
+    };
+
+    // Deploy schema to Cube.js via backend endpoint for consistency
     const deployToCube = async () => {
         try {
             setCubeIntegration(prev => ({ ...prev, status: 'analyzing' }));
@@ -1748,132 +1801,30 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
                 return;
             }
 
-            // Real Cube.js deployment to your Docker container
             try {
-                // Step 1: Deploy the YAML schema to Cube.js
-                const schemaResponse = await fetch(`${environment.cubejs.url}/cubejs-api/${environment.cubejs.apiVersion}/schema`, {
+                const deployRes = await fetch(`${environment.api.baseUrl}/cube/schema/deploy`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': getCubeJsAuthHeader()
-                    },
-                    body: JSON.stringify({
-                        schema: aiDataModeling.yamlSchema,
-                        dataSource: activeSource.type === 'file' ? 'default' : activeSource.config.connectionDetails?.type || 'default'
-                    }),
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ cube_schema: { yaml: aiDataModeling.yamlSchema }, cube_name: activeSource.name })
                 });
-                
-                if (schemaResponse.ok) {
-                    // Step 2: Test the deployed schema with a real query
-                    const testQueryResponse = await fetch(`${environment.cubejs.url}/cubejs-api/${environment.cubejs.apiVersion}/load`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': getCubeJsAuthHeader()
-                        },
-                        body: JSON.stringify({
-                            query: {
-                                measures: ['count'],
-                                dimensions: ['id'],
-                                timeDimensions: [],
-                                filters: []
-                            },
-                            dataSource: activeSource.type === 'file' ? 'default' : activeSource.config.connectionDetails?.type || 'default'
-                        }),
-                    });
-                    
-                    if (testQueryResponse.ok) {
-                        const queryResult = await testQueryResponse.json();
-                        
-                        // Successfully deployed and tested
-                        setCubeIntegration(prev => ({ 
-                            ...prev, 
-                            status: 'deployed',
-                            deployment_url: 'http://localhost:4000',
-                            schema: aiDataModeling.yamlSchema,
-                            testResult: queryResult
-                        }));
-                        
-                        message.success(`Successfully deployed to Cube.js! Test query returned ${queryResult.data?.length || 0} results.`);
-                        
-                        // Step 3: Register the data source in Cube.js
-                        await registerDataSourceInCube(activeSource);
-                        
-                    } else {
-                        throw new Error('Schema deployed but test query failed');
-                    }
+                if (!deployRes.ok) throw new Error('Deploy failed');
+                const dj = await deployRes.json();
+                if (dj.success) {
+                    setCubeIntegration(prev => ({ ...prev, status: 'deployed', deployment_url: 'http://localhost:4000', schema: aiDataModeling.yamlSchema }));
+                    message.success('Successfully deployed to Cube.js!');
                 } else {
-                    throw new Error('Failed to deploy schema to Cube.js');
+                    throw new Error(dj.error || 'Deploy failed');
                 }
-                
             } catch (cubeError) {
-                console.error('Cube.js deployment error:', cubeError);
-                
-                // Try alternative deployment method
-                try {
-                                    const altResponse = await fetch(`${environment.cubejs.url}/cubejs-api/${environment.cubejs.apiVersion}/load`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                        body: JSON.stringify({
-                            query: {
-                                measures: ['count'],
-                                dimensions: ['id'],
-                                timeDimensions: [],
-                                filters: []
-                            },
-                            dataSource: 'default'
-                        }),
-                    });
-                    
-                    if (altResponse.ok) {
-                        setCubeIntegration(prev => ({ 
-                            ...prev, 
-                            status: 'deployed',
-                            deployment_url: 'http://localhost:4000',
-                            schema: aiDataModeling.yamlSchema
-                        }));
-                        message.success('Successfully deployed to Cube.js server!');
-                    } else {
-                        throw new Error('Alternative deployment method failed');
-                    }
-                } catch (altError) {
-                    console.error('Alternative deployment failed:', altError);
-                    message.error('Cube.js deployment failed. Please check your Cube.js server.');
-                    setCubeIntegration(prev => ({ ...prev, status: 'error' }));
-                }
+                console.error('Cube deployment error:', cubeError);
+                message.error('Cube.js deployment failed');
+                setCubeIntegration(prev => ({ ...prev, status: 'error' }));
             }
 
         } catch (error) {
             console.error('Cube.js deployment error:', error);
             message.error('Failed to deploy to Cube.js');
             setCubeIntegration(prev => ({ ...prev, status: 'error' }));
-        }
-    };
-
-    // Register data source in Cube.js for real-time analytics
-    const registerDataSourceInCube = async (dataSource: any) => {
-        try {
-                    const cubeDataSourceResponse = await fetch(`${environment.cubejs.url}/cubejs-api/${environment.cubejs.apiVersion}/data-sources`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': getCubeJsAuthHeader()
-            },
-                body: JSON.stringify({
-                    name: dataSource.name,
-                    type: dataSource.type,
-                    config: dataSource.config,
-                    status: 'active'
-                }),
-            });
-            
-            if (cubeDataSourceResponse.ok) {
-                console.log('Data source registered in Cube.js successfully');
-            }
-        } catch (error) {
-            console.warn('Failed to register data source in Cube.js:', error);
         }
     };
 
@@ -1887,9 +1838,16 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
             }
 
             // Create the final data source object
+            const nameToUse = (dataSourceConfig.name || `Connected ${activeSource.type}`).trim();
+            // Enforce unique display name among existing dataSources
+            const nameExists = dataSources.some(ds => (ds?.name || '').toLowerCase() === nameToUse.toLowerCase());
+            if (nameExists) {
+                message.error('A data source with this name already exists. Please choose a different name.');
+                return;
+            }
             const finalDataSource = {
                 id: activeSource.id,
-                name: dataSourceConfig.name || `Connected ${activeSource.type}`,
+                name: nameToUse,
                 type: activeSource.type,
                 config: activeSource.config,
                 status: 'connected' as const,
@@ -1923,6 +1881,12 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
                     multiple={false}
                     accept=".csv,.tsv,.xlsx,.xls,.json,.parquet,.parq,.snappy"
                     beforeUpload={(file) => {
+                    // Enforce unique display name immediately
+                    const duplicate = dataSources.some(ds => (ds?.name || '').toLowerCase() === `file: ${file.name}`.toLowerCase());
+                    if (duplicate) {
+                        message.error('A data source with this name already exists. Please rename the file or choose a different name.');
+                        return Upload.LIST_IGNORE as any;
+                    }
                     // Store the actual File object for upload
                     setActualFile(file);
                     
@@ -2432,7 +2396,7 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
                         ]}
                         renderItem={(item) => (
                                 <List.Item>
-                                <CheckCircleOutlined style={{ color: '#52c41a', marginRight: '8px' }} />
+                                <CheckCircleOutlined style={{ color: 'var(--ant-color-success, #52c41a)', marginRight: '8px' }} />
                                 {item}
                                 </List.Item>
                             )}
@@ -2442,36 +2406,54 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
 
             {/* AI Analysis Progress */}
             <Card 
-                title="AI Analysis Progress" 
+                title="Modeling" 
                 style={{ 
-                    marginBottom: '16px',
-                    backgroundColor: '#1f1f1f',
-                    borderColor: '#434343'
+                    marginBottom: '12px',
+                    backgroundColor: 'var(--ant-color-bg-container, #ffffff)',
+                    borderColor: 'var(--ant-color-border, #d9d9d9)'
                 }}
                 headStyle={{ 
-                    backgroundColor: '#1f1f1f',
-                    borderBottomColor: '#434343',
-                    color: '#ffffff'
+                    backgroundColor: 'var(--ant-color-bg-container, #ffffff)',
+                    borderBottomColor: 'var(--ant-color-border, #d9d9d9)',
+                    color: 'var(--ant-color-text, #141414)'
                 }}
                 bodyStyle={{ 
-                    backgroundColor: '#1f1f1f',
-                    color: '#ffffff'
+                    backgroundColor: 'var(--ant-color-bg-container, #ffffff)',
+                    color: 'var(--ant-color-text, #141414)'
                 }}
             >
-                        <Space direction="vertical" style={{ width: '100%' }}>
-                        <Button 
-                            type="primary" 
-                        onClick={generateAISchema}
-                        loading={aiDataModeling.isGenerating}
-                        icon={<BulbOutlined />}
-                    >
-                        Generate AI Schema
-                        </Button>
+                        <Space direction="vertical" style={{ width: '100%', gap: 8 }}>
+                        <Space wrap>
+                            <Button 
+                                onClick={autoGenerateFromSource}
+                                icon={<ApiOutlined />}
+                                size="small"
+                            >
+                                Auto Schema
+                            </Button>
+                            <Button 
+                                onClick={buildVisualMap}
+                                icon={<ApiOutlined />}
+                                size="small"
+                                disabled={!aiDataModeling.yamlSchema}
+                            >
+                                Visual Map
+                            </Button>
+                            <Button 
+                                type="primary" 
+                                onClick={generateAISchema}
+                                loading={aiDataModeling.isGenerating}
+                                icon={<BulbOutlined />}
+                                size="small"
+                            >
+                                AI Enhance Schema
+                            </Button>
+                        </Space>
             
             {aiDataModeling.isGenerating && (
                         <div style={{ textAlign: 'center' }}>
                             <Spin size="large" />
-                            <Text style={{ color: '#ffffff' }}>AI is analyzing your data and generating schema...</Text>
+                            <Text>AI is analyzing your data and generating schema...</Text>
                                             </div>
                     )}
                     
@@ -2480,30 +2462,29 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
                               title="Generated YAML Schema" 
                               size="small"
                               style={{ 
-                                  backgroundColor: '#1f1f1f',
-                                  borderColor: '#434343'
+                                  backgroundColor: 'var(--ant-color-bg-container, #ffffff)',
+                                  borderColor: 'var(--ant-color-border, #d9d9d9)'
                               }}
                               headStyle={{ 
-                                  backgroundColor: '#1f1f1f',
-                                  borderBottomColor: '#434343',
-                                  color: '#ffffff'
+                                  backgroundColor: 'var(--ant-color-bg-container, #ffffff)',
+                                  borderBottomColor: 'var(--ant-color-border, #d9d9d9)',
+                                  color: 'var(--ant-color-text, #141414)'
                               }}
                               bodyStyle={{ 
-                                  backgroundColor: '#1f1f1f',
-                                  color: '#ffffff'
+                                  backgroundColor: 'var(--ant-color-bg-container, #ffffff)',
+                                  color: 'var(--ant-color-text, #141414)'
                               }}
                           >
-                              <div style={{ marginBottom: '16px' }}>
+                              <div style={{ marginBottom: '8px' }}>
                                   <Text strong>Schema Preview (Cube.js Compatible):</Text>
                                   <div style={{ 
-                                      backgroundColor: '#1f1f1f', 
-                                      color: '#ffffff',
-                                      padding: '16px', 
+                                      backgroundColor: 'var(--ant-color-fill-secondary, #f5f5f5)', 
+                                      padding: '8px', 
                                       borderRadius: '6px',
                                       fontFamily: 'monospace',
                                       fontSize: '12px',
-                                      border: '1px solid #434343',
-                                      maxHeight: '200px',
+                                      border: '1px solid var(--ant-color-border, #d9d9d9)',
+                                      maxHeight: '160px',
                                       overflow: 'auto'
                                   }}>
                                       <pre>{aiDataModeling.yamlSchema}</pre>
@@ -2525,20 +2506,19 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
                                                   </Space>
                                               ),
                                               children: (
-                                                  <div style={{ padding: '12px 0' }}>
+                                                  <div style={{ padding: '8px 0' }}>
                                                       <Input.TextArea
                                                           value={aiDataModeling.yamlSchema}
                                                           onChange={(e) => setAiDataModeling(prev => ({ 
                                                               ...prev, 
                                                               yamlSchema: e.target.value 
                                                           }))}
-                                                          rows={12}
+                                                          rows={10}
                                                           style={{ 
                                                               fontFamily: 'monospace', 
                                                               fontSize: '12px',
-                                                              backgroundColor: '#262626',
-                                                              border: '1px solid #434343',
-                                                              color: '#ffffff'
+                                                              backgroundColor: 'var(--ant-color-fill-secondary, #f5f5f5)',
+                                                              border: '1px solid var(--ant-color-border, #d9d9d9)'
                                                           }}
                                                           placeholder="Edit your YAML schema here... This will be deployed to Cube.js"
                                                       />
@@ -2549,95 +2529,74 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
                                               key: 'visual',
                                               label: (
                                                   <Space>
-                                                      <EyeOutlined />
-                                                      Visual Schema
+                                                      <ApiOutlined />
+                                                      Visual Map
                                                   </Space>
                                               ),
                                               children: (
-                                                  <div style={{ padding: '12px 0' }}>
-                                                      <Card 
-                                                          size="small" 
-                                                          title="Schema Structure Overview"
-                                                          style={{ 
-                                                              backgroundColor: '#1f1f1f',
-                                                              borderColor: '#434343'
-                                                          }}
-                                                          headStyle={{ 
-                                                              backgroundColor: '#1f1f1f',
-                                                              borderBottomColor: '#434343',
-                                                              color: '#ffffff'
-                                                          }}
-                                                          bodyStyle={{ 
-                                                              backgroundColor: '#1f1f1f',
-                                                              color: '#ffffff'
-                                                          }}
-                                                      >
-                                                          <Space direction="vertical" style={{ width: '100%' }}>
-                                                              <div style={{ color: '#ffffff' }}>
-                                                                  <Text strong style={{ color: '#ffffff' }}>Cubes: </Text>
-                                                                  <Tag color={aiDataModeling.yamlSchema?.includes('cubes:') ? 'success' : 'warning'}>
-                                                                      {aiDataModeling.yamlSchema?.includes('cubes:') ? 'Found' : 'Not Found'}
-                                                                  </Tag>
-                                                              </div>
-                                                              <div style={{ color: '#ffffff' }}>
-                                                                  <Text strong style={{ color: '#ffffff' }}>Dimensions: </Text>
-                                                                  <Tag color={aiDataModeling.yamlSchema?.includes('dimensions:') ? 'success' : 'warning'}>
-                                                                      {aiDataModeling.yamlSchema?.includes('dimensions:') ? 'Found' : 'Not Found'}
-                                                                  </Tag>
-                                                              </div>
-                                                              <div style={{ color: '#ffffff' }}>
-                                                                  <Text strong style={{ color: '#ffffff' }}>Measures: </Text>
-                                                                  <Tag color={aiDataModeling.yamlSchema?.includes('measures:') ? 'success' : 'warning'}>
-                                                                      {aiDataModeling.yamlSchema?.includes('measures:') ? 'Found' : 'Not Found'}
-                                                                  </Tag>
-                                                              </div>
-                                                              <div style={{ color: '#ffffff' }}>
-                                                                  <Text strong style={{ color: '#ffffff' }}>Time Dimensions: </Text>
-                                                                  <Tag color={aiDataModeling.yamlSchema?.includes('timeDimensions:') ? 'success' : 'warning'}>
-                                                                      {aiDataModeling.yamlSchema?.includes('timeDimensions:') ? 'Found' : 'Not Found'}
-                                                                  </Tag>
-                                                              </div>
-                                                              <div style={{ color: '#ffffff' }}>
-                                                                  <Text strong style={{ color: '#ffffff' }}>Filters: </Text>
-                                                                  <Tag color={aiDataModeling.yamlSchema?.includes('filters:') ? 'success' : 'warning'}>
-                                                                      {aiDataModeling.yamlSchema?.includes('filters:') ? 'Found' : 'Not Found'}
-                                                                  </Tag>
-                                                              </div>
-                                                          </Space>
-                                                      </Card>
-                                                      
-                                                      <Card 
-                                                          size="small" 
-                                                          title="Schema Preview" 
-                                                          style={{ 
-                                                              marginTop: '12px',
-                                                              backgroundColor: '#1f1f1f',
-                                                              borderColor: '#434343'
-                                                          }}
-                                                          headStyle={{ 
-                                                              backgroundColor: '#1f1f1f',
-                                                              borderBottomColor: '#434343',
-                                                              color: '#ffffff'
-                                                          }}
-                                                          bodyStyle={{ 
-                                                              backgroundColor: '#1f1f1f',
-                                                              color: '#ffffff'
-                                                          }}
-                                                      >
-                                                          <div style={{ 
-                                                              backgroundColor: '#1f1f1f', 
-                                                              color: '#ffffff',
-                                                              padding: '16px', 
-                                                              borderRadius: '6px',
-                                                              fontFamily: 'monospace',
-                                                              fontSize: '11px',
-                                                              border: '1px solid #434343',
-                                                              maxHeight: '300px',
-                                                              overflow: 'auto'
-                                                          }}>
-                                                              <pre>{aiDataModeling.yamlSchema}</pre>
-                                                          </div>
-                                                      </Card>
+                                                  <div style={{ padding: '8px 0' }}>
+                                                      <Button size="small" onClick={buildVisualMap} disabled={!aiDataModeling.yamlSchema}>Refresh Map</Button>
+                                                      <pre style={{ maxHeight: 200, overflow: 'auto', background: 'var(--ant-color-fill-secondary, #f5f5f5)', padding: 8 }}>
+                                                          {JSON.stringify(aiDataModeling.visualMap || {}, null, 2)}
+                                                      </pre>
+                                                  </div>
+                                              )
+                                          },
+                                          {
+                                              key: 'preaggs',
+                                              label: (
+                                                  <Space>
+                                                      <ApiOutlined />
+                                                      Pre-aggregations
+                                                  </Space>
+                                              ),
+                                              children: (
+                                                  <div style={{ padding: '8px 0' }}>
+                                                      <Space style={{ marginBottom: 8 }}>
+                                                          <Button size="small" disabled={!aiDataModeling.yamlSchema} onClick={async ()=>{
+                                                              if (!aiDataModeling.yamlSchema) return;
+                                                              const res = await fetch(`${environment.api.baseUrl}/cube/preaggregations/suggest`, {
+                                                                  method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                                                  body: JSON.stringify({ yaml_schema: aiDataModeling.yamlSchema })
+                                                              });
+                                                              if (res.ok){
+                                                                  const j = await res.json();
+                                                                  setAiDataModeling(prev => ({ ...prev, preAggSuggestions: j.suggestions } as any));
+                                                              }
+                                                          }}>Suggest</Button>
+                                                          <Button type="primary" size="small" disabled={!aiDataModeling.preAggSelections || (aiDataModeling.preAggSelections as any[])?.length===0} onClick={async ()=>{
+                                                              const selections = (aiDataModeling.preAggSelections as any[]) || [];
+                                                              const res = await fetch(`${environment.api.baseUrl}/cube/preaggregations/apply`, {
+                                                                  method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                                                  body: JSON.stringify({ yaml_schema: aiDataModeling.yamlSchema, selections })
+                                                              });
+                                                              if (res.ok){
+                                                                  const j = await res.json();
+                                                                  if (j.success && j.yaml_schema){
+                                                                      setAiDataModeling(prev => ({ ...prev, yamlSchema: j.yaml_schema }));
+                                                                  }
+                                                              }
+                                                          }}>Apply Selected</Button>
+                                                      </Space>
+                                                      <div style={{ maxHeight: 220, overflow: 'auto', border: '1px solid #434343', padding: 8, background: '#262626', color: '#fff' }}>
+                                                          {Array.isArray((aiDataModeling as any).preAggSuggestions) && (aiDataModeling as any).preAggSuggestions.length > 0 ? (
+                                                              (aiDataModeling as any).preAggSuggestions.map((s: any, idx: number) => (
+                                                                  <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                                                                      <Checkbox onChange={(e)=>{
+                                                                          const checked = e.target.checked;
+                                                                          setAiDataModeling(prev => {
+                                                                              const cur = (prev as any).preAggSelections || [];
+                                                                              const next = checked ? [...cur, s] : cur.filter((x: any)=> x.name !== s.name || x.cube !== s.cube);
+                                                                              return { ...(prev as any), preAggSelections: next } as any;
+                                                                          });
+                                                                      }} />
+                                                                      <span>{s.cube} • {s.name} • {s.granularity}</span>
+                                                                  </div>
+                                                              ))
+                                                          ) : (
+                                                              <span>No suggestions yet. Click Suggest.</span>
+                                                          )}
+                                                      </div>
                                                   </div>
                                               )
                                           }
@@ -2733,21 +2692,21 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
                 title="🚀 Deploy & Ready" 
                 style={{ 
                     marginBottom: '16px',
-                    backgroundColor: '#1f1f1f',
-                    borderColor: '#434343'
+                    backgroundColor: 'var(--ant-color-bg-container, #ffffff)',
+                    borderColor: 'var(--ant-color-border, #d9d9d9)'
                 }}
                 headStyle={{ 
-                    backgroundColor: '#1f1f1f',
-                    borderBottomColor: '#434343',
-                    color: '#ffffff'
+                    backgroundColor: 'var(--ant-color-bg-container, #ffffff)',
+                    borderBottomColor: 'var(--ant-color-border, #d9d9d9)',
+                    color: 'var(--ant-color-text, #141414)'
                 }}
                 bodyStyle={{ 
-                    backgroundColor: '#1f1f1f',
-                    color: '#ffffff'
+                    backgroundColor: 'var(--ant-color-bg-container, #ffffff)',
+                    color: 'var(--ant-color-text, #141414)'
                 }}
             >
                     <Space direction="vertical" style={{ width: '100%' }}>
-                    <Text style={{ color: '#ffffff' }}>Your data source is ready to be deployed!</Text>
+                    <Text>Your data source is ready to be deployed!</Text>
                     <List
                         size="small"
                         dataSource={[
@@ -2757,8 +2716,8 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
                             'Chat integration enabled'
                         ]}
                         renderItem={(item) => (
-                            <List.Item style={{ color: '#ffffff' }}>
-                                <CheckCircleOutlined style={{ color: '#52c41a', marginRight: '8px' }} />
+                            <List.Item>
+                                <CheckCircleOutlined style={{ color: 'var(--ant-color-success, #52c41a)', marginRight: '8px' }} />
                                 {item}
                             </List.Item>
                         )}
@@ -2771,21 +2730,21 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
                 title="Semantic Data Model Deployment" 
                 style={{ 
                     marginBottom: '16px',
-                    backgroundColor: '#1f1f1f',
-                    borderColor: '#434343'
+                    backgroundColor: 'var(--ant-color-bg-container, #ffffff)',
+                    borderColor: 'var(--ant-color-border, #d9d9d9)'
                 }}
                 headStyle={{ 
-                    backgroundColor: '#1f1f1f',
-                    borderBottomColor: '#434343',
-                    color: '#ffffff'
+                    backgroundColor: 'var(--ant-color-bg-container, #ffffff)',
+                    borderBottomColor: 'var(--ant-color-border, #d9d9d9)',
+                    color: 'var(--ant-color-text, #141414)'
                 }}
                 bodyStyle={{ 
-                    backgroundColor: '#1f1f1f',
-                    color: '#ffffff'
+                    backgroundColor: 'var(--ant-color-bg-container, #ffffff)',
+                    color: 'var(--ant-color-text, #141414)'
                 }}
             >
                     <Space direction="vertical" style={{ width: '100%' }}>
-                    <Text style={{ color: '#ffffff' }}>Deploy your semantic data model for analytics:</Text>
+                    <Text>Deploy your semantic data model for analytics:</Text>
                     
                     <Button 
                         type="primary" 
@@ -2862,25 +2821,8 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
             case 1:
                 return (
                     <div>
-                        {/* Data Source Configuration */}
-                        <Card 
-                            title="Data Source Configuration" 
-                            style={{ 
-                                marginBottom: '16px',
-                                backgroundColor: '#1f1f1f',
-                                borderColor: '#434343'
-                            }}
-                            headStyle={{ 
-                                backgroundColor: '#1f1f1f',
-                                borderBottomColor: '#434343',
-                                color: '#ffffff'
-                            }}
-                            bodyStyle={{ 
-                                backgroundColor: '#1f1f1f',
-                                color: '#ffffff'
-                            }}
-                        >
-                            <Row gutter={16}>
+                        {/* Compact Data Source Configuration (removed outer card chrome) */}
+                        <Row gutter={16}>
                                 <Col span={12}>
                                     <Form.Item label="Data Source Name" required>
                                         <Input
@@ -2907,25 +2849,33 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
                                     </Form.Item>
                                 </Col>
                             </Row>
-                            <Form.Item label="Description (Optional)">
-                                <Input.TextArea
-                                    value={dataSourceConfig.description}
-                                    onChange={(e) => setDataSourceConfig(prev => ({ ...prev, description: e.target.value }))}
-                                    placeholder="Describe the purpose and contents of this data source"
-                                    rows={2}
-                                    style={{ backgroundColor: '#262626', borderColor: '#434343', color: '#ffffff' }}
-                                />
-                            </Form.Item>
-                            <Form.Item label="Business Context (Optional)">
-                                <Input.TextArea
-                                    value={dataSourceConfig.businessContext}
-                                    onChange={(e) => setDataSourceConfig(prev => ({ ...prev, businessContext: e.target.value }))}
-                                    placeholder="Describe the business context and use cases for this data"
-                                    rows={2}
-                                    style={{ backgroundColor: '#262626', borderColor: '#434343', color: '#ffffff' }}
-                                />
-                            </Form.Item>
-                        </Card>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
+                                <Button type="link" size="small" onClick={() => setShowAdvanced(v => !v)}>
+                                    {showAdvanced ? 'Hide advanced' : 'Show advanced'}
+                                </Button>
+                            </div>
+                            {showAdvanced && (
+                                <>
+                                    <Form.Item label="Description (Optional)">
+                                        <Input.TextArea
+                                            value={dataSourceConfig.description}
+                                            onChange={(e) => setDataSourceConfig(prev => ({ ...prev, description: e.target.value }))}
+                                            placeholder="Describe the purpose and contents of this data source"
+                                            rows={2}
+                                            style={{ backgroundColor: '#262626', borderColor: '#434343', color: '#ffffff' }}
+                                        />
+                                    </Form.Item>
+                                    <Form.Item label="Business Context (Optional)">
+                                        <Input.TextArea
+                                            value={dataSourceConfig.businessContext}
+                                            onChange={(e) => setDataSourceConfig(prev => ({ ...prev, businessContext: e.target.value }))}
+                                            placeholder="Describe the business context and use cases for this data"
+                                            rows={2}
+                                            style={{ backgroundColor: '#262626', borderColor: '#434343', color: '#ffffff' }}
+                                        />
+                                    </Form.Item>
+                                </>
+                            )}
 
                         <Tabs
                             activeKey={activeTab}
@@ -3111,6 +3061,9 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
             message.error('Failed to create data source');
         }
     };
+
+    // UI state
+    const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
 
     return (
         <Modal

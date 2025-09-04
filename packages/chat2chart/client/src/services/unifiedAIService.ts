@@ -104,7 +104,7 @@ class UnifiedAIService {
      */
     async intelligentQueryAnalysis(request: UnifiedAIRequest) {
         try {
-            const response = await fetch(`${this.baseURL}/ai/intelligent-analysis`, {
+            const response = await fetch(`${this.baseURL}/ai/chat/analyze`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -128,7 +128,7 @@ class UnifiedAIService {
      */
     async executeUnifiedWorkflow(request: UnifiedWorkflowRequest) {
         try {
-            const response = await fetch(`${this.baseURL}/ai/unified-workflow`, {
+            const response = await fetch(`${this.baseURL}/ai/chat`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -152,7 +152,7 @@ class UnifiedAIService {
      */
     async performAgenticAnalysis(request: AgenticAnalysisRequest) {
         try {
-            const response = await fetch(`${this.baseURL}/ai/agentic-analysis`, {
+            const response = await fetch(`${this.baseURL}/ai/chat`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -211,7 +211,7 @@ class UnifiedAIService {
             if (request.data_type) formData.append('data_type', request.data_type);
             if (request.business_context) formData.append('business_context', request.business_context);
 
-            const response = await fetch(`${this.baseURL}/ai/data/ingest`, {
+            const response = await fetch(`${this.baseURL}/data/upload`, {
                 method: 'POST',
                 body: formData,
             });
@@ -232,7 +232,7 @@ class UnifiedAIService {
      */
     async connectDatabase(request: DatabaseConnectionRequest) {
         try {
-            const response = await fetch(`${this.baseURL}/ai/data/connect-database`, {
+            const response = await fetch(`${this.baseURL}/data/connect-database`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -284,7 +284,7 @@ class UnifiedAIService {
      */
     async analyzeNaturalLanguageQuery(request: UnifiedAIRequest) {
         try {
-            const response = await fetch(`${this.baseURL}/ai/query/analyze`, {
+            const response = await fetch(`${this.baseURL}/ai/chat/analyze`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -308,7 +308,7 @@ class UnifiedAIService {
      */
     async executeAIQuery(request: UnifiedAIRequest) {
         try {
-            const response = await fetch(`${this.baseURL}/ai/query/execute`, {
+            const response = await fetch(`${this.baseURL}/query/execute`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -334,7 +334,7 @@ class UnifiedAIService {
      */
     async generateEChartsVisualization(request: EChartsGenerationRequest) {
         try {
-            const response = await fetch(`${this.baseURL}/ai/visualization/echarts`, {
+            const response = await fetch(`${this.baseURL}/ai/echarts/generate`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -360,7 +360,7 @@ class UnifiedAIService {
      */
     async generateBusinessInsights(request: BusinessInsightsRequest) {
         try {
-            const response = await fetch(`${this.baseURL}/ai/insights/business`, {
+            const response = await fetch(`${this.baseURL}/ai/insights/generate`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -386,7 +386,7 @@ class UnifiedAIService {
      */
     async executeFunctionCalling(request: Record<string, any>) {
         try {
-            const response = await fetch(`${this.baseURL}/ai/function-calling`, {
+            const response = await fetch(`${this.baseURL}/ai/chat`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -413,8 +413,8 @@ class UnifiedAIService {
     async getAnalyticsDashboard(dataSourceId?: string) {
         try {
             const url = dataSourceId 
-                ? `${this.baseURL}/ai/dashboard/analytics?data_source_id=${dataSourceId}`
-                : `${this.baseURL}/ai/dashboard/analytics`;
+                ? `${this.baseURL}/ai/health?data_source_id=${dataSourceId}`
+                : `${this.baseURL}/ai/health`;
 
             const response = await fetch(url);
 
@@ -454,7 +454,7 @@ class UnifiedAIService {
      */
     async getMigrationStatus(): Promise<MigrationStatusResponse> {
         try {
-            const response = await fetch(`${this.baseURL}/ai/migration/status`);
+            const response = await fetch(`${this.baseURL}/ai/health`);
 
             if (!response.ok) {
                 throw new Error(`Migration status check failed: ${response.statusText}`);

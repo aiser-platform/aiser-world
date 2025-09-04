@@ -12,10 +12,11 @@ import {
     ExperimentOutlined,
     DashboardOutlined,
 } from '@ant-design/icons';
-import { Button, Layout, Menu, MenuProps } from 'antd';
+import { Button, Layout, Menu, MenuProps, theme } from 'antd';
 import { useRouter } from "next/navigation";
 import React from 'react';
 import AiserLogo from '@/app/components/Logo/AiserLogo';
+import { useThemeMode } from '@/components/Providers/ThemeModeContext';
 
 interface NavigationProps {
     collapsed: boolean;
@@ -40,19 +41,14 @@ const Navigation: React.FC<NavigationProps> = (props: NavigationProps) => {
             label: 'Chat',
         },
         {
-            key: 'ai-analytics',
-            icon: <ExperimentOutlined />,
-            label: 'AI Analytics',
-        },
-        {
-            key: 'chart-builder',
-            icon: <BarChartOutlined />,
-            label: 'Chart Builder',
-        },
-        {
             key: 'dash-studio',
             icon: <DashboardOutlined />,
             label: 'Dashboard Studio',
+            children: [
+                { key: 'dash-studio-query-editor', label: 'Query Editor' },
+                { key: 'dash-studio-chart', label: 'Chart Designer' },
+                { key: 'dash-studio-dashboard', label: 'Dashboard' },
+            ]
         },
         {
             key: 'data',
@@ -60,7 +56,6 @@ const Navigation: React.FC<NavigationProps> = (props: NavigationProps) => {
             label: 'Data',
         },
         {
-
             type: 'divider' as const,
         },
         {
@@ -78,14 +73,14 @@ const Navigation: React.FC<NavigationProps> = (props: NavigationProps) => {
             case 'chat':
                 router.push('/chat');
                 break;
-            case 'ai-analytics':
-                router.push('/ai-analytics');
+            case 'dash-studio-dashboard':
+                router.push('/dash-studio?tab=dashboard');
                 break;
-            case 'chart-builder':
-                router.push('/chart-builder');
+            case 'dash-studio-query-editor':
+                router.push('/dash-studio?tab=query-editor');
                 break;
-            case 'dash-studio':
-                router.push('/dash-studio');
+            case 'dash-studio-chart':
+                router.push('/dash-studio?tab=chart');
                 break;
             case 'data':
                 router.push('/data');
@@ -97,18 +92,25 @@ const Navigation: React.FC<NavigationProps> = (props: NavigationProps) => {
         }
     };
 
+    const { token } = theme.useToken();
+    const { isDarkMode } = useThemeMode();
+
     return (
         <Layout.Sider
             ref={ref}
-            theme="light"
+            theme={isDarkMode ? 'dark' : 'light'}
             collapsible
             collapsed={props.collapsed}
             breakpoint="lg"
+            style={{
+                background: isDarkMode ? '#1f1f1f' : '#ffffff',
+                borderRight: `1px solid ${isDarkMode ? '#303030' : '#f0f0f0'}`
+            }}
         >
             <div style={{ 
                 padding: '16px', 
                 textAlign: 'center', 
-                borderBottom: '1px solid #f0f0f0',
+                borderBottom: `1px solid ${token.colorBorder}`,
                 marginBottom: '8px'
             }}>
                 <AiserLogo 
@@ -118,9 +120,12 @@ const Navigation: React.FC<NavigationProps> = (props: NavigationProps) => {
             </div>
             <Menu
                 mode="inline"
-                defaultSelectedKeys={['ai-analytics']}
+                defaultSelectedKeys={['dash-studio-dashboard']}
+                defaultOpenKeys={['dash-studio']}
                 items={items}
                 onClick={onClick}
+                theme={isDarkMode ? 'dark' : 'light'}
+                style={{ background: isDarkMode ? '#1f1f1f' : '#ffffff', color: token.colorText }}
             />
         </Layout.Sider>
     );

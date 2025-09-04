@@ -4,6 +4,8 @@ FastAPI endpoints for universal data connectivity
 """
 
 import logging
+import json
+import re
 import os
 import tempfile
 from typing import List, Dict, Any, Optional
@@ -145,11 +147,18 @@ async def connect_database(request: DatabaseConnectionRequest):
         
         # Store the connection
         connection_result = await data_service.store_database_connection(connection_config)
-        
+        if not connection_result or not connection_result.get('success'):
+            err = (connection_result or {}).get('error') if isinstance(connection_result, dict) else 'Unknown error'
+            raise HTTPException(status_code=500, detail=f"Failed to store connection: {err}")
+
+        data_source_id = connection_result.get('data_source_id')
+        if not data_source_id:
+            raise HTTPException(status_code=500, detail="Missing data_source_id in connection result")
+
         return {
             "success": True,
             "message": "Database connected successfully",
-            "data_source_id": connection_result['data_source_id'],
+            "data_source_id": data_source_id,
             "connection_info": connection_result.get('connection_info')
         }
         
@@ -192,7 +201,7 @@ async def get_project_data_sources(
         # Get project-scoped data sources
         sources = await data_service.get_project_data_sources(
             organization_id=organization_id,
-            project_id=project_id,
+            project_id=project_id,  # allow slug/strings; service handles casting when possible
             user_id=user_id,
             offset=offset,
             limit=limit
@@ -343,6 +352,14 @@ async def upload_file(
             'delimiter': delimiter
         }
         
+        # Prevent duplicate display names (case-insensitive)
+        try:
+            existing = await data_service.get_data_sources(0, 500)
+            if any((ds.get('name') or '').lower() == file.filename.lower() for ds in existing):
+                raise HTTPException(status_code=400, detail="A data source with this name already exists. Please rename your file or choose a different name.")
+        except Exception:
+            pass
+
         # Use the data service to handle the upload
         result = await data_service.upload_file(content, file.filename, options)
         
@@ -840,13 +857,28 @@ async def get_data_source_data(data_source_id: str):
             return {
                 "success": True,
                 "data_source_id": data_source_id,
-                "data": [],  # Database data would be queried separately
+                "data": data_source.get('sample_data', []),  # return sample when present
                 "metadata": {
                     "type": "database",
                     "db_type": data_source.get('db_type'),
                     "connection_info": data_source.get('connection_info', {})
                 }
             }
+        # Allow demo_* ids to return embedded sample data
+        elif data_source_id.startswith('demo_'):
+            demo = await data_service.get_data_source_by_id(data_source_id)
+            if demo:
+                return {
+                    "success": True,
+                    "data_source_id": data_source_id,
+                    "data": demo.get('sample_data', []),
+                    "metadata": {
+                        "type": demo.get('type', 'file'),
+                        "columns": demo.get('schema', {}).get('columns', []),
+                        "row_count": len(demo.get('sample_data', []))
+                    }
+                }
+            raise HTTPException(status_code=404, detail="Demo data not available")
         
         else:
             raise HTTPException(status_code=400, detail=f"Unsupported data source type: {data_source['type']}")
@@ -1157,6 +1189,223 @@ async def get_data_source_schema(data_source_id: str):
         raise
     except Exception as e:
         logger.error(f"❌ Failed to get data source schema: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Views and Materialized Views Endpoints
+@router.get("/sources/{data_source_id}/views")
+async def list_views(data_source_id: str):
+    """List database views and their columns for a data source (best-effort for SQL databases)."""
+    try:
+        data_source = await data_service.get_data_source_by_id(data_source_id)
+        if not data_source:
+            raise HTTPException(status_code=404, detail="Data source not found")
+
+        views_query = (
+            "SELECT table_schema, table_name FROM information_schema.views "
+            "WHERE table_schema NOT IN ('pg_catalog','information_schema') ORDER BY 1,2"
+        )
+        result = await multi_engine_service.execute_query(
+            query=views_query,
+            data_source=data_source,
+            engine=QueryEngine.DIRECT_SQL,
+            optimization=False,
+        )
+        views = []
+        for row in result.get("data", []):
+            schema = row.get("table_schema") or row.get("schema") or "public"
+            name = row.get("table_name") or row.get("name")
+            columns_query = (
+                "SELECT column_name, data_type, is_nullable FROM information_schema.columns "
+                "WHERE table_schema = :schema AND table_name = :name ORDER BY ordinal_position"
+            )
+            try:
+                cols_res = await multi_engine_service.execute_query(
+                    query=columns_query.replace(":schema", f"'{schema}'").replace(":name", f"'{name}'"),
+                    data_source=data_source,
+                    engine=QueryEngine.DIRECT_SQL,
+                    optimization=False,
+                )
+                columns = [
+                    {
+                        "name": c.get("column_name"),
+                        "type": c.get("data_type"),
+                        "nullable": (str(c.get("is_nullable")).lower() == "yes"),
+                    }
+                    for c in cols_res.get("data", [])
+                ]
+            except Exception:
+                columns = []
+            views.append({"schema": schema, "name": name, "columns": columns})
+
+        return {"success": True, "views": views}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Failed to list views: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/sources/{data_source_id}/materialized-views")
+async def list_materialized_views(data_source_id: str):
+    """List materialized views for Postgres (best-effort)."""
+    try:
+        data_source = await data_service.get_data_source_by_id(data_source_id)
+        if not data_source:
+            raise HTTPException(status_code=404, detail="Data source not found")
+
+        query = "SELECT schemaname, matviewname FROM pg_matviews ORDER BY 1,2"
+        result = await multi_engine_service.execute_query(
+            query=query,
+            data_source=data_source,
+            engine=QueryEngine.DIRECT_SQL,
+            optimization=False,
+        )
+        mvs = [
+            {"schema": r.get("schemaname") or "public", "name": r.get("matviewname")}
+            for r in result.get("data", [])
+        ]
+        return {"success": True, "materialized_views": mvs}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Failed to list materialized views: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class CreateMaterializedViewRequest(BaseModel):
+    name: str
+    sql: str
+    schema: Optional[str] = None
+
+
+@router.post("/sources/{data_source_id}/materialized-views")
+async def create_materialized_view(data_source_id: str, request: CreateMaterializedViewRequest):
+    """Create a materialized view using provided SQL (Postgres)."""
+    try:
+        data_source = await data_service.get_data_source_by_id(data_source_id)
+        if not data_source:
+            raise HTTPException(status_code=404, detail="Data source not found")
+
+        # simple validation for name to avoid injection
+        if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", request.name):
+            raise HTTPException(status_code=400, detail="Invalid view name")
+        qualified = f"{request.schema}.{request.name}" if request.schema else request.name
+        create_sql = f"CREATE MATERIALIZED VIEW {qualified} AS {request.sql}"
+        await multi_engine_service.execute_query(
+            query=create_sql,
+            data_source=data_source,
+            engine=QueryEngine.DIRECT_SQL,
+            optimization=False,
+        )
+        return {"success": True, "message": "Materialized view created"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Failed to create materialized view: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/sources/{data_source_id}/materialized-views/{schema}.{name}/refresh")
+async def refresh_materialized_view(data_source_id: str, schema: str, name: str):
+    try:
+        data_source = await data_service.get_data_source_by_id(data_source_id)
+        if not data_source:
+            raise HTTPException(status_code=404, detail="Data source not found")
+        if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", schema) or not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", name):
+            raise HTTPException(status_code=400, detail="Invalid identifiers")
+        refresh_sql = f"REFRESH MATERIALIZED VIEW CONCURRENTLY {schema}.{name}"
+        await multi_engine_service.execute_query(
+            query=refresh_sql,
+            data_source=data_source,
+            engine=QueryEngine.DIRECT_SQL,
+            optimization=False,
+        )
+        return {"success": True, "message": "Materialized view refreshed"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Failed to refresh materialized view: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/sources/{data_source_id}/materialized-views/{schema}.{name}")
+async def drop_materialized_view(data_source_id: str, schema: str, name: str):
+    try:
+        data_source = await data_service.get_data_source_by_id(data_source_id)
+        if not data_source:
+            raise HTTPException(status_code=404, detail="Data source not found")
+        if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", schema) or not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", name):
+            raise HTTPException(status_code=400, detail="Invalid identifiers")
+        drop_sql = f"DROP MATERIALIZED VIEW IF EXISTS {schema}.{name}"
+        await multi_engine_service.execute_query(
+            query=drop_sql,
+            data_source=data_source,
+            engine=QueryEngine.DIRECT_SQL,
+            optimization=False,
+        )
+        return {"success": True, "message": "Materialized view dropped"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Failed to drop materialized view: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class AnalyzeQueryRequest(BaseModel):
+    sql: str
+
+
+@router.post("/sources/{data_source_id}/analyze")
+async def analyze_query(data_source_id: str, request: AnalyzeQueryRequest):
+    """Return EXPLAIN plan (if supported) and heuristic suggestions for optimization."""
+    try:
+        data_source = await data_service.get_data_source_by_id(data_source_id)
+        if not data_source:
+            raise HTTPException(status_code=404, detail="Data source not found")
+
+        sql = request.sql.strip().rstrip(";")
+        explain_sql = f"EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) {sql}"
+        plan = None
+        try:
+            plan_res = await multi_engine_service.execute_query(
+                query=explain_sql,
+                data_source=data_source,
+                engine=QueryEngine.DIRECT_SQL,
+                optimization=False,
+            )
+            # Many drivers return a single-row JSON plan under a key
+            rows = plan_res.get("data", [])
+            if rows:
+                # try to find JSON field
+                first = rows[0]
+                # Some drivers return the plan in a column named 'QUERY PLAN'
+                plan_json_text = first.get("QUERY PLAN") or first.get("query_plan") or json.dumps(rows)
+                try:
+                    plan = json.loads(plan_json_text)
+                except Exception:
+                    plan = rows
+        except Exception as e:
+            logger.warning(f"EXPLAIN failed: {e}")
+
+        suggestions = []
+        lowered = sql.lower()
+        if "select *" in lowered:
+            suggestions.append("Avoid SELECT *; select only required columns to reduce I/O")
+        if " order by " in lowered and " limit " not in lowered:
+            suggestions.append("Add LIMIT when using ORDER BY for interactive queries")
+        if " join " in lowered and " on " in lowered and " where " not in lowered:
+            suggestions.append("Add selective WHERE filters to reduce join input sizes")
+        if " group by " in lowered and ("date_trunc(" in lowered or "::date" in lowered):
+            suggestions.append("Pre-aggregate by time buckets or create a materialized view")
+        if " where " not in lowered:
+            suggestions.append("Consider filtering to reduce scanned rows")
+
+        return {"success": True, "plan": plan, "suggestions": suggestions}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Failed to analyze query: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
