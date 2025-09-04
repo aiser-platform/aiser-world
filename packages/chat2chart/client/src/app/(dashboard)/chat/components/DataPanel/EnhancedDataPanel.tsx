@@ -16,7 +16,8 @@ import {
     Badge,
     Divider,
     Alert,
-    Checkbox
+    Checkbox,
+    Popconfirm
 } from 'antd';
 import {
     DatabaseOutlined,
@@ -29,11 +30,14 @@ import {
     PlusOutlined,
     InfoCircleOutlined,
     CheckCircleOutlined,
-    CloseOutlined
+    CloseOutlined,
+    DeleteOutlined,
+    CompressOutlined
 } from '@ant-design/icons';
 import UniversalDataSourceModal from '@/app/components/UniversalDataSourceModal/UniversalDataSourceModal';
 import CubeSchemaPanel from './CubeSchemaPanel';
 import './styles.css';
+import '../HistoryPanel/styles.css';
 import { getBackendUrlForApi } from '@/utils/backendUrl';
 
 const { Title, Text } = Typography;
@@ -67,6 +71,16 @@ interface SchemaInfo {
             default?: string;
         }>;
         rowCount?: number;
+        description?: string;
+    }>;
+    views?: Array<{
+        name: string;
+        schema?: string;
+        columns: Array<{
+            name: string;
+            type: string;
+            nullable?: boolean;
+        }>;
         description?: string;
     }>;
     schemas?: string[];
@@ -126,18 +140,21 @@ interface EnhancedDataPanelProps {
     onDataSourceSelect?: (dataSource: DataSource | null) => void;
     onRefresh?: () => void;
     onDataSourcesChange?: (sources: DataSource[]) => void; // New callback for selected data sources
+    onCollapse?: () => void;
 }
 
 const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
     selectedDataSource,
     onDataSourceSelect,
     onRefresh,
-    onDataSourcesChange
+    onDataSourcesChange,
+    onCollapse
 }) => {
     const [dataSources, setDataSources] = useState<DataSource[]>([]);
     const [loading, setLoading] = useState(false);
     const [showDataSourceModal, setShowDataSourceModal] = useState(false);
     const [activeTab, setActiveTab] = useState<string>('overview');
+    // Collapsed state is managed by the parent chat layout. Do not collapse here.
     const [schemaInfo, setSchemaInfo] = useState<SchemaInfo | null>(null);
     const [selectedTables, setSelectedTables] = useState<string[]>([]);
     const [expandedKeys, setExpandedKeys] = useState<string[]>([]);
@@ -145,25 +162,44 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
     const [modalVisible, setModalVisible] = useState(false);
     const [schemaLoading, setSchemaLoading] = useState<string | null>(null);
     const [schemas, setSchemas] = useState<Record<string, SchemaInfo>>({});
+    const [includeFiles, setIncludeFiles] = useState<boolean>(true);
+    const [selectedFileIds, setSelectedFileIds] = useState<string[]>([]);
+    const [selectedSchemaName, setSelectedSchemaName] = useState<string>('public');
+    const [selectedEntityKey, setSelectedEntityKey] = useState<string>('');
 
-    // Load data sources on component mount
-    useEffect(() => {
-        loadDataSources();
-    }, []);
-
-    // Auto-expand public schema by default
-    useEffect(() => {
-        if (dataSources.length > 0) {
-            const defaultExpandedKeys = dataSources
-                .filter(ds => ds.type === 'database')
-                .map(ds => `${ds.id}_public`);
-            setExpandedKeys(prev => Array.from(new Set([...prev, ...defaultExpandedKeys])));
+    const handleDeleteDataSource = useCallback(async (dataSourceId: string) => {
+        try {
+            setLoading(true);
+            const res = await fetch(`${getBackendUrlForApi()}/data/sources/${dataSourceId}`, { method: 'DELETE' });
+            // ignore body; reload list regardless
+            try {
+                const response = await fetch(`${getBackendUrlForApi()}/data/sources`);
+                const result = await response.json();
+                if (result.success) {
+                    setDataSources(result.data_sources || []);
+                }
+            } catch {}
+            if (selectedDataSource?.id === dataSourceId) {
+                onDataSourceSelect?.(null);
+            }
+        } catch (e) {
+            console.error('Failed to delete data source:', e);
+        } finally {
+            setLoading(false);
         }
-    }, [dataSources]);
+    }, [onDataSourceSelect, selectedDataSource]);
 
-
-
-
+    // hydrate includeFiles from localStorage
+    useEffect(() => {
+        try {
+            const raw = localStorage.getItem('chat_include_files');
+            if (raw !== null) setIncludeFiles(raw === '1');
+        } catch {}
+    }, []);
+    // persist includeFiles
+    useEffect(() => {
+        try { localStorage.setItem('chat_include_files', includeFiles ? '1' : '0'); } catch {}
+    }, [includeFiles]);
 
     const loadDataSources = useCallback(async () => {
         setLoading(true);
@@ -173,6 +209,18 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
             
             if (result.success) {
                 let sources = result.data_sources || [];
+                // De-duplicate by id and by name (case-insensitive)
+                const seenIds = new Set<string>();
+                const seenNames = new Set<string>();
+                sources = sources.filter((s: any) => {
+                    const id = s?.id;
+                    const nameKey = (s?.name || '').toLowerCase();
+                    if (id && seenIds.has(id)) return false;
+                    if (nameKey && seenNames.has(nameKey)) return false;
+                    if (id) seenIds.add(id);
+                    if (nameKey) seenNames.add(nameKey);
+                    return true;
+                });
                 
                 // Add real Cube.js data source from actual running instance
                 const realCubeSource = {
@@ -284,6 +332,26 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
         }
     }, []);
 
+    // Load data sources on component mount
+    useEffect(() => {
+        loadDataSources();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // Auto-expand public schema by default
+    useEffect(() => {
+        if (dataSources.length > 0) {
+            const defaultExpandedKeys = dataSources
+                .filter(ds => ds.type === 'database')
+                .map(ds => `${ds.id}_public`);
+            setExpandedKeys(prev => Array.from(new Set([...prev, ...defaultExpandedKeys])));
+        }
+    }, [dataSources]);
+
+
+
+
+
     const loadSchemaInfo = async (dataSourceId: string, dataSource: DataSource) => {
         if (schemas[dataSourceId]) return; // Already loaded
         
@@ -312,9 +380,22 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
                 const result = await response.json();
                 
                 if (result.success) {
+                    const baseSchema: SchemaInfo = result.schema;
+                    // Fetch views
+                    try {
+                        const vres = await fetch(`${getBackendUrlForApi()}/data/sources/${dataSourceId}/views`);
+                        if (vres.ok) {
+                            const vj = await vres.json();
+                            baseSchema.views = (vj.views || []).map((v: any) => ({
+                                name: v.name,
+                                schema: v.schema,
+                                columns: (v.columns || []).map((c: any) => ({ name: c.name, type: c.type, nullable: c.nullable }))
+                            }));
+                        }
+                    } catch {}
                     setSchemas(prev => ({
                         ...prev,
-                        [dataSourceId]: result.schema
+                        [dataSourceId]: baseSchema
                     }));
                 } else {
                     console.error('Failed to load database schema:', result.error);
@@ -499,7 +580,8 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
                              </Tag>
                          </div>
                      ),
-                     children: tables.map((table) => ({
+                     children: [
+                        ...tables.map((table) => ({
                         key: `${dataSource.id}_${schemaName}_${table.name}`,
                         title: (
                             <div style={{ 
@@ -534,7 +616,7 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
                                         <Tooltip title={table.description}>
                                             <InfoCircleOutlined 
                                                 style={{ 
-                                                    color: '#1890ff', 
+                                                    color: 'var(--ant-color-primary, #1677ff)', 
                                                     marginLeft: '4px',
                                                     fontSize: '11px'
                                                 }} 
@@ -616,7 +698,28 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
                                  </div>
                              )
                          }))
-                    }))
+                        })),
+                        ...(((schema as any).views || []).filter((v: any) => (v.schema || 'public') === schemaName).map((view: any) => ({
+                            key: `${dataSource.id}_${schemaName}_view_${view.name}`,
+                            title: (
+                                <Space>
+                                    <TableOutlined />
+                                    <Text strong>{view.name}</Text>
+                                    <Tag color="blue">VIEW</Tag>
+                                </Space>
+                            ),
+                            children: (view.columns || []).map((col: any) => ({
+                                key: `${dataSource.id}_${schemaName}_view_${view.name}_${col.name}`,
+                                title: (
+                                    <Space>
+                                        <Text code>{col.name}</Text>
+                                        <Tag color="purple">{col.type}</Tag>
+                                        {col.nullable === false && <Tag color="red">NOT NULL</Tag>}
+                                    </Space>
+                                )
+                            }))
+                        })))
+                    ]
                 });
             });
 
@@ -729,6 +832,21 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
 
         return (
             <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <Text strong>Additional Files</Text>
+                    <Checkbox checked={includeFiles} onChange={(e)=> {
+                        const val = e.target.checked;
+                        setIncludeFiles(val);
+                        if (onDataSourcesChange) {
+                            const selectedFileSources = selectedFileIds.map((fileId: string) => 
+                                dataSources.find(ds => ds.id === fileId)
+                            ).filter((ds): ds is DataSource => ds !== undefined);
+                            const next = val ? (selectedDataSource ? [selectedDataSource, ...selectedFileSources] : selectedFileSources)
+                                             : (selectedDataSource ? [selectedDataSource] : []);
+                            onDataSourcesChange(next);
+                        }
+                    }}>Include in analysis</Checkbox>
+                </div>
 
                 <Select
                     mode="multiple"
@@ -737,13 +855,14 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
                     maxTagCount={3}
                     onChange={(selectedFiles: string[]) => {
                         console.log('Selected files for analysis:', selectedFiles);
+                        setSelectedFileIds(selectedFiles);
                         // Get the actual file data sources
                         const selectedFileSources = selectedFiles.map((fileId: string) => 
                             dataSources.find(ds => ds.id === fileId)
                         ).filter((ds): ds is DataSource => ds !== undefined);
                         
                         // Update the parent component with selected data sources
-                        if (onDataSourcesChange) {
+                        if (onDataSourcesChange && includeFiles) {
                             const allSelectedSources = selectedDataSource ? [selectedDataSource, ...selectedFileSources] : selectedFileSources;
                             onDataSourcesChange(allSelectedSources);
                         }
@@ -874,10 +993,10 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
                 size="small"
                 style={{
                     marginBottom: '8px',
-                    border: isSelected ? '2px solid #1890ff' : '1px solid #434343',
+                    border: isSelected ? '2px solid var(--ant-color-primary, #1677ff)' : '1px solid var(--ant-color-border, #d9d9d9)',
                     cursor: 'pointer',
-                    background: '#262626',
-                    color: '#ffffff'
+                    background: 'var(--ant-color-bg-container, #ffffff)',
+                    color: 'var(--ant-color-text, #141414)'
                 }}
                 onClick={() => handleDataSourceSelect(dataSource)}
                 hoverable
@@ -897,13 +1016,29 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
                         {isSelected && (
                             <CheckCircleOutlined 
                                 style={{ 
-                                    color: '#52c41a', 
+                                    color: 'var(--ant-color-success, #52c41a)', 
                                     fontSize: '16px',
                                     marginRight: '8px'
                                 }} 
                                 title="Selected for AI Analysis"
                             />
                         )}
+                        <Popconfirm
+                            title="Delete data source?"
+                            description="This will remove the data source."
+                            onConfirm={(e) => { e?.stopPropagation?.(); handleDeleteDataSource(dataSource.id); }}
+                            onCancel={(e) => e?.stopPropagation?.()}
+                            okText="Delete"
+                            cancelText="Cancel"
+                        >
+                            <Button
+                                type="text"
+                                icon={<DeleteOutlined />}
+                                onClick={(e) => e.stopPropagation()}
+                                title="Delete data source"
+                                style={{ color: 'var(--ant-color-error, #ff4d4f)' }}
+                            />
+                        </Popconfirm>
                         <Tag color={getStatusColor(dataSource.status)}>
                             {dataSource.status}
                         </Tag>
@@ -926,29 +1061,18 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
                             <div className="file-dropdown-container" style={{
                                 marginTop: '12px',
                                 padding: '8px',
-                                background: 'rgba(255, 255, 255, 0.02)',
+                                background: 'var(--ant-color-bg-container, rgba(255,255,255,0.02))',
                                 borderRadius: '6px',
-                                border: '1px solid #434343'
+                                border: '1px solid var(--ant-color-border, #f0f0f0)'
                             }}>
-                                <Text strong style={{ display: 'block', marginBottom: '8px', fontSize: '12px', color: '#ffffff' }}>
+                                <Text strong style={{ display: 'block', marginBottom: '8px', fontSize: '12px' }}>
                                     📁 Available Files for Analysis
                                 </Text>
                                 {renderFileDropdown()}
                             </div>
                         )}
                         
-                        {/* Cube.js Schema Panel for Cube Data Sources */}
-                        {dataSource.type === 'cube' && (
-                            <div style={{ marginTop: '16px' }}>
-                                <CubeSchemaPanel 
-                                    dataSourceId={dataSource.id}
-                                    onSchemaSelect={(schema) => {
-                                        console.log('Selected Cube.js schema:', schema);
-                                        // Handle schema selection for AI analysis
-                                    }}
-                                />
-                            </div>
-                        )}
+                        {/* Cube.js Schema Panel removed in favor of unified schema browser */}
                     </div>
                 )}
             </Card>
@@ -956,33 +1080,16 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
     };
 
     return (
-        <div className="EnhancedDataPanel" style={{ 
-            background: '#1f1f1f', 
-            color: '#ffffff',
-            height: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-            borderRadius: '8px',
-            overflow: 'hidden'
-        }}>
-            <div className="DataHeader" style={{ 
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '16px 20px',
-                borderBottom: '1px solid #434343',
-                background: '#262626',
-                color: '#ffffff'
-            }}>
+        <div className="collapsible-history-panel EnhancedDataPanel" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <div className="history-panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div className="DataTitle" style={{ 
                     display: 'flex',
                     alignItems: 'center',
                     fontSize: '16px',
-                    fontWeight: '600',
-                    color: '#ffffff'
+                    fontWeight: '600'
                 }}>
                     <DatabaseOutlined />
-                    <span style={{ marginLeft: '8px' }}>Data Sources</span>
+                    <span style={{ marginLeft: '8px' }}>Sources</span>
                     {dataSources.filter(ds => ds.type === 'file').length > 0 && (
                         <Badge 
                             count={dataSources.filter(ds => ds.type === 'file').length} 
@@ -991,40 +1098,118 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
                             title="Total uploaded files"
                         />
                     )}
-                    <Tooltip title="Click on any data source to view its schema and select it for analysis. The selected source will be used for AI-powered queries and chart generation.">
-                        <InfoCircleOutlined style={{ marginLeft: '8px', color: '#1890ff', cursor: 'help' }} />
+                    <Tooltip title="Click a source to view schema and use it for AI analysis.">
+                        <InfoCircleOutlined style={{ marginLeft: '8px', cursor: 'help' }} />
                     </Tooltip>
                 </div>
                 <Space>
-                    <Tooltip title="Refresh data sources">
+                    <Tooltip title="Add Source">
                         <Button
                             type="text"
-                            icon={<ReloadOutlined />}
-                            onClick={loadDataSources}
-                            loading={loading}
-                            style={{ color: '#ffffff' }}
+                            size="small"
+                            icon={<PlusOutlined />}
+                            onClick={() => setModalVisible(true)}
                         />
                     </Tooltip>
-                    <Button
-                        type="primary"
-                        icon={<PlusOutlined />}
-                        size="small"
-                        onClick={() => setModalVisible(true)}
-                    >
-                        Add Source
-                    </Button>
+                    <Tooltip title="Collapse">
+                        <Button
+                            type="text"
+                            size="small"
+                            icon={<CompressOutlined />}
+                            onClick={() => onCollapse?.()}
+                        />
+                    </Tooltip>
                 </Space>
             </div>
             
 
 
-            <div className="DataContent" style={{ 
-                flex: 1,
-                padding: '20px',
-                overflowY: 'auto',
-                background: '#1f1f1f',
-                color: '#ffffff'
-            }}>
+            <div className="history-panel-content DataContent" style={{ flex: 1, padding: '12px 12px', overflowY: 'auto' }}>
+                {/* Unified Dropdown Controls */}
+                <div style={{ marginBottom: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    {/* Data Source Select (full width to match selection summary) */}
+                    <div style={{ gridColumn: '1 / span 2' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <Text strong style={{ fontSize: 14 }}>Data Source</Text>
+                            <Tooltip title="Refresh">
+                                <Button
+                                    type="text"
+                                    size="small"
+                                    icon={<ReloadOutlined />}
+                                    onClick={loadDataSources}
+                                    loading={loading}
+                                />
+                            </Tooltip>
+                        </div>
+                        <Select
+                            value={selectedDataSource?.id}
+                            onChange={(val: string) => {
+                                const ds = dataSources.find(d => d.id === val) || null;
+                                if (ds) handleDataSourceSelect(ds);
+                            }}
+                            style={{ width: '100%', marginTop: 8, height: 40, fontSize: 14 }}
+                            placeholder="Select data source"
+                            size="middle"
+                            showSearch
+                            optionFilterProp="children"
+                            optionLabelProp="label"
+                        >
+                            {dataSources.map(ds => (
+                                <Select.Option key={ds.id} value={ds.id} label={ds.name}>
+                                    <span title={ds.name} style={{ display: 'inline-block', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', verticalAlign: 'bottom' }}>{ds.name}</span>
+                                </Select.Option>
+                            ))}
+                        </Select>
+                    </div>
+                    {/* Schema Select for databases */}
+                    {selectedDataSource && selectedDataSource.type === 'database' && (
+                        <div>
+                            <Text strong style={{ fontSize: 14 }}>Schema</Text>
+                            <Select
+                                value={selectedSchemaName}
+                                onChange={(val: string) => {
+                                    setSelectedSchemaName(val);
+                                    const sk = `${selectedDataSource.id}_${val}`;
+                                    if (!expandedKeys.includes(sk)) setExpandedKeys(prev => Array.from(new Set([...prev, sk])));
+                                }}
+                                style={{ width: '100%', marginTop: 8, height: 40, fontSize: 14 }}
+                                placeholder="Select schema"
+                                size="middle"
+                            >
+                                {(schemas[selectedDataSource.id]?.schemas || ['public']).map((sn: string) => (
+                                    <Select.Option key={sn} value={sn}>{sn}</Select.Option>
+                                ))}
+                            </Select>
+                        </div>
+                    )}
+                    {/* Table/View Select for databases */}
+                    {selectedDataSource && selectedDataSource.type === 'database' && (
+                        <div style={{ gridColumn: '1 / span 2' }}>
+                            <Text strong style={{ fontSize: 14 }}>Table / View</Text>
+                            <Select
+                                value={selectedEntityKey || undefined}
+                                onChange={(val: string) => {
+                                    setSelectedEntityKey(val);
+                                    if (!expandedKeys.includes(val)) setExpandedKeys(prev => Array.from(new Set([...prev, val])));
+                                }}
+                                style={{ width: '100%', marginTop: 8, height: 40, fontSize: 14 }}
+                                placeholder="Select table or view"
+                                size="middle"
+                                showSearch
+                                optionFilterProp="children"
+                            >
+                                {/* Tables */}
+                                {(schemas[selectedDataSource.id]?.tables || []).filter(t => (t.schema || 'public') === selectedSchemaName).map(t => (
+                                    <Select.Option key={`${selectedDataSource.id}_${selectedSchemaName}_${t.name}`} value={`${selectedDataSource.id}_${selectedSchemaName}_${t.name}`}>🗄️ {t.name}</Select.Option>
+                                ))}
+                                {/* Views */}
+                                {(schemas[selectedDataSource.id]?.views || []).filter(v => (v.schema || 'public') === selectedSchemaName).map(v => (
+                                    <Select.Option key={`${selectedDataSource.id}_${selectedSchemaName}_view_${v.name}`} value={`${selectedDataSource.id}_${selectedSchemaName}_view_${v.name}`}>👁️ {v.name} (view)</Select.Option>
+                                ))}
+                            </Select>
+                        </div>
+                    )}
+                </div>
                 {/* Selection Summary for AI Analysis */}
                 {selectedDataSource && (
                     <div style={{
@@ -1039,7 +1224,7 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
                     }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <span style={{ fontSize: '16px' }}>🎯</span>
-                            <Text strong style={{ color: '#ffffff' }}>
+                            <Text strong>
                                 For AI: {selectedDataSource.name}
                             </Text>
                             <Tag color="blue">{selectedDataSource.type}</Tag>
@@ -1053,7 +1238,7 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
                                 type="text" 
                                 icon={<CloseOutlined />}
                                 onClick={() => onDataSourceSelect?.(null)}
-                                style={{ color: '#ffffff' }}
+                                style={{ color: 'var(--ant-color-text, #141414)' }}
                                 title="Clear Selection"
                             />
                         </div>
@@ -1076,9 +1261,11 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
                             Connect Your First Data Source
                         </Button>
                     </Empty>
-                ) : (
-                    <div>
-                        {dataSources.map(renderDataSourceCard)}
+                ) : null}
+                {/* After dropdown selection UX, render schema tree for selected only */}
+                {selectedDataSource && schemas[selectedDataSource.id] && (
+                    <div style={{ marginTop: 12 }}>
+                        {renderSchemaTree(selectedDataSource)}
                     </div>
                 )}
             </div>

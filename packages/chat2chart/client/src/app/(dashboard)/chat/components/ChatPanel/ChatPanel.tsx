@@ -3,7 +3,7 @@ import { fetchApi } from '@/utils/api';
 import { apiService } from '@/services/apiService';
 import { conversationService, Conversation, Message } from '@/services/conversationService';
 import { SendOutlined, BulbOutlined, AudioOutlined, LinkOutlined, DatabaseOutlined, SettingOutlined, UserOutlined, RobotOutlined, PlusOutlined, FileTextOutlined, BarChartOutlined, MessageOutlined, ReloadOutlined, DownloadOutlined, CopyOutlined, ShareAltOutlined, InfoCircleOutlined, CodeOutlined, FileOutlined, EyeOutlined, EyeInvisibleOutlined, EditOutlined, DeleteOutlined, MoreOutlined, RiseOutlined, PieChartOutlined, SearchOutlined, LikeOutlined, DislikeOutlined, HeartOutlined, RocketOutlined } from '@ant-design/icons';
-import { Button, Input, Card, Tag, Space, Tooltip, Alert, Typography, Avatar, Divider, Empty, Spin, Select, Tabs, Dropdown, Menu, message } from 'antd';
+import { Button, Input, Card, Tag, Space, Tooltip, Alert, Typography, Avatar, Divider, Empty, Spin, Select, Tabs, Dropdown, Menu, message, Checkbox } from 'antd';
 import UniversalDataSourceModal from '@/app/components/UniversalDataSourceModal/UniversalDataSourceModal';
 import ModeSelector from '@/app/components/ModeSelector/ModeSelector';
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
@@ -19,6 +19,7 @@ import {
 } from '../../types';
 import ChatMessageBox from './MessageBox';
 import './styles.css';
+import { getBackendUrlForApi } from '@/utils/backendUrl';
 
 const { TextArea } = Input;
 const { Title, Text, Paragraph } = Typography;
@@ -111,6 +112,18 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
     const [analysisMode, setAnalysisMode] = React.useState<string>('main');
     const [openAIModel, setOpenAIModel] = React.useState<string | undefined>(undefined);
     const [selectedAIModel, setSelectedAIModel] = React.useState<string>('gpt-4.1-mini');
+    // Include files in analysis (persisted)
+    const [includeFilesInAnalysis, setIncludeFilesInAnalysis] = React.useState<boolean>(true);
+    React.useEffect(() => {
+        try {
+            const raw = localStorage.getItem('chat_include_files');
+            if (raw !== null) setIncludeFilesInAnalysis(raw === '1');
+        } catch {}
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+    React.useEffect(() => {
+        try { localStorage.setItem('chat_include_files', includeFilesInAnalysis ? '1' : '0'); } catch {}
+    }, [includeFilesInAnalysis]);
     
     // Enhanced features for accuracy and trust
     const [executionMetadata, setExecutionMetadata] = React.useState<Record<string, any>>({});
@@ -355,6 +368,10 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
         
         // Convert markdown-style formatting to HTML with enhanced features
         let formatted = content
+            .replace(/\r\n/g, '\n')
+            .replace(/(\S)(\d+\.\s)/g, '$1\n$2')
+            .replace(/(\S)(•\s)/g, '$1\n$2')
+            .replace(/\n{3,}/g, '\n\n')
             // Headers (H1-H6)
             .replace(/^###### (.*$)/gm, '<h6>$1</h6>')
             .replace(/^##### (.*$)/gm, '<h5>$1</h5>')
@@ -385,18 +402,19 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
             .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" class="markdown-image" />')
             
             // Blockquotes
-            .replace(/^> (.*$)/gm, '<blockquote>$1</blockquote>')
+            .replace(/^> (.*$)/gm, '<blockquote>$1<\/blockquote>')
             
             // Lists (ordered and unordered)
-            .replace(/^\d+\. (.*$)/gm, '<li class="ordered">$1</li>')
-            .replace(/^\* (.*$)/gm, '<li class="unordered">$1</li>')
-            .replace(/^- (.*$)/gm, '<li class="unordered">$1</li>')
-            .replace(/^\+ (.*$)/gm, '<li class="unordered">$1</li>')
+            .replace(/^\d+\. (.*$)/gm, '<li class="ordered">$1<\/li>')
+            .replace(/^\* (.*$)/gm, '<li class="unordered">$1<\/li>')
+            .replace(/^- (.*$)/gm, '<li class="unordered">$1<\/li>')
+            .replace(/^\+ (.*$)/gm, '<li class="unordered">$1<\/li>')
+            .replace(/^•\s+(.*$)/gm, '<li class="unordered">$1<\/li>')
             
             // Tables (basic support)
-            .replace(/\|(.+)\|/g, (match) => {
-                const cells = match.split('|').slice(1, -1);
-                return '<tr>' + cells.map(cell => `<td>${cell.trim()}</td>`).join('') + '</tr>';
+            .replace(/\|(.+)\|/g, (match: string) => {
+                const cells: string[] = match.split('|').slice(1, -1);
+                return '<tr>' + cells.map((cell: string) => `<td>${cell.trim()}</td>`).join('') + '</tr>';
             })
             
             // Horizontal rules
@@ -408,14 +426,9 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
         
         // Wrap lists properly
         formatted = formatted
-            .replace(/(<li[^>]*>.*?<\/li>)/g, '<ul>$1</ul>')
-            .replace(/(<li class="ordered"[^>]*>.*?<\/li>)/g, '<ol>$1</ol>');
-        
-        // Clean up empty list wrappers
-        formatted = formatted
-            .replace(/<ul>\s*<\/ul>/g, '')
-            .replace(/<ol>\s*<\/ol>/g, '');
-        
+            .replace(/((?:<li class=\"unordered\"[^>]*>[\s\S]*?<\/li>\s*)+)/g, (m) => `<ul>${m}<\/ul>`)
+            .replace(/((?:<li class=\"ordered\"[^>]*>[\s\S]*?<\/li>\s*)+)/g, (m) => `<ol>${m}<\/ol>`);
+
         return formatted;
     };
 
@@ -960,7 +973,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                     // Enhanced data source context for better AI analysis
                     const dataSourceContext = await buildDataSourceContext(dataSourceId, dataSourceType);
                     
-                    const response = await fetch('http://127.0.0.1:8000/ai/chat/analyze', {
+                    const response = await fetch(`${getBackendUrlForApi()}/ai/chat/analyze`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -1055,7 +1068,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                 try {
                     console.log('🔍 Calling AI chat analysis without data source...');
                     
-                    const response = await fetch('http://127.0.0.1:8000/ai/chat/analyze', {
+                    const response = await fetch(`${getBackendUrlForApi()}/ai/chat/analyze`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1228,7 +1241,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                 include_execution_metadata: true // Request execution metadata
             };
 
-                            const response = await fetch('http://127.0.0.1:8000/ai/chat/analyze', {
+                            const response = await fetch(`${getBackendUrlForApi()}/ai/chat/analyze`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1533,9 +1546,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
 
                     <div className="suggested-questions">
                         <Title level={4}>🚀 Start with Sample Data</Title>
-                        <Paragraph className="sample-data-intro">
-                            Experience AI-powered analysis with these pre-built datasets. Click any card to use the question, then send your message to see insights and charts.
-                        </Paragraph>
+                        {/* Removed descriptive paragraph to keep the view compact */}
                         <div className="question-grid">
                             {[
                                 {
@@ -1896,6 +1907,19 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
             <div class="chart-header">
                 <div class="chart-title">${chartData.title || 'AI Generated Chart'}</div>
                 <div class="chart-controls">
+                    <select class="chart-type-select" title="Chart type" style="margin-right:8px;padding:2px 6px;">
+                        <option value="bar">Bar</option>
+                        <option value="line">Line</option>
+                        <option value="area">Area</option>
+                        <option value="scatter">Scatter</option>
+                        <option value="pie">Pie</option>
+                    </select>
+                    <div class="series-toggle" style="display:flex;gap:4px;margin-right:8px;">
+                        <button class="series-type-btn" data-type="bar" title="Bar">Bar</button>
+                        <button class="series-type-btn" data-type="line" title="Line">Line</button>
+                        <button class="series-type-btn" data-type="area" title="Area">Area</button>
+                    </div>
+                    <span class="auto-exec-status" style="margin-right:8px;display:none;font-size:12px;color:#999;">Auto-running…</span>
                     <button class="chart-trust-btn" title="View Trust & Transparency">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/>
@@ -1962,13 +1986,14 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                         <div class="sql-queries-list" id="sql-queries-${messageId}">
                             ${chartData.executionMetadata?.sql_queries?.length > 0 ? 
                                 chartData.executionMetadata.sql_queries.map((query: string, index: number) => 
-                                    `<div class="sql-query-item">
-                                        <strong>Query ${index + 1}:</strong>
-                                        <pre class="sql-code">${query}</pre>
-                                    </div>`
+                                    `<div class=\"sql-query-item\">\n<strong>Query ${index + 1}:</strong>\n<pre class=\"sql-code\">${query}</pre>\n</div>`
                                 ).join('') : 
-                                '<p>No SQL queries executed for this analysis.</p>'
-                            }
+                                (chartData.sql_suggestions && chartData.sql_suggestions.length > 0
+                                    ? chartData.sql_suggestions.map((query: string, index: number) => 
+                                        `<div class=\"sql-query-item\">\n<strong>Suggested ${index + 1}:</strong>\n<pre class=\"sql-code\">${query}</pre>\n<button class=\"sql-exec-btn\" data-sql=\"${encodeURIComponent(query)}\" title=\"Execute SQL\">Execute</button>\n</div>`
+                                      ).join('')
+                                    : '<p>No SQL queries executed for this analysis.</p>')
+                             }
                         </div>
                     </div>
                     <div class="trust-section" id="code-section-${messageId}" style="display: ${chartData.executionMetadata?.executed_code?.length > 0 ? 'block' : 'none'}">
@@ -2030,6 +2055,103 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
             trustCloseBtn.addEventListener('click', () => {
                 trustPanel.style.display = 'none';
             });
+        }
+
+        // Bind Execute SQL buttons
+        const execButtons = chartWrapper.querySelectorAll('.sql-exec-btn');
+        execButtons.forEach((btn) => {
+            btn.addEventListener('click', async (e: any) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const encoded = (e.currentTarget as HTMLElement).getAttribute('data-sql') || '';
+                const sql = decodeURIComponent(encoded);
+                try {
+                    // Execute query on the active data source
+                    const active = props.selectedDataSources && props.selectedDataSources.length > 0 ? props.selectedDataSources[0] : props.selectedDataSource;
+                    if (!active || !active.id) {
+                        console.warn('No active data source to execute SQL');
+                        return;
+                    }
+                    const res = await fetch(`${getBackendUrlForApi()}/data/query/execute`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ query: sql, data_source_id: active.id, engine: 'direct_sql', optimization: true })
+                    });
+                    const jr = await res.json();
+                    if (jr && jr.success) {
+                        const rows = jr.data || [];
+                        const cols = jr.columns || (rows.length > 0 ? Object.keys(rows[0]) : []);
+                        const inferred = inferChartFromTabular(rows, cols);
+                        chart.setOption(inferred, true);
+                    }
+                } catch (err) {
+                    console.error('SQL execution failed', err);
+                }
+            });
+        });
+
+        // Series type toggle handlers
+        const seriesButtons = chartWrapper.querySelectorAll('.series-type-btn');
+        seriesButtons.forEach((btn) => {
+            btn.addEventListener('click', (e: any) => {
+                e.preventDefault();
+                const type = (e.currentTarget as HTMLElement).getAttribute('data-type') || 'bar';
+                const currentOption: any = chart.getOption();
+                const currentSeries: any[] = Array.isArray(currentOption?.series) ? currentOption.series : [];
+                if (currentSeries.length > 0) {
+                    const newSeries = currentSeries.map((s: any) => ({ ...s, type: type === 'area' ? 'line' : type, areaStyle: type === 'area' ? { opacity: 0.6 } : undefined }));
+                    chart.setOption({ series: newSeries }, true);
+                    try { localStorage.setItem(`chart_type_${messageId}`, type); } catch {}
+                }
+            });
+        });
+
+        // Chart type dropdown handler
+        const chartTypeSelect = chartWrapper.querySelector('.chart-type-select') as HTMLSelectElement | null;
+        if (chartTypeSelect) {
+            // Restore last used
+            try {
+                const last = localStorage.getItem(`chart_type_${messageId}`);
+                if (last) chartTypeSelect.value = last;
+            } catch {}
+            chartTypeSelect.addEventListener('change', (e: any) => {
+                const type = (e.target as HTMLSelectElement).value || 'bar';
+                const currentOption: any = chart.getOption();
+                const currentSeries: any[] = Array.isArray(currentOption?.series) ? currentOption.series : [];
+                if (currentSeries.length > 0) {
+                    const newSeries = currentSeries.map((s: any) => ({ ...s, type: type === 'area' ? 'line' : type, areaStyle: type === 'area' ? { opacity: 0.6 } : undefined }));
+                    chart.setOption({ series: newSeries }, true);
+                    try { localStorage.setItem(`chart_type_${messageId}`, type); } catch {}
+                }
+            });
+        }
+
+        // Auto-execute a single SQL suggestion if eligible
+        const suggestions = (chartData && chartData.sql_suggestions) || [];
+        const autoExecStatus = chartWrapper.querySelector('.auto-exec-status') as HTMLElement;
+        const active = props.selectedDataSources && props.selectedDataSources.length > 0 ? props.selectedDataSources[0] : props.selectedDataSource;
+        const eligible = active && active.type && ['database', 'warehouse', 'duckdb', 'postgres', 'mysql', 'mssql', 'sqlite'].includes((active.type || '').toString().toLowerCase());
+        if (suggestions.length === 1 && eligible) {
+            try {
+                if (autoExecStatus) autoExecStatus.style.display = 'inline-block';
+                const sql = suggestions[0];
+                const res = await fetch(`${getBackendUrlForApi()}/data/query/execute`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: sql, data_source_id: active.id, engine: 'direct_sql', optimization: true })
+                });
+                const jr = await res.json();
+                if (jr && jr.success) {
+                    const rows = jr.data || [];
+                    const cols = jr.columns || (rows.length > 0 ? Object.keys(rows[0]) : []);
+                    const inferred = inferChartFromTabular(rows, cols);
+                    chart.setOption(inferred, true);
+                }
+            } catch (err) {
+                console.error('Auto-execution failed', err);
+            } finally {
+                if (autoExecStatus) autoExecStatus.style.display = 'none';
+            }
         }
     };
 
@@ -2274,7 +2396,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                 const dataURL = chart.getDataURL({
                     type: 'png',
                     pixelRatio: 2,
-                    backgroundColor: '#fff'
+                    backgroundColor: 'var(--ant-color-bg-container, #ffffff)'
                 });
                 
                 const link = document.createElement('a');
@@ -2706,6 +2828,50 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
     const [dataSources, setDataSources] = React.useState<any[]>([]);
     const [selectedDataSources, setSelectedDataSources] = React.useState<string[]>([]);
 
+    const inferChartFromTabular = (rows: any[], cols: string[]) => {
+        if (!rows || rows.length === 0 || !cols || cols.length === 0) {
+            return { series: [] };
+        }
+        // Heuristics: prefer date-like for x, then non-numeric; rest numeric as series
+        const isNumeric = (v: any) => typeof v === 'number' || (typeof v === 'string' && v.trim() !== '' && !isNaN(Number(v)));
+        const isDateLike = (v: any) => {
+            if (v instanceof Date) return true;
+            if (typeof v !== 'string') return false;
+            // ISO 8601, yyyy-mm(-dd), yyyy/mm/dd, dd/mm/yyyy with time optional
+            return /(\d{4}-\d{1,2}(-\d{1,2})?(?:[ T]\d{1,2}:\d{2}(?::\d{2})?)?)/.test(v)
+                || /(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})/.test(v);
+        };
+
+        let xCol = cols[0];
+        for (const c of cols) {
+            const sample = rows[0]?.[c];
+            if (isDateLike(sample)) { xCol = c; break; }
+            if (!isNumeric(sample)) { xCol = c; break; }
+        }
+        const yCols = cols.filter(c => c !== xCol && rows.some(r => isNumeric(r[c])));
+        const xData = rows.map(r => r[xCol]);
+        // If date-like, try to normalize to ISO for consistent category order
+        const xIsDate = isDateLike(rows[0]?.[xCol]);
+        const normalizeDate = (s: any) => {
+            if (s instanceof Date) return s.toISOString();
+            const d = new Date(s);
+            return isNaN(d.getTime()) ? s : d.toISOString();
+        };
+        const xVals = xIsDate ? xData.map(normalizeDate) : xData;
+        const series = yCols.slice(0, 6).map((c, idx) => ({
+            name: c,
+            type: 'bar',
+            data: rows.map(r => Number(r[c]))
+        }));
+        return {
+            tooltip: { trigger: 'axis' },
+            legend: { bottom: 10 },
+            xAxis: { type: xIsDate ? 'category' : 'category', data: xVals },
+            yAxis: { type: 'value' },
+            series
+        };
+    };
+
     return (
         <div className="enhanced-chat-panel">
             {/* Chat Header */}
@@ -2725,22 +2891,22 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                                 { value: 'gpt-4-mini', label: '🧠 GPT-4 Mini' }
                             ]}
                         />
-                        <Button
-                            icon={<DatabaseOutlined />}
-                            onClick={() => setDataSourceModalVisible(true)}
-                            type="primary"
-                            ghost
-                        >
-                            {props.file || props.db || props.selectedDataSource ? 'Manage Data' : 'Connect Data'}
-                        </Button>
-                        <Button
-                            icon={<BarChartOutlined />}
-                            onClick={() => window.location.href = '/chart-builder'}
-                            type="default"
-                            ghost
-                        >
-                            Chart Builder
-                        </Button>
+                        <Select
+                            placeholder="Navigate"
+                            style={{ width: 200 }}
+                            onChange={(value) => {
+                                if (value === 'connect') setDataSourceModalVisible(true);
+                                if (value === 'query') window.location.href = '/dash-studio?tab=query-editor';
+                                if (value === 'chart') window.location.href = '/dash-studio?tab=chart';
+                                if (value === 'dashboard') window.location.href = '/dash-studio?tab=dashboard';
+                            }}
+                            options={[
+                                { value: 'connect', label: 'Connect Data' },
+                                { value: 'query', label: 'Query Editor' },
+                                { value: 'chart', label: 'Chart Designer' },
+                                { value: 'dashboard', label: 'Dashboard' }
+                            ]}
+                        />
                     </div>
                 </div>
             </div>
@@ -2787,10 +2953,26 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                         alignItems: 'center',
                         gap: '8px'
                     }}>
-                        <DatabaseOutlined style={{ color: '#1890ff' }} />
-                        <Text style={{ color: '#ffffff', fontSize: '12px' }}>
-                            <strong>AI Analysis Sources:</strong> {props.selectedDataSources.map((ds: any) => ds.name).join(', ')}
-                        </Text>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <DatabaseOutlined style={{ color: '#1890ff' }} />
+                            <Text style={{ color: 'var(--ant-color-text, #141414)', fontSize: '12px' }}>
+                                <strong>AI Analysis Sources:</strong> {props.selectedDataSources.map((ds: any) => ds.name).join(', ')}
+                            </Text>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <Checkbox
+                                checked={includeFilesInAnalysis}
+                                onChange={(e) => setIncludeFilesInAnalysis(e.target.checked)}
+                                style={{ color: 'var(--ant-color-text, #141414)', fontSize: 12 }}
+                            >
+                                Include files
+                            </Checkbox>
+                            {includeFilesInAnalysis && (props.selectedDataSources || []).some((ds: any) => ds.type === 'file') && (
+                                <Text style={{ color: 'var(--ant-color-text, #141414)', fontSize: '11px' }}>
+                                    Files: {(props.selectedDataSources || []).filter((ds: any) => ds.type === 'file').map((ds: any) => ds.name).join(', ')}
+                                </Text>
+                            )}
+                        </div>
                     </div>
                 )}
                 
@@ -2807,7 +2989,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                         gap: '8px'
                     }}>
                         <InfoCircleOutlined style={{ color: '#ffc107' }} />
-                        <Text style={{ color: '#ffffff', fontSize: '12px' }}>
+                        <Text style={{ color: 'var(--ant-color-text, #141414)', fontSize: '12px' }}>
                             <strong>No Data Sources Selected:</strong> Go to the Data Panel (right side) and click on a data source to select it for AI analysis.
                         </Text>
                     </div>
@@ -2873,10 +3055,10 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                     
                     {/* Quick Actions - Full Width Modern Design */}
                     <div className="quick-actions-modern">
-                        <div className="action-group">
+                        <div className="action-group" style={{ width: 240 }}>
                             <Select
                                 defaultValue="standard"
-                                style={{ width: '100%' }}
+                                style={{ width: 220 }}
                                 size="middle"
                                 className="mode-selector"
                             >
@@ -2887,29 +3069,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                         
 
                         
-                        <div className="action-group">
-                            <Button
-                                size="middle"
-                                onClick={() => setDataSourceModalVisible(true)}
-                                icon={<PlusOutlined />}
-                                className="action-btn"
-                                block
-                            >
-                                Add Data Source
-                            </Button>
-                        </div>
-                        
-                        <div className="action-group">
-                            <Button
-                                size="middle"
-                                onClick={() => window.location.href = '/chart-builder'}
-                                icon={<BarChartOutlined />}
-                                className="action-btn"
-                                block
-                            >
-                                Build Chart
-                            </Button>
-                        </div>
+                        {/* Removed Add Data Source and Build Chart buttons to keep only Standard Mode */}
                         
 
                     </div>

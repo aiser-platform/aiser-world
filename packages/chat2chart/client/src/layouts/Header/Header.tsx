@@ -9,7 +9,7 @@ import {
 } from '@ant-design/icons';
 import { Button, Layout, theme, Tooltip } from 'antd';
 import UserProfileDropdown from '@/components/UserProfileDropdown';
-import { useDarkMode } from '@/hooks/useDarkMode';
+import { useThemeMode } from '@/components/Providers/ThemeModeContext';
 import ProjectSelector from '@/app/(dashboard)/chat/components/ProjectSelector/ProjectSelector';
 
 type Props = {
@@ -24,20 +24,21 @@ export const LayoutHeader: React.FC<Props> = ({
     setCollapsed,
 }) => {
     const {
-        token: { colorBgContainer },
+        token: { colorBgContainer, colorBorder, colorText },
     } = theme.useToken();
     
-    const [isDarkMode, setIsDarkMode] = useDarkMode();
+    const { isDarkMode, setIsDarkMode } = useThemeMode();
 
     return (
         <Layout.Header
             style={{
                 padding: '0 16px',
-                background: colorBgContainer,
+                background: isDarkMode ? '#1f1f1f' : '#ffffff',
+                color: colorText,
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                borderBottom: '1px solid #f0f0f0',
+                borderBottom: `1px solid ${isDarkMode ? '#303030' : '#f0f0f0'}`,
             }}
         >
             <div className="flex items-center space-x-4">
@@ -90,7 +91,7 @@ export const LayoutHeader: React.FC<Props> = ({
                             width: 40,
                             height: 40,
                         }}
-                        className="hover:bg-gray-100"
+                        
                     />
                 </Tooltip>
                 
@@ -104,7 +105,7 @@ export const LayoutHeader: React.FC<Props> = ({
                             width: 40,
                             height: 40,
                         }}
-                        className="hover:bg-gray-100"
+                        
                     />
                 </Tooltip>
                 <UserProfileDropdown />

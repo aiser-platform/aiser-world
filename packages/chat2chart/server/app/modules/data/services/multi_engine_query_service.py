@@ -85,6 +85,30 @@ class MultiEngineQueryService:
         """Execute query using optimal or specified engine"""
         try:
             logger.info(f"🔍 Executing query with optimization: {optimization}")
+            # Org/Project scoped cache (Redis-backed if available) in addition to in-memory TTL cache
+            from app.core.cache import cache
+            cache_key_scoped = None
+            try:
+                scope = {
+                    'org': data_source.get('organization_id') or '',
+                    'proj': data_source.get('project_id') or ''
+                }
+                engine_tag = (engine.value if engine else 'auto')
+                key_payload = json.dumps({
+                    'scope': scope,
+                    'source': data_source.get('id') or data_source.get('data_source_id') or '',
+                    'engine': engine_tag,
+                    'optimization': optimization,
+                    'query': query
+                }, sort_keys=True)
+                import hashlib as _hash
+                cache_key_scoped = f"qe:{_hash.md5(key_payload.encode()).hexdigest()}"
+                scoped_cached = cache.get(cache_key_scoped) if cache else None
+                if optimization and scoped_cached is not None:
+                    logger.info("✅ Returning Redis-scoped cached result")
+                    return {**scoped_cached, 'cached': True}
+            except Exception:
+                cache_key_scoped = None
             
             # Analyze query and data source
             query_analysis = self._analyze_query(query, data_source)
@@ -124,6 +148,12 @@ class MultiEngineQueryService:
                     'data': result['data'],
                     'timestamp': datetime.now().timestamp()
                 }
+                # Persist to Redis-scoped cache with TTL
+                try:
+                    if cache_key_scoped and cache:
+                        cache.set(cache_key_scoped, result, ttl=self.cache_ttl)
+                except Exception:
+                    pass
             
             result.update({
                 'engine': engine.value,

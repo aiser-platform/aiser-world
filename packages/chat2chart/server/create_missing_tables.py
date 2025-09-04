@@ -20,6 +20,7 @@ from app.modules.data.models import DataSource, DataQuery, DataConnection
 from app.modules.charts.models import Dashboard, DashboardWidget, DashboardShare
 from app.modules.user.models import User
 from app.modules.chats.conversations.models import ChatConversation
+from app.modules.chats.messages.models import ChatMessage
 
 async def create_missing_tables():
     """Create all missing database tables"""
@@ -67,24 +68,24 @@ async def create_missing_tables():
         print("📊 Inserting demo data...")
         
         with engine.connect() as conn:
-            # Insert demo organization
+            # Insert default Aiser organization
             conn.execute(text("""
                 INSERT INTO organizations (id, name, slug, description, plan_type, is_active, created_at, updated_at)
-                VALUES (1, 'Demo Organization', 'demo-org', 'Demo organization for testing', 'enterprise', true, NOW(), NOW())
+                VALUES (1, 'Aiser', 'aiser', 'Aiser default organization', 'enterprise', true, NOW(), NOW())
                 ON CONFLICT (id) DO NOTHING
             """))
             
-            # Insert demo user
+            # Insert default Aiser admin user
             conn.execute(text("""
                 INSERT INTO users (id, username, email, is_active, created_at, updated_at)
-                VALUES (1, 'demo_user', 'demo@example.com', true, NOW(), NOW())
+                VALUES (1, 'aiser_admin', 'admin@aiser.ai', true, NOW(), NOW())
                 ON CONFLICT (id) DO NOTHING
             """))
             
-            # Insert demo project
+            # Insert default Aiser project
             conn.execute(text("""
                 INSERT INTO projects (id, name, description, organization_id, created_by, is_active, created_at, updated_at)
-                VALUES (1, 'Demo Project', 'Demo project for testing', 1, 1, true, NOW(), NOW())
+                VALUES (1, 'Aiser Default Project', 'Default project for Aiser', 1, 1, true, NOW(), NOW())
                 ON CONFLICT (id) DO NOTHING
             """))
             
@@ -106,13 +107,13 @@ async def create_missing_tables():
                 ON CONFLICT DO NOTHING
             """))
             
-            # Insert demo dashboard
+            # Insert default dashboard
             conn.execute(text("""
                 INSERT INTO dashboards (id, name, description, project_id, created_by, layout_config, theme_config, is_active, created_at, updated_at)
                 VALUES (
                     gen_random_uuid(),
-                    'Demo Dashboard',
-                    'Demo dashboard for testing',
+                    'Aiser Starter Dashboard',
+                    'Starter dashboard for Aiser',
                     1,
                     1,
                     '{"grid_size": 12, "widgets": []}',

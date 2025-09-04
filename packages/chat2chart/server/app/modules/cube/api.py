@@ -4,9 +4,13 @@ Cube.js Integration API Endpoints
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import Dict, List, Optional, Any
+from pydantic import BaseModel
 from app.modules.cube.services.cube_integration_service import cube_service
 from app.core.cache import cache
-from pydantic import BaseModel
+from app.modules.data.services.data_connectivity_service import DataConnectivityService
+from app.modules.data.services.yaml_schema_service import YAMLSchemaService
+import json
+import yaml
 
 router = APIRouter()
 
@@ -25,6 +29,23 @@ class CubeQueryRequest(BaseModel):
 class ChartGenerationRequest(BaseModel):
     natural_query: str
     available_cubes: List[str]
+
+class AutoSchemaRequest(BaseModel):
+    data_source_id: str
+    organization_id: Optional[str] = None
+    project_id: Optional[str] = None
+    preferences: Optional[Dict[str, Any]] = None
+
+class VisualMapRequest(BaseModel):
+    yaml_schema: str
+
+class PreAggSuggestRequest(BaseModel):
+    yaml_schema: str
+    preferences: Optional[Dict[str, Any]] = None
+
+class PreAggApplyRequest(BaseModel):
+    yaml_schema: str
+    selections: List[Dict[str, Any]]
 
 @router.post("/schema/generate")
 async def generate_cube_schema(request: GenerateSchemaRequest):
@@ -98,6 +119,142 @@ async def execute_cube_query(request: CubeQueryRequest):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
         )
+
+@router.post("/schema/auto")
+async def auto_generate_schema(request: AutoSchemaRequest):
+    """Auto-generate Cube.js YAML schema from an existing data source schema.
+    Uses server-side schema introspection and YAML generator before optional AI enhancement in a separate step.
+    """
+    try:
+        data_service = DataConnectivityService()
+        yaml_service = YAMLSchemaService()
+
+        # Introspect source schema (DB/warehouse/file)
+        source_schema_result = await data_service.get_source_schema(request.data_source_id)
+        if not source_schema_result.get('success'):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=source_schema_result.get('error', 'Schema introspection failed'))
+
+        raw_schema = source_schema_result.get('schema', {})
+
+        # Generate YAML schema
+        yaml_result = await yaml_service.generate_yaml_schema(
+            data_source_id=request.data_source_id,
+            data_source_type=raw_schema.get('type', 'database'),
+            raw_schema=raw_schema,
+            user_preferences=(request.preferences or {})
+        )
+
+        if not yaml_result.get('success'):
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=yaml_result.get('error', 'YAML generation failed'))
+
+        return {
+            'success': True,
+            'yaml_schema': yaml_result.get('yaml_schema', ''),
+            'schema_stats': yaml_result.get('schema_stats', {}),
+            'warnings': yaml_result.get('warnings', [])
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+@router.post("/schema/visual-map")
+async def get_visual_mapping(request: VisualMapRequest):
+    """Return a simplified nodes/edges map derived from Cube YAML for visual editors."""
+    try:
+        yaml_text = request.yaml_schema or ''
+        try:
+            parsed = yaml.safe_load(yaml_text) if yaml_text else {}
+        except Exception:
+            parsed = {}
+
+        cubes = (parsed or {}).get('cubes', []) or []
+        nodes: List[Dict[str, Any]] = []
+        edges: List[Dict[str, Any]] = []
+
+        for cube in cubes:
+            cube_name = cube.get('name') or cube.get('title') or 'Cube'
+            nodes.append({'id': cube_name, 'type': 'cube', 'label': cube_name})
+            for dim in cube.get('dimensions', []) or []:
+                dim_id = f"{cube_name}.{dim.get('name')}"
+                nodes.append({'id': dim_id, 'type': 'dimension', 'label': dim.get('title') or dim.get('name')})
+                edges.append({'source': cube_name, 'target': dim_id, 'relation': 'has_dimension'})
+            for meas in cube.get('measures', []) or []:
+                meas_id = f"{cube_name}.{meas.get('name')}"
+                nodes.append({'id': meas_id, 'type': 'measure', 'label': meas.get('title') or meas.get('name')})
+                edges.append({'source': cube_name, 'target': meas_id, 'relation': 'has_measure'})
+
+        return {'success': True, 'nodes': nodes, 'edges': edges}
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+@router.post("/preaggregations/suggest")
+async def suggest_preaggregations(request: PreAggSuggestRequest):
+    """Suggest simple rollup pre-aggregations based on YAML schema content."""
+    try:
+        yaml_text = request.yaml_schema or ''
+        parsed = yaml.safe_load(yaml_text) if yaml_text else {}
+        cubes = (parsed or {}).get('cubes', []) or []
+        suggestions: List[Dict[str, Any]] = []
+        for cube in cubes:
+            cube_name = cube.get('name') or cube.get('title')
+            dimensions = cube.get('dimensions', []) or []
+            measures = cube.get('measures', []) or []
+            # find time dimension candidates
+            time_dims = [d for d in dimensions if (d.get('type') == 'time' or 'time' in str(d.get('type','')).lower() or 'date' in (d.get('name','')).lower())]
+            numeric_measures = [m for m in measures if m.get('type') in ['sum','count','number','avg','min','max'] or 'count' in (m.get('name','')).lower()]
+            if not time_dims or not numeric_measures:
+                continue
+            # Suggest monthly and daily rollups
+            for gran in ['day','month']:
+                suggestions.append({
+                    'cube': cube_name,
+                    'name': f"{cube_name}_{gran}_rollup",
+                    'type': 'rollup',
+                    'timeDimension': time_dims[0].get('name'),
+                    'granularity': gran,
+                    'measures': [m.get('name') for m in numeric_measures][:5],
+                    'dimensions': [d.get('name') for d in dimensions if d.get('type') != 'time'][:5]
+                })
+        return {'success': True, 'suggestions': suggestions}
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+@router.post("/preaggregations/apply")
+async def apply_preaggregations(request: PreAggApplyRequest):
+    """Apply selected pre-aggregations to YAML schema and return updated YAML."""
+    try:
+        yaml_text = request.yaml_schema or ''
+        parsed = yaml.safe_load(yaml_text) if yaml_text else {}
+        cubes = (parsed or {}).get('cubes', []) or []
+        # Group selections by cube
+        cube_to_preaggs: Dict[str, List[Dict[str, Any]]] = {}
+        for sel in request.selections:
+            cube_to_preaggs.setdefault(sel.get('cube'), []).append(sel)
+        # Insert preAggregations into cubes
+        for cube in cubes:
+            name = cube.get('name') or cube.get('title')
+            if name not in cube_to_preaggs:
+                continue
+            pre_list = cube.get('preAggregations') or cube.get('preAggregations') or []
+            # Ensure list
+            if not isinstance(pre_list, list):
+                pre_list = []
+            for sel in cube_to_preaggs[name]:
+                pre_list.append({
+                    'name': sel.get('name'),
+                    'type': sel.get('type','rollup'),
+                    'timeDimension': sel.get('timeDimension'),
+                    'granularity': sel.get('granularity'),
+                    'measures': sel.get('measures', []),
+                    'dimensions': sel.get('dimensions', [])
+                })
+            cube['preAggregations'] = pre_list
+        parsed['cubes'] = cubes
+        updated_yaml = yaml.safe_dump(parsed, sort_keys=False)
+        return {'success': True, 'yaml_schema': updated_yaml}
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 @router.get("/schema/{data_source_id}")
 async def get_cube_schema(data_source_id: str):

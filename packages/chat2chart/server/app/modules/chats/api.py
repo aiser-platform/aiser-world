@@ -40,28 +40,21 @@ async def chat_endpoint(request: dict):
         
         # Use AI service for enhanced responses
         try:
-            from app.modules.ai.api import analyze_chat_query
-            
-            # Create data summary for AI analysis
-            data_summary = {
-                "data_source_id": data_source_id,
-                "query_type": "chat_analysis",
-                "timestamp": "2025-01-10T00:00:00Z"
-            }
-            
-            # Call AI analysis endpoint
-            ai_result = await analyze_chat_query({
-                "query": user_query,
-                "data_source_id": data_source_id,
-                "data_summary": data_summary,
-                "business_context": "data_analytics" if data_source_id else "general_assistance"
-            })
-            
+            # DEPRECATION: /chats/chat is a thin facade; prefer /ai/chat moving forward
+            from app.modules.ai.api import analyze_chat_query, ChatAnalysisRequest  # type: ignore
+
+            req = ChatAnalysisRequest(
+                query=user_query,
+                data_source_id=data_source_id,
+                business_context="data_analytics" if data_source_id else "general_assistance"
+            )
+            ai_result = await analyze_chat_query(req)  # delegate to AI service
+
             if ai_result.get('success'):
                 message_content = ai_result.get('analysis', 'I apologize, but I could not generate a response.')
             else:
                 raise Exception("AI analysis failed")
-                
+
         except Exception as ai_error:
             logger.warning(f"AI service failed, using fallback: {str(ai_error)}")
             
@@ -71,25 +64,7 @@ async def chat_endpoint(request: dict):
             else:
                 message_content = "Hello! I'm your AI assistant for data visualization and analytics. To get the most out of our conversation, please connect a data source using the 'Connect Data' button. I can help you with data analysis, chart creation, and business insights once you have data connected."
         
-        # Validate AI response and handle errors gracefully
-        if ai_response.get('success') and ai_response.get('content'):
-            message_content = ai_response.get('content')
-            
-            # Ensure we have meaningful content
-            if not message_content or message_content.strip() == '':
-                logger.warning("Empty AI response received, using fallback")
-                if data_source_id:
-                    message_content = f"I can see you have a data source connected (ID: {data_source_id}). I'm here to help analyze your data! What specific questions do you have about your data? I can help with trends, patterns, comparisons, and creating visualizations."
-                else:
-                    message_content = "Hello! I'm your AI assistant for data visualization and analytics. To get the most out of our conversation, please connect a data source using the 'Connect Data' button. I can help you with data analysis, chart creation, and business insights once you have data connected."
-        else:
-            # Handle LiteLLM failures with intelligent fallbacks
-            logger.error(f"LiteLLM failed: {ai_response.get('error', 'Unknown error')}")
-            
-            if data_source_id:
-                message_content = f"I can see you have a data source connected (ID: {data_source_id}). While I'm experiencing some technical difficulties with my AI service, I can still help you with:\n\n📊 **Data Analysis Tools:**\n- Chart Builder with ECharts integration\n- SQL query builder\n- Data source management\n- Export and sharing capabilities\n\n**Next Step:** Try asking a specific question about your data, or use the Chart Builder to create visualizations manually."
-            else:
-                message_content = "Hello! I'm your AI assistant for data visualization and analytics. While I'm experiencing some technical difficulties with my AI service, I can still help you with:\n\n🚀 **Getting Started:**\n1. **Connect Data** - Upload files or connect databases\n2. **Ask Questions** - Use natural language to query your data\n3. **Build Charts** - Create custom visualizations\n4. **Share Insights** - Export and share your analysis\n\n**Next Step:** Click 'Connect Data' to upload files or connect databases!"
+        # Return unified response
         
         # Return unified response format
         return {

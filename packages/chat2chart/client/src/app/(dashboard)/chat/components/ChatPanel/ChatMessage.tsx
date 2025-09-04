@@ -258,8 +258,8 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
       className={`chat-message ${message.role === 'assistant' ? 'assistant' : 'user'}`}
       style={{ 
         marginBottom: 16,
-        backgroundColor: message.role === 'assistant' ? '#f8f9fa' : '#ffffff',
-        border: message.role === 'assistant' ? '1px solid #e8e8e8' : '1px solid #d9d9d9'
+        backgroundColor: message.role === 'assistant' ? 'var(--ant-color-bg-layout, #f8f9fa)' : 'var(--ant-color-bg-container, #ffffff)',
+        border: message.role === 'assistant' ? '1px solid var(--ant-color-border-secondary, #e8e8e8)' : '1px solid var(--ant-color-border, #d9d9d9)'
       }}
     >
       <div className="message-header">

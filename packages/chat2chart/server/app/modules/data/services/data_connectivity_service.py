@@ -120,6 +120,18 @@ class DataConnectivityService:
             # Generate unique ID for the connection
             connection_id = f"db_{connection_request.get('type')}_{int(datetime.now().timestamp())}"
             
+            # Prepare in-memory representation upfront to avoid unbound variable
+            connection_data = {
+                'id': connection_id,
+                'type': 'database',
+                'db_type': connection_request.get('type'),
+                'name': connection_request.get('name', f"{connection_request.get('type')}_connection"),
+                'config': connection_request,
+                'created_at': datetime.now().isoformat(),
+                'status': 'connected',
+                'connection_type': 'database'
+            }
+            
             # Store connection info in database
             try:
                 from app.modules.data.models import DataSource
@@ -162,20 +174,14 @@ class DataConnectivityService:
                     await db.refresh(new_source)
                     
                     logger.info(f"✅ Database connection saved to database: {connection_id}")
-                    
+                    # Keep in-memory registry aligned
+                    connection_data.update({
+                        'name': new_source.name,
+                        'db_type': new_source.db_type
+                    })
             except Exception as db_error:
                 logger.error(f"❌ Failed to save to database: {str(db_error)}")
-                # Fallback to memory storage
-                connection_data = {
-                    'id': connection_id,
-                    'type': 'database',
-                    'db_type': connection_request.get('type'),
-                    'name': connection_request.get('name', f"{connection_request.get('type')}_connection"),
-                    'config': connection_request,
-                'created_at': datetime.now().isoformat(),
-                    'status': 'connected',
-                    'connection_type': 'database'
-            }
+                # Fallback to memory storage (connection_data already prepared)
             self.data_sources[connection_id] = connection_data
             
             # Also register with Cube.js if available
@@ -347,6 +353,13 @@ class DataConnectivityService:
             
             # Return schema information
             schema = source.get('schema', {})
+            # Parse JSON string schemas from database if necessary
+            if isinstance(schema, str):
+                try:
+                    schema = json.loads(schema)
+                except json.JSONDecodeError:
+                    logger.warning("⚠️ Stored schema is a string but not valid JSON; returning empty schema")
+                    schema = {}
             if schema:
                 logger.info(f"✅ Returning schema for source {source_id}")
                 return {
@@ -1205,25 +1218,61 @@ class DataConnectivityService:
 
     def delete_data_source(self, data_source_id: str) -> Dict[str, Any]:
         """Delete data source"""
-        data_source = self.data_sources.get(data_source_id)
-        if not data_source:
-            return {'success': False, 'error': 'Data source not found'}
-        
-        # Clean up file if it's a file-based source
-        if data_source['type'] == 'file' and 'file_path' in data_source:
-            file_path = data_source['file_path']
-            if os.path.exists(file_path):
-                os.unlink(file_path)
-        
-        # Close database connection if it's a database source
-        if data_source['type'] == 'database' and 'connection' in data_source:
-            connection = data_source['connection']
-            if hasattr(connection, 'close'):
-                connection.close()
-        
-        del self.data_sources[data_source_id]
-        
-        return {'success': True, 'message': 'Data source deleted successfully'}
+        try:
+            data_source = self.data_sources.get(data_source_id)
+            
+            # Attempt DB deletion first (if persisted)
+            try:
+                from app.modules.data.models import DataSource
+                from app.modules.projects.models import ProjectDataSource
+                from app.db.session import get_async_session
+                import asyncio
+                async def _delete_from_db():
+                    async with get_async_session() as db:
+                        from sqlalchemy import delete
+                        # Remove project links
+                        try:
+                            await db.execute(delete(ProjectDataSource).where(ProjectDataSource.data_source_id == data_source_id))
+                        except Exception:
+                            pass
+                        # Remove data source row
+                        await db.execute(delete(DataSource).where(DataSource.id == data_source_id))
+                        await db.commit()
+                # Run async deletion in current loop if available
+                try:
+                    loop = asyncio.get_event_loop()
+                    if loop.is_running():
+                        fut = asyncio.ensure_future(_delete_from_db())
+                        # fire-and-forget
+                    else:
+                        loop.run_until_complete(_delete_from_db())
+                except RuntimeError:
+                    # No loop, run new loop
+                    asyncio.run(_delete_from_db())
+            except Exception as db_del_err:
+                logger.warning(f"DB deletion for data source {data_source_id} skipped/failed: {db_del_err}")
+
+            # In-memory cleanup
+            if data_source:
+                # Clean up file if it's a file-based source
+                if data_source.get('type') == 'file' and 'file_path' in data_source:
+                    file_path = data_source['file_path']
+                    if os.path.exists(file_path):
+                        os.unlink(file_path)
+                # Close database connection if tracked
+                if data_source.get('type') == 'database' and 'connection' in data_source:
+                    connection = data_source['connection']
+                    if hasattr(connection, 'close'):
+                        try:
+                            connection.close()
+                        except Exception:
+                            pass
+                self.data_sources.pop(data_source_id, None)
+
+            return {'success': True, 'message': 'Data source deleted successfully'}
+        except Exception as e:
+            logger.error(f"Failed to delete data source {data_source_id}: {e}")
+            return {'success': False, 'error': str(e)}
 
     async def generate_data_insights(self, data_source_id: str) -> Dict[str, Any]:
         """Generate AI insights for a data source"""
@@ -1886,7 +1935,8 @@ class DataConnectivityService:
                     select(DataSource)
                     .join(ProjectDataSource, DataSource.id == ProjectDataSource.data_source_id)
                     .where(
-                        ProjectDataSource.project_id == int(project_id),
+                        # Accept numeric IDs or slugs; if not int, skip casting
+                        ProjectDataSource.project_id == (int(project_id) if str(project_id).isdigit() else ProjectDataSource.project_id),
                         DataSource.is_active == True,
                         ProjectDataSource.is_active == True
                     )

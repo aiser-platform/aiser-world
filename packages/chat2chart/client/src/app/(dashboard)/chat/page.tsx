@@ -3,7 +3,7 @@
 // Simple dynamic configuration that actually works
 
 import { Tabs, Card, Row, Col, Button, Space, Tag, Typography, message, Tooltip } from 'antd';
-import { MessageOutlined, DatabaseOutlined, BarChartOutlined, HistoryOutlined, SettingOutlined, DragOutlined, ArrowLeftOutlined, ArrowRightOutlined, FileTextOutlined } from '@ant-design/icons';
+import { MessageOutlined, DatabaseOutlined, BarChartOutlined, HistoryOutlined, SettingOutlined, DragOutlined, ArrowLeftOutlined, ArrowRightOutlined, FileTextOutlined, ExpandOutlined, PlusOutlined } from '@ant-design/icons';
 import ModelSelector from '@/app/components/ModelSelector/ModelSelector';
 import React, { useState, useEffect, useCallback } from 'react';
 import ChatPanel from './components/ChatPanel/ChatPanel';
@@ -341,7 +341,7 @@ const ChatToChart = () => {
                         <Col key={index} span={8}>
                             <Card
                                 hoverable
-                                cover={<div style={{ height: 200, backgroundColor: '#f5f5f5' }}>Chart Preview</div>}
+                                cover={<div style={{ height: 200, backgroundColor: 'var(--ant-color-fill-secondary, #f5f5f5)' }}>Chart Preview</div>}
                                 actions={[
                                     <Button key="view" type="text">View</Button>,
                                     <Button key="download" type="text">Download</Button>,
@@ -386,33 +386,10 @@ const ChatToChart = () => {
                                         background: 'var(--panel-background)',
                                         transition: 'all 0.3s ease',
                                         position: 'relative',
-                                        minWidth: historyPanelCollapsed ? '80px' : '240px',
-                                        maxWidth: historyPanelCollapsed ? '80px' : '240px'
+                                        minWidth: historyPanelCollapsed ? '50px' : '240px',
+                                        maxWidth: historyPanelCollapsed ? '50px' : '240px'
                                     }}
                                 >
-                                    {/* History Panel Toggle Button */}
-                                    <Button
-                                        type="text"
-                                        icon={historyPanelCollapsed ? <ArrowRightOutlined /> : <ArrowLeftOutlined />}
-                                        onClick={handleHistoryPanelExpand}
-                                        style={{
-                                            position: 'absolute',
-                                            right: historyPanelCollapsed ? '50%' : '-12px',
-                                            top: '50%',
-                                            transform: 'translateY(-50%)',
-                                            zIndex: 20,
-                                            background: 'var(--panel-background)',
-                                            border: '1px solid var(--border-color-light)',
-                                            borderRadius: '50%',
-                                            width: '24px',
-                                            height: '24px',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-                                        }}
-                                    />
-                                    
                                     {/* History Panel Content */}
                                     <CollapsibleHistoryPanel
                                         id={conversationState?.id || ''}
@@ -477,33 +454,10 @@ const ChatToChart = () => {
                                         background: 'var(--panel-background)',
                                         transition: 'all 0.3s ease',
                                         position: 'relative',
-                                        minWidth: dataPanelCollapsed ? '80px' : '320px',
-                                        maxWidth: dataPanelCollapsed ? '80px' : '320px'
+                                        minWidth: dataPanelCollapsed ? '50px' : '320px',
+                                        maxWidth: dataPanelCollapsed ? '50px' : '320px'
                                     }}
                                 >
-                                    {/* Data Panel Toggle Button */}
-                                    <Button
-                                        type="text"
-                                        icon={dataPanelCollapsed ? <ArrowRightOutlined /> : <ArrowLeftOutlined />}
-                                        onClick={handleDataPanelExpand}
-                                        style={{
-                                            position: 'absolute',
-                                            left: dataPanelCollapsed ? '50%' : '-12px',
-                                            top: '50%',
-                                            transform: 'translateY(-50%)',
-                                            zIndex: 20,
-                                            background: 'var(--panel-background)',
-                                            border: '1px solid var(--border-color-light)',
-                                            borderRadius: '50%',
-                                            width: '24px',
-                                            height: '24px',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-                                        }}
-                                    />
-                                    
                                     {/* Data Panel Content - Show only icons when collapsed */}
                                     {dataPanelCollapsed ? (
                                         <div style={{ 
@@ -513,6 +467,12 @@ const ChatToChart = () => {
                                             alignItems: 'center',
                                             gap: '16px'
                                         }}>
+                                            <Tooltip title="Expand" placement="left">
+                                                <Button type="text" onClick={handleDataPanelExpand} icon={<ExpandOutlined />} />
+                                            </Tooltip>
+                                            <Tooltip title="Add Source" placement="left">
+                                                <Button type="text" onClick={() => setShowDataSourceModal(true)} icon={<PlusOutlined />} />
+                                            </Tooltip>
                                             <Tooltip title="Data Sources" placement="right">
                                                 <DatabaseOutlined style={{ fontSize: '20px', color: '#1890ff' }} />
                                             </Tooltip>
@@ -560,6 +520,7 @@ const ChatToChart = () => {
                                                 }
                                             }}
                                             selectedDataSource={selectedDataSource}
+                                            onCollapse={() => setDataPanelCollapsed(true)}
                                             onRefresh={() => {
                                                 // Refresh data sources
                                                 console.log('Refreshing data sources...');

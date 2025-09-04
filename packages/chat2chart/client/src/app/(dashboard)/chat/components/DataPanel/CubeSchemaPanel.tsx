@@ -267,7 +267,7 @@ const CubeSchemaPanel: React.FC<CubeSchemaPanelProps> = ({ dataSourceId, onSchem
     const treeData = generateTreeData();
 
     return (
-        <div className="CubeSchemaPanel" style={{ padding: '16px', background: '#1f1f1f', borderRadius: '8px' }}>
+        <div className="CubeSchemaPanel" style={{ padding: '16px', background: 'var(--ant-color-bg-container, #ffffff)', borderRadius: '8px' }}>
             <Tree
                 treeData={treeData}
                 expandedKeys={expandedKeys}
@@ -275,7 +275,7 @@ const CubeSchemaPanel: React.FC<CubeSchemaPanelProps> = ({ dataSourceId, onSchem
                 showLine
                 showIcon
                 className="schema-tree-compact"
-                style={{ background: 'transparent', color: '#ffffff' }}
+                style={{ background: 'transparent', color: 'var(--ant-color-text, #141414)' }}
             />
         </div>
     );

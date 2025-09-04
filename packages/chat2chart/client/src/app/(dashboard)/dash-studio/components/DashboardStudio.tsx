@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Layout, Button, Space, Typography, Breadcrumb, Tabs, Card, Input, Select, message, Collapse, Tooltip, Dropdown, Menu } from 'antd';
 import { Responsive, WidthProvider } from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
@@ -233,24 +234,21 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
     setIsMounted(true);
   }, []);
 
-  // URL parameter handling for deep linking
+  // URL parameter handling for deep linking (react to changes)
+  const searchParams = useSearchParams();
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const tabParam = urlParams.get('tab');
-    if (tabParam && ['dashboard', 'query-editor', 'chart', 'filter'].includes(tabParam)) {
-      setActiveTab(tabParam);
-      
-      // Auto-hide Widget Library and Properties for Query Editor tab
-      if (tabParam === 'query-editor') {
-        setShowWidgetLibrary(false);
-        setShowProperties(false);
-      } else {
-        // Show Widget Library and Properties for other tabs
-        setShowWidgetLibrary(true);
-        setShowProperties(true);
-      }
+    const tabParam = searchParams.get('tab') || 'dashboard';
+    const validTabs = ['dashboard', 'query-editor', 'chart', 'filter'];
+    const key = validTabs.includes(tabParam) ? tabParam : 'dashboard';
+    setActiveTab(key);
+    if (key === 'query-editor') {
+      setShowWidgetLibrary(false);
+      setShowProperties(false);
+    } else {
+      setShowWidgetLibrary(true);
+      setShowProperties(true);
     }
-  }, []);
+  }, [searchParams]);
 
   // Update URL when tab changes
   const handleTabChange = (key: string) => {
@@ -1144,8 +1142,8 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
             title: { 
               text: `${widget.name || widget.title} Chart`, 
               subtext: 'Professional visualization',
-              textStyle: { fontSize: 16, fontWeight: 'bold', color: '#333' },
-              subtextStyle: { fontSize: 12, color: '#666' }
+              textStyle: { fontSize: 16, fontWeight: 'bold', color: 'var(--ant-color-text, #141414)' },
+              subtextStyle: { fontSize: 12, color: 'var(--ant-color-text-secondary, #666)' }
             },
             showTitle: true,
             showSubtitle: true,
@@ -1156,8 +1154,8 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
             colors: ['#1890ff', '#52c41a', '#faad14', '#f5222d', '#722ed1', '#13c2c2', '#eb2f96'],
             animation: true,
             // Professional styling
-            backgroundColor: '#ffffff',
-            borderColor: '#e8e8e8',
+            backgroundColor: 'var(--ant-color-bg-container, #ffffff)',
+            borderColor: 'var(--ant-color-border, #e8e8e8)',
             borderRadius: 8,
             padding: 16,
             boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
@@ -1167,7 +1165,7 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
             title: { 
               text: 'Professional Data Table', 
               subtext: 'Clean and organized data display',
-              textStyle: { fontSize: 16, fontWeight: 'bold', color: '#333' }
+              textStyle: { fontSize: 16, fontWeight: 'bold', color: 'var(--ant-color-text, #141414)' }
             },
             showTitle: true,
             showSubtitle: true,
@@ -1180,8 +1178,8 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
             sortable: true,
             filterable: true,
             // Professional styling
-            backgroundColor: '#ffffff',
-            borderColor: '#e8e8e8',
+            backgroundColor: 'var(--ant-color-bg-container, #ffffff)',
+            borderColor: 'var(--ant-color-border, #e8e8e8)',
             borderRadius: 8,
             padding: 16,
             boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
@@ -1191,7 +1189,7 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
             title: { 
               text: 'Key Performance Metric', 
               subtext: 'Real-time business indicator',
-              textStyle: { fontSize: 14, fontWeight: '500', color: '#666' }
+              textStyle: { fontSize: 14, fontWeight: '500', color: 'var(--ant-color-text-secondary, #666)' }
             },
             showTitle: true,
             showSubtitle: true,
@@ -1203,20 +1201,20 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
             trendValue: '+12.5%',
             showContainer: true,
             // Professional styling
-            backgroundColor: '#ffffff',
-            borderColor: '#e8e8e8',
+            backgroundColor: 'var(--ant-color-bg-container, #ffffff)',
+            borderColor: 'var(--ant-color-border, #e8e8e8)',
             borderRadius: 8,
             padding: 20,
             boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-            valueStyle: { fontSize: 32, fontWeight: 'bold', color: '#1890ff' },
-            trendStyle: { fontSize: 14, color: '#52c41a' }
+            valueStyle: { fontSize: 32, fontWeight: 'bold', color: 'var(--ant-color-primary, #1677ff)' },
+            trendStyle: { fontSize: 14, color: 'var(--ant-color-success, #52c41a)' }
           };
         case 'text':
           return {
             title: { 
               text: type === 'markdown' ? 'Rich Content Widget' : 'Text Widget', 
               subtext: type === 'markdown' ? 'Markdown support included' : 'Simple text display',
-              textStyle: { fontSize: 16, fontWeight: 'bold', color: '#333' }
+              textStyle: { fontSize: 16, fontWeight: 'bold', color: 'var(--ant-color-text, #141414)' }
             },
             showTitle: true,
             showSubtitle: true,
@@ -1225,14 +1223,14 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
               : 'Welcome to your professional dashboard! This text widget provides a clean and elegant way to display important information, announcements, or instructions to your users.',
             fontSize: 14,
             fontWeight: 'normal',
-            color: '#333',
+            color: 'var(--ant-color-text, #141414)',
             textAlign: 'left',
             lineHeight: 1.6,
             fontFamily: 'system-ui, -apple-system, sans-serif',
             showContainer: true,
             // Professional styling
-            backgroundColor: '#ffffff',
-            borderColor: '#e8e8e8',
+            backgroundColor: 'var(--ant-color-bg-container, #ffffff)',
+            borderColor: 'var(--ant-color-border, #e8e8e8)',
             borderRadius: 8,
             padding: 20,
             boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
@@ -1300,8 +1298,8 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
       
       // Enhanced style properties (Tableau-style)
       style: {
-        backgroundColor: isDarkMode ? '#1f1f1f' : '#ffffff',
-        borderColor: isDarkMode ? '#303030' : '#d9d9d9',
+        backgroundColor: isDarkMode ? 'var(--ant-color-bg-container, #1f1f1f)' : 'var(--ant-color-bg-container, #ffffff)',
+        borderColor: isDarkMode ? 'var(--ant-color-border, #303030)' : 'var(--ant-color-border, #d9d9d9)',
         borderWidth: 1,
         borderStyle: 'solid',
         borderRadius: 8,
@@ -1313,7 +1311,7 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
         fontSize: 14,
         fontWeight: 'normal',
         textAlign: 'left',
-        color: isDarkMode ? '#ffffff' : '#000000',
+        color: isDarkMode ? 'var(--ant-color-text, #e8e8e8)' : 'var(--ant-color-text, #141414)',
         fontFamily: 'system-ui, -apple-system, sans-serif',
         lineHeight: 1.5,
         overflow: 'auto'
@@ -2158,15 +2156,6 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
               style={{ padding: '8px' }}
               items={[
                 {
-                  key: 'dashboard',
-                  label: (
-                    <span>
-                      <DashboardOutlined /> Dashboard
-                    </span>
-                  ),
-                  children: renderDashboardTab()
-                },
-                {
                   key: 'query-editor',
                   label: (
                     <span>
@@ -2185,6 +2174,15 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
                   children: renderChartsTab()
                 },
                 {
+                  key: 'dashboard',
+                  label: (
+                    <span>
+                      <DashboardOutlined /> Dashboard
+                    </span>
+                  ),
+                  children: renderDashboardTab()
+                },
+                {
                   key: 'filter',
                   label: (
                     <span>
@@ -2201,22 +2199,17 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
         {/* Properties are now handled by the Unified Design Panel */}
       </Layout>
 
-      {/* Floating Action Buttons */}
+      {/* Floating Action Button moved inside content area to avoid overlaying the sidebar */}
       {!showWidgetLibrary && (
-        <Button
-          type="primary"
-          icon={<AppstoreOutlined />}
-          onClick={() => setShowWidgetLibrary(true)}
-          style={{
-            position: 'fixed',
-            left: '20px',
-            top: '80px',
-            zIndex: 1000,
-            borderRadius: '50%',
-            width: '56px',
-            height: '56px'
-          }}
-        />
+        <div style={{ position: 'absolute', left: '24px', top: '88px', zIndex: 10 }}>
+          <Button
+            type="primary"
+            icon={<AppstoreOutlined />}
+            onClick={() => setShowWidgetLibrary(true)}
+            shape="circle"
+            size="large"
+          />
+        </div>
       )}
 
       {/* Properties button removed - now integrated in Unified Design Panel */}

@@ -198,6 +198,12 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
   const [hasCube, setHasCube] = useState(false);
   const [uiSchemas, setUiSchemas] = useState<{ value: string; label: string; description?: string; tables: string[] }[]>([]);
   const [uiTables, setUiTables] = useState<TableInfo[]>([]);
+  const [uiViews, setUiViews] = useState<TableInfo[]>([]);
+  const [selectedView, setSelectedView] = useState<string>('');
+  const [openViewTabs, setOpenViewTabs] = useState<string[]>([]);
+  const [perfLoading, setPerfLoading] = useState(false);
+  const [perfPlan, setPerfPlan] = useState<any>(null);
+  const [perfSuggestions, setPerfSuggestions] = useState<string[]>([]);
   const [editingTabKey, setEditingTabKey] = useState<string | null>(null);
   const [titleDraft, setTitleDraft] = useState<string>('');
   const [showSavedModal, setShowSavedModal] = useState(false);
@@ -415,7 +421,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch('http://localhost:8000/data/cube/status');
+        const res = await fetch(`${getBackendUrlForApi()}/data/cube/status`);
         if (res.ok) {
           const j = await res.json();
           setHasCube(!!j?.connected || j?.status === 'connected');
@@ -433,18 +439,19 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
       setIsRefreshingSchema(true);
       try {
         if (selectedDatabase === 'cube') {
-          const res = await fetch('http://localhost:8000/data/cube/schema');
+          const res = await fetch(`${getBackendUrlForApi()}/data/cube/schema`);
           if (res.ok) {
             const j = await res.json();
             const schemas = (j?.schemas || []).map((s: any) => ({ value: s.name, label: s.name, description: s.description, tables: s.tables || [] }));
             setUiSchemas(schemas);
             const tables = (j?.tables || []).map((t: any) => ({ name: t.name, fields: (t.fields||[]).map((f:any)=>({ name:f.name, type:f.type })), rowCount: t.row_count, size: t.size }));
             setUiTables(tables);
+            setUiViews([]);
             if (schemas[0]) setSelectedSchema(schemas[0].value);
             if (tables[0]) setSelectedTable(tables[0].name);
-          } else { setUiSchemas([]); setUiTables([]); }
+          } else { setUiSchemas([]); setUiTables([]); setUiViews([]); }
         } else {
-          const res = await fetch(`http://localhost:8000/data/sources/${selectedDatabase}/schema`);
+          const res = await fetch(`${getBackendUrlForApi()}/data/sources/${selectedDatabase}/schema`);
           if (res.ok) {
             const j = await res.json();
             const schemaRoot = j?.schema || j;
@@ -453,11 +460,20 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
             const schemas = [{ value: schemaName, label: schemaName, description: schemaRoot?.description, tables: tables.map((t:any)=>t.name) }];
             setUiSchemas(schemas);
             setUiTables(tables);
+            // fetch views
+            try {
+              const vres = await fetch(`${getBackendUrlForApi()}/data/sources/${selectedDatabase}/views`);
+              if (vres.ok) {
+                const vj = await vres.json();
+                const views = (vj?.views || []).map((v:any) => ({ name: v.name, fields: (v.columns||[]).map((c:any)=>({ name:c.name, type:c.type||c.data_type })) }));
+                setUiViews(views);
+              } else { setUiViews([]); }
+            } catch { setUiViews([]); }
             if (schemas[0]) setSelectedSchema(schemas[0].value);
             if (tables[0]) setSelectedTable(tables[0].name);
-          } else { setUiSchemas([]); setUiTables([]); }
+          } else { setUiSchemas([]); setUiTables([]); setUiViews([]); }
         }
-      } catch { setUiSchemas([]); setUiTables([]); }
+      } catch { setUiSchemas([]); setUiTables([]); setUiViews([]); }
       finally { setIsRefreshingSchema(false); }
     };
     loadSchema();
@@ -467,7 +483,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
     setIsLoadingDataSources(true);
     try {
       // Use real data sources API
-      const response = await fetch('http://localhost:8000/data/sources');
+      const response = await fetch(`${getBackendUrlForApi()}/data/sources`);
       const result = await response.json();
       
       if (result && Array.isArray(result)) {
@@ -1030,8 +1046,8 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
       height: '100%', 
         display: 'flex',
       flexDirection: 'column',
-      background: isDarkMode ? '#141414' : '#ffffff',
-      color: isDarkMode ? '#ffffff' : '#000000'
+      background: isDarkMode ? 'var(--ant-color-bg-layout, #141414)' : 'var(--ant-color-bg-layout, #ffffff)',
+      color: isDarkMode ? 'var(--ant-color-text, #e8e8e8)' : 'var(--ant-color-text, #141414)'
     }}>
       {/* Top Bar removed per UX request */}
 
@@ -1041,8 +1057,8 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
       <div style={{ flex: 1, display: 'grid', gridTemplateColumns: sidebarCollapsed ? '50px 1fr' : '350px 1fr', gap: '0', overflow: 'hidden', minHeight: 0, height: '100%' }}>
         {/* Left Sidebar - Data Sources & Schema Browser */}
         <div style={{
-          background: isDarkMode ? '#1a1a1a' : '#fafafa',
-          borderRight: `1px solid ${isDarkMode ? '#303030' : '#d9d9d9'}`,
+          background: isDarkMode ? 'var(--ant-color-bg-container, #1a1a1a)' : 'var(--ant-color-fill-secondary, #fafafa)',
+          borderRight: `1px solid ${isDarkMode ? 'var(--ant-color-border, #303030)' : 'var(--ant-color-border, #d9d9d9)'}`,
           padding: sidebarCollapsed ? '8px' : '16px',
           overflowY: 'auto',
           minHeight: 0,
@@ -1058,8 +1074,8 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
               top: '8px',
               right: '8px',
               zIndex: 10,
-              background: isDarkMode ? '#2a2a2a' : '#ffffff',
-              border: `1px solid ${isDarkMode ? '#404040' : '#d9d9d9'}`
+              background: isDarkMode ? 'var(--ant-color-fill-secondary, #262626)' : 'var(--ant-color-bg-container, #ffffff)',
+              border: `1px solid ${isDarkMode ? 'var(--ant-color-border, #303030)' : 'var(--ant-color-border, #d9d9d9)'}`
             }}
             size="small"
           />
@@ -1069,8 +1085,8 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
               {/* Data Sources Section */}
               <div style={{ marginBottom: '20px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                  <Text strong style={{ color: isDarkMode ? '#ffffff' : '#000000', fontSize: '12px', textTransform: 'uppercase' }}>
-                    DATABASE
+                  <Text strong style={{ color: isDarkMode ? 'var(--ant-color-text, #e8e8e8)' : 'var(--ant-color-text, #141414)', fontSize: '12px', textTransform: 'uppercase' }}>
+                    DATA SOURCE
                   </Text>
                   <Button 
                     size="small" 
@@ -1117,10 +1133,10 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                 <div style={{ 
                   marginTop: '8px', 
                   padding: '8px', 
-                  background: isDarkMode ? '#1a1a1a' : '#f5f5f5', 
+                  background: isDarkMode ? 'var(--ant-color-bg-container, #1a1a1a)' : 'var(--ant-color-fill-secondary, #f5f5f5)', 
                   borderRadius: '4px',
                   fontSize: '10px',
-                  color: isDarkMode ? '#999' : '#666'
+                  color: isDarkMode ? 'var(--ant-color-text-secondary, #a6a6a6)' : 'var(--ant-color-text-secondary, #666)'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
                     <div style={{ 
@@ -1140,7 +1156,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
           {/* Schema Selection */}
           <div style={{ marginBottom: '20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-              <Text strong style={{ color: isDarkMode ? '#ffffff' : '#000000', fontSize: '12px', textTransform: 'uppercase' }}>
+              <Text strong style={{ color: isDarkMode ? 'var(--ant-color-text, #e8e8e8)' : 'var(--ant-color-text, #141414)', fontSize: '12px', textTransform: 'uppercase' }}>
                 SCHEMA
               </Text>
               <Button 
@@ -1171,7 +1187,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
           {/* Table Schema Browser */}
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-              <Text strong style={{ color: isDarkMode ? '#ffffff' : '#000000', fontSize: '12px', textTransform: 'uppercase' }}>
+              <Text strong style={{ color: isDarkMode ? 'var(--ant-color-text, #e8e8e8)' : 'var(--ant-color-text, #141414)', fontSize: '12px', textTransform: 'uppercase' }}>
                 VIEW TABLE
               </Text>
               <Button size="small" type="text" icon={<ReloadOutlined />} style={{ fontSize: '10px', padding: '2px 4px' }} />
@@ -1217,16 +1233,16 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                           </div>
                         }
                         style={{
-                background: isDarkMode ? '#2a2a2a' : '#ffffff',
-                border: `1px solid ${isDarkMode ? '#404040' : '#d9d9d9'}`,
+                background: isDarkMode ? 'var(--ant-color-fill-secondary, #262626)' : 'var(--ant-color-bg-container, #ffffff)',
+                border: `1px solid ${isDarkMode ? 'var(--ant-color-border, #303030)' : 'var(--ant-color-border, #d9d9d9)'}`,
                 borderRadius: '4px',
                           marginBottom: '8px'
                         }}
                       >
                         <div style={{ padding: '8px 0' }}>
                           {/* Table Info */}
-                          <div style={{ marginBottom: '12px', padding: '8px', background: isDarkMode ? '#1a1a1a' : '#f5f5f5', borderRadius: '4px' }}>
-                            <div style={{ fontSize: '10px', color: isDarkMode ? '#999' : '#666', marginBottom: '4px' }}>
+                          <div style={{ marginBottom: '12px', padding: '8px', background: isDarkMode ? 'var(--ant-color-bg-container, #1a1a1a)' : 'var(--ant-color-fill-secondary, #f5f5f5)', borderRadius: '4px' }}>
+                            <div style={{ fontSize: '10px', color: isDarkMode ? 'var(--ant-color-text-secondary, #a6a6a6)' : 'var(--ant-color-text-secondary, #666)', marginBottom: '4px' }}>
                               {table.description}
                             </div>
                             <div style={{ display: 'flex', gap: '8px', fontSize: '9px' }}>
@@ -1244,7 +1260,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                       alignItems: 'center',
                       padding: '4px 0',
                               fontSize: '11px',
-                              borderBottom: fieldIndex < table.fields.length - 1 ? `1px solid ${isDarkMode ? '#333' : '#eee'}` : 'none'
+                              borderBottom: fieldIndex < table.fields.length - 1 ? `1px solid ${isDarkMode ? 'var(--ant-color-border, #303030)' : 'var(--ant-color-border, #eeeeee)'}` : 'none'
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <FieldBinaryOutlined style={{ fontSize: '10px' }} />
@@ -1262,6 +1278,56 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                   })}
                 </Collapse>
 
+            {/* Views Schema Browser */}
+            {uiViews.length > 0 && (
+              <div style={{ marginTop: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                  <Text strong style={{ color: isDarkMode ? '#ffffff' : '#000000', fontSize: '12px', textTransform: 'uppercase' }}>
+                    VIEWS
+                  </Text>
+                </div>
+                <Select
+                  value={selectedView}
+                  onChange={(v) => { setSelectedView(v); if (!openViewTabs.includes(v)) setOpenViewTabs(prev => [...prev, v]); }}
+                  placeholder="Select view to inspect"
+                  style={{ width: '100%', marginBottom: '12px' }}
+                  size="small"
+                  options={uiViews.map(v => ({ value: v.name, label: (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <TableOutlined style={{ fontSize: 12 }} />
+                      <span>{v.name}</span>
+                    </div>
+                  ) }))}
+                />
+                <Collapse size="small" style={{ background: 'transparent', border: 'none' }} ghost>
+                  {openViewTabs.map((viewName, idx) => {
+                    const view = uiViews.find(v => v.name === viewName);
+                    if (!view) return null;
+                    return (
+                      <Panel key={idx} header={
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <TableOutlined style={{ fontSize: 12 }} />
+                          <span style={{ fontSize: 11, fontWeight: 'bold' }}>{viewName}</span>
+                          <Tag>View</Tag>
+                        </div>
+                      } style={{ background: isDarkMode ? 'var(--ant-color-fill-secondary, #262626)' : 'var(--ant-color-bg-container, #ffffff)', border: `1px solid ${isDarkMode ? 'var(--ant-color-border, #303030)' : 'var(--ant-color-border, #d9d9d9)'}`, borderRadius: 4, marginBottom: 8 }}>
+                        <div style={{ padding: '8px 0' }}>
+                          {view.fields.map((field, fieldIndex) => (
+                            <div key={fieldIndex} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', fontSize: 11, borderBottom: fieldIndex < view.fields.length - 1 ? `1px solid ${isDarkMode ? 'var(--ant-color-border, #303030)' : 'var(--ant-color-border, #eeeeee)'}` : 'none' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <FieldBinaryOutlined style={{ fontSize: 10 }} />
+                                <Text style={{ fontFamily: 'monospace', fontSize: 10 }}>{field.name}</Text>
+                              </div>
+                              <Tag style={{ fontSize: 9 }}>{field.type}</Tag>
+                            </div>
+                          ))}
+                        </div>
+                      </Panel>
+                    );
+                  })}
+                </Collapse>
+              </div>
+            )}
           </div>
             </>
           )}
@@ -1272,8 +1338,8 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
           {/* AI Prompt Bar */}
           <div style={{
             padding: '16px 20px',
-            borderBottom: `1px solid ${isDarkMode ? '#303030' : '#d9d9d9'}`,
-            background: isDarkMode ? '#1a1a1a' : '#ffffff',
+            borderBottom: `1px solid ${isDarkMode ? 'var(--ant-color-border, #303030)' : 'var(--ant-color-border, #d9d9d9)'}`,
+            background: isDarkMode ? 'var(--ant-color-bg-container, #1a1a1a)' : 'var(--ant-color-bg-container, #ffffff)',
             flexShrink: 0
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -1290,7 +1356,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
           </div>
 
           {/* Query Tabs above editor */}
-          <div style={{ padding: '8px 16px', borderBottom: `1px solid ${isDarkMode ? '#303030' : '#d9d9d9'}`, background: isDarkMode ? '#1a1a1a' : '#ffffff' }}>
+          <div style={{ padding: '8px 16px', borderBottom: `1px solid ${isDarkMode ? 'var(--ant-color-border, #303030)' : 'var(--ant-color-border, #d9d9d9)'}`, background: isDarkMode ? 'var(--ant-color-bg-container, #1a1a1a)' : 'var(--ant-color-bg-container, #ffffff)' }}>
             <Tabs
               size="small"
               type="editable-card"
@@ -1530,6 +1596,67 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                     pagination={false}
                     scroll={{ y: 350 }}
                   />
+                </div>
+              </TabPane>
+              <TabPane tab="Performance" key="performance">
+                <div style={{ display: 'flex', gap: 16 }}>
+                  <div style={{ flex: 1 }}>
+                    <Space style={{ marginBottom: 8 }}>
+                      <Button size="small" loading={perfLoading} onClick={async () => {
+                        if (!selectedDatabase) { message.warning('Select a data source'); return; }
+                        setPerfLoading(true);
+                        try {
+                          const res = await fetch(`${getBackendUrlForApi()}/data/sources/${selectedDatabase}/analyze`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sql: sqlQuery }) });
+                          const j = await res.json();
+                          if (res.ok && j.success) {
+                            setPerfPlan(j.plan);
+                            setPerfSuggestions(j.suggestions || []);
+                            message.success('Analysis complete');
+                          } else { throw new Error(j.error || 'Analyze failed'); }
+                        } catch (e:any) { message.error(e.message || 'Analyze failed'); }
+                        finally { setPerfLoading(false); }
+                      }}>Analyze Query</Button>
+                    </Space>
+                    <Card size="small" title="Suggestions" style={{ marginBottom: 8 }}>
+                      {perfSuggestions.length ? (
+                        <ul style={{ paddingLeft: 18 }}>
+                          {perfSuggestions.map((s, i) => (<li key={i} style={{ fontSize: 12 }}>{s}</li>))}
+                        </ul>
+                      ) : <Text type="secondary" style={{ fontSize: 12 }}>No suggestions yet.</Text>}
+                    </Card>
+                    <Card size="small" title="Plan (JSON)" bodyStyle={{ maxHeight: 300, overflow: 'auto' }}>
+                      <pre style={{ fontSize: 11, whiteSpace: 'pre-wrap' }}>{perfPlan ? JSON.stringify(perfPlan, null, 2) : 'No plan yet.'}</pre>
+                    </Card>
+                  </div>
+                  <div style={{ width: 280 }}>
+                    <Card size="small" title="Materialized Views">
+                      <Space direction="vertical" style={{ width: '100%' }}>
+                        <Button size="small" onClick={async () => {
+                          if (!selectedDatabase) { message.warning('Select a data source'); return; }
+                          const name = prompt('MV name (letters/underscores)');
+                          if (!name) return;
+                          try {
+                            const res = await fetch(`${getBackendUrlForApi()}/data/sources/${selectedDatabase}/materialized-views`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, sql: sqlQuery }) });
+                            if (!res.ok) throw new Error('Create failed');
+                            message.success('Materialized view created');
+                          } catch { message.error('Create failed'); }
+                        }}>Create MV from SQL</Button>
+                        <Button size="small" onClick={async () => {
+                          if (!selectedDatabase) { message.warning('Select a data source'); return; }
+                          try {
+                            const res = await fetch(`${getBackendUrlForApi()}/data/sources/${selectedDatabase}/materialized-views`);
+                            const j = await res.json();
+                            if (!res.ok) throw new Error('Load failed');
+                            Modal.info({ title: 'Materialized Views', width: 520, content: (
+                              <ul>
+                                {(j.materialized_views||[]).map((mv:any) => <li key={`${mv.schema}.${mv.name}`}>{mv.schema}.{mv.name}</li>)}
+                              </ul>
+                            )});
+                          } catch { message.error('Load failed'); }
+                        }}>List MVs</Button>
+                      </Space>
+                    </Card>
+                  </div>
                 </div>
               </TabPane>
               
