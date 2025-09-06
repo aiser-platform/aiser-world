@@ -1,0 +1,332 @@
+# Aiser Platform - Cursor AI Rules
+
+## 🎯 CRITICAL: Always Read This First
+**IMPORTANT: Always read `aiser-platform-context.md` before writing any code.**
+**After major features, update `aiser-platform-context.md`.**
+**This file is your team's shared brain.**
+
+## 🏗️ Project Architecture
+
+### Monorepo Structure
+```
+aiser-world/
+├── packages/
+│   ├── chat2chart/          # Core AI-powered chart generation (Open Source)
+│   │   ├── client/          # Next.js 14 frontend (TypeScript)
+│   │   └── server/          # FastAPI backend (Python 3.11+)
+│   ├── client/              # Enterprise client application
+│   ├── auth/                # Authentication service (FastAPI)
+│   ├── shared/              # Common utilities and types
+│   ├── docs/                # Main User and Developer Documentation
+│   └── monitoring-service/  # Observability and metrics
+├── scripts/                 # Development and deployment scripts
+```
+
+### Technology Stack
+- **Frontend**: Next.js 14, TypeScript, Ant Design, Tailwind CSS, ECharts 6
+- **Backend**: FastAPI, SQLAlchemy, PostgreSQL, Redis
+- **AI/ML**: LiteLLM, Azure OpenAI GPT-4.1-mini and GPT-5-mini, Multi-agent system
+- **DevOps**: Docker, Docker Compose, Prometheus monitoring
+
+## 🧠 AI-First Design Principles
+
+### Core Philosophy
+- **AI-Native**: Every interaction enhanced by AI intelligence
+- **Multi-Agent System**: Specialized AI agents for different tasks as Agentic AI for Enterprise Scale Data Analysis 
+- **Conversation Memory**: Persistent context across interactions
+- **Business Context Understanding**: Industry-specific analysis patterns
+
+### AI Services Architecture
+- **UnifiedAIAnalyticsService**: Core intelligence engine (standard mode)
+- **AgenticAnalysisEngine**: 6 reasoning types with confidence scoring later on deep analysis mode to be integrated with langchain or another (together with LiteLLM)
+- **LiteLLMService**: Multi-model AI orchestration 
+- **Business Context Templates**: Industry-specific analysis patterns
+
+## 📊 Database Schema
+
+### Core Tables
+```sql
+-- Organizations and Projects
+organizations (id, name, settings, created_at, updated_at)
+projects (id, organization_id, name, description, settings, created_at, updated_at)
+
+-- Users and Authentication
+users (id, email, username, password_hash, organization_id, role, settings, created_at, updated_at)
+user_sessions (id, user_id, token, expires_at, created_at)
+
+-- Data Sources
+data_sources (id, project_id, name, type, config, connection_string, status, created_at, updated_at)
+data_source_credentials (id, data_source_id, encrypted_credentials, created_at, updated_at)
+
+-- Dashboards and Charts
+dashboards (id, project_id, name, description, layout_config, theme_config, created_by, created_at, updated_at)
+dashboard_widgets (id, dashboard_id, widget_id, position, size, created_at, updated_at)
+widgets (id, project_id, title, type, config, data_source_id, query, created_by, created_at, updated_at)
+
+-- AI and Analytics
+conversations (id, project_id, user_id, title, context, created_at, updated_at)
+messages (id, conversation_id, role, content, metadata, created_at)
+ai_analysis_results (id, project_id, analysis_type, input_data, results, confidence_score, created_at)
+
+-- Monitoring and Logs
+metric_records (id, service_name, metric_name, value, tags, timestamp)
+alert_rules (id, name, condition, threshold, enabled, created_at)
+alerts (id, rule_id, severity, message, status, created_at, resolved_at)
+```
+
+## 🔌 API Endpoints
+
+### Core Services running dev via docker 
+- **Chat2Chart API** (Port 8000): FastAPI app root
+- **Auth Service** (Port 5000): `/auth/`
+- **Cube.js** (Port 4000): `/cubejs-api/v1/`
+- **Monitoring** (Port 9090): `/metrics/`
+
+### Base API prefixes (from server routing)
+- `GET /docs` OpenAPI UI, `GET /health` service health
+- `/users` users profile/settings/auth keys
+- `/files` file management
+- `/chats` chat workflows
+- `/charts` charts and dashboards (incl. builder/import/export)
+- `/data` data connectivity, sources, queries, cube data helpers
+- `/cube` semantic layer helpers (schema, query, cache)
+- `/api` organizations, projects, onboarding, queries
+- AI endpoints are top-level: `/chat`, `/analyze`, `/echarts/generate`, `/models`, `/chat/analyze`
+
+### Examples
+```http
+# Data
+GET  /data/sources
+GET  /data/sources/{data_source_id}
+POST /data/sources/{data_source_id}/query
+GET  /data/sources/{data_source_id}/schema
+POST /data/schema/generate
+
+# Charts & Dashboards
+GET  /charts/builder/list
+POST /charts/builder/save
+GET  /charts/dashboards/
+GET  /charts/dashboards/{dashboard_id}
+
+# Cube helpers
+POST /cube/schema/generate
+POST /cube/query
+GET  /cube/health
+
+# Projects / Orgs / Queries
+GET  /api/projects
+GET  /api/organizations
+GET  /api/queries/tabs
+POST /api/queries/execute
+
+# AI
+POST /chat             
+POST ai/? 
+POST /echarts/generate 
+GET  /models
+```
+
+## 🎨 Frontend Components
+
+### Key Components (client)
+- **MonacoSQLEditor**: SQL editor (uses MemoryOptimizedEditor)
+- **Dashboard Studio**: Design/develop/publish BI dashboards
+- **UniversalDataSourceModal**: Data source connection
+- **Chat2Chart**: NL → insight + chart (ECharts 6) + actional recommendation for decison-making 
+
+### Component Patterns
+```typescript
+// Always use ErrorBoundary for complex components
+<ErrorBoundary>
+  <ComplexComponent />
+</ErrorBoundary>
+
+// Use LoadingStates for async operations
+{loading ? <QueryLoading message="Executing query..." /> : <Results />}
+
+// Use MemoryOptimizedEditor for SQL editing
+<MemoryOptimizedEditor
+  value={sqlQuery}
+  onChange={handleChange}
+  language="sql"
+  options={optimizedOptions}
+/>
+```
+
+## 🔧 Development Rules
+
+### Quality Gates & Non‑Mock Policy
+- Do not introduce mock endpoints or data paths without explicit approval and a removal plan/date.
+- Prefer real implementations behind feature flags if needed; document flags in `aiser-platform-context.md`.
+- Any temporary stub must log a warning, be covered by tests, and have an owner.
+
+### Code Quality
+- **TypeScript**: Always use strict typing
+- **Error Handling**: Wrap all async operations in try-catch
+- **Loading States**: Show loading indicators for all async operations
+- **Memory Management**: Use proper cleanup in useEffect
+- **Performance**: Debounce user inputs, optimize re-renders
+
+### Database Operations
+- **Always use transactions** for multi-table operations
+- **Validate input data** before database operations
+- **Use proper error handling** with rollback on failure
+- **Log all database operations** for debugging
+
+### AI Integration
+- **Accuracy Bar**: Validate AI responses structurally and semantically against data context
+- **Confidence Scoring**: Return model + confidence + rationale; show to users
+- **Determinism**: Use temperature ≤ 0.3 for prod flows unless justified
+- **Fallbacks**: Define fallback strategies per endpoint (cached answer, classical query, user prompt)
+- **Safety**: Enforce guardrails (PII masking, SQL constraints, rate limits)
+- **Caching**: Cache stable generations with invalidation rules
+
+## 🚨 Critical Constraints
+
+### Security & Compliance (Enterprise)
+- Enforce JWT validation on protected routes; least‑privilege RBAC
+- Secrets: only from env/secret stores; never hardcode; rotate regularly
+- Data: parameterized queries; input sanitization; output encoding
+- Audit: log auth, data access, AI actions; retain per policy
+- Transport: TLS everywhere; strict CORS rules
+
+### Memory Management
+- **Monaco Editor**: Use MemoryOptimizedEditor wrapper
+- **Large datasets**: Implement pagination and virtualization
+- **Component cleanup**: Always cleanup subscriptions and timers
+- **Image optimization**: Use lazy loading and compression
+
+### Security
+- **Authentication**: Always validate JWT tokens
+- **Data validation**: Sanitize all user inputs
+- **SQL injection**: Use parameterized queries
+- **CORS**: Configure proper CORS policies
+
+### Performance
+- **Database queries**: Use proper indexing and query optimization
+- **API responses**: Implement caching with Redis
+- **Frontend**: Use React.memo and useMemo for expensive operations
+- **Bundle size**: Code split and lazy load components
+
+### Open Source & Product Posture
+- Keep core open; enterprise features behind clear, optional modules
+- Document public APIs and extension points; avoid closed hooks in OSS core
+- Contributor guidelines: tests, docs, lint pass required
+
+### Proactive Maintenance
+- Track “critical fixes” list; do not defer unless explicitly instructed
+- Add regression tests whenever fixing production incidents
+- Monitor SLOs: p95 < 500ms API; error rate < 1%; uptime 99.9%
+
+## 🐛 Known Issues & Solutions
+
+### Monaco Editor Memory Leaks
+- **Problem**: Editor instances not properly disposed
+- **Solution**: Use MemoryOptimizedEditor with proper cleanup
+
+### Database Connection Issues
+- **Problem**: Mock data instead of real connections
+- **Solution**: Use DashboardService with real database queries
+
+### Error Handling
+- **Problem**: Inconsistent error messages
+- **Solution**: Use ErrorBoundary and LoadingStates components
+
+### Performance Issues
+- **Problem**: Slow rendering with large datasets
+- **Solution**: Implement virtualization and pagination
+
+## 📝 Development Workflow
+
+### Before Writing Code
+1. **Read `aiser-platform-context.md`** for current project state and update for correctness, robustiness and align to Aiser vision 
+2. **Check existing components** for similar functionality
+3. **Review database schema** for data relationships
+4. **Consider AI integration** opportunities
+
+### After Major Features
+1. **Update `aiser-platform-context.md`** with new information
+2. **Add new API endpoints** to documentation
+3. **Update database schema** if changes made
+4. **Test all integrations** thoroughly
+
+### Code Review Checklist
+- [ ] Error handling implemented
+- [ ] Loading states added
+- [ ] TypeScript types defined
+- [ ] Memory cleanup handled
+- [ ] Performance optimized
+- [ ] Security validated
+- [ ] Documentation updated
+
+## 🎯 Business Logic Rules
+
+### Data Source Management
+- **Connection Testing**: Always test connections before saving
+- **Credential Security**: Encrypt all credentials at rest
+- **Connection Pooling**: Use connection pooling for databases
+- **Error Recovery**: Implement retry logic for failed connections
+
+### AI Analysis
+- **Confidence Scoring**: Always provide confidence scores
+- **Business Context**: Use industry-specific analysis patterns
+- **Fallback Logic**: Provide fallback when AI fails
+- **Result Validation**: Validate AI results before displaying
+
+### Dashboard Management
+- **Permission Control**: Check user permissions for dashboard access
+- **Widget Limits**: Enforce max widgets per dashboard
+- **Refresh Intervals**: Implement configurable refresh rates
+- **Theme Consistency**: Maintain consistent theming
+
+## 🔄 Migration Strategy
+
+### Database Migrations
+- **Create migration files** for schema changes
+- **Test migrations** on development data first
+- **Backup data** before running migrations
+- **Document migration steps** in `aiser-platform-context.md`
+
+### API Versioning
+- **Use versioned endpoints** for breaking changes
+- **Maintain backward compatibility** when possible
+- **Deprecate old endpoints** with proper notice
+- **Update documentation** for new versions
+
+## 📊 Monitoring & Observability
+
+### Metrics to Track
+- **API Response Times**: <500ms for 95th percentile
+- **Database Query Performance**: <100ms for simple queries
+- **Memory Usage**: <500MB per service
+- **Error Rates**: <1% error rate
+- **User Engagement**: Track feature usage
+
+### Alerting Rules
+- **High Error Rate**: >5% errors in 5 minutes
+- **Slow Response**: >2s response time
+- **Memory Usage**: >80% memory utilization
+- **Database Connections**: >80% connection pool usage
+
+## 🚀 Deployment Rules
+
+### Environment Configuration
+- **Development**: Use docker-compose.dev.yml
+- **Production**: Use docker-compose.prod.yml
+- **Environment Variables**: Always use .env files
+- **Secrets Management**: Use proper secret management
+
+### Health Checks
+- **API Health**: `/health` endpoint for all services
+- **Database Health**: Connection pool monitoring
+- **Redis Health**: Cache availability checks
+- **Service Dependencies**: Check all service dependencies
+
+---
+
+## 🎯 Remember: This is Your Team's Shared Brain
+
+**Always read `aiser-platform-context.md` before coding.**
+**Update it after major changes.**
+**Keep it current and comprehensive.**
+**This file prevents context loss and ensures consistency.**

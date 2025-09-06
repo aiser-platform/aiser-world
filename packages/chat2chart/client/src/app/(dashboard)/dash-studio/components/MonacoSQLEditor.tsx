@@ -22,9 +22,13 @@ import {
   Divider,
   Alert,
   Modal,
-  Form
+  Form,
+  Tree,
+  Spin
 } from 'antd';
-import { Editor } from '@monaco-editor/react';
+import MemoryOptimizedEditor from '@/app/components/MemoryOptimizedEditor';
+import ErrorBoundary from '@/app/components/ErrorBoundary';
+import LoadingStates, { QueryLoading } from '@/app/components/LoadingStates';
 import { 
   PlayCircleOutlined, 
   DatabaseOutlined, 
@@ -51,6 +55,7 @@ import {
   CloudOutlined,
   ApiOutlined,
   FileOutlined,
+  FileTextOutlined,
   SettingOutlined,
   BulbOutlined,
   RocketOutlined,
@@ -166,13 +171,17 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
   isDarkMode = false, 
   onQueryResult, 
   onChartCreate, 
-  selectedDataSource,
+  selectedDataSource: propSelectedDataSource,
   onDataSourceChange 
 }) => {
   const [sqlQuery, setSqlQuery] = useState('SELECT * FROM sales_data LIMIT 100;');
   const [selectedDatabase, setSelectedDatabase] = useState('');
   const [selectedSchema, setSelectedSchema] = useState('public');
   const [selectedTable, setSelectedTable] = useState('sales_data');
+  const [selectedDataSource, setSelectedDataSource] = useState<DataSource | null>(null);
+  const [availableSchemas, setAvailableSchemas] = useState<string[]>(['public']);
+  const [availableTables, setAvailableTables] = useState<any[]>([]);
+  const [isLoadingSchema, setIsLoadingSchema] = useState<boolean>(false);
   const [isExecuting, setExecuting] = useState(false);
   const [activeTab, setActiveTab] = useState('results');
   // Query tabs
@@ -181,8 +190,8 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
   ]);
   const [activeQueryKey, setActiveQueryKey] = useState<string>('q-1');
   const [previewChart, setPreviewChart] = useState<any>(null);
-  const [openTableTabs, setOpenTableTabs] = useState<string[]>(['sales_data', 'user_analytics']);
-  const [selectedTables, setSelectedTables] = useState<string[]>(['sales_data', 'user_analytics']);
+  const [openTableTabs, setOpenTableTabs] = useState<string[]>([]);
+  const [selectedTables, setSelectedTables] = useState<string[]>([]);
   const [showTableSchema, setShowTableSchema] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [executionTime, setExecutionTime] = useState<number | null>(null);
@@ -190,6 +199,8 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
   const [executionStatus, setExecutionStatus] = useState<string>('');
   const [selectedEngine, setSelectedEngine] = useState<string>('');
   const [queryHistory, setQueryHistory] = useState<any[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
   const [dataSources, setDataSources] = useState<DataSource[]>([]);
   const [schemas, setSchemas] = useState<SchemaInfo[]>([]);
   const [isLoadingDataSources, setIsLoadingDataSources] = useState(false);
@@ -349,6 +360,13 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
     loadDataSources();
   }, []);
 
+  // Load schema when data source changes
+  useEffect(() => {
+    if (selectedDatabase) {
+      loadSchemaForDataSource(selectedDatabase);
+    }
+  }, [selectedDatabase]);
+
   // Load persisted tabs and active key
   useEffect(() => {
     (async () => {
@@ -482,12 +500,18 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
   const loadDataSources = async () => {
     setIsLoadingDataSources(true);
     try {
-      // Use real data sources API
-      const response = await fetch(`${getBackendUrlForApi()}/data/sources`);
+      // Use real data sources API with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
+      const response = await fetch(`${getBackendUrlForApi()}/data/sources`, {
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
       const result = await response.json();
       
       if (result && Array.isArray(result)) {
-        setDataSources(result.map(ds => ({
+        const mappedSources = result.map(ds => ({
           id: ds.id || ds.Index,
           name: ds.name || `Data Source ${ds.Index}`,
           type: ds.type as 'file' | 'database' | 'warehouse' | 'api',
@@ -498,61 +522,81 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
           columns: ds.columns || [],
           size: ds.size?.toString(),
           description: `${ds.type} data source`,
-        })));
+        }));
+        
+        setDataSources(mappedSources);
+        
         // Set default selected database to first connected
-        const firstConnected = (result || []).find((ds: any) => ds.status === 'connected');
-        if (firstConnected) setSelectedDatabase(firstConnected.id);
+        const firstConnected = mappedSources.find((ds: any) => ds.status === 'connected');
+        if (firstConnected) {
+          setSelectedDatabase(firstConnected.id);
+        } else if (mappedSources.length === 0) {
+          // No data sources available - show helpful message
+          console.log('No data sources connected. User can connect via + button.');
+        }
       } else {
         throw new Error(result.error || 'Failed to load data sources');
       }
     } catch (error) {
       console.error('Failed to load data sources:', error);
-      message.warning('Using sample data sources. Connect to real data sources via /data page.');
+      
+      // Handle different error types
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          console.log('Data sources request timed out. User can connect via + button.');
+        } else if (error.message.includes('Failed to load data sources')) {
+          console.log('No data sources available. User can connect via + button.');
+        } else {
+          message.warning('Using sample data sources. Connect to real data sources via /data page.');
+        }
+      } else {
+        message.warning('Using sample data sources. Connect to real data sources via /data page.');
+      }
       
       // Fallback to sample data for development
       const sampleDataSources: DataSource[] = [
         {
           id: 'duckdb_local',
-          name: 'DuckDB Local Analytics',
+          name: 'DuckDB Local Analytics (Demo)',
           type: 'database',
           status: 'connected',
           description: 'Fast in-memory analytical database for local development',
           lastUsed: '2024-01-15',
-          rowCount: 125000,
-          columns: ['date', 'product', 'amount', 'region'],
+          rowCount: 1000,
+          columns: ['id', 'date', 'product', 'sales_amount', 'region', 'quantity', 'customer_id', 'discount', 'profit'],
           connection_info: { host: 'localhost', port: 8080, database: 'analytics' }
         },
         {
           id: 'postgresql_prod',
-          name: 'PostgreSQL Production',
+          name: 'PostgreSQL Production (Demo)',
           type: 'database',
           status: 'connected',
           description: 'Primary production database with ACID compliance',
           lastUsed: '2024-01-15',
-          rowCount: 500000,
-          columns: ['users', 'orders', 'products', 'analytics'],
+          rowCount: 500,
+          columns: ['customer_id', 'first_name', 'last_name', 'email', 'phone', 'city', 'country', 'registration_date', 'total_orders', 'total_spent', 'status'],
           connection_info: { host: 'prod-db.company.com', port: 5432, database: 'production' }
         },
         {
           id: 'snowflake_warehouse',
-          name: 'Snowflake Data Warehouse',
+          name: 'Snowflake Data Warehouse (Demo)',
           type: 'warehouse',
           status: 'connected',
           description: 'Cloud data warehouse for large-scale analytics',
           lastUsed: '2024-01-14',
-          rowCount: 2500000,
-          columns: ['historical_data', 'ml_features', 'business_metrics'],
+          rowCount: 200,
+          columns: ['date', 'metric', 'channel', 'device', 'value', 'country', 'campaign_id', 'user_segment'],
           connection_info: { account: 'company.snowflakecomputing.com', warehouse: 'ANALYTICS_WH' }
         },
         {
           id: 'csv_sales',
-          name: 'Sales Data Q4 2024',
+          name: 'Sales Data Q4 2024 (Demo)',
           type: 'file',
           status: 'connected',
           description: 'Quarterly sales data for analysis and reporting',
           lastUsed: '2024-01-15',
-          rowCount: 1250,
-          columns: ['date', 'product', 'sales_amount', 'region'],
+          rowCount: 1000,
+          columns: ['id', 'date', 'product', 'sales_amount', 'region', 'quantity', 'customer_id', 'discount', 'profit'],
           size: '2.3 MB'
         }
       ];
@@ -562,6 +606,159 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
       if (firstConnected) setSelectedDatabase(firstConnected.id);
     } finally {
       setIsLoadingDataSources(false);
+    }
+  };
+
+  const loadSchemaForDataSource = async (dataSourceId: string) => {
+    setIsLoadingSchema(true);
+    try {
+      // Find the data source
+      const dataSource = dataSources.find(ds => ds.id === dataSourceId);
+      if (!dataSource) {
+        console.log('Data source not found:', dataSourceId);
+        return;
+      }
+
+      setSelectedDataSource(dataSource);
+
+      // For demo data sources, provide schema information
+      if (['duckdb_local', 'postgresql_prod', 'snowflake_warehouse', 'csv_sales'].includes(dataSourceId)) {
+        const demoSchemas = {
+          'duckdb_local': {
+            schemas: ['public'],
+            tables: [
+              { 
+                name: 'sales_data', 
+                schema: 'public', 
+                columns: [
+                  { name: 'id', type: 'integer' },
+                  { name: 'date', type: 'varchar' },
+                  { name: 'product', type: 'varchar' },
+                  { name: 'sales_amount', type: 'decimal' },
+                  { name: 'region', type: 'varchar' },
+                  { name: 'quantity', type: 'integer' },
+                  { name: 'customer_id', type: 'integer' },
+                  { name: 'discount', type: 'decimal' },
+                  { name: 'profit', type: 'decimal' }
+                ]
+              }
+            ]
+          },
+          'postgresql_prod': {
+            schemas: ['public'],
+            tables: [
+              { 
+                name: 'customers', 
+                schema: 'public', 
+                columns: [
+                  { name: 'customer_id', type: 'integer' },
+                  { name: 'first_name', type: 'varchar' },
+                  { name: 'last_name', type: 'varchar' },
+                  { name: 'email', type: 'varchar' },
+                  { name: 'phone', type: 'varchar' },
+                  { name: 'city', type: 'varchar' },
+                  { name: 'country', type: 'varchar' },
+                  { name: 'registration_date', type: 'date' },
+                  { name: 'total_orders', type: 'integer' },
+                  { name: 'total_spent', type: 'decimal' },
+                  { name: 'status', type: 'varchar' }
+                ]
+              }
+            ]
+          },
+          'snowflake_warehouse': {
+            schemas: ['public'],
+            tables: [
+              { 
+                name: 'analytics_events', 
+                schema: 'public', 
+                columns: [
+                  { name: 'date', type: 'date' },
+                  { name: 'metric', type: 'varchar' },
+                  { name: 'channel', type: 'varchar' },
+                  { name: 'device', type: 'varchar' },
+                  { name: 'value', type: 'decimal' },
+                  { name: 'country', type: 'varchar' },
+                  { name: 'campaign_id', type: 'varchar' },
+                  { name: 'user_segment', type: 'varchar' }
+                ]
+              }
+            ]
+          },
+          'csv_sales': {
+            schemas: ['public'],
+            tables: [
+              { 
+                name: 'sales_data', 
+                schema: 'public', 
+                columns: [
+                  { name: 'id', type: 'integer' },
+                  { name: 'date', type: 'varchar' },
+                  { name: 'product', type: 'varchar' },
+                  { name: 'sales_amount', type: 'decimal' },
+                  { name: 'region', type: 'varchar' },
+                  { name: 'quantity', type: 'integer' },
+                  { name: 'customer_id', type: 'integer' },
+                  { name: 'discount', type: 'decimal' },
+                  { name: 'profit', type: 'decimal' }
+                ]
+              }
+            ]
+          }
+        };
+
+        const schemaInfo = demoSchemas[dataSourceId as keyof typeof demoSchemas];
+        if (schemaInfo) {
+          setAvailableSchemas(schemaInfo.schemas);
+          setAvailableTables(schemaInfo.tables);
+          setSelectedSchema('public');
+          if (schemaInfo.tables.length > 0) {
+            setSelectedTable(schemaInfo.tables[0].name);
+          }
+        }
+      } else {
+        // Check if it's a file data source (CSV/Excel)
+        if (dataSource.type === 'file') {
+          // For file data sources, show the file as a single table
+          const fileTable = {
+            name: dataSource.name.replace(/\.[^/.]+$/, ''), // Remove file extension
+            schema: 'file',
+            columns: dataSource.columns?.map((col: string) => ({ 
+              name: col, 
+              type: 'string' // Default type for file columns
+            })) || []
+          };
+          
+          setAvailableSchemas(['file']);
+          setAvailableTables([fileTable]);
+          setSelectedSchema('file');
+          setSelectedTable(fileTable.name);
+        } else {
+          // For real database sources, fetch schema from API
+          const response = await fetch(`${getBackendUrlForApi()}/data/sources/${dataSourceId}/schema`);
+          if (response.ok) {
+            const result = await response.json();
+            const schemaRoot = result?.schema || result;
+            const tables = (schemaRoot?.tables || []).map((t: any) => ({ 
+              name: t.name, 
+              schema: schemaRoot?.database || 'public', 
+              columns: (t.columns || t.fields || []).map((c: any) => ({ name: c.name, type: c.type })) 
+            }));
+            const schemas = [schemaRoot?.database || 'public'];
+            
+            setAvailableSchemas(schemas);
+            setAvailableTables(tables);
+            setSelectedSchema(schemas[0]);
+            if (tables.length > 0) {
+              setSelectedTable(tables[0].name);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load schema:', error);
+    } finally {
+      setIsLoadingSchema(false);
     }
   };
 
@@ -760,6 +957,8 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
 
   const handleExecuteQuery = async () => {
     setExecuting(true);
+    setLoading(true);
+    setError(null);
     setExecutionTime(null);
     setExecutionStatus('Analyzing query...');
     setSelectedEngine('');
@@ -767,11 +966,16 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
     try {
       const startTime = Date.now();
       
-      // Find the selected data source
-      const selectedDataSource = dataSources.find(ds => ds.name.toLowerCase().includes(selectedDatabase.toLowerCase()));
+      // Use the selected data source from state
+      if (!selectedDataSource) {
+        throw new Error('No data source selected. Please select a data source from the dropdown above before executing your query.');
+      }
       
-      if (selectedDataSource) {
-        setExecutionStatus('Executing query...');
+      if (!sqlQuery.trim()) {
+        throw new Error('Please enter a SQL query to execute.');
+      }
+      
+      setExecutionStatus('Executing query...');
         
         // Execute query using working query service with proper SQL parsing
         const result = await workingQueryService.executeQuery(selectedDataSource.id, sqlQuery);
@@ -821,46 +1025,14 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
           setSelectedEngine('unknown');
           throw new Error(result.error || 'Query execution failed');
         }
-      } else {
-        // Fallback to mock execution for demo data
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        const mockResults = [
-          { total_num_boys: 125000, total_num_girls: 118000, total_births: 243000, avg_per_state: 4860 },
-          { total_num_boys: 118000, total_num_girls: 112000, total_births: 230000, avg_per_state: 4600 },
-          { total_num_boys: 132000, total_num_girls: 125000, total_births: 257000, avg_per_state: 5140 }
-        ];
-        
-        setResults(mockResults);
-        setExecutionTime(1000);
-        
-        // Add to query history
-        const historyItem = {
-          id: Date.now(),
-          state: 'success',
-          started: new Date().toLocaleTimeString(),
-          duration: '00:00:01.00',
-          progress: 100,
-          rows: mockResults.length,
-          sql: sqlQuery,
-          status: 'success',
-          database: selectedDatabase,
-          schema: selectedSchema,
-          user: 'current_user',
-          queryType: sqlQuery.trim().toUpperCase().split(' ')[0],
-          engine: 'demo'
-        };
-        
-        setQueryHistory(prev => [historyItem, ...prev.slice(0, 49)]);
-        
-        message.success(`Query executed successfully using demo engine. ${mockResults.length} rows returned.`);
-      }
       
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Query execution failed';
-      setExecutionStatus('Connection error');
+      setExecutionStatus('Query failed');
       setSelectedEngine('unknown');
-      message.error(`Query execution failed: ${errorMessage}`);
+      setError(errorMessage);
+      setLoading(false);
+      // Remove duplicate message.error to avoid confusion - error is now displayed in Alert
       console.error('Query execution error:', error);
       
       // Add failed query to history
@@ -884,39 +1056,41 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
       setQueryHistory(prev => [historyItem, ...prev.slice(0, 49)]);
     } finally {
       setExecuting(false);
+      setLoading(false);
     }
   };
 
-  const columns = [
-    { 
-      title: 'Total Boys', 
-      dataIndex: 'total_num_boys', 
-      key: 'total_num_boys',
-      render: (value: number) => value?.toLocaleString(),
-      sorter: (a: any, b: any) => a.total_num_boys - b.total_num_boys
-    },
-    { 
-      title: 'Total Girls', 
-      dataIndex: 'total_num_girls', 
-      key: 'total_num_girls',
-      render: (value: number) => value?.toLocaleString(),
-      sorter: (a: any, b: any) => a.total_num_girls - b.total_num_girls
-    },
-    { 
-      title: 'Total Births', 
-      dataIndex: 'total_births', 
-      key: 'total_births',
-      render: (value: number) => value?.toLocaleString(),
-      sorter: (a: any, b: any) => a.total_births - b.total_births
-    },
-    { 
-      title: 'Avg Per State',
-      dataIndex: 'avg_per_state', 
-      key: 'avg_per_state',
-      render: (value: number) => value?.toLocaleString(),
-      sorter: (a: any, b: any) => a.avg_per_state - b.avg_per_state
-    }
-  ];
+  // Generate columns dynamically from query results
+  const generateColumns = (data: any[]) => {
+    if (!data || data.length === 0) return [];
+    
+    const firstRow = data[0];
+    const columnKeys = Object.keys(firstRow);
+    
+    return columnKeys.map((key, index) => ({
+      title: key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' '),
+      dataIndex: key,
+      key: key,
+      render: (value: any) => {
+        if (typeof value === 'number') {
+          return value?.toLocaleString();
+        }
+        return value;
+      },
+      width: 150,
+      ellipsis: true,
+      sorter: (a: any, b: any) => {
+        const aVal = a[key];
+        const bVal = b[key];
+        if (typeof aVal === 'number' && typeof bVal === 'number') {
+          return aVal - bVal;
+        }
+        return String(aVal).localeCompare(String(bVal));
+      }
+    }));
+  };
+
+  const columns = generateColumns(results);
 
   const historyColumns = [
     { 
@@ -1042,9 +1216,9 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
   ];
 
   return (
-      <div style={{
+    <div style={{
       height: '100%', 
-        display: 'flex',
+      display: 'flex',
       flexDirection: 'column',
       background: isDarkMode ? 'var(--ant-color-bg-layout, #141414)' : 'var(--ant-color-bg-layout, #ffffff)',
       color: isDarkMode ? 'var(--ant-color-text, #e8e8e8)' : 'var(--ant-color-text, #141414)'
@@ -1084,7 +1258,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
             <>
               {/* Data Sources Section */}
               <div style={{ marginBottom: '20px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                   <Text strong style={{ color: isDarkMode ? 'var(--ant-color-text, #e8e8e8)' : 'var(--ant-color-text, #141414)', fontSize: '12px', textTransform: 'uppercase' }}>
                     DATA SOURCE
                   </Text>
@@ -1109,10 +1283,21 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                 
                 <Select
                   value={selectedDatabase}
-                  onChange={setSelectedDatabase}
+                  onChange={(value) => {
+                    setSelectedDatabase(value);
+                    // Reset schema and table when data source changes
+                    setSelectedSchema('public');
+                    setSelectedTable('');
+                  }}
                   style={{ width: '100%' }}
                   size="small"
-                  placeholder="Select database"
+                  loading={isLoadingDataSources}
+                  placeholder={isLoadingDataSources ? "Loading data sources..." : "Select data source"}
+                  notFoundContent={
+                    isLoadingDataSources ? "Loading..." : 
+                    dataSources.length === 0 ? "No data sources connected. Click + to connect one." :
+                    "No connected data sources available"
+                  }
                   options={(() => {
                     const connected = dataSources.filter(ds => ds.status === 'connected');
                     const iconFor = (t: string) => t === 'database' ? <DatabaseOutlined /> : t === 'warehouse' ? <CloudOutlined /> : t === 'api' ? <ApiOutlined /> : <FileOutlined />;
@@ -1122,95 +1307,129 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           {iconFor(ds.type)}
                           <span>{ds.name}</span>
+                          {ds.name.includes('Demo') && <span style={{ fontSize: '10px', color: '#666' }}>(Demo)</span>}
                         </div>
                       )
                     }));
                     return hasCube ? [{ value: 'cube', label: (<div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><ThunderboltOutlined /><span>Cube.js OLAP</span></div>) }, ...base] : base;
                   })()}
                 />
-                
-                {/* Quick status indicator */}
-                <div style={{ 
-                  marginTop: '8px', 
-                  padding: '8px', 
-                  background: isDarkMode ? 'var(--ant-color-bg-container, #1a1a1a)' : 'var(--ant-color-fill-secondary, #f5f5f5)', 
-                  borderRadius: '4px',
-                  fontSize: '10px',
-                  color: isDarkMode ? 'var(--ant-color-text-secondary, #a6a6a6)' : 'var(--ant-color-text-secondary, #666)'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+
+                {/* Database Explorer Tree */}
+                {selectedDatabase && (
+                  <div style={{ marginTop: '6px' }}>
+                    <Text style={{ 
+                      fontSize: '12px', 
+                      color: isDarkMode ? '#999' : '#666', 
+                      marginBottom: '8px', 
+                      display: 'block',
+                      fontWeight: '500'
+                    }}>
+                      Database Explorer
+                    </Text>
                     <div style={{ 
-                      width: '6px', 
-                      height: '6px', 
-                      borderRadius: '50%', 
-                      background: '#52c41a' 
-                    }} />
-                    <span>Connected to {enhancedDatabases.find(db => db.value === selectedDatabase)?.label || 'database'}</span>
+                      maxHeight: '300px', 
+                      overflow: 'auto', 
+                      border: `1px solid ${isDarkMode ? '#333' : '#d9d9d9'}`, 
+                      borderRadius: '4px',
+                      padding: '6px',
+                      background: isDarkMode ? '#1a1a1a' : '#fafafa',
+                      marginLeft: '0px'
+                    }}>
+                      {isLoadingSchema ? (
+                        <div style={{ textAlign: 'center', padding: '16px' }}>
+                          <Spin size="small" /> Loading...
+                        </div>
+                      ) : (
+                        <Tree
+                          showLine
+                          defaultExpandAll
+                          style={{ 
+                            background: 'transparent',
+                            fontSize: '12px'
+                          }}
+                          treeData={[
+                            {
+                              title: (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  <DatabaseOutlined style={{ color: '#1890ff', fontSize: '12px' }} />
+                                  <span style={{ 
+                                    fontWeight: 'bold', 
+                                    fontSize: '11px',
+                                    color: isDarkMode ? '#fff' : '#000'
+                                  }}>
+                                    {selectedDataSource?.name || selectedDatabase}
+                                  </span>
+                                  {selectedDataSource?.name.includes('Demo') && (
+                                    <Tag color="orange" style={{ fontSize: '9px', padding: '0 4px' }}>Demo</Tag>
+                                  )}
+                                </div>
+                              ),
+                              key: 'database',
+                              children: availableSchemas.map(schema => ({
+                                title: (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <span style={{ color: '#52c41a', fontSize: '10px' }}>
+                                      {schema === 'file' ? '📄' : '📁'}
+                                    </span>
+                                    <span style={{ fontSize: '10px', color: isDarkMode ? '#ccc' : '#666' }}>
+                                      {schema === 'file' ? 'File Data' : schema}
+                                    </span>
+                                  </div>
+                                ),
+                                key: `schema-${schema}`,
+                                children: availableTables
+                                  .filter(table => table.schema === schema)
+                                  .map(table => ({
+                                    title: (
+                                      <div 
+                                        style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', padding: '2px 4px', borderRadius: '3px', fontSize: '11px', marginLeft: 0 }}
+                                        onClick={() => {
+                                          setSelectedTable(table.name);
+                                          setSelectedSchema(schema);
+                                          // Update SQL query with selected table
+                                          setSqlQuery(`SELECT * FROM ${table.name} LIMIT 100;`);
+                                        }}
+                                      >
+                                        {schema === 'file' ? (
+                                          <FileTextOutlined style={{ color: '#fa8c16', fontSize: '10px' }} />
+                                        ) : (
+                                          <TableOutlined style={{ color: '#722ed1', fontSize: '10px' }} />
+                                        )}
+                                        <span style={{ color: isDarkMode ? '#fff' : '#000', fontWeight: 500 }}>{table.name}</span>
+                                        <span style={{ 
+                                          fontSize: '9px', 
+                                          color: isDarkMode ? '#666' : '#999' 
+                                        }}>
+                                          ({table.columns?.length || 0})
+                                        </span>
+                                      </div>
+                                    ),
+                                    key: `table-${table.name}`,
+                                    children: table.columns?.map((column: any, index: number) => ({
+                                      title: (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px', padding: '2px 0', marginLeft: 0 }}>
+                                          <span style={{ color: '#fa8c16' }}>•</span>
+                                          <span style={{ fontFamily: 'monospace', color: isDarkMode ? '#ccc' : '#666' }}>{column.name}</span>
+                                          <span style={{ color: isDarkMode ? '#666' : '#999', fontSize: '8px' }}>({column.type || 'string'})</span>
+                                        </div>
+                                      ),
+                                      key: `column-${table.name}-${column.name}-${index}`,
+                                      isLeaf: true
+                                    })) || []
+                                  }))
+                              }))
+                            }
+                          ]}
+                        />
+                      )}
+                    </div>
                   </div>
-                  <div style={{ fontSize: '9px' }}>
-                    {dataSources.length} data sources available
-                  </div>
-                </div>
+                )}
+                
+                {/* status indicator removed per UX request */}
               </div>
 
-          {/* Schema Selection */}
-          <div style={{ marginBottom: '20px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-              <Text strong style={{ color: isDarkMode ? 'var(--ant-color-text, #e8e8e8)' : 'var(--ant-color-text, #141414)', fontSize: '12px', textTransform: 'uppercase' }}>
-                SCHEMA
-              </Text>
-              <Button 
-                size="small" 
-                type="text" 
-                icon={<ReloadOutlined />} 
-                onClick={refreshSchema}
-                loading={isRefreshingSchema}
-                style={{ fontSize: '10px', padding: '2px 4px' }}
-              />
-            </div>
-            <Select
-              value={selectedSchema}
-              onChange={setSelectedSchema}
-              options={(uiSchemas.length ? uiSchemas : enhancedSchemas).map(schema => ({
-                value: schema.value,
-                label: (
-                  <Tooltip title={schema.description} placement="right">
-                    <span>{schema.label}</span>
-                  </Tooltip>
-                )
-              }))}
-              style={{ width: '100%', marginTop: '8px' }}
-              size="small"
-            />
-          </div>
-
-          {/* Table Schema Browser */}
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-              <Text strong style={{ color: isDarkMode ? 'var(--ant-color-text, #e8e8e8)' : 'var(--ant-color-text, #141414)', fontSize: '12px', textTransform: 'uppercase' }}>
-                VIEW TABLE
-              </Text>
-              <Button size="small" type="text" icon={<ReloadOutlined />} style={{ fontSize: '10px', padding: '2px 4px' }} />
-            </div>
-            
-            {/* Table Selection Dropdown */}
-            <Select
-              value={selectedTable}
-              onChange={setSelectedTable}
-              placeholder="Select table to view"
-              style={{ width: '100%', marginBottom: '12px' }}
-              size="small"
-              options={(uiTables.length ? uiTables : enhancedTables).map(table => ({
-                value: table.name,
-                label: (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <TableOutlined style={{ fontSize: '12px' }} />
-                    <span>{table.name}</span>
-                    <Badge count={table.rowCount} size="small" />
-                  </div>
-                )
-              }))}
-            />
 
             {/* Open Table Tabs */}
                 <Collapse 
@@ -1226,9 +1445,9 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                       <Panel
                         key={index}
                         header={
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <TableOutlined style={{ fontSize: '12px' }} />
-                            <span style={{ fontSize: '11px', fontWeight: 'bold' }}>{tableName}</span>
+                            <span style={{ fontSize: '11px', fontWeight: 600 }}>{tableName}</span>
                             <Badge count={table.rowCount} size="small" />
                           </div>
                         }
@@ -1239,13 +1458,13 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                           marginBottom: '8px'
                         }}
                       >
-                        <div style={{ padding: '8px 0' }}>
+                        <div style={{ padding: '6px 0' }}>
                           {/* Table Info */}
-                          <div style={{ marginBottom: '12px', padding: '8px', background: isDarkMode ? 'var(--ant-color-bg-container, #1a1a1a)' : 'var(--ant-color-fill-secondary, #f5f5f5)', borderRadius: '4px' }}>
+                          <div style={{ marginBottom: '8px', padding: '6px', background: isDarkMode ? 'var(--ant-color-bg-container, #1a1a1a)' : 'var(--ant-color-fill-secondary, #f5f5f5)', borderRadius: '4px' }}>
                             <div style={{ fontSize: '10px', color: isDarkMode ? 'var(--ant-color-text-secondary, #a6a6a6)' : 'var(--ant-color-text-secondary, #666)', marginBottom: '4px' }}>
                               {table.description}
                             </div>
-                            <div style={{ display: 'flex', gap: '8px', fontSize: '9px' }}>
+                            <div style={{ display: 'flex', gap: '6px', fontSize: '9px' }}>
                               <span>📊 {table.rowCount?.toLocaleString()} rows</span>
                               <span>💾 {table.size}</span>
                               <span>📅 {table.lastModified}</span>
@@ -1254,24 +1473,22 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                 
                 {/* Table Fields */}
                           {table.fields.map((field, fieldIndex) => (
-                    <div key={fieldIndex} style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      padding: '4px 0',
-                              fontSize: '11px',
+                            <div key={fieldIndex} style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '2px 0',
+                              fontSize: '10px',
                               borderBottom: fieldIndex < table.fields.length - 1 ? `1px solid ${isDarkMode ? 'var(--ant-color-border, #303030)' : 'var(--ant-color-border, #eeeeee)'}` : 'none'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <FieldBinaryOutlined style={{ fontSize: '10px' }} />
-                                <Text style={{ fontFamily: 'monospace', fontSize: '10px' }}>{field.name}</Text>
-                                {field.primaryKey && <Tag color="red">PK</Tag>}
-                                {field.foreignKey && <Tag color="blue">FK</Tag>}
-                                {field.nullable && <Tag color="orange">NULL</Tag>}n 
-                      </div>
-                              <Tag style={{ fontSize: '9px' }}>{field.type}</Tag>
-                    </div>
-                  ))}
+                            }}>
+                              <FieldBinaryOutlined style={{ fontSize: '10px' }} />
+                              <Text style={{ fontFamily: 'monospace', fontSize: '10px' }}>{field.name}</Text>
+                              {field.primaryKey && <Tag color="red">PK</Tag>}
+                              {field.foreignKey && <Tag color="blue">FK</Tag>}
+                              {field.nullable && <Tag color="orange">NULL</Tag>}
+                              <Tag style={{ marginLeft: 'auto', fontSize: '9px' }}>{field.type}</Tag>
+                            </div>
+                          ))}
                 </div>
                       </Panel>
                     );
@@ -1328,7 +1545,6 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                 </Collapse>
               </div>
             )}
-          </div>
             </>
           )}
         </div>
@@ -1403,6 +1619,17 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
             />
           </div>
 
+
+          {/* Loading State */}
+          {loading && (
+            <div style={{ padding: '16px' }}>
+              <QueryLoading 
+                message={executionStatus}
+                progress={executionStatus === 'Executing query...' ? 50 : undefined}
+              />
+            </div>
+          )}
+
           {/* SQL Editor */}
           <div style={{ 
             flex: 1, 
@@ -1412,7 +1639,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
             display: 'flex',
             flexDirection: 'column'
           }}>
-            <Editor
+            <MemoryOptimizedEditor
               height="100%"
               language="sql"
               theme={isDarkMode ? 'vs-dark' : 'vs-light'}
@@ -1538,6 +1765,19 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                 </Tooltip>
               </div>
             </div>
+
+            {/* Error Display - positioned after execute button, before results */}
+            {error && (
+              <Alert
+                message="Query Error"
+                description={error}
+                type="error"
+                showIcon
+                closable
+                onClose={() => setError(null)}
+                style={{ marginTop: '16px', marginBottom: '8px' }}
+              />
+            )}
 
             {/* Results, History & Chart Tabs */}
             <Tabs 
