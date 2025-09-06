@@ -19,6 +19,11 @@ build/
 .env.backup2
 .env.corrected
 .env.fixed
+.env.*
+*.env
+*.secrets
+secrets/*.json
+secrets/*.yaml
 
 # IDE
 .vscode/
@@ -99,6 +104,9 @@ docs/updated-task-priorities.md
 # Internal development logs and temporary files
 dev.log
 INITIAL_COMMIT_MESSAGE.md
+**/INTERNAL_*.md
+**/PRIVATE_*.md
+**/CONFIDENTIAL_*.md
 
 # Backup and temporary files
 *.backup

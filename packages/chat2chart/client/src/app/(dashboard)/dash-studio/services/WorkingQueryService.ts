@@ -70,7 +70,7 @@ class WorkingQueryService {
   }
 
   /**
-   * Get data from backend API (project-scoped)
+   * Get data from backend API (project-scoped) or demo data
    */
   private async getDataSourceData(dataSourceId: string): Promise<any[]> {
     // Check cache first
@@ -78,10 +78,17 @@ class WorkingQueryService {
       return this.dataCache.get(dataSourceId)!;
     }
 
+    // Check if it's a demo data source
+    if (this.isDemoDataSource(dataSourceId)) {
+      const demoData = this.getDemoData(dataSourceId);
+      this.dataCache.set(dataSourceId, demoData);
+      return demoData;
+    }
+
     try {
-                 // Get organization and project context from URL or context
-           const organizationId = 'aiser-dev-org'; // Real development organization
-           const projectId = 'development-project'; // Real development project
+      // Get organization and project context from URL or context
+      const organizationId = 'aiser-dev-org'; // Real development organization
+      const projectId = 'development-project'; // Real development project
       
       let response;
       try {
@@ -110,6 +117,109 @@ class WorkingQueryService {
       console.error('Failed to fetch data source:', error);
       throw error;
     }
+  }
+
+  /**
+   * Check if data source is a demo source
+   */
+  private isDemoDataSource(dataSourceId: string): boolean {
+    const demoIds = ['duckdb_local', 'postgresql_prod', 'snowflake_warehouse', 'csv_sales'];
+    return demoIds.includes(dataSourceId);
+  }
+
+  /**
+   * Get demo data for sample data sources
+   */
+  private getDemoData(dataSourceId: string): any[] {
+    switch (dataSourceId) {
+      case 'duckdb_local':
+        return this.getSalesDemoData();
+      case 'postgresql_prod':
+        return this.getCustomerDemoData();
+      case 'snowflake_warehouse':
+        return this.getAnalyticsDemoData();
+      case 'csv_sales':
+        return this.getSalesDemoData();
+      default:
+        return [];
+    }
+  }
+
+  /**
+   * Generate realistic sales demo data
+   */
+  private getSalesDemoData(): any[] {
+    const products = ['Laptop', 'Phone', 'Tablet', 'Headphones', 'Monitor', 'Keyboard', 'Mouse', 'Speaker'];
+    const regions = ['North America', 'Europe', 'Asia', 'South America', 'Africa', 'Oceania'];
+    const months = ['2024-01', '2024-02', '2024-03', '2024-04', '2024-05', '2024-06'];
+    
+    const data = [];
+    for (let i = 0; i < 1000; i++) {
+      data.push({
+        id: i + 1,
+        date: months[Math.floor(Math.random() * months.length)],
+        product: products[Math.floor(Math.random() * products.length)],
+        sales_amount: Math.floor(Math.random() * 5000) + 100,
+        region: regions[Math.floor(Math.random() * regions.length)],
+        quantity: Math.floor(Math.random() * 10) + 1,
+        customer_id: Math.floor(Math.random() * 500) + 1,
+        discount: Math.floor(Math.random() * 20),
+        profit: Math.floor(Math.random() * 1000) + 50
+      });
+    }
+    return data;
+  }
+
+  /**
+   * Generate realistic customer demo data
+   */
+  private getCustomerDemoData(): any[] {
+    const firstNames = ['John', 'Jane', 'Mike', 'Sarah', 'David', 'Lisa', 'Chris', 'Emma', 'Alex', 'Maria'];
+    const lastNames = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis', 'Rodriguez', 'Martinez'];
+    const cities = ['New York', 'Los Angeles', 'Chicago', 'Houston', 'Phoenix', 'Philadelphia', 'San Antonio', 'San Diego', 'Dallas', 'San Jose'];
+    const countries = ['USA', 'Canada', 'Mexico', 'UK', 'Germany', 'France', 'Spain', 'Italy', 'Japan', 'Australia'];
+    
+    const data = [];
+    for (let i = 0; i < 500; i++) {
+      data.push({
+        customer_id: i + 1,
+        first_name: firstNames[Math.floor(Math.random() * firstNames.length)],
+        last_name: lastNames[Math.floor(Math.random() * lastNames.length)],
+        email: `customer${i + 1}@example.com`,
+        phone: `+1-${Math.floor(Math.random() * 900) + 100}-${Math.floor(Math.random() * 900) + 100}-${Math.floor(Math.random() * 9000) + 1000}`,
+        city: cities[Math.floor(Math.random() * cities.length)],
+        country: countries[Math.floor(Math.random() * countries.length)],
+        registration_date: `2024-${String(Math.floor(Math.random() * 12) + 1).padStart(2, '0')}-${String(Math.floor(Math.random() * 28) + 1).padStart(2, '0')}`,
+        total_orders: Math.floor(Math.random() * 50) + 1,
+        total_spent: Math.floor(Math.random() * 10000) + 100,
+        status: Math.random() > 0.1 ? 'active' : 'inactive'
+      });
+    }
+    return data;
+  }
+
+  /**
+   * Generate realistic analytics demo data
+   */
+  private getAnalyticsDemoData(): any[] {
+    const metrics = ['page_views', 'sessions', 'bounce_rate', 'conversion_rate', 'revenue', 'users'];
+    const channels = ['organic', 'paid', 'social', 'email', 'direct', 'referral'];
+    const devices = ['desktop', 'mobile', 'tablet'];
+    
+    const data = [];
+    for (let i = 0; i < 200; i++) {
+      data.push({
+        date: `2024-${String(Math.floor(Math.random() * 12) + 1).padStart(2, '0')}-${String(Math.floor(Math.random() * 28) + 1).padStart(2, '0')}`,
+        metric: metrics[Math.floor(Math.random() * metrics.length)],
+        channel: channels[Math.floor(Math.random() * channels.length)],
+        device: devices[Math.floor(Math.random() * devices.length)],
+        value: Math.floor(Math.random() * 10000) + 100,
+        country: ['US', 'CA', 'UK', 'DE', 'FR', 'JP', 'AU'][Math.floor(Math.random() * 7)],
+        campaign_id: `campaign_${Math.floor(Math.random() * 20) + 1}`,
+        user_segment: ['new', 'returning', 'vip'][Math.floor(Math.random() * 3)]
+      });
+    }
+    return data;
   }
 
   /**

@@ -17,6 +17,9 @@ from app.modules.charts.schemas import (
 from app.modules.charts.services import ChatVisualizationService, ChartGenerationService, MCPEChartsService
 from app.modules.charts.services.integrated_chat2chart_service import IntegratedChat2ChartService
 from app.modules.charts.services.mcp_integration_service import MCPIntegrationService
+from app.modules.charts.services.dashboard_service import DashboardService
+from app.db.session import get_async_session
+from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import APIRouter, Depends, HTTPException, Body, UploadFile, File
 from pydantic import BaseModel
 import logging
@@ -866,34 +869,21 @@ async def delete_project_dashboard(
 
 # 🏗️ Dashboard Studio API Endpoints (Global - for backward compatibility)
 @router.post("/dashboards/", response_model=DashboardResponseSchema)
-async def create_dashboard(dashboard: DashboardCreateSchema):
+async def create_dashboard(
+    dashboard: DashboardCreateSchema,
+    db: AsyncSession = Depends(get_async_session)
+):
     """
     Create a new dashboard
     """
     try:
         logger.info(f"🏗️ Creating dashboard: {dashboard.name}")
         
-        # Mock implementation - replace with actual database service
-        dashboard_data = {
-            "id": f"dashboard_{hash(dashboard.name)}",
-            "name": dashboard.name,
-            "description": dashboard.description,
-            "project_id": dashboard.project_id,
-            "layout_config": dashboard.layout_config,
-            "theme_config": dashboard.theme_config,
-            "global_filters": dashboard.global_filters,
-            "refresh_interval": dashboard.refresh_interval,
-            "is_public": dashboard.is_public,
-            "is_template": dashboard.is_template,
-            "created_by": 1,  # TODO: Get from auth context
-            "max_widgets": 10,
-            "max_pages": 5,
-            "created_at": "2025-01-10T00:00:00Z",
-            "updated_at": None,
-            "last_viewed_at": None
-        }
+        # Use real database service
+        dashboard_service = DashboardService(db)
+        created_dashboard = await dashboard_service.create_dashboard(dashboard)
         
-        return dashboard_data
+        return created_dashboard
         
     except Exception as e:
         logger.error(f"❌ Failed to create dashboard: {str(e)}")
@@ -905,55 +895,25 @@ async def list_dashboards(
     user_id: str = None,
     project_id: int = None,
     limit: int = 50,
-    offset: int = 0
+    offset: int = 0,
+    db: AsyncSession = Depends(get_async_session)
 ):
     """
     List dashboards with optional filtering
     """
     try:
-        logger.info(f"📋 Listing dashboards for user: {user_id}")
+        logger.info(f"📋 Listing dashboards for user: {user_id}, project: {project_id}")
         
-        # Mock implementation - replace with actual database service
-        mock_dashboards = [
-            {
-                "id": "dashboard_1",
-                "name": "Sales Dashboard",
-                "description": "Monthly sales performance dashboard",
-                "project_id": project_id or 1,
-                "layout_config": {"grid_size": 12, "widgets": []},
-                "theme_config": {"primary_color": "#1890ff"},
-                "global_filters": {},
-                "refresh_interval": 300,
-                "is_public": False,
-                "is_template": False,
-                "created_by": int(user_id) if user_id else 1,
-                "max_widgets": 10,
-                "max_pages": 5,
-                "created_at": "2025-01-10T00:00:00Z",
-                "updated_at": "2025-01-10T00:00:00Z",
-                "last_viewed_at": "2025-01-10T00:00:00Z"
-            },
-            {
-                "id": "dashboard_2",
-                "name": "Marketing Analytics",
-                "description": "Marketing campaign performance",
-                "project_id": project_id or 1,
-                "layout_config": {"grid_size": 12, "widgets": []},
-                "theme_config": {"primary_color": "#52c41a"},
-                "global_filters": {},
-                "refresh_interval": 600,
-                "is_public": True,
-                "is_template": False,
-                "created_by": int(user_id) if user_id else 1,
-                "max_widgets": 20,
-                "max_pages": 3,
-                "created_at": "2025-01-10T00:00:00Z",
-                "updated_at": "2025-01-10T00:00:00Z",
-                "last_viewed_at": None
-            }
-        ]
+        # Use real database service
+        dashboard_service = DashboardService(db)
+        dashboards = await dashboard_service.list_dashboards(
+            user_id=user_id,
+            project_id=project_id,
+            limit=limit,
+            offset=offset
+        )
         
-        return mock_dashboards[offset:offset + limit]
+        return dashboards
         
     except Exception as e:
         logger.error(f"❌ Failed to list dashboards: {str(e)}")
@@ -961,84 +921,77 @@ async def list_dashboards(
 
 
 @router.get("/dashboards/{dashboard_id}", response_model=DashboardResponseSchema)
-async def get_dashboard(dashboard_id: str):
+async def get_dashboard(
+    dashboard_id: str,
+    db: AsyncSession = Depends(get_async_session)
+):
     """
     Get a specific dashboard by ID
     """
     try:
         logger.info(f"📊 Getting dashboard: {dashboard_id}")
         
-        # Mock implementation - replace with actual database service
-        mock_dashboard = {
-            "id": dashboard_id,
-            "name": f"Dashboard {dashboard_id}",
-            "description": "Sample dashboard description",
-            "project_id": 1,
-            "layout_config": {"grid_size": 12, "widgets": []},
-            "theme_config": {"primary_color": "#1890ff"},
-            "global_filters": {},
-            "refresh_interval": 300,
-            "is_public": False,
-            "is_template": False,
-            "created_by": 1,
-            "max_widgets": 10,
-            "max_pages": 5,
-            "created_at": "2025-01-10T00:00:00Z",
-            "updated_at": "2025-01-10T00:00:00Z",
-            "last_viewed_at": None
-        }
+        # Use real database service
+        dashboard_service = DashboardService(db)
+        dashboard = await dashboard_service.get_dashboard(dashboard_id)
         
-        return mock_dashboard
+        if not dashboard:
+            raise HTTPException(status_code=404, detail="Dashboard not found")
         
+        return dashboard
+        
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"❌ Failed to get dashboard {dashboard_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to get dashboard: {str(e)}")
 
 
 @router.put("/dashboards/{dashboard_id}", response_model=DashboardResponseSchema)
-async def update_dashboard(dashboard_id: str, dashboard: DashboardUpdateSchema):
+async def update_dashboard(
+    dashboard_id: str, 
+    dashboard: DashboardUpdateSchema,
+    db: AsyncSession = Depends(get_async_session)
+):
     """
     Update an existing dashboard
     """
     try:
         logger.info(f"✏️ Updating dashboard: {dashboard_id}")
         
-        # Mock implementation - replace with actual database service
-        updated_dashboard = {
-            "id": dashboard_id,
-            "name": dashboard.name or f"Dashboard {dashboard_id}",
-            "description": dashboard.description,
-            "project_id": dashboard.project_id,
-            "layout_config": dashboard.layout_config,
-            "theme_config": dashboard.theme_config,
-            "global_filters": dashboard.global_filters,
-            "refresh_interval": dashboard.refresh_interval,
-            "is_public": dashboard.is_public,
-            "is_template": dashboard.is_template,
-            "created_by": 1,
-            "max_widgets": 10,
-            "max_pages": 5,
-            "created_at": "2025-01-10T00:00:00Z",
-            "updated_at": "2025-01-10T00:00:00Z",
-            "last_viewed_at": None
-        }
+        # Use real database service
+        dashboard_service = DashboardService(db)
+        updated_dashboard = await dashboard_service.update_dashboard(dashboard_id, dashboard)
+        
+        if not updated_dashboard:
+            raise HTTPException(status_code=404, detail="Dashboard not found")
         
         return updated_dashboard
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"❌ Failed to update dashboard {dashboard_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to update dashboard: {str(e)}")
 
 
 @router.delete("/dashboards/{dashboard_id}")
-async def delete_dashboard(dashboard_id: str):
+async def delete_dashboard(
+    dashboard_id: str,
+    db: AsyncSession = Depends(get_async_session)
+):
     """
     Delete a dashboard
     """
     try:
         logger.info(f"🗑️ Deleting dashboard: {dashboard_id}")
         
-        # Mock implementation - replace with actual database service
+        # Use real database service
+        dashboard_service = DashboardService(db)
+        success = await dashboard_service.delete_dashboard(dashboard_id)
+        
+        if not success:
+            raise HTTPException(status_code=404, detail="Dashboard not found")
         
         return {
             "success": True,
@@ -1046,6 +999,8 @@ async def delete_dashboard(dashboard_id: str):
             "dashboard_id": dashboard_id
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"❌ Failed to delete dashboard {dashboard_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to delete dashboard: {str(e)}")
