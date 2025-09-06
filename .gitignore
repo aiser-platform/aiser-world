@@ -140,6 +140,10 @@ client_next_build/
 .kiro/settings/sshsv.pub
 sshsv
 sshsv.pub
+
+# Cursor AI development files (internal team context)
+.cursorrules
+aiser-platform-context.md
 packages/chat2chart/client/src/app/(dashboard)/dash-studio/components/GridSystemComparison.md
 PLATFORM_ENHANCEMENT_SUMMARY.md
 EVALUATION-TERMS.md
