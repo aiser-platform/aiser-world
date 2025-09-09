@@ -164,3 +164,13 @@ packages/chat2chart/ENHANCED_IMPLEMENTATION_SUMMARY.md
 PRODUCTION_DEPLOYMENT.md
 DEFAULT_USERS.md
 DOCKER_ENV_SETUP.md
+
+# Dev artifacts
+.venv/
+**/__pycache__/
+*.pyc
+*/*.pyc
+**/*.pyc
+packages/docs/venv/
+packages/docs/.docusaurus/
+tmp_debug_*.py
