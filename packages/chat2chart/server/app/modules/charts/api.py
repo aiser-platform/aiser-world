@@ -19,9 +19,9 @@ from app.modules.charts.services.integrated_chat2chart_service import Integrated
 from app.modules.charts.services.mcp_integration_service import MCPIntegrationService
 from app.modules.charts.services.dashboard_service import DashboardService
 from app.db.session import get_async_session
-from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import APIRouter, Depends, HTTPException, Body, UploadFile, File
-from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession  # type: ignore[reportMissingImports]
+from fastapi import APIRouter, Depends, HTTPException, Body, UploadFile, File  # type: ignore[reportMissingImports]
+from pydantic import BaseModel  # type: ignore[reportMissingImports]
 import logging
 import json
 
@@ -441,8 +441,8 @@ async def save_chart(chart_data: Dict[str, Any]):
 
 @router.get("/builder/list")
 async def list_charts(
-    user_id: str = None,
-    chart_type: str = None,
+    user_id: Optional[str] = None,
+    chart_type: Optional[str] = None,
     limit: int = 50,
     offset: int = 0
 ):
@@ -451,7 +451,9 @@ async def list_charts(
     """
     try:
         logger.info(f"📋 Listing charts for user: {user_id}")
-        
+        # Sanitize optionals
+        user_id_value = user_id or "default"
+        chart_type_value = chart_type or None
         # Mock response for now - implement with your database service
         mock_charts = [
             {
@@ -460,7 +462,7 @@ async def list_charts(
                 "type": "bar",
                 "created_at": "2025-01-10T00:00:00Z",
                 "updated_at": "2025-01-10T00:00:00Z",
-                "user_id": user_id or "default",
+                "user_id": user_id_value,
                 "is_public": True
             },
             {
@@ -469,15 +471,13 @@ async def list_charts(
                 "type": "line",
                 "created_at": "2025-01-10T00:00:00Z",
                 "updated_at": "2025-01-10T00:00:00Z",
-                "user_id": user_id or "default",
+                "user_id": user_id_value,
                 "is_public": False
             }
         ]
-        
         # Filter by type if specified
-        if chart_type:
-            mock_charts = [c for c in mock_charts if c['type'] == chart_type]
-        
+        if chart_type_value:
+            mock_charts = [c for c in mock_charts if c['type'] == chart_type_value]
         return {
             "success": True,
             "charts": mock_charts[offset:offset + limit],
@@ -485,7 +485,6 @@ async def list_charts(
             "limit": limit,
             "offset": offset
         }
-        
     except Exception as e:
         logger.error(f"❌ Failed to list charts: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to list charts: {str(e)}")
@@ -672,29 +671,31 @@ async def share_chart(chart_data: Dict[str, Any]):
 async def get_project_dashboards(
     organization_id: str,
     project_id: str,
-    user_id: str = None,
+    user_id: Optional[str] = None,
     limit: int = 50,
     offset: int = 0
 ):
     """Get dashboards for a specific project (project-scoped)"""
     try:
         logger.info(f"📊 Getting dashboards for project {project_id} in organization {organization_id}")
-        
+        org_id_int = int(organization_id)
+        project_id_int = int(project_id)
+        created_by_int = int(user_id) if user_id is not None and user_id.isdigit() else 1
         # Mock implementation - replace with actual database service
         mock_dashboards = [
             {
                 "id": f"dashboard_{project_id}_1",
                 "name": "Project Sales Dashboard",
                 "description": f"Sales dashboard for project {project_id}",
-                "project_id": int(project_id),
-                "organization_id": int(organization_id),
+                "project_id": project_id_int,
+                "organization_id": org_id_int,
                 "layout_config": {"grid_size": 12, "widgets": []},
                 "theme_config": {"primary_color": "#1890ff"},
                 "global_filters": {},
                 "refresh_interval": 300,
                 "is_public": False,
                 "is_template": False,
-                "created_by": int(user_id) if user_id else 1,
+                "created_by": created_by_int,
                 "max_widgets": 10,
                 "max_pages": 5,
                 "created_at": "2025-01-10T00:00:00Z",
@@ -702,17 +703,15 @@ async def get_project_dashboards(
                 "last_viewed_at": "2025-01-10T00:00:00Z"
             }
         ]
-        
         return {
             "success": True,
             "dashboards": mock_dashboards[offset:offset + limit],
-            "organization_id": organization_id,
-            "project_id": project_id,
+            "organization_id": org_id_int,
+            "project_id": project_id_int,
             "total": len(mock_dashboards),
             "limit": limit,
             "offset": offset
         }
-        
     except Exception as e:
         logger.error(f"❌ Failed to get project dashboards: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -727,34 +726,32 @@ async def create_project_dashboard(
     """Create a new dashboard for a specific project"""
     try:
         logger.info(f"🏗️ Creating dashboard for project {project_id} in organization {organization_id}: {dashboard.name}")
-        
-        # Mock implementation - replace with actual database service
+        org_id_int = int(organization_id)
+        project_id_int = int(project_id)
         dashboard_data = {
             "id": f"dashboard_{project_id}_{hash(dashboard.name)}",
             "name": dashboard.name,
             "description": dashboard.description,
-            "project_id": int(project_id),
-            "organization_id": int(organization_id),
+            "project_id": project_id_int,
+            "organization_id": org_id_int,
             "layout_config": dashboard.layout_config,
             "theme_config": dashboard.theme_config,
             "global_filters": dashboard.global_filters,
             "refresh_interval": dashboard.refresh_interval,
             "is_public": dashboard.is_public,
             "is_template": dashboard.is_template,
-            "created_by": 1,  # TODO: Get from auth context
+            "created_by": 1,
             "max_widgets": 10,
             "max_pages": 5,
             "created_at": "2025-01-10T00:00:00Z",
             "updated_at": None,
             "last_viewed_at": None
         }
-        
         return {
             "success": True,
             "message": "Dashboard created successfully",
             "dashboard": dashboard_data
         }
-        
     except Exception as e:
         logger.error(f"❌ Failed to create project dashboard: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -878,13 +875,9 @@ async def create_dashboard(
     """
     try:
         logger.info(f"🏗️ Creating dashboard: {dashboard.name}")
-        
-        # Use real database service
         dashboard_service = DashboardService(db)
-        created_dashboard = await dashboard_service.create_dashboard(dashboard)
-        
+        created_dashboard = await dashboard_service.create_dashboard(dashboard, user_id=1)
         return created_dashboard
-        
     except Exception as e:
         logger.error(f"❌ Failed to create dashboard: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to create dashboard: {str(e)}")
@@ -892,8 +885,8 @@ async def create_dashboard(
 
 @router.get("/dashboards/", response_model=List[DashboardResponseSchema])
 async def list_dashboards(
-    user_id: str = None,
-    project_id: int = None,
+    user_id: Optional[str] = None,
+    project_id: Optional[int] = None,
     limit: int = 50,
     offset: int = 0,
     db: AsyncSession = Depends(get_async_session)
@@ -903,18 +896,17 @@ async def list_dashboards(
     """
     try:
         logger.info(f"📋 Listing dashboards for user: {user_id}, project: {project_id}")
-        
-        # Use real database service
+        user_id_int: int = int(user_id) if user_id is not None and str(user_id).isdigit() else 1
+        project_id_int: int = int(project_id) if project_id is not None else 0
         dashboard_service = DashboardService(db)
         dashboards = await dashboard_service.list_dashboards(
-            user_id=user_id,
-            project_id=project_id,
+            project_id=project_id_int,
+            user_id=user_id_int,
             limit=limit,
-            offset=offset
+            offset=offset,
+            search=None
         )
-        
         return dashboards
-        
     except Exception as e:
         logger.error(f"❌ Failed to list dashboards: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to list dashboards: {str(e)}")
@@ -930,16 +922,11 @@ async def get_dashboard(
     """
     try:
         logger.info(f"📊 Getting dashboard: {dashboard_id}")
-        
-        # Use real database service
         dashboard_service = DashboardService(db)
-        dashboard = await dashboard_service.get_dashboard(dashboard_id)
-        
+        dashboard = await dashboard_service.get_dashboard(dashboard_id, user_id=1)
         if not dashboard:
             raise HTTPException(status_code=404, detail="Dashboard not found")
-        
         return dashboard
-        
     except HTTPException:
         raise
     except Exception as e:
@@ -958,16 +945,11 @@ async def update_dashboard(
     """
     try:
         logger.info(f"✏️ Updating dashboard: {dashboard_id}")
-        
-        # Use real database service
         dashboard_service = DashboardService(db)
-        updated_dashboard = await dashboard_service.update_dashboard(dashboard_id, dashboard)
-        
+        updated_dashboard = await dashboard_service.update_dashboard(dashboard_id, dashboard, user_id=1)
         if not updated_dashboard:
             raise HTTPException(status_code=404, detail="Dashboard not found")
-        
         return updated_dashboard
-        
     except HTTPException:
         raise
     except Exception as e:
@@ -985,20 +967,15 @@ async def delete_dashboard(
     """
     try:
         logger.info(f"🗑️ Deleting dashboard: {dashboard_id}")
-        
-        # Use real database service
         dashboard_service = DashboardService(db)
-        success = await dashboard_service.delete_dashboard(dashboard_id)
-        
+        success = await dashboard_service.delete_dashboard(dashboard_id, user_id=1)
         if not success:
             raise HTTPException(status_code=404, detail="Dashboard not found")
-        
         return {
             "success": True,
             "message": "Dashboard deleted successfully",
             "dashboard_id": dashboard_id
         }
-        
     except HTTPException:
         raise
     except Exception as e:
@@ -1261,8 +1238,6 @@ async def get_dashboard_templates():
     """
     try:
         logger.info("📋 Getting dashboard templates")
-        
-        # Mock templates - replace with actual template service
         templates = [
             {
                 "id": "template_1",
@@ -1291,12 +1266,10 @@ async def get_dashboard_templates():
                 ]
             }
         ]
-        
         return {
             "success": True,
             "templates": templates
         }
-        
     except Exception as e:
         logger.error(f"❌ Failed to get dashboard templates: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to get dashboard templates: {str(e)}")

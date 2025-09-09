@@ -16,7 +16,7 @@ from app.modules.authentication.deps.auth_bearer import (
 )
 from app.modules.user.schemas import UserCreate, UserResponse, UserUpdate
 from app.modules.user.services import UserService
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status  # type: ignore[reportMissingImports]
 from app.core.config import settings
 
 router = APIRouter()
@@ -26,13 +26,16 @@ service = UserService()
 @router.get("/", response_model=ListResponseSchema[UserResponse])
 async def get_users(params: Annotated[BaseFilterParams, Depends()]):
     try:
-        search_query = create_search_query(params.search, params.search_columns)
+        # Ensure non-None strings for type safety
+        search_value = params.search or ""
+        sort_order_value = params.sort_order or ""
+        search_query = create_search_query(search_value, params.search_columns)
         return await service.get_all(
             offset=params.offset,
             limit=params.limit,
             search_query=search_query,
             sort_by=params.sort_by,
-            sort_order=params.sort_order,
+            sort_order=sort_order_value,
         )
     except Exception as e:
         raise HTTPException(
