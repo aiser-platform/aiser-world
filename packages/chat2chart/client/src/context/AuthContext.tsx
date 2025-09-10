@@ -49,8 +49,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             
             if (accessToken) {
                 try {
-                    // Try enterprise endpoint first
-                    let response = await fetch('http://localhost:5000/api/v1/enterprise/auth/me', {
+                    // Try enterprise endpoint first via backend proxy
+                    let response = await fetch('http://localhost:8000/api/v1/enterprise/auth/me', {
                         headers: {
                             'Authorization': `Bearer ${accessToken}`,
                             'Content-Type': 'application/json',
@@ -58,8 +58,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     });
                     
                     if (!response.ok) {
-                        // Try standard endpoint
-                        response = await fetch('http://localhost:5000/users/me', {
+                        // Try standard endpoint (fallback if needed)
+                        response = await fetch('http://localhost:8000/users/me/', {
                             headers: {
                                 'Authorization': `Bearer ${accessToken}`,
                                 'Content-Type': 'application/json',
@@ -109,8 +109,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         try {
             setLoginError(null);
             
-            // First try enterprise login (username only)
-            let response = await fetch('http://localhost:5000/api/v1/enterprise/auth/login', {
+            // First try enterprise login (username only) via backend proxy
+            let response = await fetch('http://localhost:8000/api/v1/enterprise/auth/login', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -134,13 +134,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
 
             // If enterprise login fails, try standard login (supports both email and username)
-            response = await fetch('http://localhost:5000/users/signin', {
+            response = await fetch('http://localhost:8000/users/sign-in', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    identifier: identifier,
+                    account: identifier,
                     password,
                 }),
             });
@@ -173,7 +173,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const signup = async (email: string, username: string, password: string): Promise<void> => {
         try {
             setLoginError(null);
-            const response = await fetch('http://localhost:5000/users/signup', {
+            const response = await fetch('http://localhost:8000/users/sign-up', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

@@ -28,8 +28,8 @@ class Settings(BaseSettings):
 
     # Security Settings
     SECRET_KEY: str = os.getenv(
-        "SECRET_KEY", "9e25a2588fcee7d21ea15fb1a63d5135"
-    )  # openssl rand -hex 16
+        "SECRET_KEY", "9e25a2588fcee7d21ea15fb1a63d5135abcdef1234567890abcdef1234567890"
+    )  # openssl rand -hex 32 (64 chars = 32 bytes)
     JWT_SECRET: str = os.getenv("JWT_SECRET", "your-jwt-secret-here")
     JWT_ALGORITHM: str = "HS256"
     JWT_EXP_TIME_MINUTES: int = 60

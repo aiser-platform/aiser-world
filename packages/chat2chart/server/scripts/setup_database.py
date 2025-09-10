@@ -51,7 +51,7 @@ async def setup_database():
             
             # Required tables
             required_tables = [
-                'organizations', 'projects', 'data_sources', 
+                'users', 'organizations', 'projects', 'data_sources', 
                 'project_data_source', 'dashboards', 'dashboard_widgets'
             ]
             
@@ -66,6 +66,25 @@ async def setup_database():
             else:
                 print("✅ All required tables exist")
         
+        # Ensure there is at least one user
+        print("🔍 Ensuring dev user exists...")
+        
+        with engine.connect() as conn:
+            result = conn.execute(text("SELECT COUNT(*) FROM users"))
+            user_count = result.scalar()
+            if user_count == 0:
+                print("🌱 No users found, creating dev admin user (admin@aiser.dev / admin12345)...")
+                from app.modules.authentication.auth import Auth
+                auth = Auth()
+                hashed = auth.hash_password("admin12345")
+                conn.execute(text("""
+                    INSERT INTO users (username, email, password, is_active, created_at, updated_at)
+                    VALUES (:username, :email, :password, true, NOW(), NOW())
+                """), {"username": "admin", "email": "admin@aiser.dev", "password": hashed})
+                conn.commit()
+            else:
+                print(f"✅ Users exist ({user_count})")
+
         # Check if demo data exists
         print("🔍 Checking demo data...")
         
@@ -91,6 +110,17 @@ async def create_missing_tables(engine, missing_tables):
     """Create missing tables"""
     
     table_creations = {
+        'users': """
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                username VARCHAR(50) NOT NULL UNIQUE,
+                email VARCHAR(100) NOT NULL UNIQUE,
+                password VARCHAR(255),
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """,
         'organizations': """
             CREATE TABLE IF NOT EXISTS organizations (
                 id SERIAL PRIMARY KEY,

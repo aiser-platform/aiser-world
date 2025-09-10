@@ -53,10 +53,34 @@ class UserService(BaseService[User, UserCreate, UserUpdate, UserResponse]):
         user = await self.repository.get_by_email(
             identifier
         ) or await self.repository.get_by_username(identifier)
-
-        if not user or not self.auth.verify_password(password, user.password):
+        if not user:
             return None
-        return user
+
+        # Stored password may be a pbkdf2 hash or legacy plaintext.
+        stored_pw = getattr(user, 'password', None)
+
+        # If stored value looks like a passlib/pbkdf2 hash, verify using Auth
+        try:
+            if isinstance(stored_pw, str) and stored_pw.startswith("$pbkdf2"):
+                if self.auth.verify_password(password, stored_pw):
+                    return user
+                return None
+            # Fallback: legacy plaintext - compare directly and migrate to hashed on success
+            if stored_pw is not None and password == stored_pw:
+                # migrate to hashed password
+                hashed = self.auth.hash_password(password)
+                from app.modules.user.schemas import UserUpdate
+
+                try:
+                    await self.repository.update(user.id, UserUpdate(password=hashed))
+                except Exception:
+                    # migration best-effort; don't fail authentication if migration fails
+                    pass
+                return user
+        except Exception:
+            return None
+
+        return None
 
     async def get_user(self, user_id: int) -> Optional[User]:
         """Get user by ID"""
@@ -66,11 +90,12 @@ class UserService(BaseService[User, UserCreate, UserUpdate, UserResponse]):
 
     async def update_user(self, user_id: int, user_in: UserUpdate) -> User:
         """Update user profile"""
-        current_user = self.repository.get(user_id)
+        # repository.get is async; await it
+        current_user = await self.repository.get(user_id)
         if not current_user:
             raise ValueError("User not found")
-
-        return await self.repository.update(current_user, user_in)
+        # repository.update expects an id and update schema
+        return await self.repository.update(user_id, user_in)
 
     async def get_active_users(
         self, offset: int = 0, limit: int = 100
