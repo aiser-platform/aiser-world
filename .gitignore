@@ -135,6 +135,9 @@ chat2chart_poetry_cache/
 cube_node_modules/
 client_node_modules/
 client_next_build/
+# Cube store internal data
+packages/chat2chart/server/cube_helpers/.cubestore/
+packages/chat2chart/server/cube_helpers/.cubestore/**
 
 # Kiro IDE settings (may contain sensitive project info)
 .kiro/settings/sshsv.pub

@@ -7,16 +7,16 @@ import logging
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete, and_, or_
+from sqlalchemy import select, update, delete, and_, or_, func
 from sqlalchemy.orm import selectinload
 
-from app.modules.charts.models import Dashboard, DashboardWidget, Widget
+from app.modules.charts.models import Dashboard, DashboardWidget
 from app.modules.charts.schemas import (
-    DashboardCreateSchema, 
-    DashboardUpdateSchema, 
+    DashboardCreateSchema,
+    DashboardUpdateSchema,
     DashboardResponseSchema,
-    WidgetCreateSchema,
-    WidgetResponseSchema
+    DashboardWidgetCreateSchema,
+    DashboardWidgetResponseSchema,
 )
 from app.common.repository import BaseRepository
 
@@ -28,7 +28,7 @@ class DashboardService:
     def __init__(self, db_session: AsyncSession):
         self.db = db_session
         self.dashboard_repo = BaseRepository(Dashboard, db_session)
-        self.widget_repo = BaseRepository(Widget, db_session)
+        self.widget_repo = BaseRepository(DashboardWidget, db_session)
         self.dashboard_widget_repo = BaseRepository(DashboardWidget, db_session)
     
     async def list_dashboards(
@@ -113,10 +113,8 @@ class DashboardService:
         try:
             logger.info(f"📊 Getting dashboard: {dashboard_id}")
             
-            # Get dashboard with widgets
-            query = select(Dashboard).options(
-                selectinload(Dashboard.widgets)
-            ).where(Dashboard.id == dashboard_id)
+            # Get dashboard first
+            query = select(Dashboard).where(Dashboard.id == dashboard_id)
             
             result = await self.db.execute(query)
             dashboard = result.scalar_one_or_none()
@@ -149,17 +147,31 @@ class DashboardService:
                 "widgets": []
             }
             
-            # Add widgets
-            for widget in dashboard.widgets:
+            # Load widgets separately
+            widgets_result = await self.db.execute(
+                select(DashboardWidget).where(DashboardWidget.dashboard_id == dashboard.id)
+            )
+            widgets = widgets_result.scalars().all()
+            for widget in widgets:
                 widget_data = {
                     "id": str(widget.id),
-                    "title": widget.title,
-                    "type": widget.type,
+                    "name": widget.name,
+                    "widget_type": widget.widget_type,
+                    "chart_type": widget.chart_type,
                     "config": widget.config or {},
-                    "position": widget.position or {},
-                    "size": widget.size or {},
+                    "data_config": widget.data_config or {},
+                    "style_config": widget.style_config or {},
+                    "x": widget.x,
+                    "y": widget.y,
+                    "width": widget.width,
+                    "height": widget.height,
+                    "z_index": widget.z_index,
+                    "is_visible": widget.is_visible,
+                    "is_locked": widget.is_locked,
+                    "is_resizable": widget.is_resizable,
+                    "is_draggable": widget.is_draggable,
                     "created_at": widget.created_at.isoformat() if widget.created_at else None,
-                    "updated_at": widget.updated_at.isoformat() if widget.updated_at else None
+                    "updated_at": widget.updated_at.isoformat() if widget.updated_at else None,
                 }
                 dashboard_data["widgets"].append(widget_data)
             

@@ -67,15 +67,12 @@ services:
         echo '🚀 Starting Aiser Backend Development Server...' &&
         pip install -r requirements.txt &&
         python scripts/setup_database.py &&
-        python scripts/setup-real-organization.py &&
         uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
       "
 
   # Frontend Client
   frontend-client:
-    build:
-      context: ./packages/chat2chart/client
-      dockerfile: Dockerfile.dev
+    image: node:18-alpine
     container_name: aiser-frontend-dev
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
@@ -84,21 +81,19 @@ services:
       - "3000:3000"
     volumes:
       - ./packages/chat2chart/client:/app
-      - /app/node_modules
+    working_dir: /app
     depends_on:
       - backend-server
     command: >
-      bash -c "
+      sh -c "
         echo '🚀 Starting Aiser Frontend Development Server...' &&
-        npm install &&
+        npm ci || npm install &&
         npm run dev
       "
 
   # Cube.js Server
   cube-server:
-    build:
-      context: ./packages/chat2chart/cube
-      dockerfile: Dockerfile.dev
+    image: cubejs/cube:latest
     container_name: aiser-cube-dev
     environment:
       - CUBEJS_API_SECRET=dev-cube-secret
@@ -111,46 +106,12 @@ services:
     ports:
       - "4000:4000"
     volumes:
-      - ./packages/chat2chart/cube:/cube/conf
-      - ./cube_schemas:/cube/conf/schema
+      - ./packages/chat2chart/server/cube_helpers:/cube/conf
+      - ./packages/chat2chart/server/cube_schemas:/cube/conf/schema
     depends_on:
       postgres:
         condition: service_healthy
-    command: >
-      bash -c "
-        echo '🚀 Starting Cube.js Development Server...' &&
-        npm install &&
-        npm run dev
-      "
 
-  # Authentication Service
-  auth-service:
-    build:
-      context: ./packages/auth-service
-      dockerfile: Dockerfile.dev
-    container_name: aiser-auth-dev
-    environment:
-      - POSTGRES_SERVER=postgres
-      - POSTGRES_DB=aiser_world
-      - POSTGRES_USER=aiser
-      - POSTGRES_PASSWORD=aiser_password
-      - JWT_SECRET=dev-jwt-secret-change-in-production
-      - REDIS_URL=redis://redis:6379
-    ports:
-      - "5000:5000"
-    volumes:
-      - ./packages/auth-service:/app
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    command: >
-      bash -c "
-        echo '🚀 Starting Authentication Service...' &&
-        pip install -r requirements.txt &&
-        python -m uvicorn main:app --host 0.0.0.0 --port 5000 --reload
-      "
 
 volumes:
   postgres_data:
