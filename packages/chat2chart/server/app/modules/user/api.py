@@ -26,11 +26,13 @@ async def get_users(params: Annotated[BaseFilterParams, Depends()]):
         # Ensure non-None strings for type safety
         search_value = params.search or ""
         sort_order_value = params.sort_order or ""
-        search_query = create_search_query(search_value, params.search_columns)
+        # Build search query string for repository layer
+        search_map = create_search_query(search_value, params.search_columns) or {}
+        search_string = search_value if search_map else None
         return await service.get_all(
             offset=params.offset,
             limit=params.limit,
-            search_query=search_query,
+            search_query=search_string,
             sort_by=params.sort_by,
             sort_order=sort_order_value,
         )

@@ -63,7 +63,7 @@ class BaseService(
         limit: int = 100,
         sort_by: str | None = None,
         sort_order: str = "desc",
-        search_query: dict | None = None,
+        search_query: str | None = None,
         filter_query: dict | None = None,
     ) -> ListResponseSchema[ResponseSchemaType]:
         """
@@ -75,7 +75,12 @@ class BaseService(
         """
         try:
             items = await self.repository.get_all(
-                offset, limit, sort_by, sort_order, search_query, filter_query
+                offset=offset,
+                limit=limit,
+                filter_query=filter_query,
+                search_query=search_query,
+                sort_by=sort_by,
+                sort_order=sort_order,
             )
             # Convert SQLAlchemy model instances to dictionaries
             items_as_dict = [item.__dict__ for item in items]
@@ -83,8 +88,13 @@ class BaseService(
             for item in items_as_dict:
                 item.pop("_sa_instance_state", None)
 
+            # Derive page from offset
+            page = (offset // limit) + 1 if limit else 1
             pagination = await self.repository.get_pagination_info(
-                offset, limit, search_query, filter_query
+                page=page,
+                page_size=limit,
+                filter_query=filter_query,
+                search_query=search_query,
             )
         except Exception as e:
             raise e
