@@ -90,11 +90,11 @@ class UserService(BaseService[User, UserCreate, UserUpdate, UserResponse]):
 
     async def update_user(self, user_id: int, user_in: UserUpdate) -> User:
         """Update user profile"""
-        # repository.get is async; await it
+        # Ensure the user exists before updating
         current_user = await self.repository.get(user_id)
         if not current_user:
             raise ValueError("User not found")
-        # repository.update expects an id and update schema
+
         return await self.repository.update(user_id, user_in)
 
     async def get_active_users(
