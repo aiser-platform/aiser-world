@@ -66,11 +66,11 @@ class UserService(BaseService[User, UserCreate, UserUpdate, UserResponse]):
 
     async def update_user(self, user_id: int, user_in: UserUpdate) -> User:
         """Update user profile"""
-        current_user = self.repository.get(user_id)
+        current_user = await self.repository.get(user_id)
         if not current_user:
             raise ValueError("User not found")
 
-        return await self.repository.update(current_user, user_in)
+        return await self.repository.update(user_id, user_in)
 
     async def get_active_users(
         self, offset: int = 0, limit: int = 100

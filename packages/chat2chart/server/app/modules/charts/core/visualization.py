@@ -149,7 +149,7 @@ class VisualizationGeneration:
 
         return result
 
-    async def generate_echarts_config(self) -> EchartsConfig:
+    async def generate_echarts_config(self) -> Optional[EchartsConfig]:
         """Generate ECharts configuration"""
         try:
             df = await self.load_data()
@@ -163,7 +163,7 @@ class VisualizationGeneration:
             self.errors.append(f"Error generating chart: {str(e)}")
             return None
 
-    async def save_result(self) -> None:
+    async def save_result(self) -> Optional[ChatVisualizationResponseSchema]:
         """Save visualization result to database"""
         try:
             if self.result is None:
@@ -186,7 +186,7 @@ class VisualizationGeneration:
                 result.__dict__
             )
 
-            return result
+            return self.chart_response
 
         except Exception as e:
             logger.error(f"Error saving visualization result: {str(e)}")
@@ -322,10 +322,13 @@ class VisualizationGeneration:
 
     def _create_y_axis(self) -> EchartsAxis:
         """Create y-axis configuration"""
+        # Guard None for prefix/suffix on metric
+        prefix = self.metrics[0].prefix or ""
+        suffix = self.metrics[0].suffix or ""
         return EchartsAxis(
             type="value",
             axisLabel=EchartsAxisLabel(
-                formatter=f"{self.metrics[0].prefix}{{value}}{self.metrics[0].suffix}"
+                formatter=f"{prefix}{{value}}{suffix}"
             ),
         )
 
@@ -342,7 +345,7 @@ class VisualizationGeneration:
 
     def _limit_rows(self, df: pd.DataFrame) -> pd.DataFrame:
         """Limit the number of rows in the dataframe"""
-        if self.rowLimit > 0:
+        if (self.rowLimit or 0) > 0:
             return df.head(self.rowLimit)
         return df
 

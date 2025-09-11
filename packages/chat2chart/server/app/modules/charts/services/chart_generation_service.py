@@ -133,14 +133,14 @@ class ChartGenerationService:
                 query_analysis = {'query_type': ['general'], 'business_context': {'type': 'general'}}
             
             cube_data = {'data': data}
-            data_analysis = self.mcp_echarts._analyze_cube_data(cube_data)
+            data_analysis = self._analyze_data_structure(cube_data)
             
             # Get recommendations for different chart types
             recommendations = []
             
             chart_types = ['line', 'bar', 'pie', 'scatter', 'gauge']
             for chart_type in chart_types:
-                if self.mcp_echarts._is_chart_type_compatible(chart_type, data_analysis):
+                if self._is_chart_type_compatible(chart_type, data_analysis):
                     score = self._calculate_chart_type_score(chart_type, data_analysis, query_analysis)
                     recommendations.append({
                         'chart_type': chart_type,
@@ -231,7 +231,7 @@ class ChartGenerationService:
         score = 0.0
         
         # Base compatibility score
-        if self.mcp_echarts._is_chart_type_compatible(chart_type, data_analysis):
+        if self._is_chart_type_compatible(chart_type, data_analysis):
             score += 3.0
         
         # Data type alignment
@@ -286,3 +286,44 @@ class ChartGenerationService:
             base_reason += ' (single metric detected)'
         
         return base_reason
+
+    def _analyze_data_structure(self, cube_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Lightweight analysis of data to guide chart recommendations."""
+        rows: List[Dict[str, Any]] = cube_data.get('data', []) or []
+        analysis: Dict[str, Any] = {
+            'data_type': 'categorical',
+            'measures': [],
+            'dimensions': [],
+            'patterns': {}
+        }
+        if not rows:
+            return analysis
+        sample = rows[0]
+        for key, value in sample.items():
+            if isinstance(value, (int, float)):
+                analysis['measures'].append(key)
+            else:
+                analysis['dimensions'].append(key)
+        # crude time series detection
+        if any('date' in k.lower() or 'time' in k.lower() for k in sample.keys()):
+            analysis['data_type'] = 'time_series'
+        # crude correlation hint
+        analysis['patterns']['has_trend'] = analysis['data_type'] == 'time_series'
+        return analysis
+
+    def _is_chart_type_compatible(self, chart_type: str, data_analysis: Dict[str, Any]) -> bool:
+        """Heuristic compatibility check between chart type and data."""
+        measures = data_analysis.get('measures', [])
+        dims = data_analysis.get('dimensions', [])
+        dtype = data_analysis.get('data_type', 'categorical')
+        if chart_type == 'line':
+            return dtype == 'time_series' and len(measures) >= 1
+        if chart_type == 'bar':
+            return len(dims) >= 1 and len(measures) >= 1
+        if chart_type == 'pie':
+            return len(dims) >= 1 and len(measures) == 1
+        if chart_type == 'scatter':
+            return len(measures) >= 2
+        if chart_type == 'gauge':
+            return len(measures) == 1
+        return True

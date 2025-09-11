@@ -25,8 +25,11 @@ class ChatVisualizationService(
     async def save(self, data: ChartConfiguration):
         try:
             _data = data.model_copy()
+            from uuid import uuid4
             viz = VisualizationGeneration(
-                datasource=_data.dataSource, form_data=_data.formData
+                form_data=_data.formData,
+                datasource=_data.dataSource,
+                message_id=str(uuid4()),
             )
 
             await viz.generate_echarts_config()
