@@ -5,13 +5,12 @@ Revises: fix_migration_chain_001
 Create Date: 2025-02-15 00:00:00.000000
 
 """
+
 from alembic import op
-import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = 'unified_schema_001'
-down_revision = 'fix_migration_chain_001'
+revision = "unified_schema_001"
+down_revision = "fix_migration_chain_001"
 branch_labels = None
 depends_on = None
 
@@ -55,7 +54,7 @@ def upgrade():
             END IF;
         END $$;
     """)
-    
+
     # Create chat2chart specific tables if they don't exist
     op.execute("""
         CREATE TABLE IF NOT EXISTS chart (
@@ -72,7 +71,7 @@ def upgrade():
             is_deleted BOOLEAN DEFAULT FALSE
         );
     """)
-    
+
     op.execute("""
         CREATE TABLE IF NOT EXISTS chat_node (
             id SERIAL PRIMARY KEY,
@@ -85,7 +84,7 @@ def upgrade():
             is_active BOOLEAN DEFAULT TRUE
         );
     """)
-    
+
     op.execute("""
         CREATE TABLE IF NOT EXISTS conversation (
             id SERIAL PRIMARY KEY,
@@ -97,7 +96,7 @@ def upgrade():
             is_deleted BOOLEAN DEFAULT FALSE
         );
     """)
-    
+
     op.execute("""
         CREATE TABLE IF NOT EXISTS message (
             id SERIAL PRIMARY KEY,
@@ -110,7 +109,7 @@ def upgrade():
             is_active BOOLEAN DEFAULT TRUE
         );
     """)
-    
+
     # Add indexes for performance
     op.execute("""
         CREATE INDEX IF NOT EXISTS idx_chart_user_id ON chart(user_id);
@@ -121,7 +120,7 @@ def upgrade():
         CREATE INDEX IF NOT EXISTS idx_message_user_id ON message(user_id);
         CREATE INDEX IF NOT EXISTS idx_files_user_id ON files(user_id);
     """)
-    
+
     # Ensure all tables have consistent audit columns
     op.execute("""
         DO $$
@@ -156,13 +155,13 @@ def downgrade():
         DROP INDEX IF EXISTS idx_message_user_id;
         DROP INDEX IF EXISTS idx_files_user_id;
     """)
-    
+
     # Drop chat2chart specific tables
     op.execute("DROP TABLE IF EXISTS message CASCADE;")
     op.execute("DROP TABLE IF EXISTS conversation CASCADE;")
     op.execute("DROP TABLE IF EXISTS chat_node CASCADE;")
     op.execute("DROP TABLE IF EXISTS chart CASCADE;")
-    
+
     # Remove added columns from files table
     op.execute("""
         ALTER TABLE files DROP COLUMN IF EXISTS uuid_filename;

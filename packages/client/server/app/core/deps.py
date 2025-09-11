@@ -1,9 +1,8 @@
-from contextvars import ContextVar
 from typing import Annotated
 
 from app.modules.user.schemas import UserBase
-from fastapi import Depends, HTTPException, Request
-from fastapi.security import OAuth2AuthorizationCodeBearer, OAuth2PasswordBearer
+from fastapi import Depends
+from fastapi.security import OAuth2PasswordBearer
 from passlib.context import CryptContext
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")

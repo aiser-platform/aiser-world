@@ -43,7 +43,7 @@ class DataSource(DataSourceBase):
     tenant_id: str
     is_active: bool
     last_accessed: Optional[datetime] = None
-    
+
     class Config:
         from_attributes = True
 
@@ -84,7 +84,7 @@ class FilterConfig(BaseModel):
 
 class SortConfig(BaseModel):
     column: str
-    direction: str = 'asc'  # 'asc' or 'desc'
+    direction: str = "asc"  # 'asc' or 'desc'
 
 
 class DataSourceQueryRequest(BaseModel):

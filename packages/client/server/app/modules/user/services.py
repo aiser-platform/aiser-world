@@ -1,11 +1,10 @@
 import logging
-from typing import List, Optional, Dict, Any
+from typing import Dict, Any
 import httpx
-from fastapi import HTTPException, Request, Response
+from fastapi import HTTPException
 
-from app.common.service import BaseService
 from app.core.config import settings
-from app.modules.user.schemas import UserCreate, UserResponse, UserUpdate
+from app.modules.user.schemas import UserResponse
 
 logger = logging.getLogger(__name__)
 

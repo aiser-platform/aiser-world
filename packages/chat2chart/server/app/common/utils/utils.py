@@ -2,10 +2,11 @@
 Common utility functions for the chat2chart service
 """
 
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List
 from datetime import datetime, date
 from decimal import Decimal
 import json
+
 
 def jsonable_encoder(obj: Any) -> Any:
     """
@@ -26,10 +27,10 @@ def jsonable_encoder(obj: Any) -> Any:
         return {key: jsonable_encoder(value) for key, value in obj.items()}
     elif isinstance(obj, list):
         return [jsonable_encoder(item) for item in obj]
-    elif hasattr(obj, 'dict'):
+    elif hasattr(obj, "dict"):
         # Pydantic models
         return jsonable_encoder(obj.dict())
-    elif hasattr(obj, '__dict__'):
+    elif hasattr(obj, "__dict__"):
         # Regular objects
         return jsonable_encoder(obj.__dict__)
     else:
@@ -38,6 +39,7 @@ def jsonable_encoder(obj: Any) -> Any:
             return str(obj)
         except:
             return None
+
 
 def safe_json_dumps(obj: Any) -> str:
     """
@@ -48,17 +50,20 @@ def safe_json_dumps(obj: Any) -> str:
     except Exception:
         return str(obj)
 
+
 def filter_dict(data: Dict[str, Any], allowed_keys: List[str]) -> Dict[str, Any]:
     """
     Filter a dictionary to only include specified keys.
     """
     return {key: value for key, value in data.items() if key in allowed_keys}
 
+
 def exclude_dict(data: Dict[str, Any], excluded_keys: List[str]) -> Dict[str, Any]:
     """
     Filter a dictionary to exclude specified keys.
     """
     return {key: value for key, value in data.items() if key not in excluded_keys}
+
 
 def deep_merge(dict1: Dict[str, Any], dict2: Dict[str, Any]) -> Dict[str, Any]:
     """

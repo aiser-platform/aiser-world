@@ -3,9 +3,9 @@ from typing import Annotated
 
 from app.common.schemas import ListResponseSchema
 from app.common.utils.query_params import BaseFilterParams
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 
-from .schemas import FileResponse, UploadResponse
+from .schemas import UploadResponse
 from .services.factory import get_upload_service
 
 logger = logging.getLogger(__name__)

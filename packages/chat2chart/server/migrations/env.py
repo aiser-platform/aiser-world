@@ -6,7 +6,8 @@ from alembic import context
 
 
 # ---------------- added code here -------------------------#
-import os, sys
+import os
+import sys
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
@@ -34,12 +35,15 @@ fileConfig(config.config_file_name)
 # This prevents circular imports during application startup
 try:
     from migrations.models import *
+
     target_metadata = [Base.metadata]
 except ImportError:
     # If models can't be imported, use empty metadata
     # This allows the application to start without migration conflicts
     target_metadata = None
-    print("Warning: Could not import migration models. Migrations may not work correctly.")
+    print(
+        "Warning: Could not import migration models. Migrations may not work correctly."
+    )
 # ------------------------------------------------------------#
 
 

@@ -1,9 +1,8 @@
 import logging
-from typing import Any, Dict, Generic, List, Optional, Type, TypeVar, Union
+from typing import Any, Dict, Generic, List, Optional, Type, TypeVar
 from sqlalchemy import select, func, desc, asc
 from sqlalchemy.orm import Query
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 
@@ -12,6 +11,7 @@ logger = logging.getLogger(__name__)
 ModelType = TypeVar("ModelType")
 CreateSchemaType = TypeVar("CreateSchemaType", bound=BaseModel)
 UpdateSchemaType = TypeVar("UpdateSchemaType", bound=BaseModel)
+
 
 class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
     """
@@ -38,7 +38,9 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         """Build base query for the model"""
         return select(self.model)
 
-    def _apply_exact_filters(self, query: Query, filter_query: Optional[Dict[str, Any]]) -> Query:
+    def _apply_exact_filters(
+        self, query: Query, filter_query: Optional[Dict[str, Any]]
+    ) -> Query:
         """Apply exact match filters to query"""
         if not filter_query:
             return query
@@ -65,11 +67,14 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
         if search_conditions:
             from sqlalchemy import or_
+
             query = query.where(or_(*search_conditions))
 
         return query
 
-    def _apply_sorting(self, query: Query, sort_by: Optional[str], sort_order: Optional[str]) -> Query:
+    def _apply_sorting(
+        self, query: Query, sort_by: Optional[str], sort_order: Optional[str]
+    ) -> Query:
         """Apply sorting to query"""
         if not sort_by or not hasattr(self.model, sort_by):
             return query
@@ -81,7 +86,9 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
         return query
 
-    def _apply_pagination(self, query: Query, offset: Optional[int], limit: Optional[int]) -> Query:
+    def _apply_pagination(
+        self, query: Query, offset: Optional[int], limit: Optional[int]
+    ) -> Query:
         """Apply pagination to query"""
         if offset is not None:
             query = query.offset(offset)
@@ -106,7 +113,7 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         filter_query: Optional[Dict[str, Any]] = None,
         search_query: Optional[str] = None,
         sort_by: Optional[str] = None,
-        sort_order: Optional[str] = "asc"
+        sort_order: Optional[str] = "asc",
     ) -> List[ModelType]:
         """Get all records with optional filtering, searching, sorting and pagination"""
         try:
@@ -126,6 +133,7 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         """Create a new record"""
         try:
             from app.common.utils import jsonable_encoder
+
             obj_in_data = jsonable_encoder(obj_in)
             db_obj = self.model(**obj_in_data)
             return await self.db.add(db_obj)
@@ -165,7 +173,7 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
     async def count(
         self,
         filter_query: Optional[Dict[str, Any]] = None,
-        search_query: Optional[str] = None
+        search_query: Optional[str] = None,
     ) -> int:
         """Get total count of records with optional filtering"""
         try:
@@ -190,7 +198,7 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         page: int = 1,
         page_size: int = 10,
         filter_query: Optional[Dict[str, Any]] = None,
-        search_query: Optional[str] = None
+        search_query: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Get pagination information"""
         try:
@@ -203,9 +211,9 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
                 "total_pages": total_pages,
                 "current_page": page,
                 "page_size": page_size,
-                "offset": offset
+                "offset": offset,
             }
-        except Exception as e:
+        except Exception:
             raise
 
     async def _execute_and_fetch_all(self, query):
@@ -215,7 +223,9 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
     async def exists(self, id: int) -> bool:
         """Check if a record exists by ID"""
         try:
-            query = select(func.count()).select_from(self.model).where(self.model.id == id)
+            query = (
+                select(func.count()).select_from(self.model).where(self.model.id == id)
+            )
             result = await self.db.execute(query)
             return result.scalar() > 0
         except Exception as e:
@@ -226,7 +236,9 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         """Get a record by a specific field value"""
         try:
             if not hasattr(self.model, field):
-                raise ValueError(f"Field '{field}' does not exist in model {self.model.__name__}")
+                raise ValueError(
+                    f"Field '{field}' does not exist in model {self.model.__name__}"
+                )
 
             query = self._build_base_query().where(getattr(self.model, field) == value)
             result = await self.db.execute(query)
@@ -238,8 +250,9 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         """Create multiple records in bulk"""
         try:
             from app.common.utils import jsonable_encoder
+
             db_objects = []
-            
+
             for obj_in in objects:
                 obj_in_data = jsonable_encoder(obj_in)
                 db_obj = self.model(**obj_in_data)
@@ -249,11 +262,11 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             async with self.db.get_session() as session:
                 session.add_all(db_objects)
                 await session.commit()
-                
+
                 # Refresh all objects to get their IDs
                 for obj in db_objects:
                     await session.refresh(obj)
-                
+
                 return db_objects
         except Exception as e:
             raise e
@@ -264,16 +277,16 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             # Use the new async database session for bulk operations
             async with self.db.get_session() as session:
                 for update_data in updates:
-                    record_id = update_data.pop('id', None)
+                    record_id = update_data.pop("id", None)
                     if record_id is None:
                         continue
-                    
+
                     record = await session.get(self.model, record_id)
                     if record:
                         for field, value in update_data.items():
                             if hasattr(record, field):
                                 setattr(record, field, value)
-                
+
                 await session.commit()
                 return True
         except Exception as e:
@@ -288,7 +301,7 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
                     record = await session.get(self.model, record_id)
                     if record:
                         await session.delete(record)
-                
+
                 await session.commit()
                 return True
         except Exception as e:

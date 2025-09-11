@@ -1,9 +1,6 @@
-import uuid
-
 from app.modules.tenants.constants.tenant_enums import OrganizationRole
 from sqlalchemy import Column, ForeignKey
 from sqlalchemy.dialects.postgresql import ENUM, UUID
-from sqlalchemy.orm import relationship
 
 from app.common.model import BaseModel  # Assuming this extends SQLAlchemy Base
 

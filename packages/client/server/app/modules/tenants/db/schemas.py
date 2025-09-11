@@ -29,8 +29,6 @@ class OrganizationDBBase(BaseModel):
 class OrganizationDBCreate(OrganizationDBBase):
     """Schema for creating a new organization database"""
 
-    pass
-
 
 class OrganizationDBUpdate(BaseModel):
     """Schema for updating organization database settings"""

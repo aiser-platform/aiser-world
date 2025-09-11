@@ -1,6 +1,5 @@
 from app.common.model import BaseModel
-from sqlalchemy import Column, Integer, String, DateTime
-from datetime import datetime
+from sqlalchemy import Column, Integer, String
 import uuid
 
 

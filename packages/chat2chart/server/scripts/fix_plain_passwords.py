@@ -8,6 +8,7 @@ Run inside the backend container (project root):
 This will locate users whose `password` column does not start with the
 passlib pbkdf2 marker and replace it with a secure hash.
 """
+
 import os
 import sys
 import psycopg2
@@ -32,11 +33,16 @@ def main():
     db_host = get_env("POSTGRES_SERVER", "postgres")
     db_port = int(get_env("POSTGRES_PORT", 5432))
 
-    conn = psycopg2.connect(dbname=db_name, user=db_user, password=db_pass, host=db_host, port=db_port)
+    conn = psycopg2.connect(
+        dbname=db_name, user=db_user, password=db_pass, host=db_host, port=db_port
+    )
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
     # Find users with passwords that are not pbkdf2 hashes
-    cur.execute("SELECT id, username, password FROM users WHERE password IS NULL OR password NOT LIKE %s", ("$pbkdf2-%",))
+    cur.execute(
+        "SELECT id, username, password FROM users WHERE password IS NULL OR password NOT LIKE %s",
+        ("$pbkdf2-%",),
+    )
     rows = cur.fetchall()
     if not rows:
         print("No plaintext passwords found. Nothing to do.")
@@ -66,5 +72,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-

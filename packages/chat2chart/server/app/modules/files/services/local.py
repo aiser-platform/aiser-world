@@ -20,7 +20,6 @@ class LocalUploadService(BaseUploadService):
         super().__init__()
 
     async def upload_file(self, file: UploadFile) -> dict:
-
         await self.validate_file_content(file)
 
         uuid_filename = File().generate_unique_filename(file.filename)

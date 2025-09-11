@@ -4,7 +4,6 @@ from typing import Any, Dict
 from urllib.parse import unquote
 
 from app.core import g
-import colorama
 import pandas as pd
 from app.modules.chats.core.ai_flows.schemas import AIFlowSchema
 from app.modules.chats.schemas import ChatDatasourceSchema, DataType
@@ -184,7 +183,6 @@ class AIManager:
 
     async def chart_handler(self):
         try:
-
             # await self._initial_data_source()
 
             sql_completion = await self.__sql_agent.execute(
@@ -261,7 +259,6 @@ class AIManager:
 
     async def full_form_handler(self):
         try:
-
             # await self._initial_data_source()
 
             sql_completion = await self.__sql_agent.execute(
@@ -330,7 +327,6 @@ class AIManager:
             )
 
     async def _initial_data_source(self):
-
         if self.__datasource:
             if self.__datasource.data_type == DataType.FILE and self.__datasource.file:
                 upload_service = get_upload_service()
@@ -426,7 +422,6 @@ class AIManager:
 
     def _initial_message_memory(self):
         try:
-
             self.__history.reverse()
 
             for memory in self.__history:
@@ -445,7 +440,6 @@ class AIManager:
 
     def _initial_personal_info(self):
         try:
-
             user = json.loads(unquote(g.get().get("user")))
 
             if user:

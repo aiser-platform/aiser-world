@@ -1,6 +1,5 @@
 from app.common.model import BaseModel
 from sqlalchemy import Column, String, Text, UUID
-from sqlalchemy.orm import relationship
 import uuid
 
 

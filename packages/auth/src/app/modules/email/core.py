@@ -13,7 +13,6 @@ logger = logging.getLogger(__name__)
 def send_verification_email(email: str, token: str, verification_url: str = None):
     """Send email verification email to user"""
     try:
-
         verification_url = (
             f"{settings.APP_URL}/verify-email?token={token}"
             if not verification_url

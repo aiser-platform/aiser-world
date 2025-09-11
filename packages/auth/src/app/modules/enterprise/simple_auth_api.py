@@ -46,42 +46,38 @@ class ConfigResponse(BaseModel):
 
 @router.post("/login", response_model=LoginResponse)
 async def login(
-    request: LoginRequest,
-    http_request: Request,
-    db: Session = Depends(get_db)
+    request: LoginRequest, http_request: Request, db: Session = Depends(get_db)
 ):
     """Authenticate user with configured provider"""
     try:
         auth_service = get_simple_enterprise_auth_service()
-        
+
         # Authenticate user
         auth_result = await auth_service.authenticate_user(
-            request.username, 
-            request.password, 
-            db
+            request.username, request.password, db
         )
-        
+
         if auth_result.success:
             return LoginResponse(
                 success=True,
                 access_token=auth_result.access_token,
                 refresh_token=auth_result.refresh_token,
                 expires_in=auth_result.expires_in,
-                user=auth_result.user_info.to_dict() if auth_result.user_info else None
+                user=auth_result.user_info.to_dict() if auth_result.user_info else None,
             )
         else:
             return LoginResponse(
                 success=False,
                 error_message=auth_result.error_message,
-                error_code=auth_result.error_code
+                error_code=auth_result.error_code,
             )
-            
+
     except Exception as e:
         logger.error(f"Login error: {e}")
         return LoginResponse(
             success=False,
             error_message="Internal server error",
-            error_code="INTERNAL_ERROR"
+            error_code="INTERNAL_ERROR",
         )
 
 
@@ -90,29 +86,29 @@ async def refresh_token(request: RefreshTokenRequest):
     """Refresh access token"""
     try:
         auth_service = get_simple_enterprise_auth_service()
-        
+
         auth_result = await auth_service.refresh_token(request.refresh_token)
-        
+
         if auth_result.success:
             return LoginResponse(
                 success=True,
                 access_token=auth_result.access_token,
                 refresh_token=auth_result.refresh_token,
-                expires_in=auth_result.expires_in
+                expires_in=auth_result.expires_in,
             )
         else:
             return LoginResponse(
                 success=False,
                 error_message=auth_result.error_message,
-                error_code=auth_result.error_code
+                error_code=auth_result.error_code,
             )
-            
+
     except Exception as e:
         logger.error(f"Token refresh error: {e}")
         return LoginResponse(
             success=False,
             error_message="Internal server error",
-            error_code="INTERNAL_ERROR"
+            error_code="INTERNAL_ERROR",
         )
 
 
@@ -121,21 +117,21 @@ async def get_auth_config():
     """Get authentication configuration for frontend"""
     try:
         config = get_simple_enterprise_config()
-        
+
         return ConfigResponse(
             auth_mode=config.auth_mode.value,
             enable_sso=config.enable_sso,
             require_mfa=config.require_mfa,
             session_timeout_minutes=config.session_timeout_minutes,
             deployment_mode=config.deployment_mode.value,
-            organization_name=config.organization_name
+            organization_name=config.organization_name,
         )
-        
+
     except Exception as e:
         logger.error(f"Get config error: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to get configuration"
+            detail="Failed to get configuration",
         )
 
 
@@ -144,19 +140,19 @@ async def health_check():
     """Health check endpoint for auth service"""
     try:
         config = get_simple_enterprise_config()
-        
+
         return {
             "status": "healthy",
             "auth_mode": config.auth_mode.value,
             "deployment_mode": config.deployment_mode.value,
             "organization": config.organization_name,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.utcnow().isoformat(),
         }
-        
+
     except Exception as e:
         logger.error(f"Health check error: {e}")
         return {
             "status": "unhealthy",
             "error": str(e),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.utcnow().isoformat(),
         }

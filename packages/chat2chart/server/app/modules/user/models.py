@@ -1,7 +1,6 @@
 from sqlalchemy import Column, Integer, String, DateTime, Boolean
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
-import uuid
 
 from app.common.model import BaseModel
 
@@ -16,7 +15,7 @@ class User(BaseModel):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
+
     # Relationships
     organizations = relationship("OrganizationUser", back_populates="user")
     owned_projects = relationship("Project", back_populates="owner")

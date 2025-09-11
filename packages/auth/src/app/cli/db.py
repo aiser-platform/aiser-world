@@ -1,13 +1,11 @@
 import click
 from alembic.config import main as alembic_main
-import asyncio
-from sqlalchemy.ext.asyncio import create_async_engine
-from contextlib import asynccontextmanager
+
 
 @click.group()
 def db():
     """Perform database migrations."""
-    pass
+
 
 @db.command(name="upgrade")
 def upgrade():
@@ -19,6 +17,7 @@ def upgrade():
         click.echo(f"Error during migration: {e}", err=True)
         raise click.Abort()
 
+
 @db.command()
 @click.argument("revision", required=True)
 def downgrade(revision):
@@ -28,6 +27,7 @@ def downgrade(revision):
     except Exception as e:
         click.echo(f"Error during downgrade: {e}", err=True)
         raise click.Abort()
+
 
 @db.command()
 @click.option("--message", "-m", required=True)

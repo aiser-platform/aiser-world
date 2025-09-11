@@ -16,8 +16,6 @@ class ProjectUserBase(BaseModel):
 class ProjectUserCreate(ProjectUserBase):
     """Schema for creating a new project-user relationship"""
 
-    pass
-
 
 class ProjectUserUpdate(BaseModel):
     """Schema for updating an existing project-user relationship"""

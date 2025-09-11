@@ -52,7 +52,9 @@ class UserRepository(BaseRepository[User, UserCreate | UserCreateInternal, UserU
         result = db.execute(query)
         return result.scalars().first()
 
-    def get_active_users(self, db: Session, offset: int = 0, limit: int = 100) -> List[User]:
+    def get_active_users(
+        self, db: Session, offset: int = 0, limit: int = 100
+    ) -> List[User]:
         """
         Get all active users with pagination
 
@@ -61,7 +63,12 @@ class UserRepository(BaseRepository[User, UserCreate | UserCreateInternal, UserU
         :param limit: Maximum number of records to return
         :return: List of active users
         """
-        query = select(self.model).filter(self.model.is_active == True).offset(offset).limit(limit)
+        query = (
+            select(self.model)
+            .filter(self.model.is_active)
+            .offset(offset)
+            .limit(limit)
+        )
         result = db.execute(query)
         return result.scalars().all()
 
@@ -119,10 +126,10 @@ class UserRepository(BaseRepository[User, UserCreate | UserCreateInternal, UserU
             user = self.get_by_id(user_id, db)
             if not user:
                 raise ValueError("User not found")
-            
+
             for field, value in user_update.model_dump(exclude_unset=True).items():
                 setattr(user, field, value)
-            
+
             db.commit()
             db.refresh(user)
             return user

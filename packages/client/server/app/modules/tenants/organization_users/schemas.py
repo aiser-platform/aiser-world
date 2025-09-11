@@ -15,8 +15,6 @@ class OrganizationUserBase(BaseModel):
 class OrganizationUserCreateSchema(OrganizationUserBase):
     """Schema for creating a new organization-user relationship"""
 
-    pass
-
 
 class OrganizationUserUpdateSchema(BaseModel):
     """Schema for updating an existing organization-user relationship"""

@@ -7,7 +7,7 @@ from .utils import (
     safe_json_dumps,
     filter_dict,
     exclude_dict,
-    deep_merge
+    deep_merge,
 )
 
 from .query_params import (
@@ -16,12 +16,12 @@ from .query_params import (
     OrganizationFilterParams,
     ProjectFilterParams,
     DataSourceFilterParams,
-    ChatFilterParams
+    ChatFilterParams,
 )
 
 __all__ = [
     "jsonable_encoder",
-    "safe_json_dumps", 
+    "safe_json_dumps",
     "filter_dict",
     "exclude_dict",
     "deep_merge",
@@ -30,5 +30,5 @@ __all__ = [
     "OrganizationFilterParams",
     "ProjectFilterParams",
     "DataSourceFilterParams",
-    "ChatFilterParams"
+    "ChatFilterParams",
 ]

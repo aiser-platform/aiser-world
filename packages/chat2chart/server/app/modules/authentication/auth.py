@@ -58,15 +58,21 @@ class Auth:
             "iat": self.JWT_IAT,
             "scope": "refresh_token",
         }
-        refresh_jwt = jwt.encode(refresh_payload, self.SECRET, algorithm=self.JWT_ALGORITHM)
+        refresh_jwt = jwt.encode(
+            refresh_payload, self.SECRET, algorithm=self.JWT_ALGORITHM
+        )
 
         # jwe.encrypt expects a bytes key of appropriate length for A256GCM
         # and returns a bytes token; decode to str for portability
-        jwe_token_bytes = jwe.encrypt(refresh_jwt, self.SECRET_BYTES, algorithm="dir", encryption="A256GCM")
+        jwe_token_bytes = jwe.encrypt(
+            refresh_jwt, self.SECRET_BYTES, algorithm="dir", encryption="A256GCM"
+        )
         try:
             # jwe.encrypt may return bytes
             jwe_token = (
-                jwe_token_bytes.decode() if isinstance(jwe_token_bytes, (bytes, bytearray)) else jwe_token_bytes
+                jwe_token_bytes.decode()
+                if isinstance(jwe_token_bytes, (bytes, bytearray))
+                else jwe_token_bytes
             )
         except Exception:
             jwe_token = str(jwe_token_bytes)
@@ -86,7 +92,9 @@ class Auth:
 
     def decodeJWT(self, token: str) -> Optional[Dict[str, Any]]:
         try:
-            decoded_token = jwt.decode(token, self.SECRET, algorithms=[self.JWT_ALGORITHM])
+            decoded_token = jwt.decode(
+                token, self.SECRET, algorithms=[self.JWT_ALGORITHM]
+            )
             return decoded_token if decoded_token.get("exp", 0) >= time.time() else None
         except Exception:
             return None
@@ -102,7 +110,9 @@ class Auth:
 
     def decodeRefreshJWT(self, token: str) -> Optional[Dict[str, Any]]:
         try:
-            decoded_token = jwt.decode(token, self.SECRET, algorithms=[self.JWT_ALGORITHM])
+            decoded_token = jwt.decode(
+                token, self.SECRET, algorithms=[self.JWT_ALGORITHM]
+            )
             expired = decoded_token.get("exp", 0) >= time.time()
             return decoded_token if expired else None
         except Exception:

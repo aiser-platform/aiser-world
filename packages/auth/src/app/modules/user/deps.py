@@ -1,5 +1,5 @@
 from typing import Optional
-from fastapi import Depends, Request, HTTPException
+from fastapi import Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.modules.authentication.deps.auth_bearer import JWTCookie
 from app.modules.authentication.auth import Auth
@@ -24,7 +24,9 @@ class CurrentUser:
         return self._email
 
     @classmethod
-    async def from_token(cls, token: str = Depends(JWTCookie()), db: Session = Depends(get_db)):
+    async def from_token(
+        cls, token: str = Depends(JWTCookie()), db: Session = Depends(get_db)
+    ):
         """Create CurrentUser instance from JWT token"""
         instance = cls()
 

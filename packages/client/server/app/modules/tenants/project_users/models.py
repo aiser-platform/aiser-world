@@ -1,5 +1,3 @@
-import uuid
-
 from app.modules.tenants.constants.tenant_enums import ProjectRole
 from sqlalchemy import Column, ForeignKey
 from sqlalchemy.dialects.postgresql import ENUM, UUID

@@ -1,5 +1,4 @@
 from app.common.repository import BaseRepository
-from app.common.schemas import PaginationSchema
 from app.modules.chats.messages.models import ChatMessage
 from app.modules.chats.messages.schemas import MessageCreateSchema, MessageUpdateSchema
 
@@ -21,7 +20,7 @@ class MessageRepository(
 
             result = await self._execute_and_fetch_all(query)
 
-            pagination = await self.get_pagination_info(query)
+            await self.get_pagination_info(query)
 
             return result
         except Exception as e:

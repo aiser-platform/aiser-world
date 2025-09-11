@@ -3,20 +3,21 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 from alembic import context
-from logging.config import fileConfig
 
 # ---------------- added code here -------------------------#
-import os, sys
+import os
+import sys
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
 
 # Add the src directory to the path
-SRC_DIR = os.path.join(BASE_DIR, 'src')
+SRC_DIR = os.path.join(BASE_DIR, "src")
 sys.path.append(SRC_DIR)
 
 # Now we can import from app
 from app.core.config import settings
+
 # ------------------------------------------------------------#
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -40,14 +41,8 @@ from app.common.model import Base
 
 # Import all models to ensure they are registered with SQLAlchemy
 try:
-    from app.modules.user.models import User
-    from app.modules.authentication.models import UserAuthentication
-    from app.modules.organizations.models import (
-        Role, Organization, UserOrganization, Project, UserProject,
-        Subscription, BillingTransaction, AIUsageLog, PricingPlan
-    )
-    from app.modules.device_session.models import DeviceSession
-    from app.modules.temporary_token.models import TemporaryToken
+    pass
+
     print("All models imported successfully")
 except ImportError as e:
     print(f"Warning: Some models could not be imported: {e}")
@@ -92,11 +87,11 @@ def run_migrations_online() -> None:
     """
     # Override sqlalchemy.url with sync PostgreSQL URL
     async_url = settings.SQLALCHEMY_DATABASE_URI
-    sync_url = async_url.replace('postgresql+asyncpg://', 'postgresql://')
-    
+    sync_url = async_url.replace("postgresql+asyncpg://", "postgresql://")
+
     configuration = config.get_section(config.config_ini_section)
     configuration["sqlalchemy.url"] = sync_url
-    
+
     connectable = engine_from_config(
         configuration,
         prefix="sqlalchemy.",

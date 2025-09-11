@@ -76,7 +76,7 @@ class ProjectRepository(BaseRepository[Project]):
         self, organization_id: Optional[UUID] = None
     ) -> List[Project]:
         """Get all active projects, optionally filtered by organization"""
-        filters = [self.model.is_active == True]
+        filters = [self.model.is_active]
 
         if organization_id:
             filters.append(self.model.organization_id == organization_id)

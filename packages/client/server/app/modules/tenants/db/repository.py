@@ -22,7 +22,7 @@ class OrganizationDBRepository(
         """Get all active database connections"""
         return (
             self.db._session.query(self.model)
-            .filter(self.model.is_active == True)
+            .filter(self.model.is_active)
             .all()
         )
 

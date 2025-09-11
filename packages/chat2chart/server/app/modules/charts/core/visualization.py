@@ -1,8 +1,6 @@
 import logging
 from typing import Any, Dict, List, Optional, Tuple
-from uuid import uuid4
 
-import colorama
 import pandas as pd
 from app.modules.charts.repository import ChatVisualizationRepository
 from app.modules.files.services.factory import get_upload_service

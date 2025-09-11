@@ -1,5 +1,4 @@
-from sqlalchemy import Column, ForeignKey, Integer, String
-from sqlalchemy.orm import relationship
+from sqlalchemy import Column, String
 
 from app.modules.authentication.models import UserAuthentication
 

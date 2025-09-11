@@ -5,7 +5,6 @@ import pkgutil
 import sys
 
 import click
-from alembic.config import main as alembic_main
 from app import cli
 from app.core.config import settings
 from uvicorn import run
