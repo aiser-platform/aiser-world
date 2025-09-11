@@ -136,7 +136,7 @@ class IntegratedChat2ChartService:
                 natural_language_query, 
                 data_source_id, 
                 str(error), 
-                options
+                options or {}
             )
 
     async def process_data_modeling_workflow(
@@ -159,7 +159,10 @@ class IntegratedChat2ChartService:
             logger.info(f"🧠 Starting AI data modeling workflow for: {data_source_id}")
             
             # Step 1: Get data source information and sample data
-            data_source_info = self.data_service.get_data_source(data_source_id)
+            # Support both sync and async implementations seamlessly
+            _get_ds_fn = self.data_service.get_data_source
+            _maybe = _get_ds_fn(data_source_id)
+            data_source_info = await _maybe if asyncio.iscoroutine(_maybe) else _maybe
             if not data_source_info['success']:
                 raise Exception(f"Data source not found: {data_source_id}")
             
@@ -220,7 +223,7 @@ class IntegratedChat2ChartService:
                 "performance": {
                     "processing_time_seconds": processing_time,
                     "ai_enhanced": True,
-                    "model_used": self.litellm_service.model_config['primary']['model']
+                    "model_used": (await self.litellm_service._get_model_config() or {}).get('model', 'unknown')
                 },
                 "next_steps": [
                     "Review the AI-generated data model",
@@ -320,12 +323,14 @@ class IntegratedChat2ChartService:
         """Step 1: AI-Enhanced Query Analysis"""
         try:
             # Get data source context
-            data_source_info = self.data_service.get_data_source(data_source_id)
+            _get_ds_fn = self.data_service.get_data_source
+            _maybe = _get_ds_fn(data_source_id)
+            data_source_info = await _maybe if asyncio.iscoroutine(_maybe) else _maybe
             
             context = {
                 'data_source': data_source_info.get('data_source', {}),
-                'user_preferences': options.get('user_preferences', {}),
-                'previous_queries': options.get('query_history', [])
+                'user_preferences': (options or {}).get('user_preferences', {}),
+                'previous_queries': (options or {}).get('query_history', [])
             }
             
             # Use LiteLLM for intelligent analysis
@@ -336,7 +341,7 @@ class IntegratedChat2ChartService:
             else:
                 # Fallback to rule-based analysis
                 return self._basic_query_analysis(query)
-                
+            
         except Exception as error:
             logger.warning(f"⚠️ AI analysis failed, using fallback: {str(error)}")
             return self._basic_query_analysis(query)
@@ -350,14 +355,16 @@ class IntegratedChat2ChartService:
         """Step 2: Intelligent Data Retrieval"""
         try:
             # Get data source information
-            data_source_info = self.data_service.get_data_source(data_source_id)
+            _get_ds_fn = self.data_service.get_data_source
+            _maybe = _get_ds_fn(data_source_id)
+            data_source_info = await _maybe if asyncio.iscoroutine(_maybe) else _maybe
             if not data_source_info['success']:
                 raise Exception(f"Data source not found: {data_source_id}")
             
             data_source = data_source_info['data_source']
             
             # Build intelligent query based on analysis
-            intelligent_query = self._build_intelligent_query(query_analysis, data_source, options)
+            intelligent_query = self._build_intelligent_query(query_analysis, data_source, options or {})
             
             # Execute query through data service
             if data_source['type'] == 'database' and self.workflow_config['enable_cube_integration']:
@@ -373,7 +380,7 @@ class IntegratedChat2ChartService:
                 return result
             else:
                 raise Exception(result['error'])
-                
+            
         except Exception as error:
             logger.error(f"❌ Data retrieval failed: {str(error)}")
             return {'success': False, 'error': str(error)}

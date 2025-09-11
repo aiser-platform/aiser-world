@@ -7,7 +7,8 @@ import logging
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete, and_, or_
+from sqlalchemy import select, update, delete, and_, or_, func
+from fastapi import HTTPException
 from sqlalchemy.orm import selectinload
 
 from app.modules.charts.models import Dashboard, DashboardWidget, Widget
