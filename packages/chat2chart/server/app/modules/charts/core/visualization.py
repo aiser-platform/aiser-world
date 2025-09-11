@@ -345,7 +345,7 @@ class VisualizationGeneration:
 
     def _limit_rows(self, df: pd.DataFrame) -> pd.DataFrame:
         """Limit the number of rows in the dataframe"""
-        if self.rowLimit > 0:
+        if (self.rowLimit or 0) > 0:
             return df.head(self.rowLimit)
         return df
 

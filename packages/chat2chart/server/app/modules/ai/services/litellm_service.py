@@ -296,7 +296,7 @@ Return only valid JSON.
 
             # Get model config for chart recommendations
             selected_model = 'azure_gpt5_mini' if self.azure_api_key else 'openai_gpt4_mini'
-            model_config = self.available_models.get(selected_model, self.available_models[self.default_model])
+            model_config = self.available_models.get(selected_model, self.available_models.get(self.default_model) or {})
             
             response = await acompletion(
                 model=model_config['model'],
@@ -471,7 +471,7 @@ Return only valid JSON array.
                 }
                 for model_id, config in self.available_models.items()
             ],
-            'default_model': self.default_model
+            'default_model': self.default_model or ''
         }
 
     def set_default_model(self, model_id: str) -> Dict[str, Any]:
@@ -1203,7 +1203,7 @@ Please try connecting a data source to get started, or let me know if you need h
             try:
                 chart_recommendations = await self.generate_chart_recommendations(
                     data_analysis={'summary': 'auto'},
-                    query_analysis={'original_query': data_context.get('query') if isinstance(data_context, dict) else ''}
+                    query_analysis={'original_query': (data_context or {}).get('query') if isinstance(data_context, dict) else ''}
                 )
             except Exception:
                 chart_recommendations = {'primary_recommendation': 'bar', 'alternative_recommendations': []}
