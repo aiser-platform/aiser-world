@@ -33,16 +33,16 @@ class Auth:
             return False
 
     @classmethod
-    def encodeJWT(self, **kwargs) -> str:
+    def encodeJWT(cls, **kwargs) -> str:
         # access token
-        exp = round(time.time() + self.JWT_EXP * 60, 0)
+        exp = round(time.time() + cls.JWT_EXP * 60, 0)
         payload = {
             **kwargs,
             "exp": exp,
-            "iat": self.JWT_IAT,
+            "iat": cls.JWT_IAT,
             "scope": "access_token",
         }
-        token = jwt.encode(payload, self.SECRET, algorithm=self.JWT_ALGORITHM)
+        token = jwt.encode(payload, cls.SECRET, algorithm=cls.JWT_ALGORITHM)
 
         return token
 
