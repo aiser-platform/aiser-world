@@ -60,14 +60,16 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             return query
 
         # Simple search across string fields
+        from sqlalchemy import or_
         search_conditions = []
         for column in self.model.__table__.columns:
-            if column.type.python_type == str:
-                search_conditions.append(column.ilike(f"%{search_query}%"))
+            try:
+                if column.type.python_type == str:
+                    search_conditions.append(column.ilike(f"%{search_query}%"))
+            except Exception:
+                continue
 
         if search_conditions:
-            from sqlalchemy import or_
-
             query = query.where(or_(*search_conditions))
 
         return query
