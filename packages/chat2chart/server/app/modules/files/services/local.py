@@ -8,6 +8,7 @@ from fastapi import HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
 from .base import BaseUploadService
+from app.modules.files.schemas import FileCreate
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +39,7 @@ class LocalUploadService(BaseUploadService):
         }
 
         try:
-            stored_file = await self.repository.create(file_data)
+            stored_file = await self.repository.create(FileCreate(**file_data))
             file_data["id"] = stored_file.id
 
         except Exception as e:

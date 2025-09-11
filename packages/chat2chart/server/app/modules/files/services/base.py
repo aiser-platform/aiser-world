@@ -169,7 +169,17 @@ class BaseUploadService(ABC, BaseService):
         """
         try:
             # Check file size
-            if len(file_content) > self.MAX_IMAGE_SIZE:
+            size_bytes: int
+            if isinstance(file_content, bytes):
+                size_bytes = len(file_content)
+            elif isinstance(file_content, io.BytesIO):
+                size_bytes = file_content.getbuffer().nbytes
+            else:
+                # Fallback: best effort by reading into memory
+                data = file_content.read()  # type: ignore[reportUnknownMemberType]
+                size_bytes = len(data) if isinstance(data, (bytes, bytearray)) else 0
+
+            if size_bytes > self.MAX_IMAGE_SIZE:
                 logger.error("Image file size exceeds limit")
                 raise HTTPException(
                     status_code=400,
