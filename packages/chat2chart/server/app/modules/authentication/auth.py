@@ -61,11 +61,11 @@ class Auth:
             algorithm=self.JWT_ALGORITHM,
         )
 
-        jwe_token = jwe.encrypt(
+        jwe_token_bytes = jwe.encrypt(
             refresh_jwt, self.SECRET, algorithm="dir", encryption="A256GCM"
         )
-
-        return jwe_token
+        # Ensure string return type
+        return jwe_token_bytes.decode("utf-8") if isinstance(jwe_token_bytes, (bytes, bytearray)) else jwe_token_bytes
 
     def signJWT(self, **kwargs) -> Dict[str, str]:
         access_token = self.encodeJWT(**kwargs)
@@ -74,7 +74,7 @@ class Auth:
 
         return {
             "access_token": access_token,
-            "expires_in": self.JWT_EXP * 60,
+            "expires_in": str(self.JWT_EXP * 60),
             "refresh_token": refresh_token,
         }
 
@@ -89,8 +89,8 @@ class Auth:
 
     def decodeRefreshJWE(self, token: str) -> str | None:
         try:
-            decoded_token = jwe.decrypt(token, self.SECRET)
-            return decoded_token
+            decoded_bytes = jwe.decrypt(token, self.SECRET)
+            return decoded_bytes.decode("utf-8") if isinstance(decoded_bytes, (bytes, bytearray)) else decoded_bytes
         except Exception:
             return None
 
