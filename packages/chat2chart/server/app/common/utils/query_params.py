@@ -16,12 +16,14 @@ class BaseFilterParams(BaseModel):
     @property
     def offset(self) -> int:
         """Calculate offset for pagination"""
-        return (self.page - 1) * self.page_size
+        page = self.page or 1
+        page_size = self.page_size or 10
+        return (page - 1) * page_size
     
     @property
     def limit(self) -> int:
         """Get limit for pagination"""
-        return self.page_size
+        return (self.page_size or 10)
 
 class UserFilterParams(BaseFilterParams):
     """Filter parameters for user endpoints"""

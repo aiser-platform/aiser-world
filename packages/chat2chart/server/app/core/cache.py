@@ -50,7 +50,7 @@ class RedisCache:
             logger.warning(f"⚠️ Redis connection failed: {e}")
             self.redis_client = None
     
-    def get_ai_response(self, query: str, context: Dict[str, Any] = None) -> Optional[Any]:
+    def get_ai_response(self, query: str, context: Optional[Dict[str, Any]] = None) -> Optional[Any]:
         """Get cached AI response for a query and context"""
         try:
             # Generate cache key from query and context
@@ -60,7 +60,7 @@ class RedisCache:
             logger.error(f"Error getting AI response from cache: {e}")
             return None
     
-    def set_ai_response(self, query: str, response: Any, context: Dict[str, Any] = None, ttl: Optional[int] = None) -> bool:
+    def set_ai_response(self, query: str, response: Any, context: Optional[Dict[str, Any]] = None, ttl: Optional[int] = None) -> bool:
         """Set cached AI response for a query and context"""
         try:
             # Generate cache key from query and context
@@ -211,9 +211,10 @@ class RedisCache:
             # Fallback to in-memory
             current = self.get(key, 0)
             if isinstance(current, (int, float)):
-                new_value = current + amount
+                new_value: Union[int, float] = current + amount
                 self.set(key, new_value)
-                return new_value
+                # Ensure int return type
+                return int(new_value) if isinstance(new_value, float) else new_value
             
             return 0
             
@@ -334,7 +335,7 @@ class RedisCache:
     
     async def health_check(self) -> Dict[str, Any]:
         """Perform cache health check"""
-        health = {
+        health: Dict[str, Any] = {
             'redis_healthy': False,
             'fallback_healthy': True,
             'response_time_ms': None

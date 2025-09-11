@@ -8,6 +8,7 @@ from fastapi import HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 
 from .base import BaseUploadService
+from app.modules.files.schemas import FileCreate
 
 
 class S3UploadService(BaseUploadService):
@@ -24,7 +25,7 @@ class S3UploadService(BaseUploadService):
 
     async def upload_file(self, file: UploadFile) -> dict:
         try:
-            self.validate_file_content(file)
+            await self.validate_file_content(file)
 
             # Generate UUID filename
             uuid_filename = File().generate_unique_filename(file.filename)
@@ -49,7 +50,7 @@ class S3UploadService(BaseUploadService):
             }
 
             # Store file info in database
-            stored_file = await self.repository.create(file_data)
+            stored_file = await self.repository.create(FileCreate(**file_data))
             file_data["id"] = stored_file.id
 
             return file_data

@@ -78,23 +78,23 @@ class Auth:
             "refresh_token": refresh_token,
         }
 
-    def decodeJWT(self, token: str) -> dict:
+    def decodeJWT(self, token: str) -> dict | None:
         try:
             decoded_token = jwt.decode(
                 token, self.SECRET, algorithms=[self.JWT_ALGORITHM]
             )
             return decoded_token if decoded_token["exp"] >= time.time() else None
-        except:
-            return {}
+        except Exception:
+            return None
 
-    def decodeRefreshJWE(self, token: str) -> dict:
+    def decodeRefreshJWE(self, token: str) -> str | None:
         try:
             decoded_token = jwe.decrypt(token, self.SECRET)
             return decoded_token
-        except:
-            return {}
+        except Exception:
+            return None
 
-    def decodeRefreshJWT(self, token: str) -> dict:
+    def decodeRefreshJWT(self, token: str) -> dict | None:
         try:
             decoded_token = jwt.decode(
                 token, self.SECRET, algorithms=[self.JWT_ALGORITHM]
@@ -102,5 +102,5 @@ class Auth:
             expired = decoded_token["exp"] >= time.time()
 
             return decoded_token if expired else None
-        except:
-            return {}
+        except Exception:
+            return None

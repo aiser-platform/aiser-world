@@ -10,6 +10,8 @@ import logging
 from datetime import datetime, timezone
 
 from app.db.session import get_async_session
+from app.core.deps import get_current_user
+from sqlalchemy import select, and_
 from app.modules.projects.models import Organization, OrganizationUser
 from app.modules.user.models import User
 from app.modules.authentication.deps.auth_bearer import JWTCookieBearer
