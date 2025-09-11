@@ -322,10 +322,13 @@ class VisualizationGeneration:
 
     def _create_y_axis(self) -> EchartsAxis:
         """Create y-axis configuration"""
+        # Guard None for prefix/suffix on metric
+        prefix = self.metrics[0].prefix or ""
+        suffix = self.metrics[0].suffix or ""
         return EchartsAxis(
             type="value",
             axisLabel=EchartsAxisLabel(
-                formatter=f"{self.metrics[0].prefix}{{value}}{self.metrics[0].suffix}"
+                formatter=f"{prefix}{{value}}{suffix}"
             ),
         )
 

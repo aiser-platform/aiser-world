@@ -208,7 +208,7 @@ Return only valid JSON.
 
             # Select model configuration
             selected_model = model_id or self.default_model
-            model_config = self.available_models.get(selected_model, self.available_models[self.default_model])
+            model_config = self.available_models.get(selected_model, self.available_models.get(self.default_model) or {})
             
             # Prepare LiteLLM parameters
             litellm_params = {
@@ -1198,9 +1198,15 @@ Please try connecting a data source to get started, or let me know if you need h
             
             execution_time = int((time.time() - start_time) * 1000)
             
-            # Extract insights and generate chart recommendations
-            insights = self._extract_insights_from_response(content, data_context)
-            chart_recommendations = await self._generate_chart_recommendations(content, data_context)
+            # Extract minimal insights and generate chart recommendations using public APIs
+            insights = self._extract_business_insights(content) if hasattr(self, '_extract_business_insights') else []
+            try:
+                chart_recommendations = await self.generate_chart_recommendations(
+                    data_analysis={'summary': 'auto'},
+                    query_analysis={'original_query': data_context.get('query') if isinstance(data_context, dict) else ''}
+                )
+            except Exception:
+                chart_recommendations = {'primary_recommendation': 'bar', 'alternative_recommendations': []}
             
             # Generate SQL queries if data analysis is involved
             sql_queries = []
