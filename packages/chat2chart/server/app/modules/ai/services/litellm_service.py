@@ -752,6 +752,8 @@ Return only valid JSON array.
     def get_model_info(self, model_id: Optional[str] = None) -> Dict[str, Any]:
         """Get information about a specific model"""
         selected_model = model_id or self.default_model
+        if not selected_model:
+            return {'error': 'Model not found'}
         model_config = self.available_models.get(selected_model)
         
         if not model_config:
@@ -907,10 +909,17 @@ Please try connecting a data source to get started, or let me know if you need h
         """Test AI model connection"""
         # Initialize variables outside try block to avoid scope issues
         selected_model = model_id or self.default_model
-        model_config = self.available_models.get(selected_model, self.available_models[self.default_model])
+        model_config = await self._get_model_config(selected_model)
         
         try:
             
+            if not model_config:
+                return {
+                    'success': False,
+                    'error': 'No AI model configured',
+                    'model': selected_model or '',
+                    'provider': 'unknown'
+                }
             # Simple test prompt
             litellm_params = {
                 'model': model_config['model'],
@@ -1060,7 +1069,14 @@ Please try connecting a data source to get started, or let me know if you need h
             
             # Get model config for enhanced analysis
             selected_model = 'azure_gpt5_mini' if self.azure_api_key else 'openai_gpt4_mini'
-            model_config = self.available_models.get(selected_model, self.available_models[self.default_model])
+            model_config = await self._get_model_config(selected_model)
+            if not model_config:
+                return {
+                    'success': False,
+                    'error': 'No AI model configured',
+                    'fallback': True,
+                    'content': self._generate_fallback_response(query, Exception('No AI model'))
+                }
             
             response = await acompletion(
                 model=model_config['model'],
