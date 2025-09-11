@@ -177,3 +177,4 @@ DOCKER_ENV_SETUP.md
 packages/docs/venv/
 packages/docs/.docusaurus/
 tmp_debug_*.py
+.venv311
