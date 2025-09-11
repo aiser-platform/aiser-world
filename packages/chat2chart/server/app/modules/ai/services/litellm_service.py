@@ -419,7 +419,9 @@ Return only valid JSON array.
         """Test LiteLLM model availability"""
         # Initialize variables outside try block to avoid scope issues
         selected_model = model_id or self.default_model
-        model_config = self.available_models.get(selected_model, self.available_models[self.default_model])
+        model_config = await self._get_model_config(selected_model)
+        if not model_config:
+            return
         
         try:
             
@@ -711,7 +713,7 @@ Return only valid JSON array.
         
         try:
             
-            logger.info(f"🌊 Starting streaming completion with {model_config['name']}")
+            logger.info(f"🌊 Starting streaming completion with {model_config.get('name', '')}")
             
             # Prepare messages
             messages = []
@@ -721,22 +723,22 @@ Return only valid JSON array.
             
             # Prepare LiteLLM parameters for streaming
             litellm_params = {
-                'model': model_config['model'],
+                'model': model_config.get('model', ''),
                 'messages': messages,
-                'max_tokens': min(max_tokens, model_config['max_tokens']),
+                'max_tokens': min(max_tokens, model_config.get('max_tokens', max_tokens)),
                 'temperature': temperature,
                 'stream': True
             }
             
             # Add Azure-specific parameters
-            if model_config['provider'] == 'azure':
+            if model_config.get('provider') == 'azure':
                 litellm_params.update({
-                    'api_key': model_config['api_key'],
-                    'api_base': model_config['api_base'],
-                    'api_version': model_config['api_version']
+                    'api_key': model_config.get('api_key', ''),
+                    'api_base': model_config.get('api_base', ''),
+                    'api_version': model_config.get('api_version', '')
                 })
             else:
-                litellm_params['api_key'] = model_config['api_key']
+                litellm_params['api_key'] = model_config.get('api_key', '')
             
             # Stream the response
             response = await acompletion(**litellm_params)
