@@ -1,13 +1,23 @@
-from sqlalchemy import Boolean, Column, DateTime, Integer, String, Text, JSON, Numeric, ForeignKey
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    Integer,
+    String,
+    Text,
+    JSON,
+    Numeric,
+    ForeignKey,
+)
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from datetime import datetime, timedelta
 
 from app.common.model import BaseModel
 
 
 class Role(BaseModel):
     """Role model for organization and project permissions"""
+
     __tablename__ = "roles"
 
     id = Column(Integer, primary_key=True)
@@ -24,16 +34,16 @@ class Role(BaseModel):
         """Check if role has permission for resource and action"""
         if not self.permissions:
             return False
-        
+
         # Check for all permissions
         if self.permissions.get("all") is True:
             return True
-        
+
         # Check specific resource permissions
         resource_perms = self.permissions.get(resource, [])
         if isinstance(resource_perms, list):
             return action in resource_perms
-        
+
         return False
 
 
@@ -46,12 +56,12 @@ class Organization(BaseModel):
     description = Column(Text, nullable=True)
     logo_url = Column(String(255), nullable=True)
     website = Column(String(255), nullable=True)
-    plan_type = Column(String(20), nullable=False, default='free')
+    plan_type = Column(String(20), nullable=False, default="free")
     ai_credits_used = Column(Integer, nullable=False, default=0)
     ai_credits_limit = Column(Integer, nullable=False, default=1000)
     stripe_customer_id = Column(String(255), nullable=True)
     stripe_subscription_id = Column(String(255), nullable=True)
-    subscription_status = Column(String(20), nullable=False, default='active')
+    subscription_status = Column(String(20), nullable=False, default="active")
     trial_ends_at = Column(DateTime, nullable=True)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
 
@@ -60,7 +70,9 @@ class Organization(BaseModel):
     projects = relationship("Project", back_populates="organization")
     subscriptions = relationship("Subscription", back_populates="organization")
     ai_usage_logs = relationship("AIUsageLog", back_populates="organization")
-    billing_transactions = relationship("BillingTransaction", back_populates="organization")
+    billing_transactions = relationship(
+        "BillingTransaction", back_populates="organization"
+    )
 
 
 class UserOrganization(BaseModel):
@@ -117,7 +129,7 @@ class Subscription(BaseModel):
     id = Column(Integer, primary_key=True)
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
     plan_type = Column(String(20), nullable=False)
-    status = Column(String(20), nullable=False, default='active')
+    status = Column(String(20), nullable=False, default="active")
     current_period_start = Column(DateTime, nullable=False)
     current_period_end = Column(DateTime, nullable=False)
     cancel_at_period_end = Column(Boolean, nullable=False, default=False)
@@ -127,7 +139,9 @@ class Subscription(BaseModel):
 
     # Relationships
     organization = relationship("Organization", back_populates="subscriptions")
-    billing_transactions = relationship("BillingTransaction", back_populates="subscription")
+    billing_transactions = relationship(
+        "BillingTransaction", back_populates="subscription"
+    )
 
 
 class AIUsageLog(BaseModel):
@@ -173,9 +187,11 @@ class BillingTransaction(BaseModel):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     subscription_id = Column(Integer, ForeignKey("subscriptions.id"), nullable=True)
     amount = Column(Numeric(10, 2), nullable=False)
-    currency = Column(String(3), nullable=False, default='USD')
-    transaction_type = Column(String(50), nullable=False)  # 'charge', 'refund', 'credit'
-    status = Column(String(20), nullable=False, default='pending')
+    currency = Column(String(3), nullable=False, default="USD")
+    transaction_type = Column(
+        String(50), nullable=False
+    )  # 'charge', 'refund', 'credit'
+    status = Column(String(20), nullable=False, default="pending")
     stripe_invoice_id = Column(String(255), nullable=True)
     stripe_payment_intent_id = Column(String(255), nullable=True)
     description = Column(Text, nullable=True)

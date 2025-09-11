@@ -1,7 +1,7 @@
 """tenancy constants
 
 Revision ID: 59c80afc9229
-Revises: 
+Revises:
 Create Date: 2025-02-26 11:33:47.119213
 
 """

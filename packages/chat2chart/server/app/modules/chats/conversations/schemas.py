@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 from app.common.schemas import BaseSchema, PaginationSchema
 from app.modules.chats.messages.schemas import MessageResponseSchema
@@ -31,8 +31,6 @@ class ConversationUpdateSchema(BaseModel):
 
 class ConversationResponseSchema(BaseConversation, BaseSchema):
     """Model for conversation response"""
-
-    pass
 
 
 class SpecificConversationResponseSchema(BaseModel):

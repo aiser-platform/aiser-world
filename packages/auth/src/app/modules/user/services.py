@@ -3,9 +3,7 @@ import uuid
 from datetime import datetime, timedelta
 from typing import List, Optional
 
-import colorama
-from fastapi import HTTPException, status
-from passlib.context import CryptContext
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.common.service import BaseService
@@ -30,15 +28,18 @@ from app.modules.authentication.schemas import (
 from app.modules.device_session.repository import DeviceSessionRepository
 from app.modules.device_session.schemas import (
     DeviceInfo,
-    DeviceSessionBase,
-    DeviceSessionCreate,
 )
 from app.modules.email.core import send_reset_password_email, send_verification_email
 from app.modules.temporary_token.constants import TokenType
 from app.modules.temporary_token.repository import TokenRepository
 from app.modules.user.models import User
 from app.modules.user.repository import UserRepository
-from app.modules.user.schemas import UserCreate, UserCreateInternal, UserResponse, UserUpdate
+from app.modules.user.schemas import (
+    UserCreate,
+    UserCreateInternal,
+    UserResponse,
+    UserUpdate,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -77,9 +78,13 @@ class UserService(BaseService):
         created_user = self.repository.create(user, db)
         return created_user
 
-    def authenticate(self, identifier: str, password: str, db: Session) -> Optional[User]:
+    def authenticate(
+        self, identifier: str, password: str, db: Session
+    ) -> Optional[User]:
         """Authenticate user by email or username and password"""
-        user = self.repository.get_by_email(identifier, db) or self.repository.get_by_username(identifier, db)
+        user = self.repository.get_by_email(
+            identifier, db
+        ) or self.repository.get_by_username(identifier, db)
 
         if not user or not self.auth.verify_password(password, user.password):
             return None
@@ -189,8 +194,8 @@ class UserService(BaseService):
                 "username": user.username,
                 "is_verified": user.is_verified,
                 "created_at": user.created_at.isoformat() if user.created_at else None,
-                "updated_at": user.updated_at.isoformat() if user.updated_at else None
-            }
+                "updated_at": user.updated_at.isoformat() if user.updated_at else None,
+            },
         )
 
     def signup(self, sign_up_payload: SignUpRequest, db: Session) -> SignUpResponse:
@@ -367,9 +372,7 @@ class UserService(BaseService):
             message="Verification email sent successfully"
         )
 
-    def forgot_password(
-        self, request: ForgotPasswordRequest
-    ) -> ForgotPasswordResponse:
+    def forgot_password(self, request: ForgotPasswordRequest) -> ForgotPasswordResponse:
         """Handle forgot password request"""
         user = self.repository.get_by_email(request.email)
         if not user:
@@ -408,9 +411,7 @@ class UserService(BaseService):
                 status_code=500, detail="Failed to send password reset email"
             )
 
-    def reset_password(
-        self, request: ResetPasswordRequest
-    ) -> ResetPasswordResponse:
+    def reset_password(self, request: ResetPasswordRequest) -> ResetPasswordResponse:
         """Reset user password with token"""
         try:
             # First verify token in database

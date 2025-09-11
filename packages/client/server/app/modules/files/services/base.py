@@ -5,9 +5,7 @@ from typing import Dict, Union
 
 from app.common.service import BaseService
 import pandas as pd
-from app.common.schemas import ListResponseSchema, PaginationSchema
 from app.modules.files.repository import FileRepository
-from app.modules.files.schemas import FileResponse
 from fastapi import HTTPException, UploadFile
 from PIL import Image
 
@@ -37,7 +35,6 @@ class BaseUploadService(ABC, BaseService):
         Returns:
             Dict: Information about the uploaded file
         """
-        pass
 
     async def validate_file_content(self, file: UploadFile) -> bool:
         """
@@ -178,7 +175,7 @@ class BaseUploadService(ABC, BaseService):
                 logger.error("Image file size exceeds limit")
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Image file size exceeds {self.MAX_IMAGE_SIZE // (1024*1024)}MB limit",
+                    detail=f"Image file size exceeds {self.MAX_IMAGE_SIZE // (1024 * 1024)}MB limit",
                 )
 
             # Convert bytes to BytesIO if needed
@@ -210,7 +207,7 @@ class BaseUploadService(ABC, BaseService):
                 img.load()
                 return True
 
-        except (IOError, SyntaxError) as e:
+        except (IOError, SyntaxError):
             logger.error("Invalid or corrupted image file")
             raise HTTPException(
                 status_code=400, detail="Invalid or corrupted image file"

@@ -7,43 +7,41 @@ Generates production-ready configuration files with real values
 import os
 import secrets
 import string
-import hashlib
-import json
-from datetime import datetime, timezone
-from typing import Dict, Any, List
+from typing import Dict, Any
 import yaml
+
 
 class ProductionConfigGenerator:
     """Generate real production configuration files"""
-    
+
     def __init__(self):
         self.config = {}
         self.secrets = {}
-    
+
     def generate_secure_secret(self, length: int = 64) -> str:
         """Generate a secure random secret"""
         alphabet = string.ascii_letters + string.digits + "!@#$%^&*()_+-=[]{}|;:,.<>?"
-        return ''.join(secrets.choice(alphabet) for _ in range(length))
-    
+        return "".join(secrets.choice(alphabet) for _ in range(length))
+
     def generate_api_key(self) -> str:
         """Generate a secure API key"""
         return secrets.token_urlsafe(32)
-    
+
     def generate_database_password(self) -> str:
         """Generate a secure database password"""
         return secrets.token_urlsafe(24)
-    
+
     def generate_jwt_secret(self) -> str:
         """Generate a secure JWT secret"""
         return secrets.token_urlsafe(64)
-    
+
     def generate_encryption_key(self) -> str:
         """Generate a secure encryption key"""
         return secrets.token_urlsafe(32)
-    
+
     def generate_real_config(self) -> Dict[str, Any]:
         """Generate real production configuration"""
-        
+
         # Generate all secrets
         self.secrets = {
             "api_secret_key": self.generate_secure_secret(64),
@@ -59,15 +57,14 @@ class ProductionConfigGenerator:
             "aws_access_key_id": f"AKIA{self.generate_api_key()[:16]}",
             "aws_secret_access_key": self.generate_secure_secret(40),
             "azure_storage_key": self.generate_secure_secret(88),
-            "gcp_service_account_key": self.generate_secure_secret(100)
+            "gcp_service_account_key": self.generate_secure_secret(100),
         }
-        
+
         # Generate real configuration
         self.config = {
             "environment": "production",
             "debug": False,
             "log_level": "INFO",
-            
             # Database Configuration
             "database": {
                 "host": "postgres",
@@ -79,9 +76,8 @@ class ProductionConfigGenerator:
                 "pool_size": 20,
                 "max_overflow": 30,
                 "pool_timeout": 30,
-                "pool_recycle": 3600
+                "pool_recycle": 3600,
             },
-            
             # Redis Configuration
             "redis": {
                 "host": "redis",
@@ -90,9 +86,8 @@ class ProductionConfigGenerator:
                 "db": 0,
                 "ssl": True,
                 "pool_size": 20,
-                "timeout": 5
+                "timeout": 5,
             },
-            
             # Security Configuration
             "security": {
                 "api_secret_key": self.secrets["api_secret_key"],
@@ -106,9 +101,8 @@ class ProductionConfigGenerator:
                 "password_require_uppercase": True,
                 "session_timeout": 1800,
                 "max_login_attempts": 5,
-                "lockout_duration": 900
+                "lockout_duration": 900,
             },
-            
             # API Configuration
             "api": {
                 "host": "0.0.0.0",
@@ -124,10 +118,9 @@ class ProductionConfigGenerator:
                     "requests_per_minute": 60,
                     "requests_per_hour": 1000,
                     "requests_per_day": 10000,
-                    "burst_limit": 100
-                }
+                    "burst_limit": 100,
+                },
             },
-            
             # Frontend Configuration
             "frontend": {
                 "host": "0.0.0.0",
@@ -137,9 +130,8 @@ class ProductionConfigGenerator:
                 "enable_analytics": True,
                 "enable_debug": False,
                 "enable_pwa": True,
-                "cache_strategy": "aggressive"
+                "cache_strategy": "aggressive",
             },
-            
             # Authentication Configuration
             "auth": {
                 "enable_2fa": True,
@@ -149,9 +141,8 @@ class ProductionConfigGenerator:
                 "session_timeout": 1800,
                 "remember_me_duration": 2592000,
                 "password_reset_timeout": 3600,
-                "email_verification_required": True
+                "email_verification_required": True,
             },
-            
             # Email Configuration
             "email": {
                 "smtp_host": "smtp.gmail.com",
@@ -161,32 +152,39 @@ class ProductionConfigGenerator:
                 "smtp_tls": True,
                 "from_email": "noreply@your-domain.com",
                 "from_name": "Aiser Platform",
-                "reply_to": "support@your-domain.com"
+                "reply_to": "support@your-domain.com",
             },
-            
             # File Storage Configuration
             "storage": {
                 "type": "s3",
                 "max_file_size": "100MB",
-                "allowed_extensions": ["csv", "xlsx", "json", "sql", "pdf", "png", "jpg", "jpeg"],
+                "allowed_extensions": [
+                    "csv",
+                    "xlsx",
+                    "json",
+                    "sql",
+                    "pdf",
+                    "png",
+                    "jpg",
+                    "jpeg",
+                ],
                 "s3": {
                     "bucket": "aiser-production-storage",
                     "region": "us-east-1",
                     "access_key_id": self.secrets["aws_access_key_id"],
                     "secret_access_key": self.secrets["aws_secret_access_key"],
-                    "endpoint_url": None
+                    "endpoint_url": None,
                 },
                 "azure": {
                     "account_name": "aiserproduction",
                     "account_key": self.secrets["azure_storage_key"],
-                    "container": "aiser-storage"
+                    "container": "aiser-storage",
                 },
                 "gcp": {
                     "bucket": "aiser-production-storage",
-                    "service_account_key": self.secrets["gcp_service_account_key"]
-                }
+                    "service_account_key": self.secrets["gcp_service_account_key"],
+                },
             },
-            
             # Monitoring Configuration
             "monitoring": {
                 "enable_metrics": True,
@@ -198,9 +196,8 @@ class ProductionConfigGenerator:
                 "kibana_port": 5601,
                 "log_level": "INFO",
                 "log_retention_days": 30,
-                "metrics_retention_days": 90
+                "metrics_retention_days": 90,
             },
-            
             # Backup Configuration
             "backup": {
                 "enable_automated_backup": True,
@@ -212,9 +209,8 @@ class ProductionConfigGenerator:
                 "storage_type": "s3",
                 "s3_bucket": "aiser-production-backups",
                 "verify_backups": True,
-                "test_restore_frequency": "weekly"
+                "test_restore_frequency": "weekly",
             },
-            
             # Billing Configuration
             "billing": {
                 "enable_billing": True,
@@ -224,9 +220,8 @@ class ProductionConfigGenerator:
                 "currency": "USD",
                 "tax_rate": 0.08,
                 "trial_days": 14,
-                "grace_period_days": 7
+                "grace_period_days": 7,
             },
-            
             # Feature Flags
             "features": {
                 "enable_ai_features": True,
@@ -236,9 +231,8 @@ class ProductionConfigGenerator:
                 "enable_webhooks": True,
                 "enable_audit_logs": True,
                 "enable_data_encryption": True,
-                "enable_compliance_mode": True
+                "enable_compliance_mode": True,
             },
-            
             # Performance Configuration
             "performance": {
                 "enable_caching": True,
@@ -248,32 +242,32 @@ class ProductionConfigGenerator:
                 "enable_brotli": True,
                 "static_file_caching": 31536000,
                 "api_response_caching": 300,
-                "database_query_caching": 600
-            }
+                "database_query_caching": 600,
+            },
         }
-        
+
         return self.config
-    
+
     def save_config_files(self, output_dir: str = "config/production"):
         """Save configuration files"""
         os.makedirs(output_dir, exist_ok=True)
-        
+
         # Save main configuration
         with open(f"{output_dir}/config.yaml", "w") as f:
             yaml.dump(self.config, f, default_flow_style=False, indent=2)
-        
+
         # Save secrets (separate file for security)
         with open(f"{output_dir}/secrets.yaml", "w") as f:
             yaml.dump(self.secrets, f, default_flow_style=False, indent=2)
-        
+
         # Save environment file
         env_content = []
         for key, value in self.secrets.items():
             env_content.append(f"{key.upper()}={value}")
-        
+
         with open(f"{output_dir}/.env.production", "w") as f:
             f.write("\n".join(env_content))
-        
+
         # Save Docker Compose environment
         docker_env = {
             "POSTGRES_PASSWORD": self.secrets["postgres_password"],
@@ -282,44 +276,45 @@ class ProductionConfigGenerator:
             "JWT_SECRET": self.secrets["jwt_secret"],
             "ENCRYPTION_KEY": self.secrets["encryption_key"],
             "CUBE_API_SECRET": self.secrets["cube_api_secret"],
-            "BACKUP_ENCRYPTION_KEY": self.secrets["backup_encryption_key"]
+            "BACKUP_ENCRYPTION_KEY": self.secrets["backup_encryption_key"],
         }
-        
+
         with open(f"{output_dir}/docker.env", "w") as f:
             for key, value in docker_env.items():
                 f.write(f"{key}={value}\n")
-        
+
         # Save Kubernetes secrets
         k8s_secrets = {
             "apiVersion": "v1",
             "kind": "Secret",
             "metadata": {
                 "name": "aiser-production-secrets",
-                "namespace": "aiser-production"
+                "namespace": "aiser-production",
             },
             "type": "Opaque",
-            "data": {}
+            "data": {},
         }
-        
+
         # Base64 encode secrets for Kubernetes
         import base64
+
         for key, value in self.secrets.items():
             k8s_secrets["data"][key] = base64.b64encode(value.encode()).decode()
-        
+
         with open(f"{output_dir}/k8s-secrets.yaml", "w") as f:
             yaml.dump(k8s_secrets, f, default_flow_style=False, indent=2)
-        
+
         print(f"✅ Configuration files saved to {output_dir}/")
-        print(f"   • config.yaml - Main configuration")
-        print(f"   • secrets.yaml - All secrets")
-        print(f"   • .env.production - Environment variables")
-        print(f"   • docker.env - Docker environment")
-        print(f"   • k8s-secrets.yaml - Kubernetes secrets")
-    
+        print("   • config.yaml - Main configuration")
+        print("   • secrets.yaml - All secrets")
+        print("   • .env.production - Environment variables")
+        print("   • docker.env - Docker environment")
+        print("   • k8s-secrets.yaml - Kubernetes secrets")
+
     def generate_nginx_config(self, domain: str, output_dir: str = "config/nginx"):
         """Generate production nginx configuration"""
         os.makedirs(output_dir, exist_ok=True)
-        
+
         nginx_config = f"""
 server {{
     listen 80;
@@ -435,39 +430,36 @@ server {{
     }}
 }}
 """
-        
+
         with open(f"{output_dir}/aiser-production.conf", "w") as f:
             f.write(nginx_config)
-        
+
         print(f"✅ Nginx configuration saved to {output_dir}/aiser-production.conf")
-    
+
     def generate_kubernetes_config(self, output_dir: str = "config/kubernetes"):
         """Generate Kubernetes configuration files"""
         os.makedirs(output_dir, exist_ok=True)
-        
+
         # Namespace
         namespace = {
             "apiVersion": "v1",
             "kind": "Namespace",
             "metadata": {
                 "name": "aiser-production",
-                "labels": {
-                    "name": "aiser-production",
-                    "environment": "production"
-                }
-            }
+                "labels": {"name": "aiser-production", "environment": "production"},
+            },
         }
-        
+
         with open(f"{output_dir}/namespace.yaml", "w") as f:
             yaml.dump(namespace, f, default_flow_style=False, indent=2)
-        
+
         # ConfigMap
         configmap = {
             "apiVersion": "v1",
             "kind": "ConfigMap",
             "metadata": {
                 "name": "aiser-production-config",
-                "namespace": "aiser-production"
+                "namespace": "aiser-production",
             },
             "data": {
                 "ENVIRONMENT": "production",
@@ -479,42 +471,52 @@ server {{
                 "POSTGRES_USER": "aiser_admin",
                 "REDIS_HOST": "redis",
                 "REDIS_PORT": "6379",
-                "REDIS_DB": "0"
-            }
+                "REDIS_DB": "0",
+            },
         }
-        
+
         with open(f"{output_dir}/configmap.yaml", "w") as f:
             yaml.dump(configmap, f, default_flow_style=False, indent=2)
-        
+
         print(f"✅ Kubernetes configuration saved to {output_dir}/")
+
 
 def main():
     """Main function"""
     import argparse
-    
+
     parser = argparse.ArgumentParser(description="Generate production configuration")
     parser.add_argument("--domain", required=True, help="Production domain")
-    parser.add_argument("--output-dir", default="config/production", help="Output directory")
-    parser.add_argument("--nginx-dir", default="config/nginx", help="Nginx config directory")
-    parser.add_argument("--k8s-dir", default="config/kubernetes", help="Kubernetes config directory")
-    
+    parser.add_argument(
+        "--output-dir", default="config/production", help="Output directory"
+    )
+    parser.add_argument(
+        "--nginx-dir", default="config/nginx", help="Nginx config directory"
+    )
+    parser.add_argument(
+        "--k8s-dir", default="config/kubernetes", help="Kubernetes config directory"
+    )
+
     args = parser.parse_args()
-    
+
     print("🚀 Generating real production configuration...")
-    
+
     generator = ProductionConfigGenerator()
-    config = generator.generate_real_config()
-    
+    generator.generate_real_config()
+
     generator.save_config_files(args.output_dir)
     generator.generate_nginx_config(args.domain, args.nginx_dir)
     generator.generate_kubernetes_config(args.k8s_dir)
-    
+
     print("🎉 Production configuration generation completed!")
-    print(f"\n📋 Generated files:")
+    print("\n📋 Generated files:")
     print(f"   • Configuration: {args.output_dir}/")
     print(f"   • Nginx config: {args.nginx_dir}/")
     print(f"   • Kubernetes config: {args.k8s_dir}/")
-    print(f"\n🔐 IMPORTANT: Keep secrets.yaml secure and never commit to version control!")
+    print(
+        "\n🔐 IMPORTANT: Keep secrets.yaml secure and never commit to version control!"
+    )
+
 
 if __name__ == "__main__":
     main()

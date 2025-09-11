@@ -42,7 +42,7 @@ class OrganizationResponse(OrganizationBase):
     is_trial_active: bool
     created_at: datetime
     updated_at: datetime
-    
+
     class Config:
         from_attributes = True
 
@@ -73,7 +73,7 @@ class ProjectResponse(ProjectBase):
     is_active: bool
     created_at: datetime
     updated_at: datetime
-    
+
     class Config:
         from_attributes = True
 
@@ -97,7 +97,7 @@ class ProjectDataSourceResponse(ProjectDataSourceBase):
     project_id: int
     is_active: bool
     added_at: datetime
-    
+
     class Config:
         from_attributes = True
 
@@ -115,23 +115,27 @@ class ProjectConversationResponse(ProjectConversationBase):
     project_id: int
     is_active: bool
     added_at: datetime
-    
+
     class Config:
         from_attributes = True
 
 
 class UserProjectAccess(BaseModel):
     """User's access to projects"""
+
     user_id: str
     organization_id: int
     role: str = Field(..., description="User role in organization")
     projects: List[ProjectResponse] = Field(default_factory=list)
-    can_create_projects: bool = Field(False, description="Whether user can create new projects")
+    can_create_projects: bool = Field(
+        False, description="Whether user can create new projects"
+    )
     max_projects_allowed: int = Field(1, description="Maximum projects user can create")
 
 
 class ProjectSummary(BaseModel):
     """Summary of project for dashboard"""
+
     id: int
     name: str
     description: Optional[str]
@@ -144,6 +148,7 @@ class ProjectSummary(BaseModel):
 
 class OrganizationSummary(BaseModel):
     """Summary of organization for dashboard"""
+
     id: int
     name: str
     plan_type: str

@@ -1,14 +1,10 @@
 import click
 from alembic.config import main as alembic_main
-import asyncio
-from sqlalchemy.ext.asyncio import create_async_engine
-from contextlib import asynccontextmanager
 
 
 @click.group()
 def db():
     """Perform database migrations."""
-    pass
 
 
 @db.command(name="upgrade")

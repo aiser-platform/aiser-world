@@ -1,7 +1,6 @@
 from typing import Dict, List
 
 from app.modules.chats.core.ai_flows.schemas import AIFlowSchema
-from app.modules.chats.schemas import ChatSchema
 
 from . import BaseAgent
 

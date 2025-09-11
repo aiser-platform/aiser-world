@@ -1,9 +1,9 @@
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Column, DateTime, Integer, String
 from sqlalchemy.orm import relationship
 
 from app.modules.authentication.models import UserAuthentication
 
-from app.common.model import Base, BaseModel
+from app.common.model import BaseModel
 
 
 class User(BaseModel, UserAuthentication):
@@ -20,9 +20,17 @@ class User(BaseModel, UserAuthentication):
     verification_sent_at = Column(DateTime, nullable=True, default=None)
 
     # Relationships - these will be populated when the models are imported
-    user_organizations = relationship("UserOrganization", back_populates="user", lazy="dynamic")
+    user_organizations = relationship(
+        "UserOrganization", back_populates="user", lazy="dynamic"
+    )
     user_projects = relationship("UserProject", back_populates="user", lazy="dynamic")
-    billing_transactions = relationship("BillingTransaction", back_populates="user", lazy="dynamic")
+    billing_transactions = relationship(
+        "BillingTransaction", back_populates="user", lazy="dynamic"
+    )
     ai_usage_logs = relationship("AIUsageLog", back_populates="user", lazy="dynamic")
-    device_sessions = relationship("DeviceSession", back_populates="user", lazy="dynamic")
-    temporary_tokens = relationship("TemporaryToken", back_populates="user", lazy="dynamic")
+    device_sessions = relationship(
+        "DeviceSession", back_populates="user", lazy="dynamic"
+    )
+    temporary_tokens = relationship(
+        "TemporaryToken", back_populates="user", lazy="dynamic"
+    )

@@ -3,7 +3,7 @@ Organization and pricing plan schemas
 """
 
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
@@ -235,6 +235,7 @@ class PricingPlanResponse(PricingPlanBase):
 
 class PricingResponse(BaseModel):
     """Response containing all pricing plans"""
+
     plans: List[PricingPlanResponse]
     current_plan: Optional[str] = None
     recommended_plan: Optional[str] = None
@@ -242,7 +243,7 @@ class PricingResponse(BaseModel):
 
 class UsageStats(BaseModel):
     ai_credits_used: int = 0
-    ai_cost_usd: Decimal = Decimal('0.00')
+    ai_cost_usd: Decimal = Decimal("0.00")
     project_count: int = 0
     user_count: int = 0
 
@@ -269,14 +270,14 @@ class RoleName(str, Enum):
 # Pricing Plan Templates
 class PricingPlanTemplates:
     """Predefined pricing plans for the platform"""
-    
+
     @staticmethod
     def get_free_plan() -> PricingPlanBase:
         return PricingPlanBase(
             name="Free",
             plan_type="free",
-            price_monthly=Decimal('0.00'),
-            price_yearly=Decimal('0.00'),
+            price_monthly=Decimal("0.00"),
+            price_yearly=Decimal("0.00"),
             ai_credits_monthly=50,
             ai_credits_yearly=600,
             features=[
@@ -284,18 +285,18 @@ class PricingPlanTemplates:
                 "Limited chart generation",
                 "Watermark on charts",
                 "1 project space",
-                "Community support"
+                "Community support",
             ],
-            sort_order=1
+            sort_order=1,
         )
-    
+
     @staticmethod
     def get_pro_plan() -> PricingPlanBase:
         return PricingPlanBase(
             name="Pro",
             plan_type="pro",
-            price_monthly=Decimal('15.00'),
-            price_yearly=Decimal('150.00'),
+            price_monthly=Decimal("15.00"),
+            price_yearly=Decimal("150.00"),
             ai_credits_monthly=500,
             ai_credits_yearly=6000,
             features=[
@@ -306,18 +307,18 @@ class PricingPlanTemplates:
                 "1 project space",
                 "Deep analysis mode",
                 "Basic theme customization",
-                "Email support"
+                "Email support",
             ],
-            sort_order=2
+            sort_order=2,
         )
-    
+
     @staticmethod
     def get_team_plan() -> PricingPlanBase:
         return PricingPlanBase(
             name="Team",
             plan_type="team",
-            price_monthly=Decimal('29.00'),
-            price_yearly=Decimal('290.00'),
+            price_monthly=Decimal("29.00"),
+            price_yearly=Decimal("290.00"),
             ai_credits_monthly=1000,
             ai_credits_yearly=12000,
             features=[
@@ -329,18 +330,18 @@ class PricingPlanTemplates:
                 "Platform API access",
                 "EChart MCP Server",
                 "Custom AI provider keys",
-                "Priority support"
+                "Priority support",
             ],
-            sort_order=3
+            sort_order=3,
         )
-    
+
     @staticmethod
     def get_enterprise_plan() -> PricingPlanBase:
         return PricingPlanBase(
             name="Enterprise",
             plan_type="enterprise",
-            price_monthly=Decimal('99.00'),
-            price_yearly=Decimal('990.00'),
+            price_monthly=Decimal("99.00"),
+            price_yearly=Decimal("990.00"),
             ai_credits_monthly=5000,
             ai_credits_yearly=60000,
             features=[
@@ -353,16 +354,16 @@ class PricingPlanTemplates:
                 "On-premise deployment",
                 "Custom AI providers",
                 "SLA guarantee",
-                "24/7 phone support"
+                "24/7 phone support",
             ],
-            sort_order=4
+            sort_order=4,
         )
-    
+
     @staticmethod
     def get_all_plans() -> List[PricingPlanBase]:
         return [
             PricingPlanTemplates.get_free_plan(),
             PricingPlanTemplates.get_pro_plan(),
             PricingPlanTemplates.get_team_plan(),
-            PricingPlanTemplates.get_enterprise_plan()
+            PricingPlanTemplates.get_enterprise_plan(),
         ]

@@ -1,9 +1,8 @@
-from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Optional
 from uuid import UUID
 
 from app.common.schemas import BaseSchema
-from pydantic import UUID4, BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # Base schema with common attributes

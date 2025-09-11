@@ -1,16 +1,10 @@
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 import pytest
 from sqlalchemy.orm import declarative_base  # Updated import for SQLAlchemy 2.0
 
 from app.modules.user.api import router
-from app.modules.user.schemas import (
-    UserResponse,
-    UserUpdate,
-    SignInRequest,
-    SignInResponse,
-)
 
 # Test Configuration
 Base = declarative_base()

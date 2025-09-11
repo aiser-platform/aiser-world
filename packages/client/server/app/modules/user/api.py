@@ -9,15 +9,12 @@ from app.modules.authentication import (
     SignInResponse,
 )
 from app.modules.authentication.deps.auth_bearer import (
-    JWTBearer,
     JWTCookieBearer,
     TokenDep,
-    CookieDep,
 )
 from app.modules.user.schemas import UserCreate, UserResponse, UserUpdate
 from app.modules.user.services import UserService
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from app.core.config import settings
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 
 router = APIRouter()
 service = UserService()
@@ -115,7 +112,6 @@ async def sign_in(credentials: SignInRequest, response: Response):
 @router.post("/sign-out")
 async def sign_out():
     try:
-
         return await service.sign_out()
     except HTTPException as e:
         raise e
@@ -137,7 +133,7 @@ async def refresh_token(request: RefreshTokenRequest):
         return await service.refresh_token(request)
     except HTTPException as e:
         raise e
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token"
         )

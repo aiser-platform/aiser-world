@@ -19,7 +19,6 @@ class ChatVisualizationService(
     ]
 ):
     def __init__(self):
-
         super().__init__(ChatVisualizationRepository())
 
     async def save(self, data: ChartConfiguration):

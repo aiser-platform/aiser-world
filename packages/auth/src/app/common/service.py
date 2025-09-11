@@ -1,8 +1,7 @@
-from typing import Any, Dict, Generic, List, Optional, Type, TypeVar
+from typing import Generic, Optional, TypeVar
 
 from app.common.repository import BaseRepository
-from app.common.schemas import ListResponseSchema, PaginationSchema
-from app.utils.pagination import paginate
+from app.common.schemas import ListResponseSchema
 from pydantic import BaseModel
 
 ModelType = TypeVar("ModelType")

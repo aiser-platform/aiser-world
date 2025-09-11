@@ -27,11 +27,11 @@ class Auth:
             # First try pbkdf2_sha256 (current format)
             if pbkdf2_sha256.verify(password, hashed_password):
                 return True
-            
+
             # If that fails, try bcrypt (legacy format)
             if bcrypt.verify(password, hashed_password):
                 return True
-                
+
             return False
         except ValueError as e:
             # Handle invalid hash format
@@ -74,7 +74,7 @@ class Auth:
         # Temporarily return the JWT directly instead of JWE encryption
         # TODO: Fix JWE encryption when SECRET format is resolved
         return refresh_jwt
-        
+
         # Original JWE encryption code (commented out for now)
         # try:
         #     # Convert hex string to bytes for A256GCM encryption

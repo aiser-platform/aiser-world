@@ -1,5 +1,5 @@
 from typing import Optional
-from fastapi import Depends, Request, HTTPException
+from fastapi import Depends, HTTPException
 from app.modules.authentication.deps.auth_bearer import JWTCookie
 from app.modules.authentication.auth import Auth
 from app.modules.user.repository import UserRepository

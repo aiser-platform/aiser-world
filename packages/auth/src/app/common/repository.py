@@ -3,7 +3,6 @@ from typing import Generic, List, Optional, TypeVar
 
 from app.common.schemas import PaginationSchema
 from app.db.session import db
-from app.utils.pagination import paginate
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 from sqlalchemy import func, select
@@ -288,7 +287,7 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
                 total_pages=total_pages,
                 current_page=current_page,
             )
-        except Exception as e:
+        except Exception:
             await self.db._session.rollback()
             raise
 

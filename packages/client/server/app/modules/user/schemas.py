@@ -1,4 +1,3 @@
-from app.common.schemas import BaseSchema
 from pydantic import BaseModel, EmailStr, Field
 
 

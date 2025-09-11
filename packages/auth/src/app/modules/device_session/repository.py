@@ -18,7 +18,7 @@ class DeviceSessionRepository(
     async def get_active_sessions(self, user_id: int) -> List[DeviceSession]:
         """Get all active sessions for a user"""
         query = select(self.model).filter(
-            self.model.user_id == user_id, self.model.is_active == True
+            self.model.user_id == user_id, self.model.is_active
         )
         result = await self.db._session.execute(query)
         return result.scalars().all()

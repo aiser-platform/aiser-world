@@ -1,13 +1,9 @@
 import logging
 
-from app.core import g
 from app.core.api import api_router
 from app.core.config import settings
-from app.modules.user.services import UserService
-from app.modules.user.utils import current_user_from_service
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
 

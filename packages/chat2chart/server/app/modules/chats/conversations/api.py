@@ -4,7 +4,12 @@ from app.common.utils.query_params import BaseFilterParams
 from app.common.utils.search_query import create_search_query
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from .schemas import ConversationResponseSchema, SpecificConversationResponseSchema, ConversationSchema, ConversationUpdateSchema
+from .schemas import (
+    ConversationResponseSchema,
+    SpecificConversationResponseSchema,
+    ConversationSchema,
+    ConversationUpdateSchema,
+)
 from .services import ConversationService
 
 router = APIRouter()
@@ -65,8 +70,7 @@ async def create_conversation(conversation: ConversationSchema):
 
 @router.put("/{conversation_id}", response_model=ConversationResponseSchema)
 async def update_conversation(
-    conversation_id: str, 
-    conversation: ConversationUpdateSchema
+    conversation_id: str, conversation: ConversationUpdateSchema
 ):
     """Update an existing conversation"""
     try:
@@ -79,10 +83,7 @@ async def update_conversation(
 
 
 @router.post("/{conversation_id}/messages")
-async def add_message_to_conversation(
-    conversation_id: str,
-    message: dict
-):
+async def add_message_to_conversation(conversation_id: str, message: dict):
     """Add a message to an existing conversation"""
     try:
         result = await service.add_message(conversation_id, message)

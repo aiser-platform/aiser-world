@@ -1,5 +1,5 @@
 from typing import List, Optional
-from sqlalchemy import and_, or_
+from sqlalchemy import and_
 from uuid import UUID
 
 from app.common.repository import BaseRepository

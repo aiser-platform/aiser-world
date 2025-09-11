@@ -2,7 +2,6 @@ import importlib
 import pkgutil
 
 import click
-from alembic.config import main as alembic_main
 from uvicorn import run
 
 from app import cli

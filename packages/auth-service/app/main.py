@@ -1,3 +1,4 @@
+# type: ignore
 from fastapi import FastAPI, Request, Response, HTTPException  # type: ignore[reportMissingImports]
 
 app = FastAPI(title="Aiser Auth Service (dev)")

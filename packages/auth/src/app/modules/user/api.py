@@ -95,7 +95,10 @@ async def delete_user(user_id: str):
 
 
 @router.get("/me/")
-async def get_me(current_user: CurrentUser = Depends(CurrentUser.from_token), db: Session = Depends(get_db)):
+async def get_me(
+    current_user: CurrentUser = Depends(CurrentUser.from_token),
+    db: Session = Depends(get_db),
+):
     """Get current user profile"""
     try:
         user = await current_user.get_user(db)
@@ -147,7 +150,7 @@ async def refresh_token(request: RefreshTokenRequest):
         return await service.refresh_token(request)
     except HTTPException as e:
         raise e
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token"
         )

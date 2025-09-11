@@ -109,5 +109,3 @@ api_router.include_router(
     tags=["enterprise-auth"],
     responses={404: {"description": "Not found"}},
 )
-
-

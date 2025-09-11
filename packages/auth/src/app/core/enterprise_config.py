@@ -8,7 +8,6 @@ import yaml
 from enum import Enum
 from typing import Optional, Dict, Any, List
 from pydantic import BaseModel, Field
-from pathlib import Path
 
 
 class DeploymentMode(str, Enum):
@@ -32,21 +31,25 @@ class SecurityConfig(BaseModel):
     enable_encryption_in_transit: bool = True
     require_mfa: bool = False
     session_timeout_minutes: int = 480
-    password_policy: Dict[str, Any] = Field(default_factory=lambda: {
-        "min_length": 12,
-        "require_uppercase": True,
-        "require_lowercase": True,
-        "require_numbers": True,
-        "require_special_chars": True,
-        "max_age_days": 90,
-        "history_count": 12
-    })
+    password_policy: Dict[str, Any] = Field(
+        default_factory=lambda: {
+            "min_length": 12,
+            "require_uppercase": True,
+            "require_lowercase": True,
+            "require_numbers": True,
+            "require_special_chars": True,
+            "max_age_days": 90,
+            "history_count": 12,
+        }
+    )
     allowed_origins: Optional[List[str]] = None
-    rate_limiting: Dict[str, Any] = Field(default_factory=lambda: {
-        "enabled": True,
-        "requests_per_minute": 100,
-        "burst_size": 200
-    })
+    rate_limiting: Dict[str, Any] = Field(
+        default_factory=lambda: {
+            "enabled": True,
+            "requests_per_minute": 100,
+            "burst_size": 200,
+        }
+    )
     audit_logging: bool = True
     data_retention_days: int = 2555  # 7 years
 
@@ -70,18 +73,18 @@ class DatabaseConfig(BaseModel):
 
 class AuthConfig(BaseModel):
     mode: AuthMode = AuthMode.INTERNAL
-    
+
     # Keycloak Configuration
     keycloak_server_url: Optional[str] = None
     keycloak_realm: Optional[str] = None
     keycloak_client_id: Optional[str] = None
     keycloak_client_secret: Optional[str] = None
-    
+
     # Internal JWT Configuration
     jwt_secret_key: str = "your-super-secret-jwt-key-change-this-in-production"
     jwt_algorithm: str = "HS256"
     jwt_expiration_hours: int = 24
-    
+
     # SSO Configuration
     enable_sso: bool = False
     auto_provision_users: bool = True
@@ -163,11 +166,20 @@ class CustomFeaturesConfig(BaseModel):
 
 
 class IntegrationsConfig(BaseModel):
-    slack: Dict[str, Any] = Field(default_factory=lambda: {"enabled": False, "webhook_url": None})
-    teams: Dict[str, Any] = Field(default_factory=lambda: {"enabled": False, "webhook_url": None})
-    jira: Dict[str, Any] = Field(default_factory=lambda: {
-        "enabled": False, "server_url": None, "username": None, "api_token": None
-    })
+    slack: Dict[str, Any] = Field(
+        default_factory=lambda: {"enabled": False, "webhook_url": None}
+    )
+    teams: Dict[str, Any] = Field(
+        default_factory=lambda: {"enabled": False, "webhook_url": None}
+    )
+    jira: Dict[str, Any] = Field(
+        default_factory=lambda: {
+            "enabled": False,
+            "server_url": None,
+            "username": None,
+            "api_token": None,
+        }
+    )
 
 
 class EnterpriseConfig(BaseModel):
@@ -176,7 +188,7 @@ class EnterpriseConfig(BaseModel):
     organization_name: str = "Aiser Enterprise"
     admin_email: str = "admin@company.com"
     license_key: Optional[str] = None
-    
+
     # Configuration sections
     security: SecurityConfig = Field(default_factory=SecurityConfig)
     database: DatabaseConfig = Field(default_factory=DatabaseConfig)
@@ -193,7 +205,7 @@ class EnterpriseConfig(BaseModel):
 def load_config_from_file(config_path: str) -> Dict[str, Any]:
     """Load configuration from YAML file"""
     try:
-        with open(config_path, 'r') as file:
+        with open(config_path, "r") as file:
             return yaml.safe_load(file) or {}
     except FileNotFoundError:
         print(f"Config file not found: {config_path}")
@@ -206,82 +218,86 @@ def load_config_from_file(config_path: str) -> Dict[str, Any]:
 def load_config_from_env() -> Dict[str, Any]:
     """Load configuration from environment variables"""
     config = {}
-    
+
     # Basic settings
-    if os.getenv('AISER_DEPLOYMENT_MODE'):
-        config['deployment_mode'] = os.getenv('AISER_DEPLOYMENT_MODE')
-    if os.getenv('AISER_ORG_NAME'):
-        config['organization_name'] = os.getenv('AISER_ORG_NAME')
-    if os.getenv('AISER_ADMIN_EMAIL'):
-        config['admin_email'] = os.getenv('AISER_ADMIN_EMAIL')
-    if os.getenv('AISER_LICENSE_KEY'):
-        config['license_key'] = os.getenv('AISER_LICENSE_KEY')
-    
+    if os.getenv("AISER_DEPLOYMENT_MODE"):
+        config["deployment_mode"] = os.getenv("AISER_DEPLOYMENT_MODE")
+    if os.getenv("AISER_ORG_NAME"):
+        config["organization_name"] = os.getenv("AISER_ORG_NAME")
+    if os.getenv("AISER_ADMIN_EMAIL"):
+        config["admin_email"] = os.getenv("AISER_ADMIN_EMAIL")
+    if os.getenv("AISER_LICENSE_KEY"):
+        config["license_key"] = os.getenv("AISER_LICENSE_KEY")
+
     # Auth settings
     auth_config = {}
-    if os.getenv('AUTH_MODE'):
-        auth_config['mode'] = os.getenv('AUTH_MODE')
-    if os.getenv('JWT_SECRET_KEY'):
-        auth_config['jwt_secret_key'] = os.getenv('JWT_SECRET_KEY')
-    if os.getenv('KEYCLOAK_SERVER_URL'):
-        auth_config['keycloak_server_url'] = os.getenv('KEYCLOAK_SERVER_URL')
-    if os.getenv('KEYCLOAK_REALM'):
-        auth_config['keycloak_realm'] = os.getenv('KEYCLOAK_REALM')
-    if os.getenv('KEYCLOAK_CLIENT_ID'):
-        auth_config['keycloak_client_id'] = os.getenv('KEYCLOAK_CLIENT_ID')
-    if os.getenv('KEYCLOAK_CLIENT_SECRET'):
-        auth_config['keycloak_client_secret'] = os.getenv('KEYCLOAK_CLIENT_SECRET')
-    
+    if os.getenv("AUTH_MODE"):
+        auth_config["mode"] = os.getenv("AUTH_MODE")
+    if os.getenv("JWT_SECRET_KEY"):
+        auth_config["jwt_secret_key"] = os.getenv("JWT_SECRET_KEY")
+    if os.getenv("KEYCLOAK_SERVER_URL"):
+        auth_config["keycloak_server_url"] = os.getenv("KEYCLOAK_SERVER_URL")
+    if os.getenv("KEYCLOAK_REALM"):
+        auth_config["keycloak_realm"] = os.getenv("KEYCLOAK_REALM")
+    if os.getenv("KEYCLOAK_CLIENT_ID"):
+        auth_config["keycloak_client_id"] = os.getenv("KEYCLOAK_CLIENT_ID")
+    if os.getenv("KEYCLOAK_CLIENT_SECRET"):
+        auth_config["keycloak_client_secret"] = os.getenv("KEYCLOAK_CLIENT_SECRET")
+
     if auth_config:
-        config['auth'] = auth_config
-    
+        config["auth"] = auth_config
+
     # Security settings
     security_config = {}
-    if os.getenv('REQUIRE_MFA'):
-        security_config['require_mfa'] = os.getenv('REQUIRE_MFA').lower() == 'true'
-    if os.getenv('AUDIT_LOGGING'):
-        security_config['audit_logging'] = os.getenv('AUDIT_LOGGING').lower() == 'true'
-    
+    if os.getenv("REQUIRE_MFA"):
+        security_config["require_mfa"] = os.getenv("REQUIRE_MFA").lower() == "true"
+    if os.getenv("AUDIT_LOGGING"):
+        security_config["audit_logging"] = os.getenv("AUDIT_LOGGING").lower() == "true"
+
     if security_config:
-        config['security'] = security_config
-    
+        config["security"] = security_config
+
     # Database settings
     db_config = {}
-    if os.getenv('DB_HOST'):
-        db_config['host'] = os.getenv('DB_HOST')
-    if os.getenv('DB_PORT'):
-        db_config['port'] = int(os.getenv('DB_PORT'))
-    if os.getenv('DB_NAME'):
-        db_config['database'] = os.getenv('DB_NAME')
-    if os.getenv('DB_USER'):
-        db_config['username'] = os.getenv('DB_USER')
-    if os.getenv('DB_PASSWORD'):
-        db_config['password'] = os.getenv('DB_PASSWORD')
-    
+    if os.getenv("DB_HOST"):
+        db_config["host"] = os.getenv("DB_HOST")
+    if os.getenv("DB_PORT"):
+        db_config["port"] = int(os.getenv("DB_PORT"))
+    if os.getenv("DB_NAME"):
+        db_config["database"] = os.getenv("DB_NAME")
+    if os.getenv("DB_USER"):
+        db_config["username"] = os.getenv("DB_USER")
+    if os.getenv("DB_PASSWORD"):
+        db_config["password"] = os.getenv("DB_PASSWORD")
+
     if db_config:
-        config['database'] = db_config
-    
+        config["database"] = db_config
+
     # AI settings
     ai_config = {}
-    if os.getenv('DATA_PRIVACY_MODE'):
-        ai_config['data_privacy_mode'] = os.getenv('DATA_PRIVACY_MODE').lower() == 'true'
-    
+    if os.getenv("DATA_PRIVACY_MODE"):
+        ai_config["data_privacy_mode"] = (
+            os.getenv("DATA_PRIVACY_MODE").lower() == "true"
+        )
+
     if ai_config:
-        config['ai'] = ai_config
-    
+        config["ai"] = ai_config
+
     return config
 
 
-def merge_configs(base_config: Dict[str, Any], override_config: Dict[str, Any]) -> Dict[str, Any]:
+def merge_configs(
+    base_config: Dict[str, Any], override_config: Dict[str, Any]
+) -> Dict[str, Any]:
     """Recursively merge two configuration dictionaries"""
     merged = base_config.copy()
-    
+
     for key, value in override_config.items():
         if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
             merged[key] = merge_configs(merged[key], value)
         else:
             merged[key] = value
-    
+
     return merged
 
 
@@ -292,23 +308,23 @@ _enterprise_config: Optional[EnterpriseConfig] = None
 def get_enterprise_config() -> EnterpriseConfig:
     """Get the global enterprise configuration instance"""
     global _enterprise_config
-    
+
     if _enterprise_config is None:
         # Load configuration from multiple sources
         config_data = {}
-        
+
         # 1. Load from file (if specified)
-        config_file = os.getenv('AISER_CONFIG_FILE', '/etc/aiser/config.yml')
+        config_file = os.getenv("AISER_CONFIG_FILE", "/etc/aiser/config.yml")
         if os.path.exists(config_file):
             config_data = load_config_from_file(config_file)
-        
+
         # 2. Load from environment variables and merge
         env_config = load_config_from_env()
         config_data = merge_configs(config_data, env_config)
-        
+
         # 3. Create configuration instance
         _enterprise_config = EnterpriseConfig(**config_data)
-    
+
     return _enterprise_config
 
 

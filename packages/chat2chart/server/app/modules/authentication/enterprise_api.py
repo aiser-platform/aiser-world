@@ -3,7 +3,6 @@ from typing import Optional
 from fastapi import APIRouter, Request, Response, HTTPException  # type: ignore[reportMissingImports]
 from pydantic import BaseModel  # type: ignore[reportMissingImports]
 
-from app.modules.authentication.schemas import SignInRequest
 from app.modules.user.services import UserService
 from app.modules.authentication.auth import Auth
 
@@ -54,13 +53,18 @@ async def enterprise_login(payload: EnterpriseSignInRequest, response: Response)
         samesite="lax",
         path="/",
     )
-    return {"access_token": tokens["access_token"], "user": {"id": user.id, "email": user.email, "username": user.username}}
+    return {
+        "access_token": tokens["access_token"],
+        "user": {"id": user.id, "email": user.email, "username": user.username},
+    }
 
 
 @router.get("/api/v1/enterprise/auth/me")
 async def enterprise_me(request: Request):
     auth = Auth()
-    bearer = request.headers.get("authorization") or request.headers.get("Authorization")
+    bearer = request.headers.get("authorization") or request.headers.get(
+        "Authorization"
+    )
     if not bearer or not bearer.lower().startswith("bearer "):
         raise HTTPException(status_code=401, detail="Unauthorized")
     token = bearer.split(" ", 1)[1]
@@ -72,5 +76,3 @@ async def enterprise_me(request: Request):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user
-
-

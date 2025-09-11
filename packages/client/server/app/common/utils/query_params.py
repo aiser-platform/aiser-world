@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 def get_search_columns(
     search_columns: List[str] = Query(
         description="Columns to search in", default_factory=list
-    )
+    ),
 ) -> Optional[List[str]]:
     return search_columns
 

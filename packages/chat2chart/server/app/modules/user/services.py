@@ -13,7 +13,7 @@ from app.modules.authentication.schemas import (
 from app.modules.user.models import User
 from app.modules.user.repository import UserRepository
 from app.modules.user.schemas import UserCreate, UserResponse, UserUpdate
-from fastapi import HTTPException, Request, Response
+from fastapi import HTTPException, Response  # type: ignore[reportMissingImports]
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +57,7 @@ class UserService(BaseService[User, UserCreate, UserUpdate, UserResponse]):
             return None
 
         # Stored password may be a pbkdf2 hash or legacy plaintext.
-        stored_pw = getattr(user, 'password', None)
+        stored_pw = getattr(user, "password", None)
 
         # If stored value looks like a passlib/pbkdf2 hash, verify using Auth
         try:
