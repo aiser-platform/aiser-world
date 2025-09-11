@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 from typing import Dict, Optional
+import hashlib
 from functools import lru_cache
 import os
 from dotenv import load_dotenv
@@ -196,6 +197,24 @@ class Settings(BaseSettings):
         elif "+psycopg2" not in async_url:
             return async_url.replace("postgresql://", "postgresql+psycopg2://")
         return async_url
+
+    @property
+    def SECRET_BYTES(self) -> bytes:
+        """Return a 32-byte key suitable for JWE A256GCM.
+
+        If SECRET_KEY is a 64-char hex string, interpret as raw bytes; otherwise
+        derive a 32-byte key via SHA-256 of the SECRET_KEY string.
+        """
+        s = self.SECRET_KEY or ""
+        try:
+            if isinstance(s, str) and len(s) == 64:
+                # treat as hex
+                return bytes.fromhex(s)
+        except Exception:
+            pass
+
+        # Fallback: deterministic 32-byte key derived from SECRET_KEY
+        return hashlib.sha256(s.encode()).digest()[:32]
 
 
 @lru_cache()
