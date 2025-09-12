@@ -1,6 +1,9 @@
-'use client';
+ 'use client';
+
+export const dynamic = 'force-dynamic';
 
 import React, { useState, useEffect } from 'react';
+import { getBackendUrl } from '@/utils/backendUrl';
 import {
     Card,
     Button,
@@ -57,7 +60,7 @@ const DataSourcesPage: React.FC = () => {
     const loadDataSources = async () => {
         setLoading(true);
         try {
-            const response = await fetch('http://localhost:8000/data/sources');
+            const response = await fetch(`${getBackendUrl()}/data/sources`);
             const result = await response.json();
             
             if (result.success) {
