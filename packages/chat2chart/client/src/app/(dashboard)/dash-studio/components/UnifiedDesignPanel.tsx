@@ -28,8 +28,10 @@ import {
   Tag,
   Empty,
   Spin,
-  Progress
+  Progress,
+  Modal
 } from 'antd';
+import { getBackendUrlForApi } from '@/utils/backendUrl';
 import {
   // Widget Library Icons
   AppstoreOutlined,
@@ -272,8 +274,13 @@ const UnifiedDesignPanel: React.FC<UnifiedDesignPanelProps> = ({
   showPanel,
   onClose
 }) => {
+  const [snapshotsList, setSnapshotsList] = useState<any[]>([]);
+  const [selectedSnapshotId, setSelectedSnapshotId] = useState<number | null>(null);
+  const [permissionModalVisible, setPermissionModalVisible] = useState(false);
+  const [permEmail, setPermEmail] = useState('');
+  const [permLoading, setPermLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('library');
-  const [activeCategory, setActiveCategory] = useState('visualization');
+  const [activeCategory, setActiveCategory] = useState('charts');
   const [searchQuery, setSearchQuery] = useState('');
   const [form] = Form.useForm();
 
@@ -490,17 +497,19 @@ const UnifiedDesignPanel: React.FC<UnifiedDesignPanelProps> = ({
         {/* Properties Tabs */}
         <Tabs
           size="small"
+          style={{ marginTop: '-8px' }}
+          defaultActiveKey="content"
           items={[
             {
               key: 'content',
               label: (
-                <span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <SettingOutlined />
-                  <span style={{ marginLeft: '4px' }}>Content</span>
+                  <span>Content</span>
                 </span>
               ),
               children: (
-                <Form form={form} layout="vertical" onValuesChange={handleConfigUpdate} size="small">
+                <Form form={form} layout="horizontal" onValuesChange={handleConfigUpdate} size="small" labelCol={{ span: 8 }} wrapperCol={{ span: 16 }}>
                   {renderContentProperties()}
                 </Form>
               )
@@ -508,13 +517,13 @@ const UnifiedDesignPanel: React.FC<UnifiedDesignPanelProps> = ({
             {
               key: 'style',
               label: (
-                <span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <BgColorsOutlined />
-                  <span style={{ marginLeft: '4px' }}>Style</span>
+                  <span>Style</span>
                 </span>
               ),
               children: (
-                <Form form={form} layout="vertical" onValuesChange={handleStyleUpdate} size="small">
+                <Form form={form} layout="horizontal" onValuesChange={handleStyleUpdate} size="small" labelCol={{ span: 8 }} wrapperCol={{ span: 16 }}>
                   {renderStyleProperties()}
                 </Form>
               )
@@ -522,9 +531,9 @@ const UnifiedDesignPanel: React.FC<UnifiedDesignPanelProps> = ({
             {
               key: 'data',
               label: (
-                <span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <DatabaseOutlined />
-                  <span style={{ marginLeft: '4px' }}>Data</span>
+                  <span>Data</span>
                 </span>
               ),
               children: renderDataProperties()
@@ -532,13 +541,13 @@ const UnifiedDesignPanel: React.FC<UnifiedDesignPanelProps> = ({
             {
               key: 'behavior',
               label: (
-                <span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <CodeOutlined />
-                  <span style={{ marginLeft: '4px' }}>Behavior</span>
+                  <span>Behavior</span>
                 </span>
               ),
               children: (
-                <Form form={form} layout="vertical" onValuesChange={handleConfigUpdate} size="small">
+                <Form form={form} layout="horizontal" onValuesChange={handleConfigUpdate} size="small" labelCol={{ span: 8 }} wrapperCol={{ span: 16 }}>
                   {renderBehaviorProperties()}
                 </Form>
               )
@@ -554,6 +563,7 @@ const UnifiedDesignPanel: React.FC<UnifiedDesignPanelProps> = ({
     if (!selectedWidget) return null;
 
     switch (selectedWidget.type) {
+      case 'chart':
       case 'bar':
       case 'line':
       case 'pie':
@@ -570,7 +580,7 @@ const UnifiedDesignPanel: React.FC<UnifiedDesignPanelProps> = ({
         return (
           <div>
             <Collapse size="small" ghost>
-              <Panel header="Table Configuration" key="table-config">
+              <Panel header="Table" key="table-config">
                 <Row gutter={[8, 4]}>
                   <Col span={24}>
                     <Form.Item label="Table Title" name={['config', 'title', 'text']} style={{ marginBottom: '8px' }}>
@@ -589,29 +599,29 @@ const UnifiedDesignPanel: React.FC<UnifiedDesignPanelProps> = ({
                 </Row>
                 <Row gutter={[8, 4]}>
                   <Col span={12}>
-                    <Form.Item label="Show Pagination" name={['config', 'pagination']} valuePropName="checked" style={{ marginBottom: '4px' }}>
+                    <Form.Item label="Show Pagination" name={['config', 'pagination']} valuePropName="checked" style={{ marginBottom: '8px' }}>
                       <Switch size="small" />
                     </Form.Item>
                   </Col>
                   <Col span={12}>
-                    <Form.Item label="Page Size" name={['config', 'pageSize']} style={{ marginBottom: '4px' }}>
+                    <Form.Item label="Page Size" name={['config', 'pageSize']} style={{ marginBottom: '8px' }}>
                       <InputNumber min={5} max={100} defaultValue={10} size="small" />
                     </Form.Item>
                   </Col>
                 </Row>
                 <Row gutter={[8, 4]}>
                   <Col span={8}>
-                    <Form.Item label="Border" name={['config', 'showBorder']} valuePropName="checked" style={{ marginBottom: '4px' }}>
+                    <Form.Item label="Border" name={['config', 'showBorder']} valuePropName="checked" style={{ marginBottom: '8px' }}>
                       <Switch size="small" />
                     </Form.Item>
                   </Col>
                   <Col span={8}>
-                    <Form.Item label="Striped" name={['config', 'striped']} valuePropName="checked" style={{ marginBottom: '4px' }}>
+                    <Form.Item label="Striped" name={['config', 'striped']} valuePropName="checked" style={{ marginBottom: '8px' }}>
                       <Switch size="small" />
                     </Form.Item>
                   </Col>
                   <Col span={8}>
-                    <Form.Item label="Hover" name={['config', 'hoverable']} valuePropName="checked" style={{ marginBottom: '4px' }}>
+                    <Form.Item label="Hover" name={['config', 'hoverable']} valuePropName="checked" style={{ marginBottom: '8px' }}>
                       <Switch size="small" />
                     </Form.Item>
                   </Col>
@@ -642,7 +652,7 @@ const UnifiedDesignPanel: React.FC<UnifiedDesignPanelProps> = ({
         return (
           <div>
             <Collapse size="small" ghost>
-              <Panel header="Metric Configuration" key="metric-config">
+              <Panel header="Metric" key="metric-config">
                 <Row gutter={[8, 4]}>
                   <Col span={24}>
                     <Form.Item label="Metric Title" name={['config', 'title', 'text']} style={{ marginBottom: '8px' }}>
@@ -668,24 +678,24 @@ const UnifiedDesignPanel: React.FC<UnifiedDesignPanelProps> = ({
                 </Row>
                 <Row gutter={[8, 4]}>
                   <Col span={8}>
-                    <Form.Item label="Prefix" name={['config', 'prefix']} style={{ marginBottom: '4px' }}>
+                    <Form.Item label="Prefix" name={['config', 'prefix']} style={{ marginBottom: '8px' }}>
                       <Input placeholder="e.g., $, €" />
                     </Form.Item>
                   </Col>
                   <Col span={8}>
-                    <Form.Item label="Suffix" name={['config', 'suffix']} style={{ marginBottom: '4px' }}>
+                    <Form.Item label="Suffix" name={['config', 'suffix']} style={{ marginBottom: '8px' }}>
                       <Input placeholder="e.g., %, K, M" />
                     </Form.Item>
                   </Col>
                   <Col span={8}>
-                    <Form.Item label="Show Trend" name={['config', 'showTrend']} valuePropName="checked" style={{ marginBottom: '4px' }}>
+                    <Form.Item label="Show Trend" name={['config', 'showTrend']} valuePropName="checked" style={{ marginBottom: '8px' }}>
                       <Switch size="small" />
                     </Form.Item>
                   </Col>
                 </Row>
                 <Row gutter={[8, 4]}>
                   <Col span={24}>
-                    <Form.Item label="Trend Value" name={['config', 'trendValue']} style={{ marginBottom: '4px' }}>
+                    <Form.Item label="Trend Value" name={['config', 'trendValue']} style={{ marginBottom: '8px' }}>
                       <Input placeholder="e.g., +12.5%" />
                     </Form.Item>
                   </Col>
@@ -805,7 +815,7 @@ const UnifiedDesignPanel: React.FC<UnifiedDesignPanelProps> = ({
         return (
           <div>
             <Collapse size="small" ghost>
-              <Panel header="Image Configuration" key="image-config">
+              <Panel header="Image" key="image-config">
                 <Form.Item label="Image URL" name={['config', 'imageUrl']}>
                   <Input placeholder="Enter image URL or upload" />
                 </Form.Item>
@@ -906,6 +916,13 @@ const UnifiedDesignPanel: React.FC<UnifiedDesignPanelProps> = ({
             </Col>
             <Col span={12}>
               <Form.Item label="Border Color" name={['style', 'borderColor']}>
+                <ColorPicker />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item label="Plot Background" name={['config', 'plotBackgroundColor']}>
                 <ColorPicker />
               </Form.Item>
             </Col>
@@ -1041,6 +1058,143 @@ const UnifiedDesignPanel: React.FC<UnifiedDesignPanelProps> = ({
         widget={selectedWidget} 
         onUpdate={handleConfigUpdate} 
       />
+
+      <Divider />
+      <div style={{ marginBottom: 12 }}>
+        <Title level={5} style={{ margin: 0 }}>Snapshots</Title>
+        <Text type="secondary" style={{ fontSize: 12 }}>Bind saved snapshots to this widget</Text>
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+        <Button size="small" onClick={async () => {
+          try {
+            const res = await fetch(`${getBackendUrlForApi()}/api/queries/snapshots`);
+            if (res.status === 403) { setPermissionModalVisible(true); return; }
+            if (!res.ok) throw new Error('Failed to load');
+            const j = await res.json();
+            setSnapshotsList(Array.isArray(j.items) ? j.items : []);
+            message.success('Snapshots loaded');
+          } catch (e) { message.error('Failed to load snapshots'); }
+        }}>Load Snapshots</Button>
+        <Select
+          size="small"
+          style={{ minWidth: 220 }}
+          placeholder="Select snapshot to bind"
+          value={selectedSnapshotId || undefined}
+          onChange={(v) => setSelectedSnapshotId(v)}
+          options={(snapshotsList || []).map(s => ({ value: s.id, label: `${s.name || 'snapshot-'+s.id} (${s.row_count || 0} rows)` }))}
+        />
+        <Button size="small" type="primary" onClick={async () => {
+          if (!selectedWidget) return message.warning('Select a widget first');
+          if (!selectedSnapshotId) return message.warning('Select a snapshot');
+          try {
+            const confirmed = await new Promise<boolean>((resolve) => {
+              Modal.confirm({
+                title: 'Bind Snapshot',
+                content: 'Bind selected snapshot to this widget? This can be undone.',
+                okText: 'Bind',
+                cancelText: 'Cancel',
+                onOk: () => resolve(true),
+                onCancel: () => resolve(false)
+              });
+            });
+            if (!confirmed) return;
+
+            const res = await fetch(`${getBackendUrlForApi()}/api/queries/snapshots/${selectedSnapshotId}`);
+            if (res.status === 403) { setPermissionModalVisible(true); return; }
+            if (!res.ok) throw new Error('Failed to fetch snapshot');
+            const j = await res.json();
+            const snap = j.snapshot;
+            if (!snap) throw new Error('Snapshot empty');
+
+            // Save previous state for undo
+            const prevData = selectedWidget.data || {};
+
+            // Bind snapshot to widget by updating widget data
+            onConfigUpdate(selectedWidget.id, {
+              data: { snapshotId: snap.id, rows: snap.rows, columns: snap.columns },
+              dataSource: snap.data_source_id,
+              query: snap.sql
+            });
+
+            // Show undo option
+            message.success({
+              content: 'Snapshot bound to widget',
+              duration: 5,
+              onClose: undefined
+            });
+
+            // Visual badge update: optimistic UI
+            try {
+              // if widget object has an id and we're using a live dashboard, persist widget change
+              if (selectedWidget && selectedWidget.dashboardId) {
+                await fetch(`${getBackendUrlForApi()}/charts/builder/widget/${selectedWidget.id}`, {
+                  method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ data: { snapshotId: snap.id, rows: snap.rows, columns: snap.columns }, dataSource: snap.data_source_id, query: snap.sql })
+                });
+              }
+            } catch (e) {
+              // swallow persistence errors; user already has undo available
+              console.warn('Failed to persist widget binding', e);
+            }
+
+            // Add Undo action via notification
+            message.info({
+              content: (
+                <span>
+                  Bound. <a onClick={() => { onConfigUpdate(selectedWidget.id, { data: prevData }); message.success('Undo complete'); }}>Undo</a>
+                </span>
+              ),
+              duration: 8
+            });
+
+          } catch (e:any) { console.error(e); message.error(e.message || 'Bind failed'); }
+        }}>Bind Snapshot</Button>
+        <Button size="small" onClick={async () => {
+          if (!selectedWidget) return message.warning('Select a widget first');
+          const sid = selectedWidget.data?.snapshotId;
+          if (!sid) return message.warning('Widget not bound to snapshot');
+          try {
+            const res = await fetch(`${getBackendUrlForApi()}/api/queries/snapshots/${sid}`);
+            if (res.status === 403) { setPermissionModalVisible(true); return; }
+            if (!res.ok) throw new Error('Failed to fetch snapshot');
+            const j = await res.json();
+            const snap = j.snapshot;
+            onConfigUpdate(selectedWidget.id, { data: { snapshotId: snap.id, rows: snap.rows, columns: snap.columns } });
+            message.success('Snapshot refreshed');
+          } catch (e:any) { console.error(e); message.error(e.message || 'Refresh failed'); }
+        }}>Refresh Snapshot</Button>
+        <Button size="small" danger onClick={async () => {
+          if (!selectedWidget) return message.warning('Select a widget first');
+          const confirmed = await new Promise<boolean>((resolve) => {
+            Modal.confirm({
+              title: 'Unbind Snapshot',
+              content: 'Are you sure you want to unbind the snapshot from this widget? This can be undone.',
+              okText: 'Unbind',
+              cancelText: 'Cancel',
+              onOk: () => resolve(true),
+              onCancel: () => resolve(false)
+            });
+          });
+          if (!confirmed) return;
+
+          // Save previous state for undo
+          const prevData = selectedWidget.data || {};
+
+          onConfigUpdate(selectedWidget.id, { data: { snapshotId: null, rows: [], columns: [] }, dataSource: undefined, query: undefined });
+          message.success({
+            content: 'Snapshot unbound',
+            duration: 5
+          });
+          message.info({
+            content: (
+              <span>
+                Unbound. <a onClick={() => { onConfigUpdate(selectedWidget.id, { data: prevData }); message.success('Undo complete'); }}>Undo</a>
+              </span>
+            ),
+            duration: 8
+          });
+        }}>Unbind</Button>
+      </div>
     </div>
   );
 
@@ -1185,13 +1339,15 @@ const UnifiedDesignPanel: React.FC<UnifiedDesignPanelProps> = ({
         <Tabs
           activeKey={activeTab}
           onChange={setActiveTab}
+          size="small"
+          style={{ marginTop: '-8px' }}
           items={[
             {
               key: 'library',
               label: (
-                <span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <AppstoreOutlined />
-                  <span style={{ marginLeft: '4px' }}>Library</span>
+                  <span>Library</span>
                 </span>
               ),
               children: (
@@ -1203,9 +1359,9 @@ const UnifiedDesignPanel: React.FC<UnifiedDesignPanelProps> = ({
             {
               key: 'properties',
               label: (
-                <span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <SettingOutlined />
-                  <span style={{ marginLeft: '4px' }}>Properties</span>
+                  <span>Properties</span>
                   {selectedWidget && <Badge size="small" />}
                 </span>
               ),
@@ -1218,6 +1374,31 @@ const UnifiedDesignPanel: React.FC<UnifiedDesignPanelProps> = ({
           ]}
         />
       </div>
+      {/* Permission Modal */}
+      <Modal
+        open={permissionModalVisible}
+        title="Request Access"
+        onCancel={() => setPermissionModalVisible(false)}
+        footer={null}
+      >
+        <div style={{ marginBottom: 12 }}>
+          <Text>You're missing permissions to perform this action. Enter admin email to request access.</Text>
+        </div>
+        <Input placeholder="Admin email" value={permEmail} onChange={(e) => setPermEmail(e.target.value)} />
+        <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          <Button onClick={() => setPermissionModalVisible(false)}>Cancel</Button>
+          <Button type="primary" loading={permLoading} onClick={async () => {
+            setPermLoading(true);
+            try {
+              await fetch(`${getBackendUrlForApi()}/api/organization/request-access`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: permEmail }) });
+              message.success('Access request sent');
+              setPermissionModalVisible(false);
+            } catch {
+              message.error('Failed to send request');
+            } finally { setPermLoading(false); }
+          }}>Request Access</Button>
+        </div>
+      </Modal>
     </div>
   );
 };

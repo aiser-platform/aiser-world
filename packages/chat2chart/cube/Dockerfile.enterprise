@@ -1,0 +1,8 @@
+FROM cubejs/cube:latest
+
+# Copy canonical cube schemas into the image for enterprise deployments
+# Use the build context root so the Docker CLI can see the files when building
+COPY ./packages/chat2chart/server/cube_schemas /cube/conf/schema
+
+# Preserve default entrypoint and expose same ports
+EXPOSE 4000 3031

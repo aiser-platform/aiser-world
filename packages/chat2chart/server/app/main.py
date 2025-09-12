@@ -1,9 +1,17 @@
 import logging
 
+from app.core import g
 from app.core.api import api_router
 from app.core.config import settings
-from fastapi import FastAPI
+from app.modules.user.services import UserService
+from app.modules.user.utils import current_user_from_service
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from sqlalchemy import select
+from sqlalchemy.sql import func
+from datetime import datetime
+from app.db.session import get_async_session
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +45,45 @@ async def health_check():
 @app.on_event("shutdown")
 async def shutdown_event():
     print("Performing cleanup before shutdown...")
+
+
+@app.middleware("http")
+async def embed_token_middleware(request: Request, call_next):
+    """Validate embed tokens for embed routes and attach embed metadata to request.state.
+    This increments access_count and updates last_accessed_at when a valid token is presented.
+    """
+    try:
+        if request.url.path.startswith("/embed/dashboards/"):
+            token = request.query_params.get("token") or request.headers.get("x-embed-token")
+            if not token:
+                return JSONResponse(status_code=401, content={"detail": "Embed token required"})
+
+            # Validate token and increment access count
+            from app.modules.charts.models import DashboardEmbed
+            async with get_async_session() as db:
+                res = await db.execute(select(DashboardEmbed).where(DashboardEmbed.embed_token == token, DashboardEmbed.is_active == True))
+                embed = res.scalar_one_or_none()
+                if not embed:
+                    return JSONResponse(status_code=403, content={"detail": "Invalid or inactive embed token"})
+
+                # expiry check
+                if embed.expires_at and isinstance(embed.expires_at, datetime):
+                    if embed.expires_at < datetime.utcnow():
+                        return JSONResponse(status_code=403, content={"detail": "Embed token expired"})
+
+                embed.access_count = (embed.access_count or 0) + 1
+                embed.last_accessed_at = func.now()
+                await db.flush()
+                # attach to request for downstream handlers
+                request.state.embed = embed
+
+    except Exception as e:
+        # Log but allow call_next to handle normal errors
+        import logging
+        logging.getLogger(__name__).error(f"Error in embed middleware: {e}")
+
+    response = await call_next(request)
+    return response
 
 
 # @app.exception_handler(Exception)

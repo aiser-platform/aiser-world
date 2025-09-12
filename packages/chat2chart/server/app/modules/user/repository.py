@@ -19,7 +19,7 @@ class UserRepository(BaseRepository[User, UserCreate, UserUpdate]):
         :return: User instance or None
         """
         query = select(self.model).filter(self.model.email == email)
-        result = await self.db.execute(query)
+        result = await self.db._session.execute(query)
         return result.scalars().first()
 
     async def get_by_username(self, username: str) -> Optional[User]:
@@ -30,7 +30,7 @@ class UserRepository(BaseRepository[User, UserCreate, UserUpdate]):
         :return: User instance or None
         """
         query = select(self.model).filter(self.model.username == username)
-        result = await self.db.execute(query)
+        result = await self.db._session.execute(query)
         return result.scalars().first()
 
     async def get_active_users(self, offset: int = 0, limit: int = 100) -> List[User]:
@@ -42,5 +42,5 @@ class UserRepository(BaseRepository[User, UserCreate, UserUpdate]):
         :return: List of active users
         """
         query = select(self.model).offset(offset).limit(limit)
-        result = await self.db.execute(query)
+        result = await self.db._session.execute(query)
         return result.scalars().all()

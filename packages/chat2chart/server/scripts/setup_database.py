@@ -6,6 +6,7 @@ This script sets up the database for new developers
 
 import asyncio
 import sys
+import os
 from pathlib import Path
 
 # Add the server directory to the Python path
@@ -15,133 +16,83 @@ sys.path.insert(0, str(server_dir))
 from sqlalchemy import create_engine, text
 from app.core.config import settings
 
-
 async def setup_database():
     """Set up the database with migrations and seed data"""
-
+    
     print("🚀 Setting up Aiser Platform Database...")
-
+    
     # Database connection string
     DATABASE_URL = f"postgresql://{settings.POSTGRES_USER}:{settings.POSTGRES_PASSWORD}@{settings.POSTGRES_SERVER}:{settings.POSTGRES_PORT}/{settings.POSTGRES_DB}"
-
+    
     print(f"🔌 Connecting to database: {settings.POSTGRES_DB}")
-
+    
     # Create engine
     engine = create_engine(DATABASE_URL, echo=False)
-
+    
     try:
         # Test connection
         with engine.connect() as conn:
             result = conn.execute(text("SELECT 1"))
             print("✅ Database connection successful")
-
+        
         # Check if tables exist
         print("🔍 Checking existing tables...")
-
+        
         with engine.connect() as conn:
-            result = conn.execute(
-                text("""
+            result = conn.execute(text("""
                 SELECT table_name 
                 FROM information_schema.tables 
                 WHERE table_schema = 'public' 
                 ORDER BY table_name
-            """)
-            )
+            """))
             existing_tables = [row[0] for row in result.fetchall()]
-
+            
             print(f"📋 Existing tables: {existing_tables}")
-
+            
             # Required tables
             required_tables = [
-                "users",
-                "organizations",
-                "projects",
-                "data_sources",
-                "project_data_source",
-                "dashboards",
-                "dashboard_widgets",
+                'organizations', 'projects', 'data_sources', 
+                'project_data_source', 'dashboards', 'dashboard_widgets',
+                'roles', 'user_organizations'
             ]
-
-            missing_tables = [
-                table for table in required_tables if table not in existing_tables
-            ]
-
+            
+            missing_tables = [table for table in required_tables if table not in existing_tables]
+            
             if missing_tables:
                 print(f"⚠️  Missing tables: {missing_tables}")
                 print("🔧 Creating missing tables...")
-
+                
                 # Create missing tables
                 await create_missing_tables(engine, missing_tables)
             else:
                 print("✅ All required tables exist")
-
-        # Ensure there is at least one user
-        print("🔍 Ensuring dev user exists...")
-
-        with engine.connect() as conn:
-            result = conn.execute(text("SELECT COUNT(*) FROM users"))
-            user_count = result.scalar()
-            if user_count == 0:
-                print(
-                    "🌱 No users found, creating dev admin user (admin@aiser.dev / admin12345)..."
-                )
-                from app.modules.authentication.auth import Auth
-
-                auth = Auth()
-                hashed = auth.hash_password("admin12345")
-                conn.execute(
-                    text("""
-                    INSERT INTO users (username, email, password, is_active, created_at, updated_at)
-                    VALUES (:username, :email, :password, true, NOW(), NOW())
-                """),
-                    {
-                        "username": "admin",
-                        "email": "admin@aiser.dev",
-                        "password": hashed,
-                    },
-                )
-                conn.commit()
-            else:
-                print(f"✅ Users exist ({user_count})")
-
+        
         # Check if demo data exists
         print("🔍 Checking demo data...")
-
+        
         with engine.connect() as conn:
             result = conn.execute(text("SELECT COUNT(*) FROM organizations"))
             org_count = result.scalar()
-
+            
             if org_count == 0:
                 print("🌱 No demo data found, seeding database...")
                 await seed_demo_data(engine)
             else:
                 print(f"✅ Demo data exists ({org_count} organizations)")
-
+        
         print("🎉 Database setup completed successfully!")
-
+        
     except Exception as e:
         print(f"❌ Error setting up database: {str(e)}")
         raise
     finally:
         engine.dispose()
 
-
 async def create_missing_tables(engine, missing_tables):
     """Create missing tables"""
-
+    
     table_creations = {
-        "users": """
-            CREATE TABLE IF NOT EXISTS users (
-                id SERIAL PRIMARY KEY,
-                username VARCHAR(50) NOT NULL UNIQUE,
-                email VARCHAR(100) NOT NULL UNIQUE,
-                password VARCHAR(255),
-                is_active BOOLEAN DEFAULT TRUE,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-        """,
-        "organizations": """
+        'organizations': """
             CREATE TABLE IF NOT EXISTS organizations (
                 id SERIAL PRIMARY KEY,
                 name VARCHAR(100) NOT NULL UNIQUE,
@@ -163,7 +114,7 @@ async def create_missing_tables(engine, missing_tables):
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """,
-        "projects": """
+        'projects': """
             CREATE TABLE IF NOT EXISTS projects (
                 id SERIAL PRIMARY KEY,
                 name VARCHAR(100) NOT NULL,
@@ -178,7 +129,7 @@ async def create_missing_tables(engine, missing_tables):
                 deleted_at TIMESTAMP
             );
         """,
-        "data_sources": """
+        'data_sources': """
             CREATE TABLE IF NOT EXISTS data_sources (
                 id VARCHAR PRIMARY KEY,
                 name VARCHAR NOT NULL,
@@ -199,7 +150,7 @@ async def create_missing_tables(engine, missing_tables):
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """,
-        "project_data_source": """
+        'project_data_source': """
             CREATE TABLE IF NOT EXISTS project_data_source (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                 project_id INTEGER REFERENCES projects(id),
@@ -209,7 +160,7 @@ async def create_missing_tables(engine, missing_tables):
                 added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """,
-        "dashboards": """
+        'dashboards': """
             CREATE TABLE IF NOT EXISTS dashboards (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                 name VARCHAR(255) NOT NULL,
@@ -232,7 +183,7 @@ async def create_missing_tables(engine, missing_tables):
                 last_viewed_at TIMESTAMP
             );
         """,
-        "dashboard_widgets": """
+        'dashboard_widgets': """
             CREATE TABLE IF NOT EXISTS dashboard_widgets (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                 dashboard_id UUID NOT NULL REFERENCES dashboards(id) ON DELETE CASCADE,
@@ -256,9 +207,32 @@ async def create_missing_tables(engine, missing_tables):
                 deleted_at TIMESTAMP,
                 is_deleted BOOLEAN DEFAULT FALSE
             );
+        """
+        ,
+        'roles': """
+            CREATE TABLE IF NOT EXISTS roles (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100) UNIQUE NOT NULL,
+                description TEXT,
+                permissions JSONB,
+                is_system_role BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
         """,
+        'user_organizations': """
+            CREATE TABLE IF NOT EXISTS user_organizations (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                organization_id INTEGER REFERENCES organizations(id),
+                user_id INTEGER REFERENCES users(id),
+                role VARCHAR(50) DEFAULT 'member',
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """
     }
-
+    
     with engine.connect() as conn:
         for table in missing_tables:
             if table in table_creations:
@@ -267,54 +241,54 @@ async def create_missing_tables(engine, missing_tables):
                 conn.commit()
                 print(f"  ✅ {table} table created")
 
-
 async def seed_demo_data(engine):
     """Seed demo data"""
-
+    
     with engine.connect() as conn:
-        # Insert demo organization
-        conn.execute(
-            text("""
+        # Insert default Aiser organization
+        conn.execute(text("""
             INSERT INTO organizations (id, name, slug, description, plan_type, is_active, created_at, updated_at)
-            VALUES (1, 'Demo Organization', 'demo-org', 'Demo organization for testing and development', 'enterprise', true, NOW(), NOW())
+            VALUES (1, 'Aiser Organization', 'aiser-org', 'Default Aiser organization for development', 'enterprise', true, NOW(), NOW())
             ON CONFLICT (id) DO NOTHING
-        """)
-        )
+        """))
+        
+        # Ensure a default admin user exists (id=1) so demo rows can reference it
+        result = conn.execute(text("SELECT COUNT(*) FROM users"))
+        user_count = result.scalar()
+        if user_count == 0:
+            conn.execute(text("""
+                INSERT INTO users (id, email, username, password, is_active, created_at, updated_at)
+                VALUES (1, 'admin@aiser.local', 'admin', 'devpassword', true, NOW(), NOW())
+                ON CONFLICT (id) DO NOTHING
+            """))
 
         # Insert demo project
-        conn.execute(
-            text("""
+        conn.execute(text("""
             INSERT INTO projects (id, name, description, organization_id, created_by, is_active, created_at, updated_at)
             VALUES (1, 'Demo Project', 'Demo project for testing and development', 1, 1, true, NOW(), NOW())
             ON CONFLICT (id) DO NOTHING
-        """)
-        )
-
+        """))
+        
         # Insert demo data sources
-        conn.execute(
-            text("""
+        conn.execute(text("""
             INSERT INTO data_sources (id, name, type, format, size, row_count, schema, user_id, tenant_id, is_active, created_at, updated_at)
             VALUES 
             ('demo_sales_data', 'Demo Sales Data', 'file', 'csv', 25600, 1000, '{"columns": [{"name": "date", "type": "date"}, {"name": "product", "type": "string"}, {"name": "sales", "type": "number"}]}', '1', '1', true, NOW(), NOW()),
             ('demo_customers_data', 'Demo Customer Data', 'file', 'csv', 15360, 500, '{"columns": [{"name": "customer_id", "type": "string"}, {"name": "name", "type": "string"}, {"name": "email", "type": "string"}]}', '1', '1', true, NOW(), NOW())
             ON CONFLICT (id) DO NOTHING
-        """)
-        )
-
+        """))
+        
         # Link data sources to project
-        conn.execute(
-            text("""
+        conn.execute(text("""
             INSERT INTO project_data_source (project_id, data_source_id, data_source_type, is_active)
             VALUES 
             (1, 'demo_sales_data', 'file', true),
             (1, 'demo_customers_data', 'file', true)
             ON CONFLICT DO NOTHING
-        """)
-        )
-
+        """))
+        
         # Insert demo dashboard
-        conn.execute(
-            text("""
+        conn.execute(text("""
             INSERT INTO dashboards (id, name, description, project_id, created_by, layout_config, theme_config, is_active, created_at, updated_at)
             VALUES (
                 gen_random_uuid(),
@@ -329,12 +303,33 @@ async def seed_demo_data(engine):
                 NOW()
             )
             ON CONFLICT DO NOTHING
-        """)
-        )
-
+        """))
+        
         conn.commit()
         print("✅ Demo data seeded successfully!")
 
+        # Insert standard roles with valid JSON permissions
+        import json
+        roles = [
+            {"name": "owner", "description": "Organization owner with full access", "permissions": {"all": True}, "is_system_role": True},
+            {"name": "admin", "description": "Organization administrator", "permissions": {"organization": ["read","write"], "projects": ["read","write"], "users": ["read","write"]}, "is_system_role": True},
+            {"name": "member", "description": "Organization member", "permissions": {"organization": ["read"], "projects": ["read","write"]}, "is_system_role": True},
+            {"name": "viewer", "description": "Organization viewer", "permissions": {"organization": ["read"], "projects": ["read"]}, "is_system_role": True},
+        ]
+
+        for role in roles:
+            conn.execute(text("""
+                INSERT INTO roles (name, description, permissions, is_system_role, created_at, updated_at)
+                VALUES (:name, :description, CAST(:permissions AS JSONB), :is_system_role, NOW(), NOW())
+                ON CONFLICT (name) DO NOTHING
+            """), {
+                "name": role["name"],
+                "description": role["description"],
+                "permissions": json.dumps(role["permissions"]),
+                "is_system_role": role["is_system_role"],
+            })
+        conn.commit()
+        print("✅ Roles seeded successfully!")
 
 if __name__ == "__main__":
     asyncio.run(setup_database())

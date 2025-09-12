@@ -210,6 +210,60 @@ export class DashboardAPIService {
     }
   }
 
+  async publishDashboard(dashboardId: string, makePublic: boolean = true) {
+    try {
+      const response = await fetch(`${this.baseURL}/charts/dashboards/${dashboardId}/publish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ make_public: makePublic })
+      });
+
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to publish dashboard:', error);
+      throw error;
+    }
+  }
+
+  async createEmbed(dashboardId: string, options: any = {}) {
+    try {
+      const response = await fetch(`${this.baseURL}/charts/dashboards/${dashboardId}/embed`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(options)
+      });
+
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to create embed:', error);
+      throw error;
+    }
+  }
+
+  async listEmbeds(dashboardId: string) {
+    try {
+      const response = await fetch(`${this.baseURL}/charts/dashboards/${dashboardId}/embeds`);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to list embeds:', error);
+      throw error;
+    }
+  }
+
+  async revokeEmbed(dashboardId: string, embedId: string) {
+    try {
+      const response = await fetch(`${this.baseURL}/charts/dashboards/${dashboardId}/embeds/${embedId}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to revoke embed:', error);
+      throw error;
+    }
+  }
+
   // Dashboard Export
   async exportDashboard(dashboardId: string, format: string = 'json') {
     try {

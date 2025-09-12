@@ -1,0 +1,20 @@
+services:
+  cube-server:
+    image: aiser-cube-enterprise:local
+    container_name: aiser-cube-dev-enterprise
+    environment:
+      CUBEJS_API_SECRET: dev-cube-secret
+      CUBEJS_DB_TYPE: postgres
+      CUBEJS_DB_HOST: postgres
+      CUBEJS_DB_NAME: aiser_world
+      CUBEJS_DB_USER: aiser
+      CUBEJS_DB_PASS: aiser_password
+      CUBEJS_DEV_MODE: 'true'
+    ports:
+      - "4001:4000"
+      - "3031:3031"
+    volumes:
+      - ./packages/chat2chart/server/cube_schemas:/cube/conf/schema:ro
+    depends_on:
+      - postgres
+

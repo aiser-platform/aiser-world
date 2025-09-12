@@ -149,6 +149,8 @@ export interface DashboardWidget {
     autoRefresh?: boolean;
     cache?: boolean;
     cacheTimeout?: number;
+    // If widget is bound to a saved query snapshot
+    snapshotId?: string | number;
   };
   
   // Widget-specific properties

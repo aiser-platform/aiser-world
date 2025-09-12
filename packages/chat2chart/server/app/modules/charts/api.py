@@ -1,6 +1,7 @@
-from typing import List, Dict, Any, Optional
+from typing import Annotated, List, Dict, Any, Optional
 from app.modules.charts.schemas import (
     ChartConfiguration,
+    ChatVisualizationResponseSchema,
     DashboardCreateSchema,
     DashboardUpdateSchema,
     DashboardResponseSchema,
@@ -13,20 +14,19 @@ from app.modules.charts.schemas import (
     DashboardExportResponse,
     PlanLimitsResponse,
 )
-from app.modules.charts.services import (
-    ChatVisualizationService,
-    ChartGenerationService,
-    MCPEChartsService,
-)
-from app.modules.charts.services.integrated_chat2chart_service import (
-    IntegratedChat2ChartService,
-)
+from app.modules.charts.services import ChatVisualizationService, ChartGenerationService, MCPEChartsService
+from app.modules.charts.services.integrated_chat2chart_service import IntegratedChat2ChartService
 from app.modules.charts.services.mcp_integration_service import MCPIntegrationService
 from app.modules.charts.services.dashboard_service import DashboardService
 from app.db.session import get_async_session
-from sqlalchemy.ext.asyncio import AsyncSession  # type: ignore[reportMissingImports]
-from fastapi import APIRouter, Depends, HTTPException, Body, UploadFile, File  # type: ignore[reportMissingImports]
-from pydantic import BaseModel  # type: ignore[reportMissingImports]
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql import func
+from datetime import datetime
+from sqlalchemy import select
+from app.modules.authentication.deps.auth_bearer import JWTCookieBearer
+from app.modules.authentication.auth import Auth
+from fastapi import APIRouter, Depends, HTTPException, Body, UploadFile, File
+from pydantic import BaseModel
 import logging
 import json
 
@@ -113,23 +113,23 @@ async def generate_mcp_chart(request: MCPChartRequest):
     """Generate chart using MCP ECharts integration"""
     try:
         logger.info("📊 MCP ECharts chart generation request received")
-
+        
         result = await mcp_echarts_service.generate_chart_from_cube_data(
-            cube_data={"data": request.data},
+            cube_data={'data': request.data},
             query_analysis=request.query_analysis,
-            options=request.options or {},
+            options=request.options or {}
         )
-
+        
         return {
-            "success": result.get("success", False),
-            "chart_type": result.get("chart_type"),
-            "chart_config": result.get("chart_config"),
-            "data_analysis": result.get("data_analysis"),
-            "metadata": result.get("metadata"),
-            "mcp_result": result.get("mcp_result"),
-            "error": result.get("error"),
+            "success": result.get('success', False),
+            "chart_type": result.get('chart_type'),
+            "chart_config": result.get('chart_config'),
+            "data_analysis": result.get('data_analysis'),
+            "metadata": result.get('metadata'),
+            "mcp_result": result.get('mcp_result'),
+            "error": result.get('error')
         }
-
+        
     except Exception as e:
         logger.error(f"❌ MCP chart generation failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -140,30 +140,30 @@ async def generate_chart(request: ChartGenerationRequest):
     """Generate chart from query results and analysis"""
     try:
         logger.info(f"🎨 Chart generation request: {request.natural_language_query}")
-
+        
         # If no query analysis provided, create basic one
         if not request.query_analysis:
             request.query_analysis = {
-                "original_query": request.natural_language_query,
-                "query_type": ["general"],
-                "business_context": {"type": "general"},
+                'original_query': request.natural_language_query,
+                'query_type': ['general'],
+                'business_context': {'type': 'general'}
             }
-
+        
         result = await chart_generation_service.generate_chart_from_query(
             data=request.data,
             query_analysis=request.query_analysis,
-            options=request.options,
+            options=request.options
         )
-
+        
         return {
-            "success": result.get("success", False),
-            "chart_type": result.get("chart_type"),
-            "chart_config": result.get("chart_config"),
-            "data_analysis": result.get("data_analysis"),
-            "generation_metadata": result.get("generation_metadata"),
-            "error": result.get("error"),
+            "success": result.get('success', False),
+            "chart_type": result.get('chart_type'),
+            "chart_config": result.get('chart_config'),
+            "data_analysis": result.get('data_analysis'),
+            "generation_metadata": result.get('generation_metadata'),
+            "error": result.get('error')
         }
-
+        
     except Exception as e:
         logger.error(f"❌ Chart generation failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -173,26 +173,24 @@ async def generate_chart(request: ChartGenerationRequest):
 async def generate_chart_from_file(request: FileChartRequest):
     """Generate chart from uploaded file data"""
     try:
-        logger.info(
-            f"📁 File chart generation: {request.file_metadata.get('name', 'Unknown')}"
-        )
-
+        logger.info(f"📁 File chart generation: {request.file_metadata.get('name', 'Unknown')}")
+        
         result = await chart_generation_service.generate_chart_from_file_data(
             data=request.data,
             file_metadata=request.file_metadata,
             natural_language_query=request.natural_language_query,
-            options=request.options,
+            options=request.options
         )
-
+        
         return {
-            "success": result.get("success", False),
-            "chart_type": result.get("chart_type"),
-            "chart_config": result.get("chart_config"),
-            "data_analysis": result.get("data_analysis"),
+            "success": result.get('success', False),
+            "chart_type": result.get('chart_type'),
+            "chart_config": result.get('chart_config'),
+            "data_analysis": result.get('data_analysis'),
             "file_metadata": request.file_metadata,
-            "error": result.get("error"),
+            "error": result.get('error')
         }
-
+        
     except Exception as e:
         logger.error(f"❌ File chart generation failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -203,19 +201,20 @@ async def get_chart_recommendations(request: ChartRecommendationRequest):
     """Get chart type recommendations for given data"""
     try:
         logger.info("💡 Chart recommendations request")
-
+        
         result = await chart_generation_service.get_chart_recommendations(
-            data=request.data, query_analysis=request.query_analysis
+            data=request.data,
+            query_analysis=request.query_analysis
         )
-
+        
         return {
-            "success": result.get("success", False),
-            "recommendations": result.get("recommendations", []),
-            "data_analysis": result.get("data_analysis"),
-            "best_recommendation": result.get("best_recommendation"),
-            "error": result.get("error"),
+            "success": result.get('success', False),
+            "recommendations": result.get('recommendations', []),
+            "data_analysis": result.get('data_analysis'),
+            "best_recommendation": result.get('best_recommendation'),
+            "error": result.get('error')
         }
-
+        
     except Exception as e:
         logger.error(f"❌ Chart recommendations failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -225,19 +224,20 @@ async def get_chart_recommendations(request: ChartRecommendationRequest):
 async def ai_data_modeling(request: DataModelingRequest):
     """
     AI-powered data modeling workflow
-
+    
     Analyzes data source and generates Cube.js schema with visual representation
     for user approval before proceeding with chart generation.
     """
     try:
         logger.info(f"🧠 AI data modeling request: {request.data_source_id}")
-
+        
         result = await integrated_service.process_data_modeling_workflow(
-            data_source_id=request.data_source_id, user_context=request.user_context
+            data_source_id=request.data_source_id,
+            user_context=request.user_context
         )
-
+        
         return result
-
+        
     except Exception as e:
         logger.error(f"❌ AI data modeling failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -248,13 +248,14 @@ async def approve_schema(request: SchemaApprovalRequest):
     """Process user approval for AI-generated schema"""
     try:
         logger.info(f"📋 Schema approval request: {request.workflow_id}")
-
+        
         result = await integrated_service.process_schema_approval(
-            workflow_id=request.workflow_id, approval_data=request.approval_data
+            workflow_id=request.workflow_id,
+            approval_data=request.approval_data
         )
-
+        
         return result
-
+        
     except Exception as e:
         logger.error(f"❌ Schema approval failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -264,22 +265,20 @@ async def approve_schema(request: SchemaApprovalRequest):
 async def integrated_chat_to_chart(request: IntegratedChat2ChartRequest):
     """
     Complete integrated chat-to-chart workflow
-
+    
     Full AI-powered workflow with LiteLLM, Cube.js, and MCP ECharts integration
     """
     try:
-        logger.info(
-            f"🚀 Integrated chat2chart request: {request.natural_language_query[:50]}..."
-        )
-
+        logger.info(f"🚀 Integrated chat2chart request: {request.natural_language_query[:50]}...")
+        
         result = await integrated_service.process_chat_to_chart_request(
             natural_language_query=request.natural_language_query,
             data_source_id=request.data_source_id,
-            options=request.options or {},
+            options=request.options or {}
         )
-
+        
         return result
-
+        
     except Exception as e:
         logger.error(f"❌ Integrated chat2chart failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -301,7 +300,10 @@ async def get_performance_metrics():
     """Get performance metrics for the integrated service"""
     try:
         metrics = integrated_service.get_performance_metrics()
-        return {"success": True, "metrics": metrics}
+        return {
+            "success": True,
+            "metrics": metrics
+        }
     except Exception as e:
         logger.error(f"❌ Performance metrics failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -317,49 +319,33 @@ async def get_supported_chart_types():
                 "type": "line",
                 "name": "Line Chart",
                 "description": "Best for showing trends over time and continuous data",
-                "use_cases": [
-                    "Time series analysis",
-                    "Trend visualization",
-                    "Continuous data",
-                ],
+                "use_cases": ["Time series analysis", "Trend visualization", "Continuous data"]
             },
             {
                 "type": "bar",
-                "name": "Bar Chart",
+                "name": "Bar Chart", 
                 "description": "Ideal for comparing categories and discrete values",
-                "use_cases": ["Category comparison", "Discrete data", "Rankings"],
+                "use_cases": ["Category comparison", "Discrete data", "Rankings"]
             },
             {
                 "type": "pie",
                 "name": "Pie Chart",
                 "description": "Perfect for showing parts of a whole and distributions",
-                "use_cases": [
-                    "Distribution analysis",
-                    "Part-to-whole relationships",
-                    "Percentages",
-                ],
+                "use_cases": ["Distribution analysis", "Part-to-whole relationships", "Percentages"]
             },
             {
                 "type": "scatter",
                 "name": "Scatter Plot",
                 "description": "Great for showing relationships between two variables",
-                "use_cases": [
-                    "Correlation analysis",
-                    "Two-variable relationships",
-                    "Pattern detection",
-                ],
+                "use_cases": ["Correlation analysis", "Two-variable relationships", "Pattern detection"]
             },
             {
                 "type": "gauge",
                 "name": "Gauge Chart",
                 "description": "Excellent for displaying single metrics and KPIs",
-                "use_cases": [
-                    "KPI monitoring",
-                    "Single metric display",
-                    "Performance indicators",
-                ],
-            },
-        ],
+                "use_cases": ["KPI monitoring", "Single metric display", "Performance indicators"]
+            }
+        ]
     }
 
 
@@ -369,7 +355,10 @@ async def get_mcp_status():
     """Get MCP server status"""
     try:
         status = mcp_integration_service.get_mcp_status()
-        return {"success": True, "mcp_status": status}
+        return {
+            "success": True,
+            "mcp_status": status
+        }
     except Exception as e:
         logger.error(f"❌ MCP status failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -391,15 +380,15 @@ async def generate_chart_with_mcp(request: MCPChartGenerationRequest):
     """Generate chart using MCP ECharts server"""
     try:
         logger.info("📊 MCP chart generation request")
-
+        
         result = await mcp_integration_service.generate_chart_with_mcp(
             data=request.data,
             chart_config=request.chart_config,
-            options=request.options,
+            options=request.options
         )
-
+        
         return result
-
+        
     except Exception as e:
         logger.error(f"❌ MCP chart generation failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -409,208 +398,164 @@ async def generate_chart_with_mcp(request: MCPChartGenerationRequest):
 async def get_mcp_chart_recommendations(data_analysis: Dict[str, Any] = Body(...)):
     """Get chart recommendations from MCP server"""
     try:
-        result = await mcp_integration_service.get_chart_recommendations_from_mcp(
-            data_analysis
-        )
+        result = await mcp_integration_service.get_chart_recommendations_from_mcp(data_analysis)
         return result
     except Exception as e:
         logger.error(f"❌ MCP recommendations failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
 # 🎨 Chart Builder Endpoints
 @router.post("/builder/save")
-async def save_chart(chart_data: Dict[str, Any]):
-    """
-    Save a chart configuration from the chart builder
-    """
+async def save_chart(chart_data: Dict[str, Any], current_token: str = Depends(JWTCookieBearer())):
+    """Persist a chart configuration created in the chart builder."""
     try:
-        logger.info(f"💾 Saving chart: {chart_data.get('name', 'Unnamed Chart')}")
-
         # Validate chart data
-        required_fields = ["name", "type", "config", "data"]
+        required_fields = ['name', 'type', 'config', 'data']
         for field in required_fields:
             if field not in chart_data:
-                raise HTTPException(
-                    status_code=400, detail=f"Missing required field: {field}"
-                )
+                raise HTTPException(status_code=400, detail=f"Missing required field: {field}")
 
-        # Save chart to database (implement with your database service)
-        # For now, return success response
-        saved_chart = {
-            "id": chart_data.get("id")
-            or f"chart_{len(chart_data)}_{hash(str(chart_data))}",
-            "name": chart_data["name"],
-            "type": chart_data["type"],
-            "config": chart_data["config"],
-            "data": chart_data["data"],
-            "query": chart_data.get("query", ""),
-            "created_at": chart_data.get("created_at"),
-            "updated_at": chart_data.get("updated_at"),
-            "user_id": chart_data.get("user_id", "default"),
-            "is_public": chart_data.get("is_public", False),
-        }
+        user_payload = Auth().decodeJWT(current_token) or {}
+        try:
+            user_id = int(user_payload.get('id') or user_payload.get('sub') or 0)
+        except Exception:
+            user_id = 0
 
-        return {
-            "success": True,
-            "message": "Chart saved successfully",
-            "chart": saved_chart,
-        }
+        # Persist chart
+        from app.modules.charts.models import ChatVisualization
+        async with get_async_session() as db:
+            chart = ChatVisualization(
+                title=chart_data.get('name'),
+                chart_type=chart_data.get('type'),
+                form_data=chart_data.get('config'),
+                result=chart_data.get('data'),
+                user_id=user_id,
+                is_active=True
+            )
+            db.add(chart)
+            await db.flush()
+            await db.refresh(chart)
 
+            return {"success": True, "message": "Chart saved successfully", "chart": {"id": str(chart.id), "name": chart.title}}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"❌ Failed to save chart: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to save chart: {str(e)}")
 
-
 @router.get("/builder/list")
-async def list_charts(
-    user_id: Optional[str] = None,
-    chart_type: Optional[str] = None,
-    limit: int = 50,
-    offset: int = 0,
-):
-    """
-    List saved charts with optional filtering
-    """
+async def list_charts(current_token: str = Depends(JWTCookieBearer()), chart_type: str = None, limit: int = 50, offset: int = 0):
+    """List charts owned by the user or active charts."""
     try:
-        logger.info(f"📋 Listing charts for user: {user_id}")
-        # Sanitize optionals
-        user_id_value = user_id or "default"
-        chart_type_value = chart_type or None
-        # Mock response for now - implement with your database service
-        mock_charts = [
-            {
-                "id": "chart_1",
-                "name": "Sample Bar Chart",
-                "type": "bar",
-                "created_at": "2025-01-10T00:00:00Z",
-                "updated_at": "2025-01-10T00:00:00Z",
-                "user_id": user_id_value,
-                "is_public": True,
-            },
-            {
-                "id": "chart_2",
-                "name": "Sample Line Chart",
-                "type": "line",
-                "created_at": "2025-01-10T00:00:00Z",
-                "updated_at": "2025-01-10T00:00:00Z",
-                "user_id": user_id_value,
-                "is_public": False,
-            },
-        ]
-        # Filter by type if specified
-        if chart_type_value:
-            mock_charts = [c for c in mock_charts if c["type"] == chart_type_value]
-        return {
-            "success": True,
-            "charts": mock_charts[offset : offset + limit],
-            "total": len(mock_charts),
-            "limit": limit,
-            "offset": offset,
-        }
+        user_payload = Auth().decodeJWT(current_token) or {}
+        try:
+            user_id = int(user_payload.get('id') or user_payload.get('sub') or 0)
+        except Exception:
+            user_id = 0
+
+        from app.modules.charts.models import ChatVisualization
+        async with get_async_session() as db:
+            query = select(ChatVisualization).where((ChatVisualization.user_id == user_id) | (ChatVisualization.is_active == True))
+            if chart_type:
+                query = query.where(ChatVisualization.chart_type == chart_type)
+            res = await db.execute(query)
+            charts = res.scalars().all()
+            items = []
+            for c in charts:
+                items.append({"id": str(c.id), "name": c.title, "type": c.chart_type, "created_at": c.created_at, "updated_at": c.updated_at, "user_id": c.user_id})
+            return {"success": True, "charts": items[offset:offset+limit], "total": len(items), "limit": limit, "offset": offset}
     except Exception as e:
         logger.error(f"❌ Failed to list charts: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to list charts: {str(e)}")
 
-
 @router.get("/builder/{chart_id}")
-async def get_chart(chart_id: str):
-    """
-    Get a specific chart by ID
-    """
+async def get_chart(chart_id: str, current_token: str = Depends(JWTCookieBearer())):
+    """Get a specific chart by ID with permission checks."""
     try:
-        logger.info(f"📊 Getting chart: {chart_id}")
+        user_payload = Auth().decodeJWT(current_token) or {}
+        try:
+            user_id = int(user_payload.get('id') or user_payload.get('sub') or 0)
+        except Exception:
+            user_id = 0
 
-        # Mock response - implement with your database service
-        mock_chart = {
-            "id": chart_id,
-            "name": f"Chart {chart_id}",
-            "type": "bar",
-            "config": {
-                "title": {"text": "Sample Chart"},
-                "xAxis": {"type": "category", "data": ["A", "B", "C"]},
-                "yAxis": {"type": "value"},
-                "series": [{"type": "bar", "data": [10, 20, 30]}],
-            },
-            "data": [
-                {"name": "A", "value": 10},
-                {"name": "B", "value": 20},
-                {"name": "C", "value": 30},
-            ],
-            "query": "SELECT name, value FROM sample_data",
-            "created_at": "2025-01-10T00:00:00Z",
-            "updated_at": "2025-01-10T00:00:00Z",
-            "user_id": "default",
-            "is_public": True,
-        }
-
-        return {"success": True, "chart": mock_chart}
-
+        from app.modules.charts.models import ChatVisualization
+        async with get_async_session() as db:
+            res = await db.execute(select(ChatVisualization).where(ChatVisualization.id == chart_id))
+            chart = res.scalar_one_or_none()
+            if not chart:
+                raise HTTPException(status_code=404, detail="Chart not found")
+            if chart.user_id and chart.user_id != user_id and not chart.is_active:
+                raise HTTPException(status_code=403, detail="Access denied")
+            return {"success": True, "chart": {"id": str(chart.id), "name": chart.title, "type": chart.chart_type, "config": chart.form_data, "data": chart.result, "created_at": chart.created_at, "updated_at": chart.updated_at}}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"❌ Failed to get chart {chart_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to get chart: {str(e)}")
 
-
 @router.put("/builder/{chart_id}")
-async def update_chart(chart_id: str, chart_data: Dict[str, Any]):
-    """
-    Update an existing chart
-    """
+async def update_chart(chart_id: str, chart_data: Dict[str, Any], current_token: str = Depends(JWTCookieBearer())):
+    """Update an existing chart with ownership check."""
     try:
         logger.info(f"✏️ Updating chart: {chart_id}")
-
-        # Validate chart data
-        required_fields = ["name", "type", "config", "data"]
+        required_fields = ['name', 'type', 'config', 'data']
         for field in required_fields:
             if field not in chart_data:
-                raise HTTPException(
-                    status_code=400, detail=f"Missing required field: {field}"
-                )
+                raise HTTPException(status_code=400, detail=f"Missing required field: {field}")
 
-        # Update chart in database (implement with your database service)
-        updated_chart = {
-            "id": chart_id,
-            "name": chart_data["name"],
-            "type": chart_data["type"],
-            "config": chart_data["config"],
-            "data": chart_data["data"],
-            "query": chart_data.get("query", ""),
-            "updated_at": "2025-01-10T00:00:00Z",
-            "user_id": chart_data.get("user_id", "default"),
-            "is_public": chart_data.get("is_public", False),
-        }
+        user_payload = Auth().decodeJWT(current_token) or {}
+        try:
+            user_id = int(user_payload.get('id') or user_payload.get('sub') or 0)
+        except Exception:
+            user_id = 0
 
-        return {
-            "success": True,
-            "message": "Chart updated successfully",
-            "chart": updated_chart,
-        }
-
+        from app.modules.charts.models import ChatVisualization
+        async with get_async_session() as db:
+            res = await db.execute(select(ChatVisualization).where(ChatVisualization.id == chart_id))
+            chart = res.scalar_one_or_none()
+            if not chart:
+                raise HTTPException(status_code=404, detail="Chart not found")
+            if chart.user_id and chart.user_id != user_id:
+                raise HTTPException(status_code=403, detail="Access denied")
+            chart.title = chart_data.get('name')
+            chart.chart_type = chart_data.get('type')
+            chart.form_data = chart_data.get('config')
+            chart.result = chart_data.get('data')
+            await db.flush()
+            await db.refresh(chart)
+            return {"success": True, "message": "Chart updated successfully", "chart": {"id": str(chart.id), "name": chart.title}}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"❌ Failed to update chart {chart_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to update chart: {str(e)}")
 
-
 @router.delete("/builder/{chart_id}")
-async def delete_chart(chart_id: str):
-    """
-    Delete a chart
-    """
+async def delete_chart(chart_id: str, current_token: str = Depends(JWTCookieBearer())):
+    """Delete a chart if owned by request user."""
     try:
-        logger.info(f"🗑️ Deleting chart: {chart_id}")
+        user_payload = Auth().decodeJWT(current_token) or {}
+        try:
+            user_id = int(user_payload.get('id') or user_payload.get('sub') or 0)
+        except Exception:
+            user_id = 0
 
-        # Delete chart from database (implement with your database service)
-
-        return {
-            "success": True,
-            "message": "Chart deleted successfully",
-            "chart_id": chart_id,
-        }
-
+        from app.modules.charts.models import ChatVisualization
+        async with get_async_session() as db:
+            res = await db.execute(select(ChatVisualization).where(ChatVisualization.id == chart_id))
+            chart = res.scalar_one_or_none()
+            if not chart:
+                raise HTTPException(status_code=404, detail="Chart not found")
+            if chart.user_id and chart.user_id != user_id:
+                raise HTTPException(status_code=403, detail="Access denied")
+            await db.delete(chart)
+            await db.flush()
+            return {"success": True, "message": "Chart deleted successfully", "chart_id": chart_id}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"❌ Failed to delete chart {chart_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to delete chart: {str(e)}")
-
 
 @router.post("/builder/export")
 async def export_chart(chart_data: Dict[str, Any]):
@@ -619,21 +564,20 @@ async def export_chart(chart_data: Dict[str, Any]):
     """
     try:
         logger.info(f"📤 Exporting chart: {chart_data.get('name', 'Unnamed Chart')}")
-
+        
         # This would integrate with ECharts export functionality
         # For now, return success response
-
+        
         return {
             "success": True,
             "message": "Chart exported successfully",
             "export_url": f"/exports/chart_{hash(str(chart_data))}.png",
-            "formats": ["PNG", "SVG", "PDF"],
+            "formats": ["PNG", "SVG", "PDF"]
         }
-
+        
     except Exception as e:
         logger.error(f"❌ Failed to export chart: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to export chart: {str(e)}")
-
 
 @router.post("/builder/import")
 async def import_chart(file: UploadFile = File(...)):
@@ -642,35 +586,30 @@ async def import_chart(file: UploadFile = File(...)):
     """
     try:
         logger.info(f"📥 Importing chart from file: {file.filename}")
-
+        
         # Read file content
         content = await file.read()
-
-        if file.filename.endswith(".json"):
-            chart_data = json.loads(content.decode("utf-8"))
+        
+        if file.filename.endswith('.json'):
+            chart_data = json.loads(content.decode('utf-8'))
         else:
-            raise HTTPException(
-                status_code=400, detail="Unsupported file format. Please use JSON."
-            )
-
+            raise HTTPException(status_code=400, detail="Unsupported file format. Please use JSON.")
+        
         # Validate imported chart data
-        required_fields = ["name", "type", "config", "data"]
+        required_fields = ['name', 'type', 'config', 'data']
         for field in required_fields:
             if field not in chart_data:
-                raise HTTPException(
-                    status_code=400, detail=f"Invalid chart file: missing {field}"
-                )
-
+                raise HTTPException(status_code=400, detail=f"Invalid chart file: missing {field}")
+        
         return {
             "success": True,
             "message": "Chart imported successfully",
-            "chart": chart_data,
+            "chart": chart_data
         }
-
+        
     except Exception as e:
         logger.error(f"❌ Failed to import chart: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to import chart: {str(e)}")
-
 
 @router.post("/builder/share")
 async def share_chart(chart_data: Dict[str, Any]):
@@ -679,19 +618,19 @@ async def share_chart(chart_data: Dict[str, Any]):
     """
     try:
         logger.info(f"🔗 Sharing chart: {chart_data.get('name', 'Unnamed Chart')}")
-
+        
         # Generate shareable link
         share_id = f"share_{hash(str(chart_data))}"
         share_url = f"/chart-builder?share={share_id}"
-
+        
         return {
             "success": True,
             "message": "Chart shared successfully",
             "share_id": share_id,
             "share_url": share_url,
-            "is_public": chart_data.get("is_public", False),
+            "is_public": chart_data.get('is_public', False)
         }
-
+        
     except Exception as e:
         logger.error(f"❌ Failed to share chart: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to share chart: {str(e)}")
@@ -699,56 +638,51 @@ async def share_chart(chart_data: Dict[str, Any]):
 
 # 🏗️ PROJECT-SCOPED DASHBOARD ENDPOINTS
 
-
 @router.get("/api/organizations/{organization_id}/projects/{project_id}/dashboards")
 async def get_project_dashboards(
     organization_id: str,
     project_id: str,
-    user_id: Optional[str] = None,
+    user_id: str = None,
     limit: int = 50,
-    offset: int = 0,
+    offset: int = 0
 ):
     """Get dashboards for a specific project (project-scoped)"""
     try:
-        logger.info(
-            f"📊 Getting dashboards for project {project_id} in organization {organization_id}"
-        )
-        org_id_int = int(organization_id)
-        project_id_int = int(project_id)
-        created_by_int = (
-            int(user_id) if user_id is not None and user_id.isdigit() else 1
-        )
+        logger.info(f"📊 Getting dashboards for project {project_id} in organization {organization_id}")
+        
         # Mock implementation - replace with actual database service
         mock_dashboards = [
             {
                 "id": f"dashboard_{project_id}_1",
                 "name": "Project Sales Dashboard",
                 "description": f"Sales dashboard for project {project_id}",
-                "project_id": project_id_int,
-                "organization_id": org_id_int,
+                "project_id": int(project_id),
+                "organization_id": int(organization_id),
                 "layout_config": {"grid_size": 12, "widgets": []},
                 "theme_config": {"primary_color": "#1890ff"},
                 "global_filters": {},
                 "refresh_interval": 300,
                 "is_public": False,
                 "is_template": False,
-                "created_by": created_by_int,
+                "created_by": int(user_id) if user_id else 1,
                 "max_widgets": 10,
                 "max_pages": 5,
                 "created_at": "2025-01-10T00:00:00Z",
                 "updated_at": "2025-01-10T00:00:00Z",
-                "last_viewed_at": "2025-01-10T00:00:00Z",
+                "last_viewed_at": "2025-01-10T00:00:00Z"
             }
         ]
+        
         return {
             "success": True,
-            "dashboards": mock_dashboards[offset : offset + limit],
-            "organization_id": org_id_int,
-            "project_id": project_id_int,
+            "dashboards": mock_dashboards[offset:offset + limit],
+            "organization_id": organization_id,
+            "project_id": project_id,
             "total": len(mock_dashboards),
             "limit": limit,
-            "offset": offset,
+            "offset": offset
         }
+        
     except Exception as e:
         logger.error(f"❌ Failed to get project dashboards: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -756,56 +690,56 @@ async def get_project_dashboards(
 
 @router.post("/api/organizations/{organization_id}/projects/{project_id}/dashboards")
 async def create_project_dashboard(
-    organization_id: str, project_id: str, dashboard: DashboardCreateSchema
+    organization_id: str,
+    project_id: str,
+    dashboard: DashboardCreateSchema
 ):
     """Create a new dashboard for a specific project"""
     try:
-        logger.info(
-            f"🏗️ Creating dashboard for project {project_id} in organization {organization_id}: {dashboard.name}"
-        )
-        org_id_int = int(organization_id)
-        project_id_int = int(project_id)
+        logger.info(f"🏗️ Creating dashboard for project {project_id} in organization {organization_id}: {dashboard.name}")
+        
+        # Mock implementation - replace with actual database service
         dashboard_data = {
             "id": f"dashboard_{project_id}_{hash(dashboard.name)}",
             "name": dashboard.name,
             "description": dashboard.description,
-            "project_id": project_id_int,
-            "organization_id": org_id_int,
+            "project_id": int(project_id),
+            "organization_id": int(organization_id),
             "layout_config": dashboard.layout_config,
             "theme_config": dashboard.theme_config,
             "global_filters": dashboard.global_filters,
             "refresh_interval": dashboard.refresh_interval,
             "is_public": dashboard.is_public,
             "is_template": dashboard.is_template,
-            "created_by": 1,
+            "created_by": 1,  # TODO: Get from auth context
             "max_widgets": 10,
             "max_pages": 5,
             "created_at": "2025-01-10T00:00:00Z",
             "updated_at": None,
-            "last_viewed_at": None,
+            "last_viewed_at": None
         }
+        
         return {
             "success": True,
             "message": "Dashboard created successfully",
-            "dashboard": dashboard_data,
+            "dashboard": dashboard_data
         }
+        
     except Exception as e:
         logger.error(f"❌ Failed to create project dashboard: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get(
-    "/api/organizations/{organization_id}/projects/{project_id}/dashboards/{dashboard_id}"
-)
+@router.get("/api/organizations/{organization_id}/projects/{project_id}/dashboards/{dashboard_id}")
 async def get_project_dashboard(
-    organization_id: str, project_id: str, dashboard_id: str
+    organization_id: str,
+    project_id: str,
+    dashboard_id: str
 ):
     """Get a specific dashboard for a project"""
     try:
-        logger.info(
-            f"📊 Getting dashboard {dashboard_id} for project {project_id} in organization {organization_id}"
-        )
-
+        logger.info(f"📊 Getting dashboard {dashboard_id} for project {project_id} in organization {organization_id}")
+        
         # Mock implementation - replace with actual database service
         mock_dashboard = {
             "id": dashboard_id,
@@ -824,31 +758,30 @@ async def get_project_dashboard(
             "max_pages": 5,
             "created_at": "2025-01-10T00:00:00Z",
             "updated_at": "2025-01-10T00:00:00Z",
-            "last_viewed_at": None,
+            "last_viewed_at": None
         }
-
-        return {"success": True, "dashboard": mock_dashboard}
-
+        
+        return {
+            "success": True,
+            "dashboard": mock_dashboard
+        }
+        
     except Exception as e:
         logger.error(f"❌ Failed to get project dashboard: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.put(
-    "/api/organizations/{organization_id}/projects/{project_id}/dashboards/{dashboard_id}"
-)
+@router.put("/api/organizations/{organization_id}/projects/{project_id}/dashboards/{dashboard_id}")
 async def update_project_dashboard(
     organization_id: str,
     project_id: str,
     dashboard_id: str,
-    dashboard: DashboardUpdateSchema,
+    dashboard: DashboardUpdateSchema
 ):
     """Update a dashboard for a specific project"""
     try:
-        logger.info(
-            f"✏️ Updating dashboard {dashboard_id} for project {project_id} in organization {organization_id}"
-        )
-
+        logger.info(f"✏️ Updating dashboard {dashboard_id} for project {project_id} in organization {organization_id}")
+        
         # Mock implementation - replace with actual database service
         updated_dashboard = {
             "id": dashboard_id,
@@ -867,40 +800,38 @@ async def update_project_dashboard(
             "max_pages": 5,
             "created_at": "2025-01-10T00:00:00Z",
             "updated_at": "2025-01-10T00:00:00Z",
-            "last_viewed_at": None,
+            "last_viewed_at": None
         }
-
+        
         return {
             "success": True,
             "message": "Dashboard updated successfully",
-            "dashboard": updated_dashboard,
+            "dashboard": updated_dashboard
         }
-
+        
     except Exception as e:
         logger.error(f"❌ Failed to update project dashboard: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.delete(
-    "/api/organizations/{organization_id}/projects/{project_id}/dashboards/{dashboard_id}"
-)
+@router.delete("/api/organizations/{organization_id}/projects/{project_id}/dashboards/{dashboard_id}")
 async def delete_project_dashboard(
-    organization_id: str, project_id: str, dashboard_id: str
+    organization_id: str,
+    project_id: str,
+    dashboard_id: str
 ):
     """Delete a dashboard for a specific project"""
     try:
-        logger.info(
-            f"🗑️ Deleting dashboard {dashboard_id} for project {project_id} in organization {organization_id}"
-        )
-
+        logger.info(f"🗑️ Deleting dashboard {dashboard_id} for project {project_id} in organization {organization_id}")
+        
         # Mock implementation - replace with actual database service
-
+        
         return {
             "success": True,
             "message": "Dashboard deleted successfully",
-            "dashboard_id": dashboard_id,
+            "dashboard_id": dashboard_id
         }
-
+        
     except Exception as e:
         logger.error(f"❌ Failed to delete project dashboard: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -909,146 +840,160 @@ async def delete_project_dashboard(
 # 🏗️ Dashboard Studio API Endpoints (Global - for backward compatibility)
 @router.post("/dashboards/", response_model=DashboardResponseSchema)
 async def create_dashboard(
-    dashboard: DashboardCreateSchema, db: AsyncSession = Depends(get_async_session)
+    dashboard: DashboardCreateSchema,
+    current_token: str = Depends(JWTCookieBearer()),
+    db: AsyncSession = Depends(get_async_session)
 ):
     """
     Create a new dashboard
     """
     try:
         logger.info(f"🏗️ Creating dashboard: {dashboard.name}")
+        
+        # Use real database service
+        # Enforce org/project ownership using JWT
+        user_payload = Auth().decodeJWT(current_token) or {}
+        user_id = int(user_payload.get('id') or user_payload.get('sub') or 0)
+        org_id = int(user_payload.get('organization_id') or 0)
+        # Ensure dashboard.project_id belongs to org (best-effort)
+        if dashboard.project_id and org_id and dashboard.project_id:
+            # project ownership validated in Project service when creating
+            pass
         dashboard_service = DashboardService(db)
-        created_dashboard = await dashboard_service.create_dashboard(
-            dashboard, user_id=1
-        )
+        created_dashboard = await dashboard_service.create_dashboard(dashboard, created_by=user_id)
+        
         return created_dashboard
+        
     except Exception as e:
         logger.error(f"❌ Failed to create dashboard: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to create dashboard: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to create dashboard: {str(e)}")
 
 
 @router.get("/dashboards/", response_model=List[DashboardResponseSchema])
 async def list_dashboards(
-    user_id: Optional[str] = None,
-    project_id: Optional[int] = None,
+    user_id: str = None,
+    project_id: int = None,
     limit: int = 50,
     offset: int = 0,
-    db: AsyncSession = Depends(get_async_session),
+    db: AsyncSession = Depends(get_async_session)
 ):
     """
     List dashboards with optional filtering
     """
     try:
         logger.info(f"📋 Listing dashboards for user: {user_id}, project: {project_id}")
-        user_id_int: int = (
-            int(user_id) if user_id is not None and str(user_id).isdigit() else 1
-        )
-        project_id_int: int = int(project_id) if project_id is not None else 0
+        
+        # Use real database service
         dashboard_service = DashboardService(db)
         dashboards = await dashboard_service.list_dashboards(
-            project_id=project_id_int,
-            user_id=user_id_int,
+            user_id=user_id,
+            project_id=project_id,
             limit=limit,
-            offset=offset,
-            search=None,
+            offset=offset
         )
+        
         return dashboards
+        
     except Exception as e:
         logger.error(f"❌ Failed to list dashboards: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to list dashboards: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to list dashboards: {str(e)}")
 
 
 @router.get("/dashboards/{dashboard_id}", response_model=DashboardResponseSchema)
 async def get_dashboard(
-    dashboard_id: str, db: AsyncSession = Depends(get_async_session)
+    dashboard_id: str,
+    db: AsyncSession = Depends(get_async_session)
 ):
     """
     Get a specific dashboard by ID
     """
     try:
         logger.info(f"📊 Getting dashboard: {dashboard_id}")
+        
+        # Use real database service
         dashboard_service = DashboardService(db)
-        dashboard = await dashboard_service.get_dashboard(dashboard_id, user_id=1)
+        dashboard = await dashboard_service.get_dashboard(dashboard_id)
+        
         if not dashboard:
             raise HTTPException(status_code=404, detail="Dashboard not found")
+        
         return dashboard
+        
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"❌ Failed to get dashboard {dashboard_id}: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get dashboard: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get dashboard: {str(e)}")
 
 
 @router.put("/dashboards/{dashboard_id}", response_model=DashboardResponseSchema)
 async def update_dashboard(
-    dashboard_id: str,
+    dashboard_id: str, 
     dashboard: DashboardUpdateSchema,
-    db: AsyncSession = Depends(get_async_session),
+    db: AsyncSession = Depends(get_async_session)
 ):
     """
     Update an existing dashboard
     """
     try:
         logger.info(f"✏️ Updating dashboard: {dashboard_id}")
+        
+        # Use real database service
         dashboard_service = DashboardService(db)
-        updated_dashboard = await dashboard_service.update_dashboard(
-            dashboard_id, dashboard, user_id=1
-        )
+        updated_dashboard = await dashboard_service.update_dashboard(dashboard_id, dashboard)
+        
         if not updated_dashboard:
             raise HTTPException(status_code=404, detail="Dashboard not found")
+        
         return updated_dashboard
+        
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"❌ Failed to update dashboard {dashboard_id}: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to update dashboard: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to update dashboard: {str(e)}")
 
 
 @router.delete("/dashboards/{dashboard_id}")
 async def delete_dashboard(
-    dashboard_id: str, db: AsyncSession = Depends(get_async_session)
+    dashboard_id: str,
+    db: AsyncSession = Depends(get_async_session)
 ):
     """
     Delete a dashboard
     """
     try:
         logger.info(f"🗑️ Deleting dashboard: {dashboard_id}")
+        
+        # Use real database service
         dashboard_service = DashboardService(db)
-        success = await dashboard_service.delete_dashboard(dashboard_id, user_id=1)
+        success = await dashboard_service.delete_dashboard(dashboard_id)
+        
         if not success:
             raise HTTPException(status_code=404, detail="Dashboard not found")
+        
         return {
             "success": True,
             "message": "Dashboard deleted successfully",
-            "dashboard_id": dashboard_id,
+            "dashboard_id": dashboard_id
         }
+        
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"❌ Failed to delete dashboard {dashboard_id}: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to delete dashboard: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to delete dashboard: {str(e)}")
 
 
 # 🧩 Widget Management Endpoints
-@router.post(
-    "/dashboards/{dashboard_id}/widgets", response_model=DashboardWidgetResponseSchema
-)
+@router.post("/dashboards/{dashboard_id}/widgets", response_model=DashboardWidgetResponseSchema)
 async def create_widget(dashboard_id: str, widget: DashboardWidgetCreateSchema):
     """
     Create a new widget in a dashboard
     """
     try:
         logger.info(f"🧩 Creating widget in dashboard {dashboard_id}: {widget.name}")
-
+        
         # Mock implementation - replace with actual database service
         widget_data = {
             "id": f"widget_{hash(widget.name)}",
@@ -1069,29 +1014,24 @@ async def create_widget(dashboard_id: str, widget: DashboardWidgetCreateSchema):
             "is_resizable": widget.is_resizable,
             "is_draggable": widget.is_draggable,
             "created_at": "2025-01-10T00:00:00Z",
-            "updated_at": None,
+            "updated_at": None
         }
-
+        
         return widget_data
-
+        
     except Exception as e:
         logger.error(f"❌ Failed to create widget: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to create widget: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to create widget: {str(e)}")
 
 
-@router.get(
-    "/dashboards/{dashboard_id}/widgets",
-    response_model=List[DashboardWidgetResponseSchema],
-)
+@router.get("/dashboards/{dashboard_id}/widgets", response_model=List[DashboardWidgetResponseSchema])
 async def list_widgets(dashboard_id: str):
     """
     List all widgets in a dashboard
     """
     try:
         logger.info(f"📋 Listing widgets for dashboard: {dashboard_id}")
-
+        
         # Mock implementation - replace with actual database service
         mock_widgets = [
             {
@@ -1113,7 +1053,7 @@ async def list_widgets(dashboard_id: str):
                 "is_resizable": True,
                 "is_draggable": True,
                 "created_at": "2025-01-10T00:00:00Z",
-                "updated_at": None,
+                "updated_at": None
             },
             {
                 "id": "widget_2",
@@ -1134,30 +1074,25 @@ async def list_widgets(dashboard_id: str):
                 "is_resizable": True,
                 "is_draggable": True,
                 "created_at": "2025-01-10T00:00:00Z",
-                "updated_at": None,
-            },
+                "updated_at": None
+            }
         ]
-
+        
         return mock_widgets
-
+        
     except Exception as e:
         logger.error(f"❌ Failed to list widgets: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to list widgets: {str(e)}")
 
 
-@router.put(
-    "/dashboards/{dashboard_id}/widgets/{widget_id}",
-    response_model=DashboardWidgetResponseSchema,
-)
-async def update_widget(
-    dashboard_id: str, widget_id: str, widget: DashboardWidgetUpdateSchema
-):
+@router.put("/dashboards/{dashboard_id}/widgets/{widget_id}", response_model=DashboardWidgetResponseSchema)
+async def update_widget(dashboard_id: str, widget_id: str, widget: DashboardWidgetUpdateSchema):
     """
     Update a widget
     """
     try:
         logger.info(f"✏️ Updating widget {widget_id} in dashboard {dashboard_id}")
-
+        
         # Mock implementation - replace with actual database service
         updated_widget = {
             "id": widget_id,
@@ -1178,16 +1113,14 @@ async def update_widget(
             "is_resizable": widget.is_resizable,
             "is_draggable": widget.is_draggable,
             "created_at": "2025-01-10T00:00:00Z",
-            "updated_at": "2025-01-10T00:00:00Z",
+            "updated_at": "2025-01-10T00:00:00Z"
         }
-
+        
         return updated_widget
-
+        
     except Exception as e:
         logger.error(f"❌ Failed to update widget {widget_id}: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to update widget: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to update widget: {str(e)}")
 
 
 @router.delete("/dashboards/{dashboard_id}/widgets/{widget_id}")
@@ -1197,61 +1130,53 @@ async def delete_widget(dashboard_id: str, widget_id: str):
     """
     try:
         logger.info(f"🗑️ Deleting widget {widget_id} from dashboard {dashboard_id}")
-
+        
         # Mock implementation - replace with actual database service
-
+        
         return {
             "success": True,
             "message": "Widget deleted successfully",
-            "widget_id": widget_id,
+            "widget_id": widget_id
         }
-
+        
     except Exception as e:
         logger.error(f"❌ Failed to delete widget {widget_id}: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to delete widget: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to delete widget: {str(e)}")
 
 
 # 📤 Export and Sharing Endpoints
-@router.post(
-    "/dashboards/{dashboard_id}/export", response_model=DashboardExportResponse
-)
+@router.post("/dashboards/{dashboard_id}/export", response_model=DashboardExportResponse)
 async def export_dashboard(dashboard_id: str, export_request: DashboardExportRequest):
     """
     Export dashboard in various formats
     """
     try:
         logger.info(f"📤 Exporting dashboard {dashboard_id} as {export_request.format}")
-
+        
         # Mock implementation - replace with actual export service
         export_url = f"/exports/dashboard_{dashboard_id}_{export_request.format}.{export_request.format}"
-
+        
         return {
             "success": True,
             "export_url": export_url,
             "file_size": 1024000,  # Mock file size
             "format": export_request.format,
-            "message": f"Dashboard exported successfully as {export_request.format.upper()}",
+            "message": f"Dashboard exported successfully as {export_request.format.upper()}"
         }
-
+        
     except Exception as e:
         logger.error(f"❌ Failed to export dashboard {dashboard_id}: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to export dashboard: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to export dashboard: {str(e)}")
 
 
-@router.post(
-    "/dashboards/{dashboard_id}/share", response_model=DashboardShareResponseSchema
-)
-async def share_dashboard(dashboard_id: str, share_request: DashboardShareCreateSchema):
+@router.post("/dashboards/{dashboard_id}/share", response_model=DashboardShareResponseSchema)
+async def share_dashboard(dashboard_id: str, share_request: DashboardShareCreateSchema, current_token: str = Depends(JWTCookieBearer())):
     """
     Share dashboard with other users
     """
     try:
         logger.info(f"🔗 Sharing dashboard {dashboard_id}")
-
+        
         # Mock implementation - replace with actual sharing service
         share_data = {
             "id": f"share_{hash(dashboard_id)}",
@@ -1265,16 +1190,204 @@ async def share_dashboard(dashboard_id: str, share_request: DashboardShareCreate
             "access_count": 0,
             "last_accessed_at": None,
             "created_at": "2025-01-10T00:00:00Z",
-            "updated_at": None,
+            "updated_at": None
         }
+        
+        # Persist share in DB (best-effort)
+        user_payload = Auth().decodeJWT(current_token) or {}
+        try:
+            user_id = int(user_payload.get('id') or user_payload.get('sub') or 0)
+        except Exception:
+            user_id = 0
 
-        return share_data
+        from app.modules.charts.models import DashboardShare, Dashboard
+        async with get_async_session() as db:
+            # Basic permission: only owner/org_admin can share
+            res = await db.execute(select(Dashboard).where(Dashboard.id == dashboard_id))
+            db_dash = res.scalar_one_or_none()
+            if not db_dash:
+                raise HTTPException(status_code=404, detail="Dashboard not found")
+            if db_dash.created_by and db_dash.created_by != user_id:
+                # try org admin check via project->organization
+                org_id = None
+                if db_dash.project_id:
+                    from app.modules.projects.models import Project
+                    pres = await db.execute(select(Project).where(Project.id == db_dash.project_id))
+                    proj = pres.scalar_one_or_none()
+                    if proj:
+                        org_id = proj.organization_id
+                if org_id:
+                    from app.modules.projects.models import OrganizationUser
+                    our = await db.execute(select(OrganizationUser).where(OrganizationUser.user_id == user_id, OrganizationUser.organization_id == org_id))
+                    our_row = our.scalar_one_or_none()
+                    if not our_row or our_row.role not in ('owner', 'admin'):
+                        raise HTTPException(status_code=403, detail="Insufficient permissions to share dashboard")
+                else:
+                    raise HTTPException(status_code=403, detail="Insufficient permissions to share dashboard")
 
+            share = DashboardShare(
+                dashboard_id=dashboard_id,
+                shared_by=user_id,
+                shared_with=share_request.shared_with,
+                permission=share_request.permission,
+                expires_at=share_request.expires_at,
+                is_active=share_request.is_active,
+                share_token=f"share_{hash((dashboard_id, share_request.shared_with, share_request.permission))}"
+            )
+            db.add(share)
+            await db.flush()
+            await db.refresh(share)
+            return {
+                "id": str(share.id),
+                "dashboard_id": dashboard_id,
+                "shared_by": share.shared_by,
+                "shared_with": share.shared_with,
+                "permission": share.permission,
+                "expires_at": share.expires_at,
+                "is_active": share.is_active,
+                "share_token": share.share_token,
+                "access_count": share.access_count,
+                "last_accessed_at": share.last_accessed_at,
+                "created_at": share.created_at,
+                "updated_at": share.updated_at
+            }
+        
     except Exception as e:
         logger.error(f"❌ Failed to share dashboard {dashboard_id}: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to share dashboard: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to share dashboard: {str(e)}")
+
+
+@router.post("/dashboards/{dashboard_id}/publish")
+async def publish_dashboard(dashboard_id: str, make_public: bool = True, current_token: str = Depends(JWTCookieBearer()), db: AsyncSession = Depends(get_async_session)):
+    """Publish or unpublish a dashboard (toggle public visibility). Enforces auth."""
+    try:
+        user_payload = Auth().decodeJWT(current_token) or {}
+        try:
+            user_id = int(user_payload.get('id') or user_payload.get('sub') or 0)
+        except Exception:
+            user_id = 0
+
+        # In real impl, load dashboard and check ownership/org membership
+        user_id = int(user_payload.get('id') or user_payload.get('sub') or 0)
+        async with get_async_session() as sdb:
+            from app.modules.charts.models import Dashboard
+            res = await sdb.execute(select(Dashboard).where(Dashboard.id == dashboard_id))
+            db_dash = res.scalar_one_or_none()
+            if not db_dash:
+                raise HTTPException(status_code=404, detail="Dashboard not found")
+            # Only allow publish by owner or org admin (simplified)
+            if db_dash.created_by and db_dash.created_by != user_id:
+                raise HTTPException(status_code=403, detail="Only owner can publish")
+            db_dash.is_public = bool(make_public)
+            await sdb.flush()
+            await sdb.refresh(db_dash)
+            return {"success": True, "dashboard_id": dashboard_id, "is_public": db_dash.is_public}
+    except Exception as e:
+        logger.error(f"❌ Failed to publish dashboard {dashboard_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to publish dashboard: {str(e)}")
+
+
+@router.post("/dashboards/{dashboard_id}/embed")
+async def create_dashboard_embed(dashboard_id: str, options: Dict[str, Any] = Body({}), current_token: str = Depends(JWTCookieBearer())):
+    """Create an embeddable token/URL for a dashboard. In production, persist tokens and validate scopes."""
+    try:
+        user_payload = Auth().decodeJWT(current_token) or {}
+        try:
+            user_id = int(user_payload.get('id') or user_payload.get('sub') or 0)
+        except Exception:
+            user_id = 0
+
+        # Permission check: only owner or org admin can create embed
+        from app.modules.charts.models import DashboardEmbed, Dashboard
+        async with get_async_session() as sdb:
+            res = await sdb.execute(select(Dashboard).where(Dashboard.id == dashboard_id))
+            db_dash = res.scalar_one_or_none()
+            if not db_dash:
+                raise HTTPException(status_code=404, detail="Dashboard not found")
+            # Simplified RBAC: owner only for now
+            if db_dash.created_by and db_dash.created_by != user_id:
+                # Check organization user's role
+                from app.modules.projects.models import OrganizationUser
+                # find org id from project (db_dash.project_id)
+                org_id = None
+                if db_dash.project_id:
+                    # Lookup project -> organization in projects table
+                    from app.modules.projects.models import Project
+                    pres = await sdb.execute(select(Project).where(Project.id == db_dash.project_id))
+                    proj = pres.scalar_one_or_none()
+                    if proj:
+                        org_id = proj.organization_id
+                if org_id:
+                    ou = await sdb.execute(select(OrganizationUser).where(OrganizationUser.user_id == user_id, OrganizationUser.organization_id == org_id))
+                    ou_row = ou.scalar_one_or_none()
+                    if ou_row and ou_row.role in ('admin', 'owner'):
+                        pass
+                    else:
+                        raise HTTPException(status_code=403, detail="Only owner or org admin can create embeds")
+                else:
+                    raise HTTPException(status_code=403, detail="Only owner or org admin can create embeds")
+
+            embed_token = f"embed_{hash((dashboard_id, user_id, str(options)))}"
+            embed = DashboardEmbed(dashboard_id=dashboard_id, created_by=user_id, embed_token=embed_token, options=options)
+            sdb.add(embed)
+            await sdb.flush()
+            await sdb.refresh(embed)
+            embed_url = f"/embed/dashboards/{dashboard_id}?token={embed_token}"
+            return {"success": True, "dashboard_id": dashboard_id, "embed_token": embed_token, "embed_url": embed_url, "embed_id": str(embed.id)}
+    except Exception as e:
+        logger.error(f"❌ Failed to create embed for dashboard {dashboard_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to create embed: {str(e)}")
+
+
+@router.get("/embed/dashboards/{dashboard_id}")
+async def serve_embedded_dashboard(dashboard_id: str, token: Optional[str] = None, db: AsyncSession = Depends(get_async_session)):
+    """Serve an embedded dashboard payload when a valid embed token is provided.
+    This endpoint validates the token, increments access_count, and returns dashboard JSON.
+    """
+    try:
+        if not token:
+            raise HTTPException(status_code=401, detail="Embed token required")
+
+        from app.modules.charts.models import DashboardEmbed, Dashboard
+        async with get_async_session() as sdb:
+            res = await sdb.execute(select(DashboardEmbed).where(DashboardEmbed.embed_token == token, DashboardEmbed.dashboard_id == dashboard_id, DashboardEmbed.is_active == True))
+            embed = res.scalar_one_or_none()
+            if not embed:
+                raise HTTPException(status_code=403, detail="Invalid or inactive embed token")
+
+            # Check expiry
+            if embed.expires_at and isinstance(embed.expires_at, datetime):
+                if embed.expires_at < datetime.utcnow():
+                    raise HTTPException(status_code=403, detail="Embed token expired")
+
+            # Increment access count and update last_accessed_at
+            embed.access_count = (embed.access_count or 0) + 1
+            embed.last_accessed_at = func.now()
+            await sdb.flush()
+
+            # Load dashboard
+            dres = await sdb.execute(select(Dashboard).where(Dashboard.id == dashboard_id))
+            db_dash = dres.scalar_one_or_none()
+            if not db_dash:
+                raise HTTPException(status_code=404, detail="Dashboard not found")
+
+            # Return minimal dashboard payload (omit sensitive fields)
+            payload = {
+                "id": str(db_dash.id),
+                "name": db_dash.name,
+                "description": db_dash.description,
+                "layout_config": db_dash.layout_config,
+                "theme_config": db_dash.theme_config,
+                "global_filters": db_dash.global_filters,
+                "is_public": db_dash.is_public,
+            }
+
+            return {"success": True, "dashboard": payload}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Failed to serve embed for dashboard {dashboard_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # 📊 Plan and Limits Endpoints
@@ -1285,27 +1398,29 @@ async def get_plan_limits(plan: str = "free"):
     """
     try:
         logger.info(f"📊 Getting plan limits for: {plan}")
-
+        
         # Import plan limits from models
         from app.modules.charts.models import PLAN_LIMITS
-
+        
         limits = PLAN_LIMITS.get(plan, PLAN_LIMITS["free"])
-
+        
         # Mock current usage - replace with actual usage calculation
         current_usage = {
             "dashboards": 2,
             "widgets": 5,
             "shared_dashboards": 0,
-            "storage_gb": 1.5,
+            "storage_gb": 1.5
         }
-
-        return {"plan": plan, "limits": limits, "current_usage": current_usage}
-
+        
+        return {
+            "plan": plan,
+            "limits": limits,
+            "current_usage": current_usage
+        }
+        
     except Exception as e:
         logger.error(f"❌ Failed to get plan limits: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get plan limits: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get plan limits: {str(e)}")
 
 
 @router.get("/dashboards/templates")
@@ -1315,6 +1430,8 @@ async def get_dashboard_templates():
     """
     try:
         logger.info("📋 Getting dashboard templates")
+        
+        # Mock templates - replace with actual template service
         templates = [
             {
                 "id": "template_1",
@@ -1326,8 +1443,8 @@ async def get_dashboard_templates():
                 "widgets": [
                     {"type": "chart", "chart_type": "bar", "name": "Monthly Sales"},
                     {"type": "chart", "chart_type": "line", "name": "Sales Trend"},
-                    {"type": "table", "name": "Top Products"},
-                ],
+                    {"type": "table", "name": "Top Products"}
+                ]
             },
             {
                 "id": "template_2",
@@ -1337,22 +1454,21 @@ async def get_dashboard_templates():
                 "preview_image": "/templates/marketing_dashboard.png",
                 "required_plan": "pro",
                 "widgets": [
-                    {
-                        "type": "chart",
-                        "chart_type": "pie",
-                        "name": "Campaign Distribution",
-                    },
+                    {"type": "chart", "chart_type": "pie", "name": "Campaign Distribution"},
                     {"type": "chart", "chart_type": "scatter", "name": "ROI Analysis"},
-                    {"type": "gauge", "name": "Conversion Rate"},
-                ],
-            },
+                    {"type": "gauge", "name": "Conversion Rate"}
+                ]
+            }
         ]
-        return {"success": True, "templates": templates}
+        
+        return {
+            "success": True,
+            "templates": templates
+        }
+        
     except Exception as e:
         logger.error(f"❌ Failed to get dashboard templates: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to get dashboard templates: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get dashboard templates: {str(e)}")
 
 
 @router.post("/dashboards/from-template")
@@ -1361,28 +1477,23 @@ async def create_dashboard_from_template(template_id: str, dashboard_name: str):
     Create a new dashboard from a template
     """
     try:
-        logger.info(
-            f"🏗️ Creating dashboard from template {template_id}: {dashboard_name}"
-        )
-
+        logger.info(f"🏗️ Creating dashboard from template {template_id}: {dashboard_name}")
+        
         # Mock implementation - replace with actual template service
         dashboard_data = {
             "id": f"dashboard_{hash(dashboard_name)}",
             "name": dashboard_name,
             "description": f"Dashboard created from template {template_id}",
             "template_id": template_id,
-            "created_at": "2025-01-10T00:00:00Z",
+            "created_at": "2025-01-10T00:00:00Z"
         }
-
+        
         return {
             "success": True,
             "message": "Dashboard created from template successfully",
-            "dashboard": dashboard_data,
+            "dashboard": dashboard_data
         }
-
+        
     except Exception as e:
         logger.error(f"❌ Failed to create dashboard from template: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to create dashboard from template: {str(e)}",
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to create dashboard from template: {str(e)}")

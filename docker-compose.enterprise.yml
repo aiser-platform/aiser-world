@@ -178,7 +178,7 @@ services:
   # Cube.js Server (Enterprise Grade)
   cube-server:
     build:
-      context: ./packages/chat2chart/cube
+      context: ./packages/chat2chart/server/cube_helpers
       dockerfile: Dockerfile.enterprise
     container_name: aiser-cube-enterprise
     environment:
@@ -198,8 +198,8 @@ services:
     ports:
       - "${CUBE_PORT:-4000}:4000"
     volumes:
-      - ./packages/chat2chart/cube:/cube/conf
-      - ./cube_schemas:/cube/conf/schema
+      - ./packages/chat2chart/server/cube_helpers:/cube/conf
+      - ./packages/chat2chart/server/cube_schemas:/cube/conf/schema
       - cube_cache:/cube/conf/cache
     depends_on:
       postgres:

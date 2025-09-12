@@ -218,6 +218,10 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
   const [editingTabKey, setEditingTabKey] = useState<string | null>(null);
   const [titleDraft, setTitleDraft] = useState<string>('');
   const [showSavedModal, setShowSavedModal] = useState(false);
+  const [snapshots, setSnapshots] = useState<any[]>([]);
+  const [permissionModalVisible, setPermissionModalVisible] = useState(false);
+  const [permEmail, setPermEmail] = useState('');
+  const [permLoading, setPermLoading] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [savedQueries, setSavedQueries] = useState<any[]>([]);
   const [schedules, setSchedules] = useState<any[]>([]);
@@ -385,7 +389,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
       } catch {}
       // then attempt backend
       try {
-        const res = await fetch(`${getBackendUrlForApi()}/api/queries/tabs`);
+        const res = await fetch(`${getBackendUrlForApi()}/api/queries/tabs`, { credentials: 'include' });
         if (res.ok) {
           const j = await res.json();
           if (Array.isArray(j.tabs) && j.tabs.length) {
@@ -419,6 +423,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
             const res = await fetch(`${getBackendUrlForApi()}/api/queries/tabs`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
               body: JSON.stringify({ tabs: queryTabs, active_key: activeQueryKey })
             });
             if (!res.ok) throw new Error('Failed');
@@ -439,7 +444,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch(`${getBackendUrlForApi()}/data/cube/status`);
+        const res = await fetch(`${getBackendUrlForApi()}/data/cube/status`, { credentials: 'include' });
         if (res.ok) {
           const j = await res.json();
           setHasCube(!!j?.connected || j?.status === 'connected');
@@ -457,7 +462,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
       setIsRefreshingSchema(true);
       try {
         if (selectedDatabase === 'cube') {
-          const res = await fetch(`${getBackendUrlForApi()}/data/cube/schema`);
+          const res = await fetch(`${getBackendUrlForApi()}/data/cube/schema`, { credentials: 'include' });
           if (res.ok) {
             const j = await res.json();
             const schemas = (j?.schemas || []).map((s: any) => ({ value: s.name, label: s.name, description: s.description, tables: s.tables || [] }));
@@ -469,7 +474,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
             if (tables[0]) setSelectedTable(tables[0].name);
           } else { setUiSchemas([]); setUiTables([]); setUiViews([]); }
         } else {
-          const res = await fetch(`${getBackendUrlForApi()}/data/sources/${selectedDatabase}/schema`);
+          const res = await fetch(`${getBackendUrlForApi()}/data/sources/${selectedDatabase}/schema`, { credentials: 'include' });
           if (res.ok) {
             const j = await res.json();
             const schemaRoot = j?.schema || j;
@@ -480,7 +485,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
             setUiTables(tables);
             // fetch views
             try {
-              const vres = await fetch(`${getBackendUrlForApi()}/data/sources/${selectedDatabase}/views`);
+              const vres = await fetch(`${getBackendUrlForApi()}/data/sources/${selectedDatabase}/views`, { credentials: 'include' });
               if (vres.ok) {
                 const vj = await vres.json();
                 const views = (vj?.views || []).map((v:any) => ({ name: v.name, fields: (v.columns||[]).map((c:any)=>({ name:c.name, type:c.type||c.data_type })) }));
@@ -505,7 +510,8 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
       
       const response = await fetch(`${getBackendUrlForApi()}/data/sources`, {
-        signal: controller.signal
+        signal: controller.signal,
+        credentials: 'include'
       });
       clearTimeout(timeoutId);
       const result = await response.json();
@@ -735,7 +741,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
           setSelectedTable(fileTable.name);
         } else {
           // For real database sources, fetch schema from API
-          const response = await fetch(`${getBackendUrlForApi()}/data/sources/${dataSourceId}/schema`);
+          const response = await fetch(`${getBackendUrlForApi()}/data/sources/${dataSourceId}/schema`, { credentials: 'include' });
           if (response.ok) {
             const result = await response.json();
             const schemaRoot = result?.schema || result;
@@ -1742,7 +1748,8 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                 <Tooltip title="Saved Queries">
                   <Button size="small" icon={<SaveOutlined />} onClick={async () => {
                     try {
-                      const res = await fetch(`${getBackendUrlForApi()}/api/queries/saved-queries`);
+                      const res = await fetch(`${getBackendUrlForApi()}/api/queries/saved-queries`, { credentials: 'include' });
+                      if (res.status === 403 || res.status === 401) { setPermissionModalVisible(true); return; }
                       if (res.ok) {
                         const j = await res.json();
                         setSavedQueries(Array.isArray(j.items) ? j.items : []);
@@ -1751,10 +1758,50 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                     } catch { message.error('Failed to load saved queries'); }
                   }} />
                 </Tooltip>
+                <Tooltip title="Save Snapshot">
+                  <Button size="small" icon={<FileTextOutlined />} onClick={async () => {
+                    const name = prompt('Snapshot name (optional)');
+                    if (name === null) return;
+                    try {
+                      const payload = { data_source_id: selectedDataSource?.id || selectedDatabase, sql: sqlQuery, name, preview_rows: 100 };
+                      const res = await fetch(`${getBackendUrlForApi()}/api/queries/snapshots`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify(payload)
+                      });
+                      if (res.status === 403 || res.status === 401) { setPermissionModalVisible(true); return; }
+                      if (!res.ok) {
+                        const j = await res.json().catch(() => ({}));
+                        throw new Error(j.detail || 'Failed to save snapshot');
+                      }
+                      const j = await res.json();
+                      if (j && j.success) {
+                        message.success('Snapshot saved');
+                      } else {
+                        throw new Error(j.error || 'Save failed');
+                      }
+                    } catch (e:any) {
+                      console.error('Snapshot save failed', e);
+                      message.error(e.message || 'Snapshot save failed');
+                    }
+                  }} />
+                </Tooltip>
+                <Tooltip title="List Snapshots">
+                  <Button size="small" icon={<FileTextOutlined />} onClick={async () => {
+                    try {
+                      const res = await fetch(`${getBackendUrlForApi()}/api/queries/snapshots`, { credentials: 'include' });
+                      if (res.status === 403 || res.status === 401) { setPermissionModalVisible(true); return; }
+                      if (!res.ok) throw new Error('Failed to load snapshots');
+                      const j = await res.json();
+                      setSnapshots(Array.isArray(j.items) ? j.items : []);
+                      setShowSavedModal(true);
+                    } catch (e) { message.error('Failed to load snapshots'); }
+                  }} />
+                </Tooltip>
                 <Tooltip title="Schedule Query">
                   <Button size="small" icon={<ClockCircleOutlined />} onClick={async () => {
                     try {
-                      const res = await fetch(`${getBackendUrlForApi()}/api/queries/schedules`);
+                      const res = await fetch(`${getBackendUrlForApi()}/api/queries/schedules`, { credentials: 'include' });
                       if (res.ok) {
                         const j = await res.json();
                         setSchedules(Array.isArray(j.items) ? j.items : []);
@@ -1846,7 +1893,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                         if (!selectedDatabase) { message.warning('Select a data source'); return; }
                         setPerfLoading(true);
                         try {
-                          const res = await fetch(`${getBackendUrlForApi()}/data/sources/${selectedDatabase}/analyze`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sql: sqlQuery }) });
+                          const res = await fetch(`${getBackendUrlForApi()}/data/sources/${selectedDatabase}/analyze`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ sql: sqlQuery }) });
                           const j = await res.json();
                           if (res.ok && j.success) {
                             setPerfPlan(j.plan);
@@ -1876,7 +1923,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                           const name = prompt('MV name (letters/underscores)');
                           if (!name) return;
                           try {
-                            const res = await fetch(`${getBackendUrlForApi()}/data/sources/${selectedDatabase}/materialized-views`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, sql: sqlQuery }) });
+                            const res = await fetch(`${getBackendUrlForApi()}/data/sources/${selectedDatabase}/materialized-views`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ name, sql: sqlQuery }) });
                             if (!res.ok) throw new Error('Create failed');
                             message.success('Materialized view created');
                           } catch { message.error('Create failed'); }
@@ -1884,7 +1931,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                         <Button size="small" onClick={async () => {
                           if (!selectedDatabase) { message.warning('Select a data source'); return; }
                           try {
-                            const res = await fetch(`${getBackendUrlForApi()}/data/sources/${selectedDatabase}/materialized-views`);
+                            const res = await fetch(`${getBackendUrlForApi()}/data/sources/${selectedDatabase}/materialized-views`, { credentials: 'include' });
                             const j = await res.json();
                             if (!res.ok) throw new Error('Load failed');
                             Modal.info({ title: 'Materialized Views', width: 520, content: (
@@ -2058,6 +2105,10 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
         footer={null}
         width={720}
       >
+        <div style={{ marginBottom: 8 }}>
+          <Text strong>Snapshots</Text>
+          <div style={{ fontSize: 12, color: '#888' }}>Select a snapshot to load or bind to a widget</div>
+        </div>
         <div style={{ marginBottom: 12, display: 'flex', gap: 8 }}>
           <Input placeholder="Name" style={{ width: 240 }} id="save-query-name" />
           <Button
@@ -2070,11 +2121,12 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
               try {
                 const res = await fetch(`${getBackendUrlForApi()}/api/queries/saved-queries`, {
                   method: 'POST', headers: { 'Content-Type': 'application/json' },
+                  credentials: 'include',
                   body: JSON.stringify({ name, sql: sqlQuery, metadata: { activeQueryKey } })
                 });
                 if (!res.ok) throw new Error('Failed');
                 message.success('Saved');
-                const reload = await fetch(`${getBackendUrlForApi()}/api/queries/saved-queries`);
+                const reload = await fetch(`${getBackendUrlForApi()}/api/queries/saved-queries`, { credentials: 'include' });
                 if (reload.ok) { const j = await reload.json(); setSavedQueries(Array.isArray(j.items) ? j.items : []); }
                 if (nameInput) nameInput.value = '';
               } catch { message.error('Save failed'); }
@@ -2082,7 +2134,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
           >Save Current</Button>
         </div>
         <Table
-          dataSource={savedQueries}
+          dataSource={snapshots.length ? snapshots : savedQueries}
           rowKey={(r) => r.id}
           size="small"
           pagination={false}
@@ -2092,11 +2144,51 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
             { title: 'Actions', key: 'actions', render: (_: any, r: any) => (
               <Space>
                 <Button size="small" onClick={() => { setSqlQuery(r.sql); setShowSavedModal(false); }}>Load</Button>
+                <Button size="small" onClick={() => {
+                  // Bind snapshot rows to preview table (not full widget binding yet)
+                  try {
+                    const rows = r.rows || [];
+                    if (Array.isArray(rows) && rows.length) {
+                      setResults(rows);
+                      setActiveTab('results');
+                      message.success('Snapshot loaded into results');
+                    } else {
+                      message.warning('Snapshot has no rows to load');
+                    }
+                  } catch (e) { message.error('Failed to load snapshot'); }
+                }}>Load Snapshot</Button>
               </Space>
             ) }
           ]}
           style={{ maxHeight: 320, overflow: 'auto' }}
         />
+      </Modal>
+
+      {/* Permission / Invite Modal */}
+      <Modal
+        open={permissionModalVisible}
+        title="Request Access"
+        onCancel={() => setPermissionModalVisible(false)}
+        footer={null}
+      >
+        <div style={{ marginBottom: 12 }}>
+          <Text>You're missing permissions to perform this action. Request access from your organization admin by entering their email below.</Text>
+        </div>
+        <Input placeholder="Admin email" value={permEmail} onChange={(e) => setPermEmail(e.target.value)} />
+        <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          <Button onClick={() => setPermissionModalVisible(false)}>Cancel</Button>
+          <Button type="primary" loading={permLoading} onClick={async () => {
+            setPermLoading(true);
+            try {
+              // Send a lightweight access request to the backend (endpoint to implement)
+              await fetch(`${getBackendUrlForApi()}/api/organization/request-access`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: permEmail }) });
+              message.success('Access request sent');
+              setPermissionModalVisible(false);
+            } catch {
+              message.error('Failed to send request');
+            } finally { setPermLoading(false); }
+          }}>Request Access</Button>
+        </div>
       </Modal>
 
       {/* Schedule Modal */}
@@ -2111,11 +2203,12 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
           try {
             const res = await fetch(`${getBackendUrlForApi()}/api/queries/schedules`, {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
               body: JSON.stringify({ name: vals.name, sql: sqlQuery, cron: vals.cron, enabled: true })
             });
             if (!res.ok) throw new Error('Failed');
             message.success('Scheduled');
-            const reload = await fetch(`${getBackendUrlForApi()}/api/queries/schedules`);
+            const reload = await fetch(`${getBackendUrlForApi()}/api/queries/schedules`, { credentials: 'include' });
             if (reload.ok) { const j = await reload.json(); setSchedules(Array.isArray(j.items) ? j.items : []); }
           } catch { message.error('Schedule failed'); }
         }}>

@@ -1,7 +1,13 @@
-try:
-    from app.main import app  # type: ignore
-except Exception:
-    # Fallback minimal app to avoid container crash if app.main import fails
-    from fastapi import FastAPI  # type: ignore
+from app.main import app as application
+from app.middleware.auth_mode import is_enterprise_mode
 
-    app = FastAPI(title="Aiser Auth Service (fallback)")
+# Provide expected module name 'main' exporting ASGI app at 'app'
+app = application
+
+# Example: log selected auth mode on startup
+if is_enterprise_mode():
+    print("Auth service running in ENTERPRISE mode")
+else:
+    print("Auth service running in BASIC mode")
+
+

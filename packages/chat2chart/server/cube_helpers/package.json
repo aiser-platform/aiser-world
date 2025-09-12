@@ -1,0 +1,10 @@
+{
+  "name": "aiser-cube-helpers",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "node -e \"setInterval(()=>console.log('cube helpers placeholder'),10000)\""
+  }
+}
+
+

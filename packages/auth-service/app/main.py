@@ -1,23 +1,3 @@
-# type: ignore
-from fastapi import FastAPI, Request, Response, HTTPException  # type: ignore[reportMissingImports]
-
-app = FastAPI(title="Aiser Auth Service (dev)")
-
-
-@app.get("/health")
-async def health():
-    return {"status": "ok"}
-
-
-@app.post('/users/signout', response_model=None)
-async def signout_user(request: Request, response: Response):
-    """Sign out current user by clearing refresh cookie."
-    try:
-        response.delete_cookie('refresh_token', path='/')
-    except Exception:
-        pass
-    return {"success": True}
-
 from fastapi import FastAPI, Request, HTTPException  # type: ignore[reportMissingImports]
 from fastapi.middleware.cors import CORSMiddleware  # type: ignore[reportMissingImports]
 from pydantic import BaseModel  # type: ignore[reportMissingImports]
@@ -307,12 +287,6 @@ async def enterprise_login(payload: EnterpriseSignInRequest, request: Request, r
 
     signin_payload = SignInRequest(identifier=identifier, password=payload.password)
     return await signin(signin_payload, request, response)
-
-
-# Explicit CORS preflight handler for enterprise login
-@app.options('/api/v1/enterprise/auth/login')
-async def options_enterprise_login():
-    return Response(status_code=200)
 
 
 class SignUpRequest(BaseModel):
@@ -610,6 +584,5 @@ async def upgrade_organization(org_id: int, payload: dict):
             raise HTTPException(status_code=500, detail=f"Failed to upgrade: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to upgrade: {str(e)}")
-
 
 

@@ -11,8 +11,6 @@ logger = logging.getLogger(__name__)
 
 class Auth:
     SECRET = settings.SECRET_KEY
-    # 32-byte key for JWE A256GCM
-    SECRET_BYTES = settings.SECRET_BYTES
 
     JWT_ALGORITHM = settings.JWT_ALGORITHM
     JWT_EXP = settings.JWT_EXP_TIME_MINUTES
@@ -35,16 +33,16 @@ class Auth:
             return False
 
     @classmethod
-    def encodeJWT(cls, **kwargs) -> str:
+    def encodeJWT(self, **kwargs) -> str:
         # access token
-        exp = round(time.time() + cls.JWT_EXP * 60, 0)
+        exp = round(time.time() + self.JWT_EXP * 60, 0)
         payload = {
             **kwargs,
             "exp": exp,
-            "iat": cls.JWT_IAT,
+            "iat": self.JWT_IAT,
             "scope": "access_token",
         }
-        token = jwt.encode(payload, cls.SECRET, algorithm=cls.JWT_ALGORITHM)
+        token = jwt.encode(payload, self.SECRET, algorithm=self.JWT_ALGORITHM)
 
         return token
 
@@ -63,11 +61,11 @@ class Auth:
             algorithm=self.JWT_ALGORITHM,
         )
 
-        jwe_token_bytes = jwe.encrypt(
-            refresh_jwt, self.SECRET_BYTES, algorithm="dir", encryption="A256GCM"
+        jwe_token = jwe.encrypt(
+            refresh_jwt, self.SECRET, algorithm="dir", encryption="A256GCM"
         )
-        # Ensure string return type
-        return jwe_token_bytes.decode("utf-8") if isinstance(jwe_token_bytes, (bytes, bytearray)) else jwe_token_bytes
+
+        return jwe_token
 
     def signJWT(self, **kwargs) -> Dict[str, str]:
         access_token = self.encodeJWT(**kwargs)
@@ -76,31 +74,27 @@ class Auth:
 
         return {
             "access_token": access_token,
-            "expires_in": str(self.JWT_EXP * 60),
+            "expires_in": self.JWT_EXP * 60,
             "refresh_token": refresh_token,
         }
 
-    def decodeJWT(self, token: str) -> dict | None:
+    def decodeJWT(self, token: str) -> dict:
         try:
             decoded_token = jwt.decode(
                 token, self.SECRET, algorithms=[self.JWT_ALGORITHM]
             )
             return decoded_token if decoded_token["exp"] >= time.time() else None
-        except Exception:
-            return None
+        except:
+            return {}
 
-    def decodeRefreshJWE(self, token: str) -> str | None:
+    def decodeRefreshJWE(self, token: str) -> dict:
         try:
-            decoded_bytes = jwe.decrypt(token, self.SECRET_BYTES)
-            return (
-                decoded_bytes.decode("utf-8")
-                if isinstance(decoded_bytes, (bytes, bytearray))
-                else decoded_bytes
-            )
-        except Exception:
-            return None
+            decoded_token = jwe.decrypt(token, self.SECRET)
+            return decoded_token
+        except:
+            return {}
 
-    def decodeRefreshJWT(self, token: str) -> dict | None:
+    def decodeRefreshJWT(self, token: str) -> dict:
         try:
             decoded_token = jwt.decode(
                 token, self.SECRET, algorithms=[self.JWT_ALGORITHM]
@@ -108,5 +102,5 @@ class Auth:
             expired = decoded_token["exp"] >= time.time()
 
             return decoded_token if expired else None
-        except Exception:
-            return None
+        except:
+            return {}
