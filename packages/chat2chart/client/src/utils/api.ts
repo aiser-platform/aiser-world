@@ -4,7 +4,7 @@ import { getBackendUrl } from './backendUrl';
 export const API_URL = getBackendUrl();
 
 export const AUTH_URL =
-    process.env.NEXT_PUBLIC_AUTH_URL || 'http://localhost:5000';
+    process.env.NEXT_PUBLIC_AUTH_URL || 'http://127.0.0.1:5000';
 
 export const fetchApi = async (
     endpoint: string,

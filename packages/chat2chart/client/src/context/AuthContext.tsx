@@ -3,7 +3,7 @@ import Cookies from 'js-cookie';
 import { createContext, useContext, useEffect, useState } from 'react';
 
 //api here is an axios instance which has the baseURL set according to the env.
-import { fetchApi } from '@/utils/api';
+import { fetchApi, AUTH_URL } from '@/utils/api';
 import { usePathname, useRouter } from 'next/navigation';
 import { ReactNode } from 'react';
 
@@ -49,21 +49,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             
             if (accessToken) {
                 try {
-                    // Try enterprise endpoint first via backend proxy
-                    let response = await fetch('http://localhost:8000/api/v1/enterprise/auth/me', {
+                    // Try enterprise endpoint first
+                    let response = await fetch(`${AUTH_URL}/api/v1/enterprise/auth/me`, {
                         headers: {
                             'Authorization': `Bearer ${accessToken}`,
                             'Content-Type': 'application/json',
                         },
+                        credentials: 'include',
                     });
                     
                     if (!response.ok) {
-                        // Try standard endpoint (fallback if needed)
-                        response = await fetch('http://localhost:8000/users/me/', {
+                        // Try standard endpoint
+                        response = await fetch(`${AUTH_URL}/users/me`, {
                             headers: {
                                 'Authorization': `Bearer ${accessToken}`,
                                 'Content-Type': 'application/json',
                             },
+                            credentials: 'include',
                         });
                     }
                     
@@ -108,24 +110,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const login = async (identifier: string, password: string): Promise<void> => {
         try {
             setLoginError(null);
-            
-            // First try enterprise login (username only) via backend proxy
-            let response = await fetch('http://localhost:8000/api/v1/enterprise/auth/login', {
+
+            // First try enterprise login (username only) using the shared fetchApi helper
+            let response = await fetchApi('api/v1/enterprise/auth/login', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    username: identifier,
-                    password,
-                }),
+                body: JSON.stringify({ username: identifier, password }),
             });
 
             if (response.ok) {
                 const data = await response.json();
                 // Set the access token cookie for enterprise login
                 Cookies.set('access_token', data.access_token, { expires: 7, path: '/' });
-                // Also set user info in cookie for persistence
                 Cookies.set('user', JSON.stringify(data.user), { expires: 7, path: '/' });
                 setUser(data.user);
                 setLoginError(null);
@@ -134,38 +129,39 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
 
             // If enterprise login fails, try standard login (supports both email and username)
-            response = await fetch('http://localhost:8000/users/sign-in', {
+            response = await fetchApi('users/signin', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    account: identifier,
-                    password,
-                }),
+                body: JSON.stringify({ identifier, password }),
             });
 
             if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.detail || 'Login failed');
+                // Try to extract a structured error message, fall back to generic
+                let errMsg = 'Login failed';
+                try {
+                    const errorData = await response.json();
+                    errMsg = errorData.detail || errMsg;
+                } catch (e) {
+                    // ignore parse errors
+                }
+                throw new Error(errMsg);
             }
 
             const data = await response.json();
             // Set the access token cookie for standard login
             if (data.access_token) {
                 Cookies.set('access_token', data.access_token, { expires: 7, path: '/' });
-                // Also set user info in cookie for persistence
                 Cookies.set('user', JSON.stringify(data.user), { expires: 7, path: '/' });
             }
             setUser(data.user);
             setLoginError(null);
             router.push('/');
         } catch (error) {
-            setLoginError(
+            // Surface network errors more clearly
+            const message =
                 error instanceof Error
                     ? error.message
-                    : 'An unexpected error occurred'
-            );
+                    : 'Network error: failed to reach authentication service';
+            setLoginError(message);
             return Promise.reject(error);
         }
     };
@@ -173,7 +169,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const signup = async (email: string, username: string, password: string): Promise<void> => {
         try {
             setLoginError(null);
-            const response = await fetch('http://localhost:8000/users/sign-up', {
+            const response = await fetch(`${AUTH_URL}/users/signup`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -183,6 +179,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     username,
                     password,
                 }),
+                credentials: 'include',
             });
 
             if (!response.ok) {

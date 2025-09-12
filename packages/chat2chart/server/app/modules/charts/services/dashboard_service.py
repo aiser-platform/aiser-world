@@ -7,17 +7,17 @@ import logging
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete, and_, or_, func
-from fastapi import HTTPException
+from sqlalchemy import select, update, delete, and_, or_
 from sqlalchemy.orm import selectinload
 
 from app.modules.charts.models import Dashboard, DashboardWidget
+from sqlalchemy import func
 from app.modules.charts.schemas import (
-    DashboardCreateSchema, 
-    DashboardUpdateSchema, 
+    DashboardCreateSchema,
+    DashboardUpdateSchema,
     DashboardResponseSchema,
-    DashboardWidgetCreateSchema,
-    DashboardWidgetResponseSchema
+    DashboardWidgetCreateSchema as WidgetCreateSchema,
+    DashboardWidgetResponseSchema as WidgetResponseSchema,
 )
 from app.common.repository import BaseRepository
 
@@ -28,8 +28,9 @@ class DashboardService:
     
     def __init__(self, db_session: AsyncSession):
         self.db = db_session
-        self.dashboard_repo = BaseRepository(Dashboard)
-        self.dashboard_widget_repo = BaseRepository(DashboardWidget)
+        self.dashboard_repo = BaseRepository(Dashboard, db_session)
+        self.widget_repo = BaseRepository(DashboardWidget, db_session)
+        self.dashboard_widget_repo = BaseRepository(DashboardWidget, db_session)
     
     async def list_dashboards(
         self, 

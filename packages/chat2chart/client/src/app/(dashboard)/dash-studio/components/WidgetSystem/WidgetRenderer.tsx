@@ -20,6 +20,10 @@ interface WidgetRendererProps {
   widget: DashboardWidget;
   isPreviewMode?: boolean;
   onConfigUpdate?: (config: any) => void;
+  onWidgetClick?: (widget: any) => void;
+  onDelete?: (widgetId: string) => void;
+  onDuplicate?: (widget: any) => void;
+  onUpdate?: (widgetId: string, updates: any) => void;
   isDarkMode?: boolean;
 }
 
@@ -27,6 +31,10 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({
   widget, 
   isPreviewMode = false,
   onConfigUpdate,
+  onWidgetClick,
+  onDelete,
+  onDuplicate,
+  onUpdate,
   isDarkMode = false
 }) => {
   console.log('WidgetRenderer called with widget:', widget);
@@ -58,6 +66,10 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({
             config={widget.config}
             data={widget.data || []}
             onConfigUpdate={onConfigUpdate}
+            onWidgetClick={onWidgetClick}
+            onDelete={onDelete}
+            onDuplicate={onDuplicate}
+            onUpdate={onUpdate}
             isDarkMode={isDarkMode}
             showEditableTitle={true}
             onTitleChange={(title, subtitle) => {
@@ -140,6 +152,12 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({
 
   return (
     <div style={widgetStyle}>
+      {/* Snapshot badge */}
+      {widget?.data?.snapshotId && (
+        <div style={{ position: 'absolute', top: 8, right: 8, zIndex: 10 }}>
+          <Tag color="blue" style={{ fontSize: 10 }}>Snapshot: {widget.data.snapshotId}</Tag>
+        </div>
+      )}
       {renderWidgetContent()}
     </div>
   );
@@ -271,8 +289,20 @@ const TableWidgetContent: React.FC<{ widget: DashboardWidget; onConfigUpdate?: (
   onConfigUpdate 
 }) => {
   const config = widget.config || {};
-  
-  // Better sample data for table
+  // If widget.data is provided (e.g. from Query Editor), use it
+  const anyData = widget.data as any;
+  const dataSource = (anyData && Array.isArray(anyData.rows)) ? anyData.rows.map((r:any, i:number) => ({ key: i, ...r })) : null;
+  const colsFromData = (anyData && Array.isArray(anyData.columns)) ? anyData.columns.map((c:any) => ({ title: c, dataIndex: c, key: c })) : null;
+
+  // Allow config.columns definition: [{ title, dataIndex, key }]
+  const tableColumns = colsFromData || config.columns || [
+    { title: 'Product', dataIndex: 'name', key: 'name' },
+    { title: 'Sales', dataIndex: 'sales', key: 'sales' },
+    { title: 'Revenue', dataIndex: 'revenue', key: 'revenue' },
+    { title: 'Region', dataIndex: 'region', key: 'region' }
+  ];
+
+  // Sample fallback data when no binding exists
   const sampleData = [
     { key: 1, name: 'Product A', sales: 1200, revenue: '$12,000', region: 'North' },
     { key: 2, name: 'Product B', sales: 800, revenue: '$8,000', region: 'South' },
@@ -280,46 +310,44 @@ const TableWidgetContent: React.FC<{ widget: DashboardWidget; onConfigUpdate?: (
     { key: 4, name: 'Product D', sales: 900, revenue: '$9,000', region: 'West' },
     { key: 5, name: 'Product E', sales: 1100, revenue: '$11,000', region: 'North' }
   ];
-  
-  const tableColumns = [
-    { title: 'Product', dataIndex: 'name', key: 'name' },
-    { title: 'Sales', dataIndex: 'sales', key: 'sales' },
-    { title: 'Revenue', dataIndex: 'revenue', key: 'revenue' },
-    { title: 'Region', dataIndex: 'region', key: 'region' }
-  ];
-  
+
+  const finalData = dataSource || sampleData;
+
+  // Sorting and pagination
+  const pagination = config.pagination !== false ? { pageSize: config.pageSize || 10 } : false;
+
   return (
     <div style={{ 
       height: '100%', 
       display: 'flex', 
       flexDirection: 'column',
-      padding: '16px',
+      padding: '12px',
       background: '#fafafa',
       borderRadius: '8px'
     }}>
       <div style={{ 
         fontSize: '12px', 
         color: '#666', 
-        marginBottom: '12px',
+        marginBottom: '8px',
         display: 'flex',
         alignItems: 'center',
         gap: '6px'
       }}>
         <TableOutlined />
-        Table Widget
+        {config.title?.text || 'Table Widget'}
       </div>
       
       <div style={{ 
         flex: 1,
-        background: '#ffffff',
+        background: config.style?.backgroundColor || '#ffffff',
         borderRadius: '4px',
-        border: '1px solid #e8e8e8',
-        overflow: 'hidden'
+        border: `1px solid ${config.style?.borderColor || '#e8e8e8'}`,
+        overflow: 'auto'
       }}>
         <Table
           columns={tableColumns}
-          dataSource={sampleData}
-          pagination={config.pagination ? { pageSize: config.pageSize || 10 } : false}
+          dataSource={finalData}
+          pagination={pagination}
           size="small"
           style={{ height: '100%' }}
         />

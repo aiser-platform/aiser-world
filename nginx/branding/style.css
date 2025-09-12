@@ -1,0 +1,17 @@
+.aiser-brand-bar {
+  position: fixed;
+  top: 8px;
+  right: 12px;
+  z-index: 99999;
+  background: rgba(255,255,255,0.9);
+  padding: 6px 10px;
+  border-radius: 6px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  color: #1890ff;
+}
+
+/* Basic styling for the Aiser branding bar injected into Cube UI */
+#aiser-brand-bar a{ font-weight:600; color:#1890ff }
+#aiser-brand-bar{ font-family: Inter, system-ui, Arial, sans-serif }
+
+

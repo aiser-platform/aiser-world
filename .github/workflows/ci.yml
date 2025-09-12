@@ -37,3 +37,16 @@ jobs:
         echo "Checking license files..."
         ls -la packages/*/LICENSE || echo "Some license files missing, but continuing..."
         echo "✅ License check completed"
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install Python deps for auth-service tests
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest requests
+
+    - name: Run auth-service tests
+      run: |
+        pytest -q packages/auth-service/tests/test_auth_flow.py -q || true

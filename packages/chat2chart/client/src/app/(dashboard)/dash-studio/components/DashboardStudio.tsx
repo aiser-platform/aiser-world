@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Layout, Button, Space, Typography, Breadcrumb, Tabs, Card, Input, Select, message, Collapse, Tooltip, Dropdown, Menu } from 'antd';
+import { Layout, Button, Space, Typography, Breadcrumb, Tabs, Card, Input, Select, message, Collapse, Tooltip, Dropdown, Menu, Divider, Badge } from 'antd';
 import { Responsive, WidthProvider } from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
@@ -43,6 +43,7 @@ import {
   DownOutlined,
   MenuOutlined,
   MoreOutlined,
+  LinkOutlined,
   SyncOutlined
 } from '@ant-design/icons';
 import { EChartsConfigProvider } from './EChartsConfiguration';
@@ -54,6 +55,8 @@ import { dashboardAPIService } from '../services/DashboardAPIService';
 
 import AdvancedDashboardCanvas from './AdvancedDashboardCanvas';
 import dynamic from 'next/dynamic';
+import EmbedModal from './EmbedModal';
+import FullscreenPreviewModal from './FullscreenPreviewModal';
 
 // Lazy load heavy components to reduce initial bundle size
 const UnifiedDesignPanel = dynamic(() => import('./UnifiedDesignPanel'), {
@@ -164,8 +167,13 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
   const [dashboardSubtitle, setDashboardSubtitle] = useState('Professional BI Dashboard');
   const [dashboardId, setDashboardId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [embedModalVisible, setEmbedModalVisible] = useState(false);
+  const [embedUrl, setEmbedUrl] = useState<string | null>(null);
+  const [isPublished, setIsPublished] = useState<boolean>(false);
+  const [previewModalVisible, setPreviewModalVisible] = useState(false);
   const [currentQueryResult, setCurrentQueryResult] = useState<any>(null);
   const [selectedDataSource, setSelectedDataSource] = useState<string>('');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
 
 
@@ -283,18 +291,54 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Auto-save layout changes
+  // Auto-save functionality
   useEffect(() => {
-    if (layout.length > 0) {
+    if (layout.length > 0 && dashboardTitle.trim()) {
       const timeoutId = setTimeout(() => {
-        // Auto-save layout changes
+        // Auto-save to localStorage
         localStorage.setItem('dashboard-layout', JSON.stringify(layout));
         localStorage.setItem('dashboard-widgets', JSON.stringify(dashboardWidgets));
-      }, 1000);
+        localStorage.setItem('dashboard-title', dashboardTitle);
+        localStorage.setItem('dashboard-subtitle', dashboardSubtitle);
+        
+        // Auto-save to backend if dashboard exists
+        if (dashboardId) {
+          handleAutoSave();
+        }
+      }, 2000); // 2 second delay for auto-save
       
       return () => clearTimeout(timeoutId);
     }
-  }, [layout, dashboardWidgets]);
+  }, [layout, dashboardWidgets, dashboardTitle, dashboardSubtitle, dashboardId]);
+
+  // Auto-save function (without user feedback)
+  const handleAutoSave = useCallback(async () => {
+    if (!dashboardId || !dashboardTitle.trim()) return;
+    
+    try {
+      const dashboardData = {
+        title: dashboardTitle.trim(),
+        subtitle: dashboardSubtitle.trim(),
+        widgets: dashboardWidgets,
+        layout: layout,
+        settings: {
+          theme: isDarkMode ? 'dark' : 'light',
+          breakpoint: breakpoint
+        },
+        metadata: {
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          version: '1.0.0'
+        }
+      };
+
+      await dashboardAPIService.updateDashboard(dashboardId, dashboardData);
+      // Silent auto-save - no user notification
+    } catch (error) {
+      console.warn('Auto-save failed:', error);
+      // Don't show error for auto-save failures
+    }
+  }, [dashboardId, dashboardTitle, dashboardSubtitle, dashboardWidgets, layout, isDarkMode, breakpoint]);
 
   // Load saved layout on mount
   useEffect(() => {
@@ -827,13 +871,28 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
   ];
 
   const handleSave = async () => {
+    // Validation
+    if (!dashboardTitle.trim()) {
+      message.warning('Please enter a dashboard title');
+      return;
+    }
+
+    if (dashboardTitle.length > 100) {
+      message.warning('Dashboard title must be less than 100 characters');
+      return;
+    }
+
     setIsSaving(true);
     try {
       const dashboardData = {
-        title: dashboardTitle,
-        subtitle: dashboardSubtitle,
+        title: dashboardTitle.trim(),
+        subtitle: dashboardSubtitle.trim(),
         widgets: dashboardWidgets,
         layout: layout,
+        settings: {
+          theme: isDarkMode ? 'dark' : 'light',
+          breakpoint: breakpoint
+        },
         metadata: {
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -852,9 +911,13 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
         setDashboardId(result.id);
         message.success('Dashboard created successfully!');
       }
+      
+      // Update undo/redo state
+      setCanUndo(true);
+      setCanRedo(false);
     } catch (error) {
       console.error('Failed to save dashboard:', error);
-      message.error('Failed to save dashboard. Please try again.');
+      message.error('Failed to save dashboard. Please check your connection and try again.');
     } finally {
       setIsSaving(false);
     }
@@ -919,11 +982,14 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
   const handleToggleFullscreen = () => setIsFullscreen(!isFullscreen);
 
   const handleWidgetSelect = (widget: any) => {
+    console.log('handleWidgetSelect called:', widget);
     setSelectedWidget(widget);
   };
 
   const handleCanvasWidgetSelect = (widgetId: string) => {
+    console.log('handleCanvasWidgetSelect called:', widgetId);
     const widget = dashboardWidgets.find(w => w.id === widgetId);
+    console.log('Found widget:', widget);
     if (widget) {
       setSelectedWidget(widget);
     }
@@ -939,10 +1005,13 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
 
   // Update widget configuration with real-time updates
   const handleWidgetConfigUpdate = (widgetId: string, config: any) => {
-    setDashboardWidgets(prev => prev.map(widget => {
+    console.log('handleWidgetConfigUpdate called:', { widgetId, config });
+    // Compute updated widgets based on current state snapshot to enable persistence
+    const updatedWidgets = dashboardWidgets.map(widget => {
       if (widget.id === widgetId) {
+        console.log('Updating widget:', widget.id, 'with config:', config);
         const updatedWidget = { ...widget };
-        
+
         // Handle different types of config updates
         if (config.title !== undefined) {
           updatedWidget.title = config.title;
@@ -971,57 +1040,60 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
         if (config.data !== undefined) {
           updatedWidget.data = { ...updatedWidget.data, ...config.data };
         }
-        
+
         // Update the main config object
         updatedWidget.config = { ...updatedWidget.config, ...config };
-        
+
+        console.log('Updated widget:', updatedWidget);
         return updatedWidget;
       }
       return widget;
-    }));
-    
-    // Update selected widget if it's the one being configured
-    if (selectedWidget?.id === widgetId) {
-      setSelectedWidget(prev => {
-        if (prev) {
-          const updatedWidget = { ...prev };
-          
-          if (config.title !== undefined) {
-            updatedWidget.title = config.title;
-          }
-          if (config.style !== undefined) {
-            updatedWidget.style = { ...updatedWidget.style, ...config.style };
-          }
-          if (config.isVisible !== undefined) {
-            updatedWidget.isVisible = config.isVisible;
-          }
-          if (config.isLocked !== undefined) {
-            updatedWidget.isLocked = config.isLocked;
-          }
-          if (config.refreshInterval !== undefined) {
-            updatedWidget.refreshInterval = config.refreshInterval;
-          }
-          if (config.layout !== undefined) {
-            updatedWidget.layout = { ...updatedWidget.layout, ...config.layout };
-          }
-          if (config.behavior !== undefined) {
-            updatedWidget.behavior = { ...updatedWidget.behavior, ...config.behavior };
-          }
-          if (config.animation !== undefined) {
-            updatedWidget.animation = { ...updatedWidget.animation, ...config.animation };
-          }
-          if (config.data !== undefined) {
-            updatedWidget.data = { ...updatedWidget.data, ...config.data };
-          }
-          
-          updatedWidget.config = { ...updatedWidget.config, ...config };
-          
-          return updatedWidget;
+    });
+
+    // Apply state update
+    setDashboardWidgets(updatedWidgets);
+
+    // Persist update to backend if dashboard is saved
+    try {
+      if (dashboardId) {
+        const toPersist = updatedWidgets.find(w => w.id === widgetId);
+        if (toPersist) {
+          // Fire-and-forget persistence
+          dashboardAPIService.updateWidget(dashboardId, widgetId, toPersist).catch(err => console.error('Persist widget failed', err));
         }
-        return prev;
-      });
+      }
+    } catch (err) {
+      console.error('Failed to persist widget update:', err);
+    }
+
+  };
+
+  const handlePublishDashboard = async (makePublic: boolean) => {
+    if (!dashboardId) return message.warning('Dashboard not saved yet');
+    try {
+      const j = await dashboardAPIService.publishDashboard(dashboardId, makePublic);
+      setIsPublished(!!j?.is_public);
+      message.success(`Dashboard ${j.is_public ? 'published' : 'unpublished'}`);
+    } catch (e) { message.error('Failed to change publish status'); }
+  };
+
+  const handleCreateEmbed = async (options: any = {}) => {
+    if (!dashboardId) return message.warning('Save dashboard first');
+    try {
+      const res = await dashboardAPIService.createEmbed(dashboardId, options);
+      setEmbedUrl(res.embed_url || res.embedUrl || null);
+      setEmbedModalVisible(true);
+    } catch (e) {
+      console.error('Failed to create embed', e);
+      message.error('Failed to create embed');
     }
   };
+
+  const handleOpenPreview = () => {
+    if (!dashboardId) return message.warning('Save dashboard first');
+    setPreviewModalVisible(true);
+  };
+  
 
   const handleAddToDashboard = async (widget: any) => {
     // Map specific widget types to allowed types
@@ -1151,14 +1223,15 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
             showTooltip: true,
             showGrid: true,
             showContainer: true,
+            // Defaults optimized for minimal chrome: background/shadow hidden by default
+            showContainerBackground: false,
+            showContainerShadow: false,
             colors: ['#1890ff', '#52c41a', '#faad14', '#f5222d', '#722ed1', '#13c2c2', '#eb2f96'],
             animation: true,
-            // Professional styling
-            backgroundColor: 'var(--ant-color-bg-container, #ffffff)',
+            // Simplified styling - let ECharts handle its own background
             borderColor: 'var(--ant-color-border, #e8e8e8)',
             borderRadius: 8,
-            padding: 16,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+            padding: 16
           };
         case 'table':
           return {
@@ -1432,16 +1505,18 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
   };
 
   const handleDuplicateWidget = (widget: DashboardWidget) => {
+    // defensively handle possibly-missing position
+    const pos = widget.position || { x: 0, y: 0, w: 6, h: 4 };
     const newWidget: DashboardWidget = {
       ...widget,
       id: `widget-${Date.now()}`,
-      position: { ...widget.position, x: widget.position.x + 1, y: widget.position.y + 1 }
+      position: { ...pos, x: (pos.x ?? 0) + 1, y: (pos.y ?? 0) + 1 }
     };
     
     const newLayout = {
       i: newWidget.id,
-      x: widget.position.x + 1,
-      y: widget.position.y + 1,
+      x: (pos.x ?? 0) + 1,
+      y: (pos.y ?? 0) + 1,
       w: widget.position.w,
       h: widget.position.h,
       minW: 2,
@@ -1458,11 +1533,39 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
   };
 
   const handleDeleteWidget = (widgetId: string) => {
-    setDashboardWidgets(prev => prev.filter(w => w.id !== widgetId));
-    setLayout(prev => prev.filter(l => l.i !== widgetId));
+    console.log('handleDeleteWidget called with widgetId:', widgetId);
+    console.log('Current widgets before delete:', dashboardWidgets.map(w => ({ id: w.id, title: w.title })));
+    console.log('Current layout before delete:', layout.map(l => ({ i: l.i, x: l.x, y: l.y })));
+    
+    if (!widgetId) {
+      console.error('No widgetId provided to handleDeleteWidget');
+      return;
+    }
+    
+    const widgetExists = dashboardWidgets.find(w => w.id === widgetId);
+    if (!widgetExists) {
+      console.error('Widget not found:', widgetId);
+      return;
+    }
+    
+    setDashboardWidgets(prev => {
+      const filtered = prev.filter(w => w.id !== widgetId);
+      console.log('Widgets after delete:', filtered.map(w => ({ id: w.id, title: w.title })));
+      return filtered;
+    });
+    
+    setLayout(prev => {
+      const filtered = prev.filter(l => l.i !== widgetId);
+      console.log('Layout after delete:', filtered.map(l => ({ i: l.i, x: l.x, y: l.y })));
+      return filtered;
+    });
+    
     if (selectedWidget?.id === widgetId) {
+      console.log('Clearing selected widget');
       setSelectedWidget(null);
     }
+    
+    console.log('Delete operation completed');
   };
 
 
@@ -2017,74 +2120,115 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
   // Main component return
   return (
     <div className={`dashboard-studio ${isDarkMode ? 'dark' : 'light'}`}>
-      {/* Onboarding is now handled by PlatformOnboardingModal in the main app */}
-      {/* Header with Breadcrumbs and Actions */}
-      <Header className="dashboard-header" style={{ 
+      {/* Modern Header with Enhanced UX */}
+      <Header className="modern-dashboard-header" style={{ 
         background: isDarkMode ? '#001529' : '#ffffff',
         borderBottom: `1px solid ${isDarkMode ? '#303030' : '#d9d9d9'}`,
         padding: '0 24px',
         height: '64px',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'space-between'
+        justifyContent: 'space-between',
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
+        position: 'relative',
+        zIndex: 100
       }}>
         <div className="header-left">
-          <Breadcrumb
-            items={[
-              { title: <HomeOutlined />, href: '/' },
-              { title: 'Dashboards', href: '/dashboard' },
-              { title: 'Aiser Dashboard Studio' }
-            ]}
-            style={{ color: isDarkMode ? '#ffffff' : '#000000' }}
-          />
+          <Space>
+            <Button 
+              type="text" 
+              icon={<MenuOutlined />} 
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              style={{ color: isDarkMode ? '#ffffff' : '#000000' }}
+            />
+            <Breadcrumb
+              items={[
+                { title: <HomeOutlined />, href: '/' },
+                { title: 'Dashboards', href: '/dashboard' },
+                { title: 'Dashboard Studio' }
+              ]}
+              style={{ color: isDarkMode ? '#ffffff' : '#000000' }}
+            />
+          </Space>
         </div>
         
         <div className="header-center">
-          <div style={{ textAlign: 'center' }}>
-            <Title level={4} style={{ margin: 0, color: isDarkMode ? '#ffffff' : '#000000' }}>
-              Aiser Dashboard Studio
-            </Title>
-
-          </div>
+          <Space>
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              gap: 4,
+              lineHeight: 1,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              maxWidth: 420
+            }}>
+              <div style={{ fontSize: 16, fontWeight: 600, margin: 0, padding: 0, color: isDarkMode ? '#ffffff' : '#000000' }}>{dashboardTitle}</div>
+              <div style={{ fontSize: 12, margin: 0, padding: 0, color: isDarkMode ? '#999' : '#666' }}>{dashboardSubtitle}</div>
+            </div>
+          </Space>
         </div>
 
         <div className="header-right">
           <Space>
-            {/* Widget Library Toggle */}
+            {/* Quick Actions */}
             <Tooltip title={showWidgetLibrary ? "Hide Widget Library" : "Show Widget Library"}>
               <Button
                 type="text"
                 icon={<AppstoreOutlined />}
                 onClick={() => setShowWidgetLibrary(!showWidgetLibrary)}
                 style={{
-                  color: showWidgetLibrary ? (isDarkMode ? '#1890ff' : '#1890ff') : (isDarkMode ? '#666' : '#999'),
-                  background: showWidgetLibrary ? (isDarkMode ? 'rgba(24, 144, 255, 0.1)' : 'rgba(24, 144, 255, 0.05)') : 'transparent'
+                  color: showWidgetLibrary ? '#1890ff' : (isDarkMode ? '#666' : '#999'),
+                  background: showWidgetLibrary ? 'rgba(24, 144, 255, 0.1)' : 'transparent'
                 }}
               />
             </Tooltip>
             
-                            {/* Properties are now integrated in the Unified Design Panel */}
+            <Divider type="vertical" style={{ height: '24px', margin: '0 8px' }} />
             
+            {/* Edit/Preview Toggle */}
             <Button
               icon={isEditing ? <EyeOutlined /> : <EditOutlined />}
               onClick={() => setIsEditing(!isEditing)}
               type={isEditing ? 'default' : 'primary'}
+              size="small"
             >
               {isEditing ? 'Preview' : 'Edit'}
             </Button>
             
-            <Button icon={<UndoOutlined />} disabled={!canUndo} onClick={handleUndo} />
-            <Button icon={<RedoOutlined />} disabled={!canRedo} onClick={handleRedo} />
-            <Button icon={isFullscreen ? <CompressOutlined /> : <FullscreenOutlined />} onClick={handleToggleFullscreen} />
+            {/* Undo/Redo */}
+            <Button 
+              icon={<UndoOutlined />} 
+              disabled={!canUndo} 
+              onClick={handleUndo}
+              type="text"
+              size="small"
+            />
+            <Button 
+              icon={<RedoOutlined />} 
+              disabled={!canRedo} 
+              onClick={handleRedo}
+              type="text"
+              size="small"
+            />
+            
+            <Divider type="vertical" style={{ height: '24px', margin: '0 8px' }} />
+            
+            {/* Save Button */}
             <Button 
               icon={<SaveOutlined />} 
               type="primary" 
               loading={isSaving}
               onClick={handleSave}
+              size="small"
             >
               Save
             </Button>
             
+            {/* More Actions */}
             <Dropdown
               overlay={
                 <Menu>
@@ -2097,42 +2241,75 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
                   <Menu.Item key="export-json" icon={<DownloadOutlined />} onClick={() => handleExport('json')}>
                     Export as JSON
                   </Menu.Item>
+                  <Menu.Divider />
+                  <Menu.Item key="publish" icon={<ShareAltOutlined />} onClick={() => handlePublishDashboard(!isPublished)}>
+                    {isPublished ? 'Unpublish' : 'Publish'} Dashboard
+                  </Menu.Item>
+                  <Menu.Item key="preview" icon={<EyeOutlined />} onClick={handleOpenPreview}>
+                    Preview (Full Screen)
+                  </Menu.Item>
+                  <Menu.Item key="embed" icon={<LinkOutlined />} onClick={() => handleCreateEmbed()}>
+                    Create Embed
+                  </Menu.Item>
+                  <Menu.Divider />
+                  <Menu.Item key="share" icon={<ShareAltOutlined />} onClick={handleShare}>
+                    Share Dashboard
+                  </Menu.Item>
+                  <Menu.Item key="fullscreen" icon={isFullscreen ? <CompressOutlined /> : <FullscreenOutlined />} onClick={handleToggleFullscreen}>
+                    {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+                  </Menu.Item>
                 </Menu>
               }
               trigger={['click']}
             >
-              <Button icon={<DownloadOutlined />}>
-                Export
-              </Button>
+              <Button icon={<MoreOutlined />} type="text" size="small" />
             </Dropdown>
-            
-            <Button icon={<SettingOutlined />} onClick={handleShare}>
-              Share
-            </Button>
           </Space>
         </div>
       </Header>
 
       <Layout style={{ height: 'calc(100vh - 64px)' }}>
-        {/* Left Sidebar - Unified Design Panel */}
+        {/* Enhanced Left Sidebar */}
         {showWidgetLibrary && (
           <Sider
-            width={300}
+            width={sidebarCollapsed ? 60 : 300}
+            collapsed={sidebarCollapsed}
             theme={isDarkMode ? 'dark' : 'light'}
+            className="modern-sidebar"
             style={{ 
               borderRight: `1px solid ${isDarkMode ? '#303030' : '#d9d9d9'}`,
-              background: isDarkMode ? '#141414' : '#ffffff'
+              background: isDarkMode ? '#141414' : '#ffffff',
+              boxShadow: '2px 0 8px rgba(0, 0, 0, 0.06)'
             }}
           >
-            <UnifiedDesignPanel
-              selectedWidget={selectedWidget}
-              onConfigUpdate={handleWidgetConfigUpdate}
-              onWidgetSelect={handleWidgetSelect}
-              onAddWidget={handleAddToDashboard}
-              isDarkMode={isDarkMode}
-              showPanel={showWidgetLibrary}
-              onClose={() => setShowWidgetLibrary(false)}
-            />
+            <div className="sidebar-content">
+              {!sidebarCollapsed && (
+                <div className="sidebar-header" style={{
+                  padding: '16px',
+                  borderBottom: `1px solid ${isDarkMode ? '#303030' : '#d9d9d9'}`,
+                  background: isDarkMode ? '#1f1f1f' : '#fafafa'
+                }}>
+                  <Space>
+                    <AppstoreOutlined style={{ color: '#1890ff', fontSize: '16px' }} />
+                    <Text strong style={{ color: isDarkMode ? '#ffffff' : '#000000' }}>
+                      Widget Library
+                    </Text>
+                  </Space>
+                </div>
+              )}
+              
+              <div className="sidebar-body" style={{ height: 'calc(100% - 60px)', overflow: 'hidden' }}>
+                <UnifiedDesignPanel
+                  selectedWidget={selectedWidget}
+                  onConfigUpdate={handleWidgetConfigUpdate}
+                  onWidgetSelect={handleWidgetSelect}
+                  onAddWidget={handleAddToDashboard}
+                  isDarkMode={isDarkMode}
+                  showPanel={showWidgetLibrary}
+                  onClose={() => setShowWidgetLibrary(false)}
+                />
+              </div>
+            </div>
           </Sider>
         )}
 
@@ -2211,6 +2388,9 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
           />
         </div>
       )}
+
+      <EmbedModal visible={embedModalVisible} onClose={() => setEmbedModalVisible(false)} initialEmbedUrl={embedUrl} dashboardId={dashboardId} />
+      <FullscreenPreviewModal visible={previewModalVisible} onClose={() => setPreviewModalVisible(false)} widgets={dashboardWidgets} layout={layout} title={dashboardTitle} subtitle={dashboardSubtitle} isDarkMode={isDarkMode} />
 
       {/* Properties button removed - now integrated in Unified Design Panel */}
       

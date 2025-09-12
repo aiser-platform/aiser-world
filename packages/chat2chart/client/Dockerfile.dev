@@ -1,0 +1,16 @@
+FROM node:18-alpine
+
+# Set working directory
+WORKDIR /app
+
+# Install dependencies if package.json present during build
+COPY package*.json ./
+RUN if [ -f package.json ]; then npm install --no-audit --no-fund; fi
+
+# Copy source
+COPY . .
+
+# Default dev command
+CMD ["npm run dev"]
+
+

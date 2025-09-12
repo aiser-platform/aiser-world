@@ -7,6 +7,8 @@ from app.modules.charts.schemas import (
     ChatVisualizationCreateSchema,
     ChatVisualizationResponseSchema,
     ChatVisualizationUpdateSchema,
+    DashboardWidgetCreateSchema,
+    DashboardWidgetResponseSchema,
 )
 
 
@@ -19,16 +21,14 @@ class ChatVisualizationService(
     ]
 ):
     def __init__(self):
+
         super().__init__(ChatVisualizationRepository())
 
     async def save(self, data: ChartConfiguration):
         try:
             _data = data.model_copy()
-            from uuid import uuid4
             viz = VisualizationGeneration(
-                form_data=_data.formData,
-                datasource=_data.dataSource,
-                message_id=str(uuid4()),
+                datasource=_data.dataSource, form_data=_data.formData
             )
 
             await viz.generate_echarts_config()

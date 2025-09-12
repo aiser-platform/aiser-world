@@ -135,9 +135,6 @@ chat2chart_poetry_cache/
 cube_node_modules/
 client_node_modules/
 client_next_build/
-# Cube store internal data
-packages/chat2chart/server/cube_helpers/.cubestore/
-packages/chat2chart/server/cube_helpers/.cubestore/**
 
 # Kiro IDE settings (may contain sensitive project info)
 .kiro/settings/sshsv.pub
@@ -174,13 +171,3 @@ DOCKER_ENV_SETUP.md
 *.pyc
 *.pyo
 tmp_debug_*.py
-packages/docs/venv/
-packages/docs/.docusaurus/
-packages/chat2chart/server/cube_helpers/
-.venv311/
-.venv311
-venv/
-.venv/
-.pytest_cache/
-dist/
-build/

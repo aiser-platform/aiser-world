@@ -65,6 +65,12 @@ const AdvancedDashboardCanvas: React.FC<AdvancedDashboardCanvasProps> = ({
   onTitleChange,
   onSubtitleChange
 }) => {
+  console.log('AdvancedDashboardCanvas props:', {
+    widgets: widgets.length,
+    layout: layout.length,
+    selectedWidget: selectedWidget?.id,
+    onWidgetDelete: typeof onWidgetDelete
+  });
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(100);
   const [showGrid, setShowGrid] = useState(false);
@@ -100,7 +106,7 @@ const AdvancedDashboardCanvas: React.FC<AdvancedDashboardCanvasProps> = ({
           case 'd':
             if (selectedWidget) {
               e.preventDefault();
-              handleDelete();
+              handleDelete(selectedWidget);
             }
             break;
           case 'f':
@@ -111,7 +117,7 @@ const AdvancedDashboardCanvas: React.FC<AdvancedDashboardCanvasProps> = ({
       }
       
       if (e.key === 'Delete' && selectedWidget) {
-        handleDelete();
+        handleDelete(selectedWidget);
       }
       
       if (e.key === 'Escape') {
@@ -143,41 +149,54 @@ const AdvancedDashboardCanvas: React.FC<AdvancedDashboardCanvasProps> = ({
     }
   };
 
-  const handleDelete = () => {
-    if (selectedWidget) {
+  const handleDelete = (widget?: DashboardWidget) => {
+    const widgetToDelete = widget || selectedWidget;
+    console.log('handleDelete called with widget:', widgetToDelete);
+    console.log('onWidgetDelete function:', onWidgetDelete);
+    
+    if (widgetToDelete) {
       Modal.confirm({
         title: 'Delete Widget',
-        content: `Are you sure you want to delete "${selectedWidget.title}"?`,
+        content: `Are you sure you want to delete "${widgetToDelete.title || 'this widget'}"?`,
         okText: 'Delete',
         okType: 'danger',
         cancelText: 'Cancel',
         onOk: () => {
-          onWidgetDelete(selectedWidget.id);
-          message.success('Widget deleted!');
+          console.log('Modal confirmed - deleting widget:', widgetToDelete.id);
+          try {
+            onWidgetDelete(widgetToDelete.id);
+            message.success('Widget deleted!');
+          } catch (error) {
+            console.error('Error deleting widget:', error);
+            message.error('Failed to delete widget');
+          }
         }
       });
+    } else {
+      console.log('No widget to delete');
     }
   };
 
   const handleContextMenu = (e: React.MouseEvent, widget: DashboardWidget) => {
     e.preventDefault();
+    console.log('Context menu triggered for widget:', widget);
     setContextMenu({
       x: e.clientX,
       y: e.clientY,
       widget
     });
+    console.log('Context menu set:', { x: e.clientX, y: e.clientY, widget });
   };
 
-  const contextMenuItems = [
+  // Create context menu items with proper widget reference
+  const createContextMenuItems = (widget: DashboardWidget) => [
     {
       key: 'edit',
       label: 'Edit',
       icon: <EditOutlined />,
       onClick: () => {
-        if (contextMenu) {
-          onWidgetSelect(contextMenu.widget);
-          setContextMenu(null);
-        }
+        console.log('Edit clicked for widget:', widget);
+        onWidgetSelect(widget);
       }
     },
     {
@@ -185,32 +204,26 @@ const AdvancedDashboardCanvas: React.FC<AdvancedDashboardCanvasProps> = ({
       label: 'Duplicate',
       icon: <CopyOutlined />,
       onClick: () => {
-        if (contextMenu) {
-          onWidgetDuplicate(contextMenu.widget);
-          setContextMenu(null);
-        }
+        console.log('Duplicate clicked for widget:', widget);
+        onWidgetDuplicate(widget);
       }
     },
     {
       key: 'visibility',
-      label: contextMenu?.widget.isVisible ? 'Hide' : 'Show',
-      icon: contextMenu?.widget.isVisible ? <EyeInvisibleOutlined /> : <EyeOutlined />,
+      label: widget.isVisible ? 'Hide' : 'Show',
+      icon: widget.isVisible ? <EyeInvisibleOutlined /> : <EyeOutlined />,
       onClick: () => {
-        if (contextMenu) {
-          onWidgetUpdate(contextMenu.widget.id, { isVisible: !contextMenu.widget.isVisible });
-          setContextMenu(null);
-        }
+        console.log('Visibility clicked for widget:', widget);
+        onWidgetUpdate(widget.id, { isVisible: !widget.isVisible });
       }
     },
     {
       key: 'lock',
-      label: contextMenu?.widget.isLocked ? 'Unlock' : 'Lock',
-      icon: contextMenu?.widget.isLocked ? <UnlockOutlined /> : <LockOutlined />,
+      label: widget.isLocked ? 'Unlock' : 'Lock',
+      icon: widget.isLocked ? <UnlockOutlined /> : <LockOutlined />,
       onClick: () => {
-        if (contextMenu) {
-          onWidgetUpdate(contextMenu.widget.id, { isLocked: !contextMenu.widget.isLocked });
-          setContextMenu(null);
-        }
+        console.log('Lock clicked for widget:', widget);
+        onWidgetUpdate(widget.id, { isLocked: !widget.isLocked });
       }
     },
     {
@@ -222,10 +235,9 @@ const AdvancedDashboardCanvas: React.FC<AdvancedDashboardCanvasProps> = ({
       icon: <DeleteOutlined />,
       danger: true,
       onClick: () => {
-        if (contextMenu) {
-          handleDelete();
-          setContextMenu(null);
-        }
+        console.log('Delete clicked for widget:', widget);
+        console.log('onWidgetDelete function available:', typeof onWidgetDelete);
+        handleDelete(widget);
       }
     }
   ];
@@ -297,7 +309,7 @@ const AdvancedDashboardCanvas: React.FC<AdvancedDashboardCanvasProps> = ({
         height: '100%',
         width: '100%',
         position: 'relative',
-        background: isDarkMode ? '#1a1a1a' : '#f5f5f5',
+        background: isDarkMode ? '#0f1419' : '#f8f9ff',
         transform: `scale(${zoomLevel / 100})`,
         transformOrigin: 'top left',
         transition: isDragging || isResizing ? 'none' : 'transform 0.2s ease',
@@ -364,6 +376,7 @@ const AdvancedDashboardCanvas: React.FC<AdvancedDashboardCanvasProps> = ({
         preventCollision={false}
         margin={[16, 16]}
         containerPadding={[16, 16]}
+        resizeHandles={['se','ne','sw','nw']}
         style={{
           background: showGrid ? 
             (isDarkMode ? 'rgba(24, 144, 255, 0.05)' : 'rgba(24, 144, 255, 0.02)') : 
@@ -381,22 +394,28 @@ const AdvancedDashboardCanvas: React.FC<AdvancedDashboardCanvasProps> = ({
               onContextMenu={(e) => handleContextMenu(e, widget)}
               style={{
                 cursor: widget.isLocked ? 'default' : 'pointer',
-                border: selectedWidget?.id === widget.id ? '2px solid #1890ff' : '1px solid transparent',
+                border: '1px solid rgba(0, 0, 0, 0.08)',
                 borderRadius: '8px',
                 transition: 'all 0.2s ease',
                 position: 'relative',
-                background: 'transparent',
-                boxShadow: selectedWidget?.id === widget.id ? 
-                  '0 4px 12px rgba(24, 144, 255, 0.3)' : 
-                  'none',
+                background: (widget.style as any)?.backgroundColor || (isDarkMode ? '#1a1a1a' : '#ffffff'),
+                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
                 opacity: widget.isVisible ? 1 : 0.5
               }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.border = '2px solid #1890ff';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(24, 144, 255, 0.3)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.border = '1px solid rgba(0, 0, 0, 0.08)';
+                e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
+              }}
             >
-              {/* Widget Header */}
+              {/* Widget Status Indicators */}
               <div style={{
                 position: 'absolute',
                 top: '8px',
-                right: '8px',
+                left: '8px',
                 zIndex: 10,
                 opacity: selectedWidget?.id === widget.id ? 1 : 0,
                 transition: 'opacity 0.2s ease'
@@ -412,22 +431,6 @@ const AdvancedDashboardCanvas: React.FC<AdvancedDashboardCanvasProps> = ({
                       <LockOutlined style={{ color: '#faad14', fontSize: '12px' }} />
                     </Tooltip>
                   )}
-                  <Dropdown
-                    menu={{ items: contextMenuItems }}
-                    trigger={['click']}
-                    placement="bottomRight"
-                  >
-                    <Button 
-                      size="small" 
-                      type="text" 
-                      icon={<MoreOutlined />}
-                      style={{ 
-                        color: isDarkMode ? '#ffffff' : '#000000',
-                        background: isDarkMode ? 'rgba(0, 0, 0, 0.5)' : 'rgba(255, 255, 255, 0.8)',
-                        backdropFilter: 'blur(4px)'
-                      }}
-                    />
-                  </Dropdown>
                 </Space>
               </div>
 
@@ -439,6 +442,10 @@ const AdvancedDashboardCanvas: React.FC<AdvancedDashboardCanvasProps> = ({
                               <WidgetRenderer
                 widget={widget}
                 onConfigUpdate={(config) => onWidgetConfigUpdate(widget.id, config)}
+                onWidgetClick={onWidgetSelect}
+                onDelete={onWidgetDelete}
+                onDuplicate={onWidgetDuplicate}
+                onUpdate={onWidgetUpdate}
                 isDarkMode={isDarkMode}
               />
               </div>
@@ -465,7 +472,7 @@ const AdvancedDashboardCanvas: React.FC<AdvancedDashboardCanvasProps> = ({
           onClick={() => setContextMenu(null)}
         >
           <Menu
-            items={contextMenuItems}
+            items={createContextMenuItems(contextMenu.widget)}
             style={{
               background: 'transparent',
               border: 'none',

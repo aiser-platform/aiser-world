@@ -1,8 +1,74 @@
-/* Dashboard Studio Styles */
+/* Modern Dashboard Studio Styles */
+.dashboard-studio {
+  height: 100vh;
+  overflow: hidden;
+}
+
+.dashboard-studio.dark {
+  background: #000000;
+  color: #ffffff;
+}
+
+.dashboard-studio.light {
+  background: #f5f5f5;
+  color: #000000;
+}
+
+/* Modern Header Styles */
+.modern-dashboard-header {
+  position: relative;
+  z-index: 100;
+  backdrop-filter: blur(8px);
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+
+.dashboard-studio.dark .modern-dashboard-header {
+  background: rgba(0, 21, 41, 0.95) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+
+.header-left, .header-center, .header-right {
+  display: flex;
+  align-items: center;
+}
+
+.header-center {
+  flex: 1;
+  justify-content: center;
+}
+
+/* Modern Sidebar Styles */
+.modern-sidebar {
+  border-right: 1px solid rgba(0, 0, 0, 0.06) !important;
+  background: #ffffff !important;
+}
+
+.dashboard-studio.dark .modern-sidebar {
+  border-right: 1px solid rgba(255, 255, 255, 0.06) !important;
+  background: #141414 !important;
+}
+
+.sidebar-content {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-header {
+  flex-shrink: 0;
+}
+
+.sidebar-body {
+  flex: 1;
+  overflow: hidden;
+}
+
 .dashboard-canvas {
   position: relative;
   overflow: hidden;
   transition: all 0.2s ease;
+  background: transparent;
 }
 
 .dashboard-canvas.drag-over {

@@ -2,14 +2,19 @@ from pydantic import BaseModel, Field
 
 
 class SignInRequest(BaseModel):
-    account: str
-    password: str = Field(..., min_length=8, max_length=128)
+    # Backwards-compatible: accept either `account` or `email` as identifier
+    account: str | None = None
+    email: str | None = None
+    password: str = Field(..., min_length=1)
 
 
 class SignInResponse(BaseModel):
-    access_token: str
-    expires_in: int
-    refresh_token: str
+    # Compatibility: some callers expect access_token + token_type
+    access_token: str | None = None
+    token_type: str | None = "bearer"
+    # Legacy fields
+    expires_in: int | None = None
+    refresh_token: str | None = None
 
 
 class RefreshTokenRequest(BaseModel):

@@ -6,11 +6,16 @@ from alembic import context
 
 
 # ---------------- added code here -------------------------#
-import os
-import sys
+import os, sys
 
+# Base dir is the server package (contains `app/`)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(BASE_DIR)
+# Ensure server root and app package are on sys.path so Alembic can import models
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
+APP_DIR = os.path.join(BASE_DIR, 'app')
+if APP_DIR not in sys.path:
+    sys.path.insert(0, APP_DIR)
 from app.core.config import settings
 
 # ------------------------------------------------------------#
@@ -31,19 +36,15 @@ fileConfig(config.config_file_name)
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
 # ---------------- added code here -------------------------#
-# Import models only when needed for migrations
-# This prevents circular imports during application startup
+# Import model metadata for autogenerate support. Prefer explicit import from
+# the application's model module to avoid import errors during migrations.
 try:
-    from migrations.models import *
-
-    target_metadata = [Base.metadata]
-except ImportError:
-    # If models can't be imported, use empty metadata
-    # This allows the application to start without migration conflicts
+    # Import Base metadata from the application's common model module
+    from app.common.model import Base
+    target_metadata = Base.metadata
+except Exception as e:
     target_metadata = None
-    print(
-        "Warning: Could not import migration models. Migrations may not work correctly."
-    )
+    print(f"Warning: Could not import migration models ({e}). Migrations may not work correctly.")
 # ------------------------------------------------------------#
 
 

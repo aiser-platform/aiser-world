@@ -1,0 +1,49 @@
+{
+  "label": "Aiser",
+  "url": "/",
+  "background": "rgba(255,255,255,0.9)",
+  "color": "#1890ff",
+  "replacements": [
+    {
+      "selector": "a.cube-logo, .logo, .brand-logo",
+      "type": "html",
+      "value": "<div style=\"float: left;\"><img src=\"/branding/aiser-logo.svg\" alt=\"Aiser\" style=\"height:28px;margin-right:28px;\"></div>"
+    },
+    {
+      "selector": "a.run-on-cube, .cloud-button, a[data-testid=\"live-preview-btn\"]",
+      "type": "attr",
+      "attrName": "href",
+      "value": "https://github.com/dataticon"
+    },
+    {
+      "selector": "a[data-testid=\"live-preview-btn\"]",
+      "type": "text",
+      "value": "GitHub"
+    },
+    {
+      "selector": "#cube-ui-kit-root > header > ul > a:nth-child(6)",
+      "type": "attr",
+      "attrName": "href",
+      "value": "https://aiser-docs.dataticon.com/docs"
+    },
+    {
+      "selector": "#cube-ui-kit-root > header > ul > a:nth-child(6)",
+      "type": "attr",
+      "attrName": "target",
+      "value": "_blank"
+    },
+    {
+      "selector": "a[eventkey=\"slack\"], a[aria-label=\"slack\"], a.sc-eteQWc.bdgQam[eventkey=\"slack\"]",
+      "type": "attr",
+      "attrName": "href",
+      "value": "https://t.me/dataticon_ai"
+    },
+    {
+      "selector": "a[eventkey=\"slack\"], a[aria-label=\"slack\"]",
+      "type": "text",
+      "value": "Telegram"
+    }
+  ]
+}
+
+

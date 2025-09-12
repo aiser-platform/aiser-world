@@ -10,7 +10,6 @@ from app.modules.cube.api import router as cube_router
 from app.modules.projects.api import router as projects_router
 from app.modules.onboarding.api import router as onboarding_router
 from app.modules.queries.api import router as queries_router
-from app.modules.authentication.enterprise_api import router as enterprise_auth_router
 from fastapi import APIRouter
 
 api_router = APIRouter()
@@ -102,10 +101,4 @@ api_router.include_router(
     responses={404: {"description": "Not found"}},
 )
 
-# Enterprise auth proxy endpoints (for dev UX and compatibility)
-api_router.include_router(
-    router=enterprise_auth_router,
-    prefix="",
-    tags=["enterprise-auth"],
-    responses={404: {"description": "Not found"}},
-)
+
