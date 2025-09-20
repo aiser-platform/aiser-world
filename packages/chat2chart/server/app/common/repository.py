@@ -70,11 +70,7 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
                 continue
 
         if search_conditions:
-<<<<<<< Current (Your changes)
             from sqlalchemy import or_
-
-=======
->>>>>>> Incoming (Background Agent changes)
             query = query.where(or_(*search_conditions))
 
         return query
