@@ -171,3 +171,33 @@ DOCKER_ENV_SETUP.md
 *.pyc
 *.pyo
 tmp_debug_*.py
+
+# Additional unnecessary files
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Docker development files
+docker-compose.override.yml
+docker-compose.dev.yml
+
+# Test and debug files
+test-*.js
+test-*.py
+debug_*.py
+temp-*
+
+# IDE and editor files
+.vscode/settings.json
+.idea/
+*.sublime-*
+
+# OS generated files
+.DS_Store?
+ehthumbs.db
+Icon?
