@@ -70,6 +70,27 @@ class RedisCache:
             logger.error(f"Error setting AI response in cache: {e}")
             return False
 
+    def clear_ai_cache(self):
+        """Clear all AI response cache"""
+        try:
+            if self.redis_client:
+                # Clear all keys starting with ai_response:
+                keys = self.redis_client.keys("ai_response:*")
+                if keys:
+                    self.redis_client.delete(*keys)
+                    logger.info(f"🧹 Cleared {len(keys)} AI cache entries from Redis")
+            
+            # Clear fallback cache
+            ai_keys = [k for k in self.fallback_cache.keys() if k.startswith("ai_response:")]
+            for key in ai_keys:
+                del self.fallback_cache[key]
+            
+            if ai_keys:
+                logger.info(f"🧹 Cleared {len(ai_keys)} AI cache entries from fallback cache")
+                
+        except Exception as e:
+            logger.error(f"Error clearing AI cache: {e}")
+
     def _generate_key(self, prefix: str, identifier: str) -> str:
         """Generate consistent cache key"""
         key_string = f"{prefix}:{identifier}"

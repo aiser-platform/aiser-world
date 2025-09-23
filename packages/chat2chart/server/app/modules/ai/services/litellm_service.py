@@ -92,10 +92,10 @@ class LiteLLMService:
             }
         }
         
-        # Default model selection - Prioritize Azure OpenAI GPT-4.1 Mini for better compatibility
+        # Default model selection - Use Azure OpenAI with fixed configuration
         if self.azure_api_key and self.azure_endpoint:
-            self.default_model = 'azure_gpt4_mini'
-            logger.info("🚀 Using Azure OpenAI GPT-4.1 Mini as primary model")
+            self.default_model = 'azure_gpt5_mini'
+            logger.info("🚀 Using Azure OpenAI GPT-5 Mini as primary model")
         elif self.openai_api_key:
             self.default_model = 'openai_gpt4_mini'
             logger.info("🚀 Using OpenAI GPT-4o Mini as fallback model")
@@ -171,14 +171,20 @@ class LiteLLMService:
         self, 
         query: str, 
         context: Optional[Dict[str, Any]] = None,
-        model_id: Optional[str] = None
+        model_id: Optional[str] = None,
+        conversation_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """Analyze natural language query using LiteLLM"""
         try:
             logger.info(f"🧠 Analyzing query with LiteLLM: {query[:50]}...")
             
+            # Include conversation_id in context for unique cache keys
+            cache_context = context or {}
+            if conversation_id:
+                cache_context["conversation_id"] = conversation_id
+            
             # Check Redis cache first
-            cached_analysis = cache.get_ai_response(query, context or {})
+            cached_analysis = cache.get_ai_response(query, cache_context)
             if cached_analysis:
                 logger.info("📋 Using cached analysis from Redis")
                 return cached_analysis
@@ -254,8 +260,8 @@ Return only valid JSON.
             # Add original query
             analysis['original_query'] = query
             
-            # Cache the response in Redis
-            cache.set_ai_response(query, context or {}, analysis)
+            # Cache the response in Redis with conversation context
+            cache.set_ai_response(query, cache_context, analysis)
             logger.info("💾 Cached analysis in Redis")
             
             logger.info(f"✅ Query analysis completed: {analysis.get('query_type', [])}")
@@ -595,14 +601,25 @@ Return only valid JSON array.
                     'fallback': True
                 }
             
-            # Prepare LiteLLM parameters
-            litellm_params = {
-                'model': model_config['model'],
-                'messages': final_messages,
-                'api_key': model_config['api_key'],
-                'api_base': model_config.get('api_base'),
-                'api_version': model_config.get('api_version')
-            }
+            # Prepare LiteLLM parameters with correct Azure format
+            if model_config['provider'] == 'azure':
+                # Use the exact Azure format as specified
+                litellm_params = {
+                    'model': f"azure/{os.environ['AZURE_OPENAI_DEPLOYMENT_NAME']}",
+                    'messages': final_messages,
+                    'api_base': os.environ["AZURE_OPENAI_ENDPOINT"],
+                    'api_key': os.environ["AZURE_OPENAI_API_KEY"],
+                    'api_version': os.environ["AZURE_OPENAI_API_VERSION"]
+                }
+            else:
+                # Use standard format for other providers
+                litellm_params = {
+                    'model': model_config['model'],
+                    'messages': final_messages,
+                    'api_key': model_config['api_key'],
+                    'api_base': model_config.get('api_base'),
+                    'api_version': model_config.get('api_version')
+                }
             
             # Handle temperature for GPT-5 models (only supports temperature=1)
             if 'gpt-5' in model_config['model']:

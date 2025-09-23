@@ -1,20 +1,22 @@
+version: '3.8'
+
 services:
   # PostgreSQL Database
   postgres:
     image: postgres:15-alpine
     container_name: aiser-postgres-dev
+    env_file: .env  # Moved here
     environment:
-      POSTGRES_DB: aiser_world
-      POSTGRES_USER: aiser
-      POSTGRES_PASSWORD: aiser_password
+      POSTGRES_DB: ${POSTGRES_DB:-aiser_world}
+      POSTGRES_USER: ${POSTGRES_USER:-aiser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aiser_password}
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_dev_data:/var/lib/postgresql/data
       - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
-      - ./scripts/init-dev-data.sql:/docker-entrypoint-initdb.d/init-dev-data.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U aiser -d aiser_world"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aiser} -d ${POSTGRES_DB:-aiser_world}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -23,139 +25,161 @@ services:
   redis:
     image: redis:7-alpine
     container_name: aiser-redis-dev
+    env_file: .env  # Moved here
     ports:
       - "6379:6379"
     volumes:
-      - redis_data:/data
+      - redis_dev_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # Backend API Server
-  backend-server:
-    build:
-      context: ./packages/chat2chart/server
-      dockerfile: Dockerfile.dev
-    container_name: aiser-backend-dev
+  # Authentication Service
+  auth-service:
+    image: python:3.11-slim
+    container_name: aiser-auth-dev
+    working_dir: /app
+    env_file: .env  # Moved here
+    ports:
+      - "5000:5000"
     environment:
       - POSTGRES_SERVER=postgres
-      - POSTGRES_DB=aiser_world
-      - POSTGRES_USER=aiser
-      - POSTGRES_PASSWORD=aiser_password
-      - POSTGRES_PORT=5432
-      - REDIS_URL=redis://redis:6379
-      - API_SECRET_KEY=dev-secret-key-change-in-production
-      - CUBE_API_SECRET=dev-cube-secret
-      - ENVIRONMENT=development
-      - DEBUG=true
+      - POSTGRES_DB=${POSTGRES_DB:-aiser_world}
+      - POSTGRES_USER=${POSTGRES_USER:-aiser}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-aiser_password}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-key}
+      - DEBUG=${DEBUG:-True}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./packages/auth:/app
+      - ./scripts/start-auth.sh:/start.sh
+      - auth_poetry_cache:/root/.cache/pypoetry
+    command: ["bash", "/start.sh"]
+    restart: unless-stopped
+
+  # Chat2Chart Server
+  chat2chart-server:
+    image: python:3.11-slim
+    container_name: aiser-chat2chart-dev
+    working_dir: /app
+    env_file: .env  # Moved here
     ports:
       - "8000:8000"
-    volumes:
-      - ./packages/chat2chart/server:/app
-      - ./uploads:/app/uploads
+    environment:
+      - POSTGRES_SERVER=postgres
+      - POSTGRES_DB=${POSTGRES_DB:-aiser_chat2chart}
+      - POSTGRES_USER=${POSTGRES_USER:-aiser}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-aiser_password}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-aiser}:${POSTGRES_PASSWORD:-aiser_password}@postgres:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-aiser_chat2chart}
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-key}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - DEBUG=${DEBUG:-True}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - REDIS_URL=redis://redis:6379/0
+      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY}
+      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
+      - AZURE_OPENAI_API_VERSION=${AZURE_OPENAI_API_VERSION:-2025-04-01-preview}
+      - AZURE_OPENAI_DEPLOYMENT_NAME=${AZURE_OPENAI_DEPLOYMENT_NAME:-gpt-5-mini}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL_ID=${OPENAI_MODEL_ID:-gpt-4o-mini}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: >
-      sh -c "
-        echo '🚀 Starting Aiser Backend Development Server...' &&
-        pip install -r requirements.txt &&
-        python scripts/setup_database.py &&
-        python scripts/setup-organization.py || true && \
-        uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-      "
-
-  # Frontend Client
-  frontend-client:
-    build:
-      context: ./packages/chat2chart/client
-      dockerfile: Dockerfile.dev
-    container_name: aiser-frontend-dev
-    environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
-      - NEXT_PUBLIC_ENVIRONMENT=development
-    ports:
-      - "3000:3000"
+      cube-server:
+        condition: service_started
     volumes:
-      - ./packages/chat2chart/client:/app
-      - /app/node_modules
+      - ./packages/chat2chart/server:/app
+      - ./scripts/start-chat2chart.sh:/start.sh
+      - chat2chart_poetry_cache:/root/.cache/pypoetry
+    command: ["bash", "/start.sh"]
+    restart: unless-stopped
+
+  # Cube.js Universal Semantic Layer
+  cube-server:
+    image: node:18-alpine
+    container_name: aiser-cube-dev
+    working_dir: /app
+    env_file: .env  # Moved here
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=${NODE_ENV:-development}
+      - CUBE_DB_TYPE=${CUBE_DB_TYPE:-postgres}
+      - CUBE_DB_HOST=${CUBE_DB_HOST:-postgres}
+      - CUBE_DB_PORT=${CUBE_DB_PORT:-5432}
+      - CUBE_DB_NAME=${POSTGRES_DB:-aiser_world}
+      - CUBE_DB_USER=${POSTGRES_USER:-aiser}
+      - CUBE_DB_PASS=${POSTGRES_PASSWORD:-aiser_password}
+      - CUBE_DB_SCHEMA=${CUBE_DB_SCHEMA:-public}
+      - CUBE_DB_SSL=${CUBE_DB_SSL:-false}
+      - CUBE_DB_POOL_MIN=${CUBE_DB_POOL_MIN:-2}
+      - CUBE_DB_POOL_MAX=${CUBE_DB_POOL_MAX:-10}
+      - CUBE_REDIS_URL=${CUBE_REDIS_URL:-redis://redis:6379}
+      - CUBE_API_SECRET=${CUBE_API_SECRET:-dev-cube-secret-key}
+      - CUBE_DEV_MODE=${CUBE_DEV_MODE:-true}
+      - CUBE_LOG_LEVEL=${CUBE_LOG_LEVEL:-info}
+      - CUBEJS_EXTERNAL_DEFAULT=${CUBEJS_EXTERNAL_DEFAULT:-true}
+      - CUBEJS_SCHEDULED_REFRESH_DEFAULT=${CUBEJS_SCHEDULED_REFRESH_DEFAULT:-true}
+      - CUBEJS_SKIP_NATIVE_EXTENSIONS=${CUBEJS_SKIP_NATIVE_EXTENSIONS:-true}
     depends_on:
-      - backend-server
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./packages/cube:/app
+      - cube_node_modules:/app/node_modules
     command: >
       sh -c "
-        echo '🚀 Starting Aiser Frontend Development Server...' &&
         npm install &&
         npm run dev
       "
+    restart: unless-stopped
 
-  # Cube.js Server
-  cube-server:
-    image: cubejs/cube:latest
-    container_name: aiser-cube-dev
+  # Chat2Chart Client (Next.js)
+  chat2chart-client:
+    image: node:18-alpine
+    container_name: aiser-client-dev
+    working_dir: /app
+    env_file: .env  # Moved here
+    ports:
+      - "3000:3000"
     environment:
-      CUBEJS_API_SECRET: dev-cube-secret
-      CUBEJS_DB_TYPE: postgres
-      CUBEJS_DB_HOST: postgres
-      CUBEJS_DB_NAME: aiser_world
-      CUBEJS_DB_USER: aiser
-      CUBEJS_DB_PASS: aiser_password
-      CUBEJS_DEV_MODE: 'true'
-    ports:
-      # Expose Cube internal API on host port 4001; the branded proxy will bind to 4000
-      - "4001:4000"
-      - "3031:3031"
+      - NODE_ENV=${NODE_ENV:-development}
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+      - NEXT_PUBLIC_AUTH_URL=${NEXT_PUBLIC_AUTH_URL:-http://localhost:5000}
+      - NEXT_PUBLIC_CUBE_URL=${NEXT_PUBLIC_CUBE_URL:-http://localhost:4000}
     volumes:
-      - ./packages/chat2chart/server/cube_schemas:/cube/conf/schema:ro
+      - ./packages/chat2chart/client:/app
+      - ./packages/shared:/shared
+      - ./scripts/start-client.sh:/start.sh
+      - /app/node_modules
+      - /app/.next
     depends_on:
-      postgres:
-        condition: service_healthy
-
-  # Authentication Service
-  auth-service:
-    build:
-      context: ./packages/auth-service
-      dockerfile: Dockerfile.dev
-    container_name: aiser-auth-dev
-    environment:
-      - POSTGRES_SERVER=postgres
-      - POSTGRES_DB=aiser_world
-      - POSTGRES_USER=aiser
-      - POSTGRES_PASSWORD=aiser_password
-      - JWT_SECRET=dev-jwt-secret-change-in-production
-      - REDIS_URL=redis://redis:6379
-    ports:
-      - "5000:5000"
-    volumes:
-      - ./packages/auth-service:/app
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    command: >
-      sh -c "
-        echo '🚀 Starting Authentication Service...' &&
-        pip install -r requirements.txt &&
-        python -m uvicorn main:app --host 0.0.0.0 --port 5000 --reload
-      "
-
-  # Branded Cube UI reverse proxy
-  cube-proxy:
-    image: nginx:stable-alpine
-    container_name: aiser-cube-proxy
-    ports:
-      - "4000:80"
-    volumes:
-      - ./nginx/cube-proxy.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./nginx/branding:/usr/share/nginx/html/branding:ro
-    depends_on:
+      - chat2chart-server
+      - auth-service
       - cube-server
+    command: ["sh", "/start.sh"]
     restart: unless-stopped
 
 volumes:
-  postgres_data:
-  redis_data:
+  postgres_dev_data:
+  redis_dev_data:
+  auth_poetry_cache:
+  chat2chart_poetry_cache:
+  cube_node_modules:
+
+networks:
+  default:
+    name: aiser-dev-network
