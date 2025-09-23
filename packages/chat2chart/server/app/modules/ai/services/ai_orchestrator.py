@@ -1959,10 +1959,10 @@ Remember: The user has specifically selected or activated certain data sources. 
         """Get the currently configured AI model"""
         try:
             self.litellm_service.get_model_info()
-            # Use Azure GPT-4.1 Mini as default for better compatibility
-            return "azure_gpt4_mini"  # model_info.get("model_name", "gpt-4")
+            # Use Azure GPT-5 Mini as default
+            return "azure_gpt5_mini"  # model_info.get("model_name", "gpt-4")
         except:
-            return "azure_gpt4_mini"
+            return "azure_gpt5_mini"
 
     async def _execute_cube_query(self, query_params: Dict) -> Dict:
         """Execute query against Cube.js API"""

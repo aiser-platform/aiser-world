@@ -351,6 +351,7 @@ class DuckDBEngine(BaseQueryEngine):
         """Load database data into DuckDB"""
         # This would connect to the source database and load data
         # For now, we'll simulate loading data
+        pass
 
 
 class CubeEngine(BaseQueryEngine):

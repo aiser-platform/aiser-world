@@ -70,6 +70,11 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
         };
     }>({});
 
+    // Clear message cache to prevent repeated responses
+    React.useEffect(() => {
+        setMessageCache({});
+    }, [props.conversationId]);
+
     const [conversation, setConversation] = React.useState<IConversation | null>(null);
     const [pagination, setPagination] = React.useState<Pagination>({
         offset: 0,
@@ -1238,7 +1243,9 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                     active_data_sources: activeDataSources
                 },
                 include_sql: true, // Request SQL queries in response
-                include_execution_metadata: true // Request execution metadata
+                include_execution_metadata: true, // Request execution metadata
+                timestamp: Date.now(), // Add timestamp to make each request unique
+                conversation_id: props.conversationId || 'new-conversation'
             };
 
                             const response = await fetch(`${getBackendUrlForApi()}/ai/chat/analyze`, {
