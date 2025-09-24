@@ -387,9 +387,9 @@ async def sign_up(user_in: UserCreate, response: Response):
 
 
 @router.post("/refresh-token", response_model=RefreshTokenResponse)
-async def refresh_token(request: RefreshTokenRequest):
+async def refresh_token(request: RefreshTokenRequest, response: Response):
     try:
-        return await service.refresh_token(request)
+        return await service.refresh_token(request, response)
     except HTTPException as e:
         raise e
     except Exception as e:
