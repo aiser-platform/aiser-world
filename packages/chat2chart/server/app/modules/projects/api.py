@@ -100,7 +100,7 @@ async def update_organization(organization_id: str, organization: OrganizationUp
 
 # Project endpoints
 @router.post("/projects", response_model=ProjectResponse)
-async def create_project(project: ProjectCreate, current_token: str = Depends(JWTCookieBearer()), request: Request | None = None):
+async def create_project(project: ProjectCreate, current_token: str = Depends(JWTCookieBearer()), request: Request = None):
     """Create a new project deriving user from JWT cookie"""
     try:
         try:
