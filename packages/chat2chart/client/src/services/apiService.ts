@@ -6,9 +6,25 @@ export async function fetchWithAuth(input: RequestInfo, init: RequestInit = {}) 
   if ((res.status === 401 || res.status === 403) && !cfg._retried) {
     // dev-only upgrade attempt
     try {
-      if (process.env.NODE_ENV === 'development') {
+        if (process.env.NODE_ENV === 'development') {
         // Try upgrade-demo and if it returns a token in body, set client cookie so subsequent requests include it
-        const up = await fetch(`${API_URL}/auth/upgrade-demo`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' } });
+        // Include demo cookie payload in body as a fallback when cookies are not sent by the browser
+        let demoToken = null;
+        let userPayload = null;
+        try {
+          const m = document.cookie.match(/(?:^|; )access_token=([^;]+)/);
+          demoToken = m ? decodeURIComponent(m[1]) : null;
+        } catch (e) {
+          demoToken = null;
+        }
+        try {
+          const mu = document.cookie.match(/(?:^|; )user=([^;]+)/);
+          userPayload = mu ? decodeURIComponent(mu[1]) : null;
+        } catch (e) {
+          userPayload = null;
+        }
+
+        const up = await fetch(`${API_URL}/auth/upgrade-demo`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ demo_token: demoToken, user: userPayload }) });
         if (up.ok) {
           try {
             const body = await up.json();
