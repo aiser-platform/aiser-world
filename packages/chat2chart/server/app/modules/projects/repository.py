@@ -26,11 +26,18 @@ class ProjectRepository(BaseRepository[Project, ProjectCreate, ProjectUpdate]):
     async def get_user_projects(self, user_id: str, db: AsyncSession) -> List[Project]:
         """Get all projects for a specific user"""
         try:
+            # Normalize user_id to integer when possible to avoid SQL type-mismatch
+            try:
+                uid = int(user_id)
+            except Exception:
+                uid = None
+
             # Get projects where user is owner or has access
-            query = select(Project).where(
-                (Project.created_by == user_id)  # Changed from owner_id to created_by
-                | (Project.is_public)
-            )
+            if uid is not None:
+                query = select(Project).where((Project.created_by == uid) | (Project.is_public))
+            else:
+                # fallback: only public projects if we can't coerce the id
+                query = select(Project).where(Project.is_public)
             result = await db.execute(query)
             return result.scalars().all()
         except Exception as e:
@@ -105,8 +112,8 @@ class ProjectRepository(BaseRepository[Project, ProjectCreate, ProjectUpdate]):
             # Verify user has access to project
             project_query = select(Project).where(
                 Project.id == project_id,
-                (Project.created_by == user_id)
-                | (Project.is_public),  # Changed from owner_id to created_by
+                # coerce user_id
+                ((Project.created_by == (int(user_id) if str(user_id).isdigit() else None)) if str(user_id).isdigit() else Project.is_public) or (Project.is_public),
             )
             project_result = await db.execute(project_query)
             project = project_result.scalar_one_or_none()
@@ -154,7 +161,8 @@ class ProjectRepository(BaseRepository[Project, ProjectCreate, ProjectUpdate]):
             # Verify user has access to project
             project_query = select(Project).where(
                 Project.id == project_id,
-                (Project.owner_id == user_id) | (Project.is_public),
+                # owner_id usage legacy: attempt to coerce
+                ((Project.owner_id == int(user_id)) if str(user_id).isdigit() else Project.is_public) or (Project.is_public),
             )
             project_result = await db.execute(project_query)
             project = project_result.scalar_one_or_none()
@@ -193,7 +201,7 @@ class ProjectRepository(BaseRepository[Project, ProjectCreate, ProjectUpdate]):
             # Verify user has access to project
             project_query = select(Project).where(
                 Project.id == project_id,
-                Project.created_by == user_id,  # Changed from owner_id to created_by
+                (Project.created_by == (int(user_id) if str(user_id).isdigit() else None)) if str(user_id).isdigit() else (Project.created_by == None),  # Changed from owner_id to created_by
             )
             project_result = await db.execute(project_query)
             project = project_result.scalar_one_or_none()
