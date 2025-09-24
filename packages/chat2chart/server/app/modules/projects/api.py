@@ -100,11 +100,23 @@ async def update_organization(organization_id: str, organization: OrganizationUp
 
 # Project endpoints
 @router.post("/projects", response_model=ProjectResponse)
-async def create_project(project: ProjectCreate, user_id: str):
-    """Create a new project"""
+async def create_project(project: ProjectCreate, current_token: str = Depends(JWTCookieBearer()), request: Request | None = None):
+    """Create a new project deriving user from JWT cookie"""
     try:
+        try:
+            user_payload = current_token if isinstance(current_token, dict) else Auth().decodeJWT(current_token) or {}
+            user_id = str(user_payload.get('id') or user_payload.get('sub') or '')
+        except Exception:
+            user_id = ''
+
+        if not user_id:
+            logger.warning('create_project attempted without authenticated user')
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Authentication required')
+
         result = await project_service.create_project(project, user_id)
         return result
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
@@ -160,13 +172,25 @@ async def get_projects(
 
 
 @router.get("/projects/{project_id}", response_model=ProjectWithDataSources)
-async def get_project(project_id: str, user_id: str):
-    """Get project by ID with data source counts"""
+async def get_project(project_id: str, current_token: str = Depends(JWTCookieBearer())):
+    """Get project by ID with data source counts, using authenticated user"""
     try:
+        try:
+            user_payload = current_token if isinstance(current_token, dict) else Auth().decodeJWT(current_token) or {}
+            user_id = str(user_payload.get('id') or user_payload.get('sub') or '')
+        except Exception:
+            user_id = ''
+
+        if not user_id:
+            logger.warning('get_project attempted without authenticated user')
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Authentication required')
+
         result = await project_service.get_project_with_data_sources(
             project_id, user_id
         )
         return result
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
@@ -202,10 +226,20 @@ async def delete_project(project_id: str):
     "/projects/{project_id}/data-sources", response_model=ProjectDataSourceResponse
 )
 async def add_data_source_to_project(
-    project_id: str, data_source: ProjectDataSourceCreate, user_id: str
+    project_id: str, data_source: ProjectDataSourceCreate, current_token: str = Depends(JWTCookieBearer())
 ):
-    """Add a data source to a project"""
+    """Add a data source to a project deriving user from JWT"""
     try:
+        try:
+            user_payload = current_token if isinstance(current_token, dict) else Auth().decodeJWT(current_token) or {}
+            user_id = str(user_payload.get('id') or user_payload.get('sub') or '')
+        except Exception:
+            user_id = ''
+
+        if not user_id:
+            logger.warning('add_data_source_to_project attempted without authenticated user')
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Authentication required')
+
         result = await project_service.add_data_source_to_project(
             project_id,
             data_source.data_source_id,
@@ -213,6 +247,8 @@ async def add_data_source_to_project(
             user_id,
         )
         return result
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
@@ -223,11 +259,23 @@ async def add_data_source_to_project(
     "/projects/{project_id}/data-sources",
     response_model=List[ProjectDataSourceResponse],
 )
-async def get_project_data_sources(project_id: str, user_id: str):
-    """Get all data sources in a project"""
+async def get_project_data_sources(project_id: str, current_token: str = Depends(JWTCookieBearer())):
+    """Get all data sources in a project deriving user from JWT"""
     try:
+        try:
+            user_payload = current_token if isinstance(current_token, dict) else Auth().decodeJWT(current_token) or {}
+            user_id = str(user_payload.get('id') or user_payload.get('sub') or '')
+        except Exception:
+            user_id = ''
+
+        if not user_id:
+            logger.warning('get_project_data_sources attempted without authenticated user')
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Authentication required')
+
         result = await project_service.get_project_data_sources(project_id, user_id)
         return result
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
@@ -235,19 +283,25 @@ async def get_project_data_sources(project_id: str, user_id: str):
 
 
 @router.delete("/projects/{project_id}/data-sources/{data_source_id}")
-async def remove_data_source_from_project(
-    project_id: str, data_source_id: str, user_id: str
-):
-    """Remove a data source from a project"""
+async def remove_data_source_from_project(project_id: str, data_source_id: str, current_token: str = Depends(JWTCookieBearer())):
+    """Remove a data source from a project deriving user from JWT"""
     try:
-        result = await project_service.remove_data_source_from_project(
-            project_id, data_source_id, user_id
-        )
+        try:
+            user_payload = current_token if isinstance(current_token, dict) else Auth().decodeJWT(current_token) or {}
+            user_id = str(user_payload.get('id') or user_payload.get('sub') or '')
+        except Exception:
+            user_id = ''
+
+        if not user_id:
+            logger.warning('remove_data_source_from_project attempted without authenticated user')
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Authentication required')
+
+        result = await project_service.remove_data_source_from_project(project_id, data_source_id, user_id)
         return {"success": result, "message": "Data source removed from project"}
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 # Project conversation endpoints
