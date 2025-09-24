@@ -876,7 +876,7 @@ async def create_dashboard(
             logger.warning('Attempt to create dashboard without valid JWT')
             raise HTTPException(status_code=401, detail='Authentication required to create dashboards; ensure you are logged in and cookies are enabled (access_token).')
         try:
-        user_id = int(user_payload.get('id') or user_payload.get('sub') or 0)
+            user_id = int(user_payload.get('id') or user_payload.get('sub') or 0)
         except Exception:
             user_id = 0
 
@@ -1221,8 +1221,8 @@ async def share_dashboard(dashboard_id: str, share_request: DashboardShareCreate
             user_id = 0
 
         from app.modules.charts.models import DashboardShare, Dashboard
-            from app.db.session import async_session
-            async with async_session() as db:
+        from app.db.session import async_session
+        async with async_session() as db:
             # Basic permission: only owner/org_admin can share
             res = await db.execute(select(Dashboard).where(Dashboard.id == dashboard_id))
             db_dash = res.scalar_one_or_none()
@@ -1290,7 +1290,7 @@ async def publish_dashboard(dashboard_id: str, make_public: bool = True, current
 
         # In real impl, load dashboard and check ownership/org membership
         from app.db.session import async_session
-            from app.modules.charts.models import Dashboard
+        from app.modules.charts.models import Dashboard
         async with async_session() as sdb:
             res = await sdb.execute(select(Dashboard).where(Dashboard.id == dashboard_id))
             db_dash = res.scalar_one_or_none()
