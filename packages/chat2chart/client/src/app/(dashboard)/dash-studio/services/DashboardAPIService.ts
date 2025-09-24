@@ -18,6 +18,28 @@ export class DashboardAPIService {
   // Dashboard Management (Project-scoped)
          async createDashboard(dashboardData: any, organizationId?: string, projectId?: string) {
     try {
+      // Ensure we have a project_id when possible: if not supplied, try to infer from current user
+      if (!dashboardData.project_id) {
+        try {
+          const whoami = await fetchWithAuth(`${this.baseURL}/auth/whoami`);
+          if (whoami?.authenticated && whoami.payload) {
+            const uid = whoami.payload?.id || whoami.payload?.user_id || whoami.payload?.sub;
+            if (uid) {
+              // fetch user's projects and pick the first active project as default
+              const projRes = await fetchWithAuth(`${this.baseURL}/api/projects?user_id=${uid}`);
+              if (projRes && Array.isArray(projRes) && projRes.length > 0) {
+                dashboardData.project_id = projRes[0].id;
+                // if organizationId not provided, try to set from project
+                if (!organizationId && projRes[0].organization_id) organizationId = String(projRes[0].organization_id);
+              }
+            }
+          }
+        } catch (e) {
+          // best-effort only; continue without project_id if we can't infer
+          console.debug('Could not infer project_id for dashboard create', e);
+        }
+      }
+
       // Try project-scoped API first only if numeric IDs are provided
       let response;
       const canUseProject = organizationId && projectId && /^\d+$/.test(String(organizationId)) && /^\d+$/.test(String(projectId));
@@ -53,7 +75,11 @@ export class DashboardAPIService {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      return await response.json();
+      const body = await response.json();
+
+      // Normalize response: API may return { id, dashboard } or { success, dashboard, id }
+      const normalizedId = body?.id || body?.dashboard?.id || (body?.dashboard && body.dashboard.id) || null;
+      return { raw: body, id: normalizedId };
     } catch (error) {
       console.error('Failed to create dashboard:', error);
       throw error;

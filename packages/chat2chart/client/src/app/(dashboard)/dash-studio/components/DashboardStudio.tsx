@@ -909,7 +909,8 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
       } else {
         // Create new dashboard
         const created = await dashboardAPIService.createDashboard(dashboardData);
-        const newId = created?.id || created?.dashboard?.id;
+        // DashboardAPIService now returns { raw, id }
+        const newId = created?.id || created?.raw?.id || created?.raw?.dashboard?.id;
         if (newId) setDashboardId(newId);
         message.success('Dashboard created successfully!');
       }
