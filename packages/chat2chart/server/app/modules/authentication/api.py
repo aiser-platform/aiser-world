@@ -36,17 +36,46 @@ async def upgrade_demo(request: Request, response: Response, payload: dict | Non
         raise HTTPException(status_code=403, detail="Not allowed in this environment")
 
     cookies = request.cookies or {}
+    # Log masked cookie keys for diagnostics (do not log full token values)
+    try:
+        cookie_keys = list(cookies.keys())
+        logger.info(f"upgrade-demo called - cookies present: {cookie_keys}")
+    except Exception:
+        logger.info("upgrade-demo called - failed to read cookies")
+
     user_cookie = cookies.get("user")
     demo_token = cookies.get("access_token")
     # Allow passing demo token or user payload in request body for cases where cookie is on frontend origin
-    if payload:
-        if not demo_token and payload.get("demo_token"):
-            demo_token = payload.get("demo_token")
-        if not user_cookie and payload.get("user"):
-            user_cookie = payload.get("user")
+    # Also log the incoming body for diagnostics (mask token values)
+    try:
+        body_json = payload or (await request.json() if request._body is None else payload)
+    except Exception:
+        body_json = payload
+    try:
+        if isinstance(body_json, dict):
+            body_keys = list(body_json.keys())
+            logger.info(f"upgrade-demo body keys: {body_keys}")
+            # Mask demo token length for diagnostics
+            if body_json.get('demo_token'):
+                dt = str(body_json.get('demo_token'))
+                logger.info(f"upgrade-demo received demo_token (len={len(dt)})")
+            if body_json.get('user'):
+                logger.info("upgrade-demo received user payload in body")
+        else:
+            logger.info("upgrade-demo received non-dict body")
+    except Exception:
+        logger.info("upgrade-demo: failed to log body")
+
+    if body_json:
+        if not demo_token and body_json.get("demo_token"):
+            demo_token = body_json.get("demo_token")
+        if not user_cookie and body_json.get("user"):
+            user_cookie = body_json.get("user")
 
     if not user_cookie and not demo_token:
-        raise HTTPException(status_code=400, detail="No demo cookie or demo token provided")
+        # Provide more helpful debug detail for dev flows
+        logger.warning("upgrade-demo missing both user cookie and demo_token; incoming cookies: %s", list(cookies.keys()))
+        raise HTTPException(status_code=400, detail="No demo cookie or demo token provided - ensure the browser sent the legacy demo cookies or include them in the request body as {demo_token,user}")
 
     payload = {}
     # Try to parse user cookie first (it's URL-encoded JSON in many dev flows)
