@@ -100,7 +100,7 @@ async def update_organization(organization_id: str, organization: OrganizationUp
 
 # Project endpoints
 @router.post("/projects", response_model=ProjectResponse)
-async def create_project(project: ProjectCreate, current_token: str = Depends(JWTCookieBearer()), request: Request):
+async def create_project(project: ProjectCreate, request: Request, current_token: str = Depends(JWTCookieBearer())):
     """Create a new project deriving user from JWT cookie"""
     try:
         try:
@@ -126,8 +126,8 @@ async def create_project(project: ProjectCreate, current_token: str = Depends(JW
 @router.get("/projects", response_model=ListResponseSchema[ProjectResponse])
 async def get_projects(
     params: Annotated[BaseFilterParams, Depends()],
+    request: Request,
     current_token: str = Depends(JWTCookieBearer()),
-    request: Request = None,
 ):
     """Get all projects for a user"""
     try:
