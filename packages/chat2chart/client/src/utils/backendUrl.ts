@@ -17,7 +17,8 @@ export const getBackendUrl = (): string => {
   }
   // Priority 2: Local development (browser needs localhost), fall back to Docker host for server-only environments
   if (process.env.NODE_ENV === 'development') {
-    return 'http://127.0.0.1:8000';
+    // Use localhost so browser and container-origin cookie host match (localhost vs 127.0.0.1 mismatch)
+    return 'http://localhost:8000';
   }
 
   // Production / containerized default
