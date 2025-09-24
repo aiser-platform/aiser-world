@@ -15,8 +15,12 @@ export const getBackendUrl = (): string => {
   if (process.env.NEXT_PUBLIC_BACKEND_URL) {
     return process.env.NEXT_PUBLIC_BACKEND_URL;
   }
+  // Priority 2: Local development (browser needs localhost), fall back to Docker host for server-only environments
+  if (process.env.NODE_ENV === 'development') {
+    return 'http://127.0.0.1:8000';
+  }
 
-  // Priority 2: Docker development (default)
+  // Production / containerized default
   return 'http://aiser-chat2chart-dev:8000';
 };
 
