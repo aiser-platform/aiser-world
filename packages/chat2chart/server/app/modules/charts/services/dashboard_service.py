@@ -19,7 +19,7 @@ from app.modules.charts.schemas import (
     DashboardWidgetCreateSchema as WidgetCreateSchema,
     DashboardWidgetResponseSchema as WidgetResponseSchema,
 )
-from app.common.repository import BaseRepository
+from fastapi import HTTPException
 
 logger = logging.getLogger(__name__)
 
@@ -28,14 +28,11 @@ class DashboardService:
     
     def __init__(self, db_session: AsyncSession):
         self.db = db_session
-        self.dashboard_repo = BaseRepository(Dashboard, db_session)
-        self.widget_repo = BaseRepository(DashboardWidget, db_session)
-        self.dashboard_widget_repo = BaseRepository(DashboardWidget, db_session)
     
     async def list_dashboards(
-        self, 
-        project_id: int, 
-        user_id: int,
+        self,
+        project_id: Optional[int] = None,
+        user_id: Optional[int] = None,
         offset: int = 0, 
         limit: int = 20,
         search: Optional[str] = None
@@ -45,15 +42,18 @@ class DashboardService:
             logger.info(f"📊 Listing dashboards for project {project_id}, user {user_id}")
             
             # Build query
-            query = select(Dashboard).where(
-                and_(
-                    Dashboard.project_id == project_id,
-                    or_(
-                        Dashboard.created_by == user_id,
-                        Dashboard.is_public == True
-                    )
-                )
-            )
+            query = select(Dashboard)
+            conditions = []
+            if project_id is not None:
+                conditions.append(Dashboard.project_id == project_id)
+            if user_id is not None:
+                # authenticated user: return dashboards they own plus public ones
+                conditions.append(or_(Dashboard.created_by == user_id, Dashboard.is_public == True))
+            else:
+                # unauthenticated: only public dashboards
+                conditions.append(Dashboard.is_public == True)
+            if conditions:
+                query = query.where(and_(*conditions))
             
             # Add search filter
             if search:
@@ -70,7 +70,7 @@ class DashboardService:
             total = total_result.scalar()
             
             # Get paginated results
-            query = query.offset(offset).limit(limit).order_by(Dashboard.updated_at.desc())
+            query = query.order_by(Dashboard.updated_at.desc()).offset(offset).limit(limit)
             result = await self.db.execute(query)
             dashboards = result.scalars().all()
             
@@ -126,7 +126,7 @@ class DashboardService:
                 raise HTTPException(status_code=404, detail="Dashboard not found")
             
             # Check permissions
-            if dashboard.created_by != user_id and not dashboard.is_public:
+            if dashboard.created_by is not None and dashboard.created_by != user_id and not dashboard.is_public:
                 raise HTTPException(status_code=403, detail="Access denied")
             
             # Convert to response format
@@ -173,15 +173,16 @@ class DashboardService:
             raise e
     
     async def create_dashboard(
-        self, 
-        dashboard_data: DashboardCreateSchema, 
-        user_id: int
+        self,
+        dashboard_data: DashboardCreateSchema,
+        user_id: int,
     ) -> Dict[str, Any]:
         """Create a new dashboard"""
         try:
             logger.info(f"📊 Creating dashboard: {dashboard_data.name}")
             
             # Create dashboard
+            created_by_value = user_id if user_id and user_id > 0 else None
             dashboard = Dashboard(
                 name=dashboard_data.name,
                 description=dashboard_data.description,
@@ -192,9 +193,9 @@ class DashboardService:
                 refresh_interval=dashboard_data.refresh_interval or 300,
                 is_public=dashboard_data.is_public or False,
                 is_template=dashboard_data.is_template or False,
-                created_by=user_id,
-                max_widgets=dashboard_data.max_widgets or 10,
-                max_pages=dashboard_data.max_pages or 5
+                created_by=created_by_value,
+                max_widgets=10,
+                max_pages=5,
             )
             
             self.db.add(dashboard)
@@ -217,7 +218,7 @@ class DashboardService:
                 "max_widgets": dashboard.max_widgets,
                 "max_pages": dashboard.max_pages,
                 "created_at": dashboard.created_at.isoformat(),
-                "updated_at": dashboard.updated_at.isoformat(),
+                "updated_at": dashboard.updated_at.isoformat() if dashboard.updated_at else None,
                 "last_viewed_at": None,
                 "widgets": []
             }
@@ -246,7 +247,7 @@ class DashboardService:
                 raise HTTPException(status_code=404, detail="Dashboard not found")
             
             # Check permissions
-            if dashboard.created_by != user_id:
+            if dashboard.created_by is not None and dashboard.created_by != user_id:
                 raise HTTPException(status_code=403, detail="Access denied")
             
             # Update fields
@@ -300,7 +301,7 @@ class DashboardService:
                 raise HTTPException(status_code=404, detail="Dashboard not found")
             
             # Check permissions
-            if dashboard.created_by != user_id:
+            if dashboard.created_by is not None and dashboard.created_by != user_id:
                 raise HTTPException(status_code=403, detail="Access denied")
             
             # Delete dashboard (cascade will handle widgets)
@@ -313,5 +314,163 @@ class DashboardService:
             raise
         except Exception as e:
             logger.error(f"❌ Failed to delete dashboard {dashboard_id}: {str(e)}")
+            await self.db.rollback()
+            raise e
+
+    # -------------------- Widget CRUD --------------------
+    async def create_widget(self, dashboard_id: str, widget_data: WidgetCreateSchema, user_id: int) -> Dict[str, Any]:
+        """Create a widget attached to a dashboard"""
+        try:
+            logger.info(f"🧩 Creating widget on dashboard {dashboard_id}: {widget_data.name}")
+
+            # Ensure dashboard exists and permission
+            q = select(Dashboard).where(Dashboard.id == dashboard_id)
+            res = await self.db.execute(q)
+            db_dash = res.scalar_one_or_none()
+            if not db_dash:
+                raise HTTPException(status_code=404, detail="Dashboard not found")
+            if db_dash.created_by is not None and db_dash.created_by != user_id:
+                raise HTTPException(status_code=403, detail="Access denied to add widget")
+
+            widget = DashboardWidget(
+                dashboard_id=dashboard_id,
+                name=widget_data.name,
+                widget_type=widget_data.widget_type,
+                chart_type=widget_data.chart_type,
+                config=widget_data.config or {},
+                data_config=widget_data.data_config or {},
+                style_config=widget_data.style_config or {},
+                x=widget_data.x or 0,
+                y=widget_data.y or 0,
+                width=widget_data.width or 4,
+                height=widget_data.height or 3,
+                z_index=widget_data.z_index or 0,
+                is_visible=widget_data.is_visible if widget_data.is_visible is not None else True,
+                is_locked=widget_data.is_locked if widget_data.is_locked is not None else False,
+                is_resizable=widget_data.is_resizable if widget_data.is_resizable is not None else True,
+                is_draggable=widget_data.is_draggable if widget_data.is_draggable is not None else True,
+            )
+
+            self.db.add(widget)
+            await self.db.commit()
+            await self.db.refresh(widget)
+
+            return {
+                "id": str(widget.id),
+                "dashboard_id": str(widget.dashboard_id),
+                "name": widget.name,
+                "widget_type": widget.widget_type,
+                "chart_type": widget.chart_type,
+                "config": widget.config,
+                "data_config": widget.data_config,
+                "style_config": widget.style_config,
+                "x": widget.x,
+                "y": widget.y,
+                "width": widget.width,
+                "height": widget.height,
+                "z_index": widget.z_index,
+                "is_visible": widget.is_visible,
+                "is_locked": widget.is_locked,
+                "is_resizable": widget.is_resizable,
+                "is_draggable": widget.is_draggable,
+                "created_at": widget.created_at.isoformat() if widget.created_at else None,
+                "updated_at": widget.updated_at.isoformat() if widget.updated_at else None,
+            }
+        except Exception as e:
+            logger.error(f"❌ Failed to create widget on {dashboard_id}: {e}")
+            await self.db.rollback()
+            raise e
+
+    async def list_widgets(self, dashboard_id: str, user_id: int) -> List[Dict[str, Any]]:
+        """List widgets for a dashboard"""
+        try:
+            logger.info(f"📋 Listing widgets for dashboard {dashboard_id}")
+            # Permission: ensure dashboard visible or owned
+            q = select(Dashboard).where(Dashboard.id == dashboard_id)
+            res = await self.db.execute(q)
+            db_dash = res.scalar_one_or_none()
+            if not db_dash:
+                raise HTTPException(status_code=404, detail="Dashboard not found")
+            if db_dash.created_by is not None and db_dash.created_by != user_id and not db_dash.is_public:
+                raise HTTPException(status_code=403, detail="Access denied to list widgets")
+
+            wq = select(DashboardWidget).where(DashboardWidget.dashboard_id == dashboard_id, DashboardWidget.is_deleted == False)
+            result = await self.db.execute(wq)
+            widgets = result.scalars().all()
+            out = []
+            for w in widgets:
+                out.append({
+                    "id": str(w.id),
+                    "dashboard_id": str(w.dashboard_id),
+                    "name": w.name,
+                    "widget_type": w.widget_type,
+                    "chart_type": w.chart_type,
+                    "config": w.config,
+                    "data_config": w.data_config,
+                    "style_config": w.style_config,
+                    "x": w.x,
+                    "y": w.y,
+                    "width": w.width,
+                    "height": w.height,
+                    "z_index": w.z_index,
+                    "is_visible": w.is_visible,
+                    "is_locked": w.is_locked,
+                    "is_resizable": w.is_resizable,
+                    "is_draggable": w.is_draggable,
+                })
+            return out
+        except Exception as e:
+            logger.error(f"❌ Failed to list widgets for {dashboard_id}: {e}")
+            raise e
+
+    async def update_widget(self, dashboard_id: str, widget_id: str, widget_data: WidgetCreateSchema, user_id: int) -> Dict[str, Any]:
+        """Update a widget"""
+        try:
+            logger.info(f"✏️ Updating widget {widget_id} on dashboard {dashboard_id}")
+            res = await self.db.execute(select(DashboardWidget).where(DashboardWidget.id == widget_id, DashboardWidget.dashboard_id == dashboard_id))
+            widget = res.scalar_one_or_none()
+            if not widget:
+                raise HTTPException(status_code=404, detail="Widget not found")
+
+            # Permission check against parent dashboard
+            dres = await self.db.execute(select(Dashboard).where(Dashboard.id == dashboard_id))
+            db_dash = dres.scalar_one_or_none()
+            if db_dash and db_dash.created_by is not None and db_dash.created_by != user_id:
+                raise HTTPException(status_code=403, detail="Access denied to update widget")
+
+            # Update allowed fields
+            update_map = widget_data.dict(exclude_unset=True)
+            for k, v in update_map.items():
+                # Map schema keys to model fields if necessary
+                if hasattr(widget, k):
+                    setattr(widget, k, v)
+
+            await self.db.commit()
+            await self.db.refresh(widget)
+            return {"id": str(widget.id), "name": widget.name}
+        except Exception as e:
+            logger.error(f"❌ Failed to update widget {widget_id}: {e}")
+            await self.db.rollback()
+            raise e
+
+    async def delete_widget(self, dashboard_id: str, widget_id: str, user_id: int) -> bool:
+        """Delete a widget"""
+        try:
+            logger.info(f"🗑️ Deleting widget {widget_id} from dashboard {dashboard_id}")
+            res = await self.db.execute(select(DashboardWidget).where(DashboardWidget.id == widget_id, DashboardWidget.dashboard_id == dashboard_id))
+            widget = res.scalar_one_or_none()
+            if not widget:
+                raise HTTPException(status_code=404, detail="Widget not found")
+
+            dres = await self.db.execute(select(Dashboard).where(Dashboard.id == dashboard_id))
+            db_dash = dres.scalar_one_or_none()
+            if db_dash and db_dash.created_by is not None and db_dash.created_by != user_id:
+                raise HTTPException(status_code=403, detail="Access denied to delete widget")
+
+            await self.db.delete(widget)
+            await self.db.commit()
+            return True
+        except Exception as e:
+            logger.error(f"❌ Failed to delete widget {widget_id}: {e}")
             await self.db.rollback()
             raise e

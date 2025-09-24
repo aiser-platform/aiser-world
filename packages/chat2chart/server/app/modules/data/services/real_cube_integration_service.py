@@ -626,9 +626,9 @@ class RealCubeIntegrationService:
         """Save connection metadata to database"""
         try:
             from app.modules.data.models import DataSource
-            from app.db.session import get_async_session
+            from app.db.session import async_session
 
-            async with get_async_session() as db:
+            async with async_session() as db:
                 data_source = DataSource(
                     id=connection_metadata["id"],
                     name=f"{connection_metadata['type']}_connection",
@@ -664,9 +664,9 @@ class RealCubeIntegrationService:
         """Get connection metadata from database"""
         try:
             from app.modules.data.models import DataSource
-            from app.db.session import get_async_session
+            from app.db.session import async_session
 
-            async with get_async_session() as db:
+            async with async_session() as db:
                 from sqlalchemy import select
 
                 query = select(DataSource).where(DataSource.id == connection_id)

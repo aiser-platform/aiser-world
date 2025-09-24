@@ -973,9 +973,9 @@ class EnterpriseConnectorsService:
         """Save connection to database"""
         try:
             from app.modules.data.models import DataSource
-            from app.db.session import get_async_session
+            from app.db.session import async_session
 
-            async with get_async_session() as db:
+            async with async_session() as db:
                 # Create data source record
                 data_source = DataSource(
                     id=connection_id,
@@ -1047,26 +1047,25 @@ class EnterpriseConnectorsService:
 
                 # Remove from database
                 from app.modules.data.models import DataSource
-                from app.db.session import get_async_session
+            from app.db.session import async_session
 
-                async with get_async_session() as db:
-                    from sqlalchemy import select
+            async with async_session() as db:
+                from sqlalchemy import select
 
-                    query = select(DataSource).where(DataSource.id == connection_id)
-                    result = await db.execute(query)
-                    data_source = result.scalar_one_or_none()
+                query = select(DataSource).where(DataSource.id == connection_id)
+                result = await db.execute(query)
+                data_source = result.scalar_one_or_none()
 
-                    if data_source:
-                        data_source.is_active = False
-                        data_source.updated_at = datetime.now()
-                        await db.commit()
+                if data_source:
+                    data_source.is_active = False
+                    data_source.updated_at = datetime.now()
+                    await db.commit()
 
                 logger.info(f"✅ Enterprise connection deleted: {connection_id}")
                 return {
                     "success": True,
                     "message": f"Connection {connection_id} deleted successfully",
                 }
-            else:
                 return {
                     "success": False,
                     "error": f"Connection {connection_id} not found",

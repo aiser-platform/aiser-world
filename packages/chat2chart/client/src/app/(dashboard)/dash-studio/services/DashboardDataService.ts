@@ -9,6 +9,7 @@ import { dashboardAPIService } from './DashboardAPIService';
 export interface WidgetDataConfig {
   dataSourceId: string;
   query: string;
+  filters?: Array<{ field: string; op: string; value?: any; values?: any[]; from?: any; to?: any }>;
   refreshInterval?: number;
   autoRefresh?: boolean;
   cache?: boolean;
@@ -50,10 +51,13 @@ class DashboardDataService {
     }
 
     try {
+      // Apply global filters by wrapping original query if provided
+      const finalQuery = this.applyFiltersToQuery(config.query, config.filters);
+
       // Execute query using enhanced data service (multi-engine)
       const result: QueryResult = await enhancedDataService.executeMultiEngineQuery(
-        config.dataSourceId,
-        config.query
+        finalQuery,
+        config.dataSourceId
       );
 
       if (result.success) {
@@ -97,6 +101,43 @@ class DashboardDataService {
         lastUpdated: new Date()
       };
     }
+  }
+
+  /**
+   * Safely apply filters to SQL by wrapping the original query.
+   * SELECT * FROM (original_query) AS q WHERE ...
+   */
+  private applyFiltersToQuery(originalQuery: string, filters?: Array<{ field: string; op: string; value?: any; values?: any[]; from?: any; to?: any }>): string {
+    if (!filters || filters.length === 0) return originalQuery;
+
+    const safeField = (f: string) => (/^[a-zA-Z0-9_\.]+$/.test(f) ? f : '');
+    const sqlValue = (v: any) => {
+      if (v === null || v === undefined) return 'NULL';
+      if (typeof v === 'number') return String(v);
+      if (typeof v === 'boolean') return v ? 'TRUE' : 'FALSE';
+      // basic string escape
+      const s = String(v).replace(/'/g, "''");
+      return `'${s}'`;
+    };
+
+    const clauses: string[] = [];
+    for (const f of filters) {
+      const field = safeField(f.field || '');
+      if (!field) continue;
+      const op = (f.op || '=').toLowerCase();
+      if (op === 'between' && f.from !== undefined && f.to !== undefined) {
+        clauses.push(`${field} BETWEEN ${sqlValue(f.from)} AND ${sqlValue(f.to)}`);
+      } else if ((op === 'in' || op === 'not in') && Array.isArray(f.values) && f.values.length > 0) {
+        const list = f.values.map(sqlValue).join(', ');
+        clauses.push(`${field} ${op.toUpperCase()} (${list})`);
+      } else if (['=','!=','>','<','>=','<=','like','ilike'].includes(op) && f.value !== undefined) {
+        clauses.push(`${field} ${op.toUpperCase()} ${sqlValue(f.value)}`);
+      }
+    }
+
+    if (clauses.length === 0) return originalQuery;
+    const where = clauses.join(' AND ');
+    return `SELECT * FROM (${originalQuery}) AS q WHERE ${where}`;
   }
 
   /**

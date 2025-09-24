@@ -90,34 +90,87 @@ class UserService(BaseService[User, UserCreate, UserUpdate, UserResponse]):
         if not user:
             raise HTTPException(status_code=401, detail="Invalid credentials")
 
+        # Standardize JWT claims: include both `id` and `user_id` and `sub` for compatibility
+        jwt_payload = {"id": str(user.id), "user_id": str(user.id), "sub": str(user.id), "email": user.email}
         sign_in = SignInResponse(
-            **self.auth.signJWT(user_id=str(user.id), email=user.email)
+            **self.auth.signJWT(**jwt_payload)
         )
 
+        # Set cookies with HttpOnly and SameSite=None to allow cross-site frontend to send cookies
+        secure_flag = False if settings.ENVIRONMENT == 'development' else True
+        # For cross-site frontend (localhost:3000) during development, set SameSite=None so cookie is sent
+        samesite_setting = 'none'
         response.set_cookie(
-            key="access_token",
+            key="c2c_access_token",
             value=sign_in.access_token,
             max_age=settings.JWT_EXP_TIME_MINUTES * 60,
             expires=settings.JWT_EXP_TIME_MINUTES * 60,
+            httponly=True,
+            secure=secure_flag,
+            samesite=samesite_setting,
+            path='/'
         )
         response.set_cookie(
             key="refresh_token",
             value=sign_in.refresh_token,
             max_age=settings.JWT_REFRESH_EXP_TIME_MINUTES * 60,
             expires=settings.JWT_REFRESH_EXP_TIME_MINUTES * 60,
+            httponly=True,
+            secure=secure_flag,
+            samesite=samesite_setting,
+            path='/'
         )
+
+        # Remove legacy demo or colliding cookies named `access_token` to avoid using stale demo tokens
+        try:
+            response.delete_cookie("access_token", path='/')
+        except Exception:
+            pass
 
         return user
 
-    async def sign_up(self, user_up: UserCreate) -> SignInResponse:
+    async def sign_up(self, user_up: UserCreate, response: Response) -> SignInResponse:
         """
-        Register new user and return JWT token
+        Register new user and return JWT token; also set HttpOnly cookies like sign-in.
         """
         try:
             user = await self.create_user(user_up)
-            return SignInResponse(
-                **self.auth.signJWT(user_id=user.id, email=user.email)
+
+            # Standardize JWT claims
+            jwt_payload = {"id": str(user.id), "user_id": str(user.id), "sub": str(user.id), "email": user.email}
+            sign_in = SignInResponse(**self.auth.signJWT(**jwt_payload))
+
+            # Set cookies
+            secure_flag = False if settings.ENVIRONMENT == 'development' else True
+            samesite_setting = 'none'
+            response.set_cookie(
+            key="c2c_access_token",
+                value=sign_in.access_token,
+                max_age=settings.JWT_EXP_TIME_MINUTES * 60,
+                expires=settings.JWT_EXP_TIME_MINUTES * 60,
+                httponly=True,
+                secure=secure_flag,
+                samesite=samesite_setting,
+                path='/'
             )
+            response.set_cookie(
+                key="refresh_token",
+                value=sign_in.refresh_token,
+                max_age=settings.JWT_REFRESH_EXP_TIME_MINUTES * 60,
+                expires=settings.JWT_REFRESH_EXP_TIME_MINUTES * 60,
+                httponly=True,
+                secure=secure_flag,
+                samesite=samesite_setting,
+                path='/'
+            )
+
+            # Remove legacy demo/colliding cookie
+            try:
+                response.delete_cookie("access_token", path='/')
+            except Exception:
+                pass
+
+            return user
         except ValueError as e:
             logger.error(f"Error signing up user: {e}")
             raise HTTPException(status_code=400, detail=str(e))

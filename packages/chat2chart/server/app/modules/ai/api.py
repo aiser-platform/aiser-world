@@ -17,6 +17,7 @@ import asyncio
 from .services.ai_orchestrator import AIOrchestrator
 from .services.litellm_service import LiteLLMService
 from app.core.deps import get_current_user
+from app.core.cache import cache
 from app.modules.user.models import User
 
 logger = logging.getLogger(__name__)
@@ -489,7 +490,10 @@ async def stream_chat_analysis(request: ChatAnalysisRequest):
 
 
 @router.post("/echarts/generate")
-async def generate_echarts(request: EChartsGenerationRequest) -> Dict[str, Any]:
+async def generate_echarts(
+    request: EChartsGenerationRequest,
+    current_user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
     """
     Generate ECharts configuration based on query and data
     """
@@ -497,6 +501,29 @@ async def generate_echarts(request: EChartsGenerationRequest) -> Dict[str, Any]:
         from .services.litellm_service import LiteLLMService
 
         service = LiteLLMService()
+
+        # Build cache key and try cache first
+        cache_key = None
+        try:
+            cache_key = cache._generate_key(
+                "echarts_gen",
+                json.dumps(
+                    {
+                        "u": getattr(current_user, "id", None),
+                        "q": request.query,
+                        "ds": request.data_source_id,
+                        "sum": request.data_summary or {},
+                    },
+                    sort_keys=True,
+                    default=str,
+                ),
+            ) if cache else None
+            if cache_key and cache:
+                cached = cache.get(cache_key)
+                if cached:
+                    return cached
+        except Exception:
+            pass
 
         system_context = f"""You are an expert data visualization specialist with a creative and helpful personality. Generate ECharts configuration for the user's request.
 
@@ -523,7 +550,7 @@ IMPORTANT:
             prompt=f"Generate ECharts configuration for: {request.query}",
             system_context=system_context,
             max_tokens=1500,
-            temperature=0.7,
+            temperature=0.3,
         )
 
         if ai_response.get("success") and ai_response.get("content"):
@@ -539,10 +566,12 @@ IMPORTANT:
                 if json_match:
                     echarts_config = json.loads(json_match.group(1))
                 else:
-                    # Generate fallback config
                     echarts_config = _generate_fallback_echarts_config(request.query)
 
-                return {
+                # Validate minimal ECharts config structure
+                _validate_echarts_config(echarts_config)
+
+                response_payload = {
                     "success": True,
                     "chart_type": echarts_config.get("series", [{}])[0].get(
                         "type", "bar"
@@ -551,26 +580,49 @@ IMPORTANT:
                     "ai_engine": "GPT-5 Mini (Azure)",
                     "query": request.query,
                 }
+
+                # Store in cache
+                try:
+                    if cache_key and cache:
+                        cache.set(cache_key, response_payload, ttl=300)
+                except Exception:
+                    pass
+
+                return response_payload
             except Exception as parse_error:
                 logger.error(f"Failed to parse ECharts config: {parse_error}")
                 echarts_config = _generate_fallback_echarts_config(request.query)
-                return {
+                _validate_echarts_config(echarts_config)
+                response_payload = {
                     "success": True,
                     "chart_type": "bar",
                     "echarts_config": echarts_config,
                     "ai_engine": "Fallback System",
                     "query": request.query,
                 }
+                try:
+                    if cache_key and cache:
+                        cache.set(cache_key, response_payload, ttl=300)
+                except Exception:
+                    pass
+                return response_payload
         else:
             # Use fallback
             echarts_config = _generate_fallback_echarts_config(request.query)
-            return {
+            _validate_echarts_config(echarts_config)
+            response_payload = {
                 "success": True,
                 "chart_type": "bar",
                 "echarts_config": echarts_config,
                 "ai_engine": "Fallback System",
                 "query": request.query,
             }
+            try:
+                if cache_key and cache:
+                    cache.set(cache_key, response_payload, ttl=300)
+            except Exception:
+                pass
+            return response_payload
 
     except Exception as e:
         logger.error(f"ECharts generation failed: {str(e)}")
@@ -1546,6 +1598,21 @@ def _generate_fallback_echarts_config(query: str) -> Dict[str, Any]:
             }
         ],
     }
+
+
+def _validate_echarts_config(config: Dict[str, Any]) -> None:
+    """Validate minimal ECharts option structure to avoid client errors."""
+    if not isinstance(config, dict):
+        raise ValueError("ECharts config must be a dict")
+    # Required top-level keys sanity
+    if "series" not in config or not isinstance(config["series"], list) or len(config["series"]) == 0:
+        # ensure at least one default series
+        config.setdefault("series", [{"type": "bar", "data": []}])
+    # Ensure xAxis/yAxis exist for common charts
+    first_type = config["series"][0].get("type", "bar")
+    if first_type in {"bar", "line", "scatter", "area"}:
+        config.setdefault("xAxis", {"type": "category", "data": config.get("xAxis", {}).get("data", [])})
+        config.setdefault("yAxis", {"type": "value"})
 
 
 def _generate_fallback_insights(data_source_id: str) -> str:

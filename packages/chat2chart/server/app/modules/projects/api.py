@@ -1,5 +1,5 @@
-from typing import Annotated, List
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Annotated, List, Optional, Dict, Any
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from app.common.schemas import ListResponseSchema, PaginationSchema
 from app.common.utils.query_params import BaseFilterParams
 
@@ -19,6 +19,8 @@ from .schemas import (
     OrganizationSummary,
 )
 from .services import ProjectService, OrganizationService
+from app.modules.authentication.deps.auth_bearer import JWTCookieBearer
+from app.modules.authentication.auth import Auth
 
 router = APIRouter()
 project_service = ProjectService()
@@ -108,16 +110,25 @@ async def create_project(project: ProjectCreate, user_id: str):
 
 @router.get("/projects", response_model=ListResponseSchema[ProjectResponse])
 async def get_projects(
-    params: Annotated[BaseFilterParams, Depends()], user_id: str = "default"
+    params: Annotated[BaseFilterParams, Depends()],
+    current_token: str = Depends(JWTCookieBearer()),
+    request: Request = None,
 ):
     """Get all projects for a user"""
     try:
+        # Resolve user id from JWT token
+        try:
+            user_payload = current_token if isinstance(current_token, dict) else Auth().decodeJWT(current_token) or {}
+            user_id = int(user_payload.get('id') or user_payload.get('sub'))
+        except Exception:
+            user_id = None
+
         # Get real projects from database for the user
-        if user_id == "default":
-            # For now, get all projects. In production, this would be filtered by actual user ID
+        if not user_id:
+            # If no authenticated user, return public projects only
             result = await project_service.get_all()
         else:
-            result = await project_service.get_user_projects(user_id)
+            result = await project_service.get_user_projects(str(user_id))
 
         # Convert to ListResponseSchema format
         return ListResponseSchema(

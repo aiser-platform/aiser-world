@@ -1,3 +1,37 @@
+import { API_URL } from '@/utils/api';
+
+export async function fetchWithAuth(input: RequestInfo, init: RequestInit = {}) {
+  const cfg = { ...(init || {}), credentials: 'include', headers: { ...(init.headers || {}) } } as RequestInit & { _retried?: boolean };
+  let res = await fetch(input, cfg);
+  if ((res.status === 401 || res.status === 403) && !cfg._retried) {
+    // dev-only upgrade attempt
+    try {
+      if (process.env.NODE_ENV === 'development') {
+        // Try upgrade-demo and if it returns a token in body, set client cookie so subsequent requests include it
+        const up = await fetch(`${API_URL}/auth/upgrade-demo`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' } });
+        if (up.ok) {
+          try {
+            const body = await up.json();
+            if (body && body.access_token) {
+              document.cookie = `c2c_access_token=${body.access_token}; path=/; samesite=lax`; // client-side fallback for dev
+            }
+          } catch (e) {
+            // ignore parse errors
+          }
+        }
+        cfg._retried = true;
+        res = await fetch(input, cfg);
+      } else {
+        // production: redirect to login
+        window.location.href = '/login';
+      }
+    } catch (e) {
+      // ignore and fall through
+    }
+  }
+  return res;
+}
+
 import { fetchApi } from '@/utils/api';
 import { unifiedAIService } from './unifiedAIService';
 import { getBackendUrl } from '@/utils/backendUrl';

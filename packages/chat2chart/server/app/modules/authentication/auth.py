@@ -61,11 +61,14 @@ class Auth:
             algorithm=self.JWT_ALGORITHM,
         )
 
-        jwe_token = jwe.encrypt(
-            refresh_jwt, self.SECRET, algorithm="dir", encryption="A256GCM"
-        )
-
-        return jwe_token
+        try:
+            jwe_token = jwe.encrypt(
+                refresh_jwt, self.SECRET, algorithm="dir", encryption="A256GCM"
+            )
+            return jwe_token
+        except Exception:
+            # Fallback to return signed JWT if JWE fails (e.g., key length)
+            return refresh_jwt
 
     def signJWT(self, **kwargs) -> Dict[str, str]:
         access_token = self.encodeJWT(**kwargs)

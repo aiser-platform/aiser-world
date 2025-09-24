@@ -69,8 +69,11 @@ const ChartWidget: React.FC<ChartWidgetProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [isEditingSubtitle, setIsEditingSubtitle] = useState(false);
   const [editingTitle, setEditingTitle] = useState('');
   const [editingSubtitle, setEditingSubtitle] = useState('');
+  const titleInputRef = useRef<any>(null);
+  const subtitleInputRef = useRef<any>(null);
   const [chartSize, setChartSize] = useState({
     width: '100%',
     height: '100%',
@@ -157,6 +160,7 @@ const ChartWidget: React.FC<ChartWidgetProps> = ({
   const generateChartOptions = (chartType: string, config: any, data: any) => {
     // Create comprehensive chart configuration
     let options: any = {
+      aria: { enabled: true },
       backgroundColor: (config?.plotBackgroundColor ?? 'transparent'),
       // We render chart title/subtitle as HTML overlay for inline editing; hide ECharts title
       title: {
@@ -173,7 +177,7 @@ const ChartWidget: React.FC<ChartWidgetProps> = ({
         }
       },
       legend: {
-        show: config?.legend?.data !== undefined,
+        show: (config?.legend?.show !== undefined) ? !!config.legend.show : (config?.showLegend !== false),
         data: config?.legend?.data || [],
         bottom: config?.legend?.bottom || 10,
         orient: config?.legend?.orient || 'horizontal',
@@ -182,14 +186,14 @@ const ChartWidget: React.FC<ChartWidgetProps> = ({
           fontSize: config?.legend?.textStyle?.fontSize || 12
         }
       },
-      color: config?.color || ['#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de'],
+      color: config?.color || ['#1f77b4', '#2ca02c', '#ff7f0e', '#d62728', '#9467bd', '#17becf'],
       animation: config?.animation !== false,
       grid: {
-        top: config?.grid?.top || (config?.title?.subtext ? 90 : 70), // Dynamic top margin based on subtitle
+        top: config?.grid?.top || (config?.title?.subtext ? 90 : 70),
         right: config?.grid?.right || 40,
         bottom: config?.grid?.bottom || 60,
         left: config?.grid?.left || 60,
-        show: config?.grid?.show !== false
+        show: (config?.grid?.show !== undefined) ? !!config.grid.show : (config?.showGrid !== false)
       },
       xAxis: {
         type: config?.xAxis?.type || 'category',
@@ -511,7 +515,23 @@ const ChartWidget: React.FC<ChartWidgetProps> = ({
       try {
         const chartType = config?.chartType || widget.type;
         const options = generateChartOptions(chartType, config, data);
-        chartInstance.current.setOption(options, true);
+
+        // Minimal client-side ECharts option validator
+        const validated = (() => {
+          const safe = { ...(options || {}) } as any;
+          if (!safe || typeof safe !== 'object') return { series: [{ type: 'bar', data: [] }] };
+          if (!Array.isArray(safe.series) || safe.series.length === 0) {
+            safe.series = [{ type: (chartType || 'bar'), data: [] }];
+          }
+          const firstType = (safe.series?.[0]?.type) || chartType || 'bar';
+          if (['bar','line','scatter','area','column','groupedBar','stackedBar'].includes(firstType)) {
+            safe.xAxis = safe.xAxis || { type: 'category', data: [] };
+            safe.yAxis = safe.yAxis || { type: 'value' };
+          }
+          return safe;
+        })();
+
+        chartInstance.current.setOption(validated, true);
         
         // Add event listeners for interactions
         chartInstance.current.on('click', (params) => {
@@ -777,28 +797,15 @@ const ChartWidget: React.FC<ChartWidgetProps> = ({
 
   // Get widget title - use ECharts config title if available, otherwise widget name, fallback to 'Untitled'
   const getWidgetTitle = () => {
-    // Check ECharts config title first
-    if (config?.title?.text) {
-      return config.title.text;
-    }
-    // Check if title is a string in config
-    if (typeof config?.title === 'string') {
-      return config.title;
-    }
-    // Fallback to widget name
-    if (widget.name && widget.name !== 'Chart Title') {
-      return widget.name;
-    }
-    return 'Untitled';
+    // Only use explicit config title; otherwise show empty (no fallback)
+    if (config?.title?.text) return config.title.text;
+    if (typeof config?.title === 'string') return config.title;
+    return '';
   };
 
   // Get widget subtitle - use ECharts config subtitle
   const getWidgetSubtitle = () => {
-    // Check ECharts config subtitle
-    if (config?.title?.subtext) {
-      return config.title.subtext;
-    }
-    return '';
+    return config?.title?.subtext || '';
   };
 
   // Get title alignment - default to left as requested
@@ -821,7 +828,7 @@ const ChartWidget: React.FC<ChartWidgetProps> = ({
         title: {
           ...config?.title,
           text: editingTitle,
-          subtext: editingSubtitle
+          subtext: config?.title?.subtext
         }
       };
       onConfigUpdate(updatedConfig);
@@ -829,7 +836,7 @@ const ChartWidget: React.FC<ChartWidgetProps> = ({
     
     // Also call the legacy onTitleChange if provided
     if (onTitleChange) {
-      onTitleChange(editingTitle, editingSubtitle);
+      onTitleChange(editingTitle, getWidgetSubtitle());
     }
     setIsEditingTitle(false);
   };
@@ -837,8 +844,55 @@ const ChartWidget: React.FC<ChartWidgetProps> = ({
   const cancelEditingTitle = () => {
     setIsEditingTitle(false);
     setEditingTitle('');
+  };
+
+  // Handle subtitle editing
+  const startEditingSubtitle = () => {
+    setEditingSubtitle(getWidgetSubtitle());
+    setIsEditingSubtitle(true);
+  };
+
+  const saveSubtitle = () => {
+    if (onConfigUpdate) {
+      const updatedConfig = {
+        ...config,
+        title: {
+          ...config?.title,
+          subtext: editingSubtitle,
+          text: config?.title?.text || getWidgetTitle()
+        }
+      };
+      onConfigUpdate(updatedConfig);
+    }
+    if (onTitleChange) {
+      onTitleChange(getWidgetTitle(), editingSubtitle);
+    }
+    setIsEditingSubtitle(false);
+  };
+
+  const cancelEditingSubtitle = () => {
+    setIsEditingSubtitle(false);
     setEditingSubtitle('');
   };
+
+  // Auto-select text when entering edit modes
+  useEffect(() => {
+    if (isEditingTitle && titleInputRef.current) {
+      try {
+        titleInputRef.current.focus();
+        titleInputRef.current.select?.();
+      } catch {}
+    }
+  }, [isEditingTitle]);
+
+  useEffect(() => {
+    if (isEditingSubtitle && subtitleInputRef.current) {
+      try {
+        subtitleInputRef.current.focus();
+        subtitleInputRef.current.select?.();
+      } catch {}
+    }
+  }, [isEditingSubtitle]);
 
   // Handle aspect ratio change
   const handleAspectRatioChange = (ratio: string) => {
@@ -1161,43 +1215,52 @@ const ChartWidget: React.FC<ChartWidgetProps> = ({
           onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.opacity = '0'; (e.currentTarget as HTMLDivElement).style.background = 'transparent'; (e.currentTarget as HTMLDivElement).style.border = '1px solid transparent'; }}
         />
         
-        {/* Clickable title/subtitle overlay to start inline editing */}
-        {!isEditingTitle && showEditableTitle && (
-          <div
-            onClick={startEditingTitle}
-            style={{
-              position: 'absolute',
-              top: '8px',
-              left: '12px',
-              right: '12px',
-              zIndex: 900,
-              cursor: 'pointer',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 4,
-              pointerEvents: 'auto'
-            }}
-          >
-            <div style={{ fontSize: 16, fontWeight: 600, color: isDarkMode ? '#fff' : '#000' }}>{getWidgetTitle()}</div>
-            {getWidgetSubtitle() ? (
-              <div style={{ fontSize: 12, color: isDarkMode ? '#ccc' : '#666' }}>{getWidgetSubtitle()}</div>
-            ) : null}
-          </div>
-        )}
-
         {/* Inline title editing - overlay on chart title area */}
         {/* Inline editable HTML title/subtitle rendered above the chart */}
-        <div style={{ position: 'absolute', top: 8, left: 12, right: 12, zIndex: 900, pointerEvents: 'auto' }}>
+        <div className="no-drag" style={{ position: 'absolute', top: 8, left: 12, right: 12, zIndex: 900, pointerEvents: 'auto' }}>
+          {/* Title line */}
           {!isEditingTitle ? (
-            <div onClick={startEditingTitle} style={{ cursor: 'text' }}>
-              <div style={{ fontSize: 16, fontWeight: 600, color: isDarkMode ? '#fff' : '#000', textAlign: config?.title?.left || 'left', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{getWidgetTitle()}</div>
-              {getWidgetSubtitle() ? <div style={{ fontSize: 12, color: isDarkMode ? '#ccc' : '#666', textAlign: config?.title?.left || 'left' }}>{getWidgetSubtitle()}</div> : null}
+            <div onDoubleClick={startEditingTitle} style={{ cursor: 'text', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: 16, fontWeight: 600, color: isDarkMode ? '#fff' : '#000', textAlign: config?.title?.left || 'left', minHeight: 18 }}>
+              {getWidgetTitle()}
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <Input value={editingTitle} onChange={(e) => setEditingTitle(e.target.value)} onBlur={saveTitle} onPressEnter={saveTitle} autoFocus size="small" style={{ fontSize: 16, fontWeight: 600 }} />
-              <Input value={editingSubtitle} onChange={(e) => setEditingSubtitle(e.target.value)} onBlur={saveTitle} onPressEnter={saveTitle} size="small" style={{ fontSize: 12 }} />
+            <Input
+              value={editingTitle}
+              onChange={(e) => setEditingTitle(e.target.value)}
+              onBlur={saveTitle}
+              onPressEnter={saveTitle}
+              autoFocus
+              size="small"
+              style={{ fontSize: 16, fontWeight: 600 }}
+              ref={titleInputRef}
+              onFocus={(e) => {
+                try { (e.target as HTMLInputElement).select(); } catch {}
+              }}
+            />
+          )}
+
+          {/* Subtitle line */}
+          {!isEditingSubtitle ? (
+            <div
+              onDoubleClick={startEditingSubtitle}
+              style={{ cursor: 'text', fontSize: 12, marginTop: 2, color: getWidgetSubtitle() ? (isDarkMode ? '#ccc' : '#666') : 'transparent', textAlign: config?.title?.left || 'left', minHeight: 14 }}
+            >
+              {getWidgetSubtitle()}
             </div>
+          ) : (
+            <Input
+              value={editingSubtitle}
+              onChange={(e) => setEditingSubtitle(e.target.value)}
+              onBlur={saveSubtitle}
+              onPressEnter={saveSubtitle}
+              size="small"
+              placeholder="Subtitle"
+              style={{ marginTop: 4 }}
+              ref={subtitleInputRef}
+              onFocus={(e) => {
+                try { (e.target as HTMLInputElement).select(); } catch {}
+              }}
+            />
           )}
         </div>
       </div>

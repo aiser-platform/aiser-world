@@ -56,6 +56,7 @@ import { dashboardAPIService } from '../services/DashboardAPIService';
 import AdvancedDashboardCanvas from './AdvancedDashboardCanvas';
 import dynamic from 'next/dynamic';
 import EmbedModal from './EmbedModal';
+import { Modal, List } from 'antd';
 import FullscreenPreviewModal from './FullscreenPreviewModal';
 
 // Lazy load heavy components to reduce initial bundle size
@@ -165,12 +166,18 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [dashboardTitle, setDashboardTitle] = useState('My Dashboard');
   const [dashboardSubtitle, setDashboardSubtitle] = useState('Professional BI Dashboard');
+  const [globalFilters, setGlobalFilters] = useState<any[]>([]);
   const [dashboardId, setDashboardId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [embedModalVisible, setEmbedModalVisible] = useState(false);
   const [embedUrl, setEmbedUrl] = useState<string | null>(null);
+  const [isCreatingEmbed, setIsCreatingEmbed] = useState(false);
   const [isPublished, setIsPublished] = useState<boolean>(false);
+  const [isPublishing, setIsPublishing] = useState(false);
   const [previewModalVisible, setPreviewModalVisible] = useState(false);
+  const [manageEmbedsVisible, setManageEmbedsVisible] = useState(false);
+  const [isLoadingEmbeds, setIsLoadingEmbeds] = useState(false);
+  const [embeds, setEmbeds] = useState<any[]>([]);
   const [currentQueryResult, setCurrentQueryResult] = useState<any>(null);
   const [selectedDataSource, setSelectedDataSource] = useState<string>('');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -314,31 +321,26 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
   // Auto-save function (without user feedback)
   const handleAutoSave = useCallback(async () => {
     if (!dashboardId || !dashboardTitle.trim()) return;
-    
+
     try {
       const dashboardData = {
-        title: dashboardTitle.trim(),
-        subtitle: dashboardSubtitle.trim(),
-        widgets: dashboardWidgets,
-        layout: layout,
-        settings: {
-          theme: isDarkMode ? 'dark' : 'light',
-          breakpoint: breakpoint
-        },
-        metadata: {
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          version: '1.0.0'
-        }
+        name: dashboardTitle.trim() || 'Untitled Dashboard',
+        description: dashboardSubtitle.trim() || undefined,
+        layout_config: { lg: layout },
+        theme_config: { theme: isDarkMode ? 'dark' : 'light', breakpoint },
+        global_filters: Array.isArray(globalFilters) ? { items: globalFilters } : (globalFilters || {}),
+        refresh_interval: 300,
+        is_public: isPublished,
+        is_template: false
       };
 
       await dashboardAPIService.updateDashboard(dashboardId, dashboardData);
       // Silent auto-save - no user notification
     } catch (error) {
+      // Silent auto-save failure
       console.warn('Auto-save failed:', error);
-      // Don't show error for auto-save failures
     }
-  }, [dashboardId, dashboardTitle, dashboardSubtitle, dashboardWidgets, layout, isDarkMode, breakpoint]);
+  }, [dashboardId, dashboardTitle, dashboardSubtitle, layout, isDarkMode, breakpoint, globalFilters, isPublished]);
 
   // Load saved layout on mount
   useEffect(() => {
@@ -884,20 +886,19 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
 
     setIsSaving(true);
     try {
+      // Map to backend Dashboard schema
+      const mappedGlobalFilters = Array.isArray(globalFilters)
+        ? { items: globalFilters }
+        : (globalFilters || {});
       const dashboardData = {
-        title: dashboardTitle.trim(),
-        subtitle: dashboardSubtitle.trim(),
-        widgets: dashboardWidgets,
-        layout: layout,
-        settings: {
-          theme: isDarkMode ? 'dark' : 'light',
-          breakpoint: breakpoint
-        },
-        metadata: {
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          version: '1.0.0'
-        }
+        name: dashboardTitle.trim() || 'Untitled Dashboard',
+        description: dashboardSubtitle.trim() || undefined,
+        layout_config: { lg: layout },
+        theme_config: { theme: isDarkMode ? 'dark' : 'light', breakpoint },
+        global_filters: mappedGlobalFilters,
+        refresh_interval: 300,
+        is_public: isPublished,
+        is_template: false
       };
 
       let result;
@@ -907,8 +908,9 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
         message.success('Dashboard updated successfully!');
       } else {
         // Create new dashboard
-        result = await dashboardAPIService.createDashboard(dashboardData);
-        setDashboardId(result.id);
+        const created = await dashboardAPIService.createDashboard(dashboardData);
+        const newId = created?.id || created?.dashboard?.id;
+        if (newId) setDashboardId(newId);
         message.success('Dashboard created successfully!');
       }
       
@@ -1058,8 +1060,29 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
       if (dashboardId) {
         const toPersist = updatedWidgets.find(w => w.id === widgetId);
         if (toPersist) {
+          // Map local widget to backend schema with data_config persisted
+          const payload: any = {
+            name: toPersist.title || toPersist.config?.title?.text || 'Widget',
+            widget_type: toPersist.type,
+            chart_type: toPersist.config?.chartType || toPersist.type,
+            config: toPersist.config || {},
+            data_config: {
+              source: toPersist.data?.source || toPersist.dataSource || undefined,
+              query: toPersist.data?.query || undefined
+            },
+            style_config: toPersist.style || {},
+            x: toPersist.position?.x ?? 0,
+            y: toPersist.position?.y ?? 0,
+            width: toPersist.position?.w ?? 6,
+            height: toPersist.position?.h ?? 4,
+            is_visible: toPersist.isVisible !== false,
+            is_locked: !!toPersist.isLocked,
+            is_resizable: true,
+            is_draggable: true
+          };
+
           // Fire-and-forget persistence
-          dashboardAPIService.updateWidget(dashboardId, widgetId, toPersist).catch(err => console.error('Persist widget failed', err));
+          dashboardAPIService.updateWidget(dashboardId, widgetId, payload).catch(err => console.error('Persist widget failed', err));
         }
       }
     } catch (err) {
@@ -1071,21 +1094,59 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
   const handlePublishDashboard = async (makePublic: boolean) => {
     if (!dashboardId) return message.warning('Dashboard not saved yet');
     try {
+      setIsPublishing(true);
       const j = await dashboardAPIService.publishDashboard(dashboardId, makePublic);
       setIsPublished(!!j?.is_public);
       message.success(`Dashboard ${j.is_public ? 'published' : 'unpublished'}`);
     } catch (e) { message.error('Failed to change publish status'); }
+    finally { setIsPublishing(false); }
   };
 
   const handleCreateEmbed = async (options: any = {}) => {
     if (!dashboardId) return message.warning('Save dashboard first');
     try {
+      setIsCreatingEmbed(true);
       const res = await dashboardAPIService.createEmbed(dashboardId, options);
       setEmbedUrl(res.embed_url || res.embedUrl || null);
       setEmbedModalVisible(true);
     } catch (e) {
       console.error('Failed to create embed', e);
       message.error('Failed to create embed');
+    } finally { setIsCreatingEmbed(false); }
+  };
+
+  const handleManageEmbeds = async () => {
+    if (!dashboardId) return message.warning('Save dashboard first');
+    try {
+      setIsLoadingEmbeds(true);
+      const res = await dashboardAPIService.listEmbeds(dashboardId);
+      setEmbeds(res?.embeds || res || []);
+      setManageEmbedsVisible(true);
+    } catch (e) {
+      message.error('Failed to load embeds');
+    } finally {
+      setIsLoadingEmbeds(false);
+    }
+  };
+
+  const handleRevokeEmbed = async (embedId: string) => {
+    if (!dashboardId) return;
+    try {
+      await dashboardAPIService.revokeEmbed(dashboardId, embedId);
+      message.success('Embed revoked');
+      const res = await dashboardAPIService.listEmbeds(dashboardId);
+      setEmbeds(res?.embeds || res || []);
+    } catch (e) {
+      message.error('Failed to revoke embed');
+    }
+  };
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      message.success('Copied to clipboard');
+    } catch {
+      message.error('Copy failed');
     }
   };
 
@@ -1139,6 +1200,7 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
           const result = await dashboardDataService.executeWidgetQuery({
             dataSourceId,
             query,
+            filters: globalFilters,
             cache: true,
             cacheTimeout: 300000 // 5 minutes
           });
@@ -1424,11 +1486,15 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
     // Get initial data for the widget (async, non-blocking)
     getWidgetData(widget.type, newWidget.dataSource, newWidget.data?.query).then(initialData => {
       // Update widget data after it's loaded
-      setDashboardWidgets(prev => prev.map(w => 
-        w.id === newWidget.id 
-          ? { ...w, data: { ...w.data, ...initialData } }
-          : w
-      ));
+      setDashboardWidgets(prev => prev.map(w => {
+        if (w.id !== newWidget.id) return w;
+        const merged = { ...w, data: { ...w.data, ...initialData } } as any;
+        // Store query/source into data_config-compatible shape for persistence later
+        if (!merged.data) merged.data = {};
+        if (newWidget.data?.query) merged.data.query = newWidget.data.query;
+        if (newWidget.data?.source) merged.data.source = newWidget.data.source;
+        return merged;
+      }));
     }).catch(error => {
       console.error('Failed to load initial widget data:', error);
     });
@@ -1681,6 +1747,28 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
       setSelectedWidget(newWidget);
       
       message.success(`Chart "${chartData.title}" added to dashboard`);
+
+      // Fetch real data immediately if data source and query are available
+      try {
+        if (newWidget.data?.source && newWidget.data?.query) {
+          const sourceId = (newWidget as any)?.data?.source;
+          const queryText = (newWidget as any)?.data?.query;
+          const result = await dashboardDataService.executeWidgetQuery({
+            dataSourceId: sourceId,
+            query: queryText,
+            filters: globalFilters,
+            cache: true,
+            cacheTimeout: 300000
+          });
+          if (result.success) {
+            const chartType = newWidget.config?.chartType || newWidget.type;
+            const normalized = dashboardDataService.generateChartData(result, chartType);
+            setDashboardWidgets(prev => prev.map(w => w.id === newWidget.id ? { ...w, data: { ...w.data, ...normalized, query: queryText, source: sourceId } } : w));
+          }
+        }
+      } catch (e) {
+        console.warn('Initial real data fetch failed for new chart', e);
+      }
     } catch (error) {
       console.error('Failed to create chart widget:', error);
       message.error('Failed to create chart widget');
@@ -2251,6 +2339,9 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
                   <Menu.Item key="embed" icon={<LinkOutlined />} onClick={() => handleCreateEmbed()}>
                     Create Embed
                   </Menu.Item>
+                  <Menu.Item key="manage-embeds" icon={<LinkOutlined />} onClick={handleManageEmbeds}>
+                    Manage Embeds
+                  </Menu.Item>
                   <Menu.Divider />
                   <Menu.Item key="share" icon={<ShareAltOutlined />} onClick={handleShare}>
                     Share Dashboard
@@ -2391,6 +2482,34 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
 
       <EmbedModal visible={embedModalVisible} onClose={() => setEmbedModalVisible(false)} initialEmbedUrl={embedUrl} dashboardId={dashboardId} />
       <FullscreenPreviewModal visible={previewModalVisible} onClose={() => setPreviewModalVisible(false)} widgets={dashboardWidgets} layout={layout} title={dashboardTitle} subtitle={dashboardSubtitle} isDarkMode={isDarkMode} />
+
+      {/* Manage Embeds Modal */}
+      <Modal
+        open={manageEmbedsVisible}
+        onCancel={() => setManageEmbedsVisible(false)}
+        footer={null}
+        title="Manage Embeds"
+        width={720}
+      >
+        <List
+          loading={isLoadingEmbeds}
+          dataSource={embeds}
+          locale={{ emptyText: 'No embeds found' }}
+          renderItem={(item: any) => (
+            <List.Item
+              actions={[
+                <Button key="copy" size="small" onClick={() => copyToClipboard(item.embed_url || item.embedUrl || '')}>Copy URL</Button>,
+                <Button key="revoke" size="small" danger onClick={() => handleRevokeEmbed(item.id || item.embed_id)}>Revoke</Button>
+              ]}
+            >
+              <List.Item.Meta
+                title={item.name || `Embed ${item.id || ''}`}
+                description={(item.embed_url || item.embedUrl || '')}
+              />
+            </List.Item>
+          )}
+        />
+      </Modal>
 
       {/* Properties button removed - now integrated in Unified Design Panel */}
       

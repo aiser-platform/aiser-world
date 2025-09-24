@@ -10,6 +10,7 @@ from app.modules.cube.api import router as cube_router
 from app.modules.projects.api import router as projects_router
 from app.modules.onboarding.api import router as onboarding_router
 from app.modules.queries.api import router as queries_router
+from app.modules.authentication.api import router as auth_api_router
 from fastapi import APIRouter
 
 api_router = APIRouter()
@@ -37,6 +38,9 @@ api_router.include_router(
     tags=["files"],
     responses={404: {"description": "Not found"}},
 )
+
+
+api_router.include_router(router=auth_api_router, prefix="", tags=["auth"]) 
 
 api_router.include_router(
     router=chat_router,

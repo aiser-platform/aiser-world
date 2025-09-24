@@ -6,12 +6,16 @@ from app.core.config import settings
 from app.modules.user.services import UserService
 from app.modules.user.utils import current_user_from_service
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.sql import func
 from datetime import datetime
 from app.db.session import get_async_session
+from app.core.cache import cache
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -25,16 +29,47 @@ app = FastAPI(
 )
 
 
+# Configure CORS from settings for stricter control
+allowed_origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # React app URL
+    allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=[
+        "Authorization",
+        "Content-Type",
+        "X-Requested-With",
+        "Accept",
+        "X-Embed-Token",
+    ],
+    expose_headers=[
+        "X-RateLimit-Limit",
+        "X-RateLimit-Remaining",
+        "X-RateLimit-Reset",
+    ],
 )
 
 app.include_router(api_router)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Return structured JSON for request body/parameter validation errors.
+
+    This gives the frontend precise feedback about which fields failed
+    validation so we can surface user-friendly messages instead of opaque 422s.
+    """
+    # Log the validation error with context
+    logger.warning(f"Validation error for path={request.url.path}: {exc}")
+    return JSONResponse(
+        status_code=422,
+        content={
+            "error": "validation_error",
+            "message": "Request validation failed",
+            "details": exc.errors(),
+        },
+    )
 
 
 @app.get("/health")
@@ -45,6 +80,87 @@ async def health_check():
 @app.on_event("shutdown")
 async def shutdown_event():
     print("Performing cleanup before shutdown...")
+
+
+# Simple rate limiting for AI endpoints (per-identifier per minute)
+_ai_rl_fallback_store = {}
+
+
+@app.middleware("http")
+async def ai_rate_limiting_middleware(request: Request, call_next):
+    try:
+        path = request.url.path or ""
+        if path.startswith("/ai/"):
+            # Identifier: prefer user id via Authorization header presence; else IP
+            identifier = request.client.host if request.client else "unknown"
+            # Window and limit
+            window_seconds = 60
+            limit = 60  # 60 requests/minute per identifier
+
+            allowed = True
+            remaining = None
+            reset_epoch = None
+            retry_after = None
+
+            # Try Redis if available
+            try:
+                rc = cache.redis_client if cache else None
+                if rc is not None:
+                    key = f"ai_rl:{identifier}:{int(time.time() // window_seconds)}"
+                    current = rc.incr(key)
+                    if current == 1:
+                        rc.expire(key, window_seconds)
+                    ttl = rc.ttl(key)
+                    allowed = current <= limit
+                    remaining = max(0, limit - int(current))
+                    reset_epoch = int(time.time()) + (ttl if ttl and ttl > 0 else window_seconds)
+                    retry_after = max(1, ttl) if not allowed and ttl else None
+                else:
+                    raise RuntimeError("Redis unavailable")
+            except Exception:
+                # Fallback in-memory window counter
+                now = int(time.time())
+                bucket = now // window_seconds
+                key = f"{identifier}:{bucket}"
+                entry = _ai_rl_fallback_store.get(key)
+                if not entry:
+                    _ai_rl_fallback_store.clear()  # clear previous window buckets
+                    entry = {"count": 0, "reset": (bucket + 1) * window_seconds}
+                    _ai_rl_fallback_store[key] = entry
+                entry["count"] += 1
+                allowed = entry["count"] <= limit
+                remaining = max(0, limit - int(entry["count"]))
+                reset_epoch = entry["reset"]
+                retry_after = max(1, reset_epoch - now) if not allowed else None
+
+            if not allowed:
+                resp = JSONResponse(
+                    status_code=429,
+                    content={
+                        "error": "Rate limit exceeded",
+                        "message": "Too many requests. Please try again later.",
+                        "retry_after": retry_after,
+                        "reset_time": reset_epoch,
+                    },
+                )
+                resp.headers["X-RateLimit-Limit"] = str(limit)
+                resp.headers["X-RateLimit-Remaining"] = str(remaining if remaining is not None else 0)
+                resp.headers["X-RateLimit-Reset"] = str(reset_epoch or 0)
+                if retry_after:
+                    resp.headers["Retry-After"] = str(retry_after)
+                return resp
+
+            response = await call_next(request)
+            # Add headers on success path too
+            response.headers["X-RateLimit-Limit"] = str(limit)
+            response.headers["X-RateLimit-Remaining"] = str(remaining if remaining is not None else 0)
+            response.headers["X-RateLimit-Reset"] = str(reset_epoch or 0)
+            return response
+        else:
+            return await call_next(request)
+    except Exception:
+        # If limiter fails, do not block request
+        return await call_next(request)
 
 
 @app.middleware("http")

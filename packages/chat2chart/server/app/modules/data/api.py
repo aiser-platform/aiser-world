@@ -1167,9 +1167,9 @@ async def get_data_source_schema(data_source_id: str):
         
         # Get the data source first
         from app.modules.data.models import DataSource
-        from app.db.session import get_async_session
+        from app.db.session import async_session
         
-        async with get_async_session() as db:
+        async with async_session() as db:
             from sqlalchemy import select
             
             query = select(DataSource).where(DataSource.id == data_source_id)
@@ -1562,6 +1562,7 @@ async def execute_multi_engine_query(request: Dict[str, Any]):
     try:
         query = request.get('query', '')
         data_source_id = request.get('data_source_id')
+        filters = request.get('filters')  # Optional: [{field, op, value|values|from/to}]
         engine = request.get('engine')  # Optional: 'duckdb', 'cube', 'spark', 'direct_sql', 'pandas'
         optimization = request.get('optimization', True)
         
@@ -1581,6 +1582,13 @@ async def execute_multi_engine_query(request: Dict[str, Any]):
             except ValueError:
                 raise HTTPException(status_code=400, detail=f"Invalid engine: {engine}")
         
+        # Apply filters server-side by safely wrapping the original SQL
+        if filters and isinstance(filters, list):
+            try:
+                query = _apply_filters_to_query(query, filters)
+            except Exception:
+                pass
+
         # Execute query
         result = await multi_engine_service.execute_query(
             query=query,
@@ -1596,6 +1604,49 @@ async def execute_multi_engine_query(request: Dict[str, Any]):
     except Exception as e:
         logger.error(f"❌ Multi-engine query execution failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+def _apply_filters_to_query(original_query: str, filters: list) -> str:
+    """Safely wrap query with filters as WHERE clauses.
+    SELECT * FROM (original_query) AS q WHERE ...
+    """
+    if not original_query or not isinstance(filters, list) or len(filters) == 0:
+        return original_query
+
+    def safe_field(name: str) -> str:
+        import re
+        return name if name and re.match(r"^[a-zA-Z0-9_\.]+$", name) else ""
+
+    def sql_value(v):
+        if v is None:
+            return 'NULL'
+        if isinstance(v, (int, float)):
+            return str(v)
+        if isinstance(v, bool):
+            return 'TRUE' if v else 'FALSE'
+        s = str(v).replace("'", "''")
+        return f"'{s}'"
+
+    clauses = []
+    for f in filters:
+        if not isinstance(f, dict):
+            continue
+        field = safe_field(str(f.get('field', '')))
+        if not field:
+            continue
+        op = str(f.get('op', '=')).lower()
+        if op == 'between' and f.get('from') is not None and f.get('to') is not None:
+            clauses.append(f"{field} BETWEEN {sql_value(f.get('from'))} AND {sql_value(f.get('to'))}")
+        elif op in ('in', 'not in') and isinstance(f.get('values'), list) and len(f['values']) > 0:
+            vals = ', '.join(sql_value(v) for v in f['values'])
+            clauses.append(f"{field} {op.upper()} ({vals})")
+        elif op in ('=', '!=', '>', '<', '>=', '<=', 'like', 'ilike') and f.get('value') is not None:
+            clauses.append(f"{field} {op.upper()} {sql_value(f.get('value'))}")
+
+    if not clauses:
+        return original_query
+    where = ' AND '.join(clauses)
+    return f"SELECT * FROM ({original_query}) AS q WHERE {where}"
 
 
 @router.post("/query/parallel")

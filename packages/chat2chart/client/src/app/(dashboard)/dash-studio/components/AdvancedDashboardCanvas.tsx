@@ -98,10 +98,7 @@ const AdvancedDashboardCanvas: React.FC<AdvancedDashboardCanvasProps> = ({
             }
             break;
           case 'c':
-            if (selectedWidget) {
-              e.preventDefault();
-              handleDuplicate();
-            }
+            // Do not intercept copy; allow default copy behavior
             break;
           case 'd':
             if (selectedWidget) {
@@ -371,6 +368,7 @@ const AdvancedDashboardCanvas: React.FC<AdvancedDashboardCanvasProps> = ({
         onResizeStop={handleResizeStop}
         isDraggable={true}
         isResizable={true}
+        draggableCancel={".no-drag, input, textarea, .ant-input"}
         useCSSTransforms={true}
         compactType="vertical"
         preventCollision={false}

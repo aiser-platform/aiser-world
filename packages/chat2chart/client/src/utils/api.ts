@@ -14,11 +14,8 @@ export const fetchApi = async (
         'Content-Type': 'application/json',
     };
 
-    // Get auth token from cookies
-    const accessToken = Cookies.get('access_token');
-    if (accessToken) {
-        defaultHeaders['Authorization'] = `Bearer ${accessToken}`;
-    }
+    // Prefer server-set HttpOnly cookie token; avoid injecting Authorization header from client-side stored token
+    // For enterprise flows where Authorization header is required, callers may set it explicitly.
 
     // Determine which base URL to use based on the endpoint
     const isAuthEndpoint = endpoint.startsWith('api/v1/enterprise/auth/') ||

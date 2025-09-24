@@ -135,9 +135,9 @@ class DataConnectivityService:
             # Store connection info in database
             try:
                 from app.modules.data.models import DataSource
-                from app.db.session import get_async_session
-                
-                async with get_async_session() as db:
+                from app.db.session import async_session
+
+                async with async_session() as db:
                     # Create new data source record
                     new_source = DataSource(
                         id=connection_id,
@@ -509,9 +509,9 @@ class DataConnectivityService:
             logger.info(f"🔍 Available demo sources: {list(self.data_sources.keys())}")
             
             from app.modules.data.models import DataSource
-            from app.db.session import get_async_session
-            
-            async with get_async_session() as db:
+            from app.db.session import async_session
+
+            async with async_session() as db:
                 # Query database for data sources using async session
                 from sqlalchemy import select, func
                 
@@ -570,9 +570,9 @@ class DataConnectivityService:
         """Save data source to database"""
         try:
             from app.modules.data.models import DataSource
-            from app.db.session import get_async_session
-            
-            async with get_async_session() as db:
+            from app.db.session import async_session
+
+            async with async_session() as db:
                 # Check if data source already exists
                 from sqlalchemy import select
                 existing_query = select(DataSource).where(DataSource.id == data_source['id'])
@@ -1319,9 +1319,9 @@ class DataConnectivityService:
             
             # Get the data source from database
             from app.modules.data.models import DataSource
-            from app.db.session import get_async_session
-            
-            async with get_async_session() as db:
+            from app.db.session import async_session
+
+            async with async_session() as db:
                 from sqlalchemy import select
                 
                 query = select(DataSource).where(DataSource.id == data_source_id)
@@ -1943,11 +1943,11 @@ class DataConnectivityService:
             
             from app.modules.data.models import DataSource
             from app.modules.projects.models import ProjectDataSource
-            from app.db.session import get_async_session
-            
-            async with get_async_session() as db:
+            from app.db.session import async_session
+
+            async with async_session() as db:
                 from sqlalchemy import select, join
-                
+
                 # Join data sources with project data sources
                 query = (
                     select(DataSource)
@@ -1998,9 +1998,9 @@ class DataConnectivityService:
             
             from app.modules.data.models import DataSource
             from app.modules.projects.models import ProjectDataSource
-            from app.db.session import get_async_session
-            
-            async with get_async_session() as db:
+            from app.db.session import async_session
+
+            async with async_session() as db:
                 # Create the data source
                 data_source = DataSource(
                     id=f"ds_{organization_id}_{project_id}_{int(datetime.now().timestamp())}",
@@ -2061,9 +2061,9 @@ class DataConnectivityService:
             
             from app.modules.data.models import DataSource
             from app.modules.projects.models import ProjectDataSource
-            from app.db.session import get_async_session
-            
-            async with get_async_session() as db:
+            from app.db.session import async_session
+
+            async with async_session() as db:
                 from sqlalchemy import select, join
                 
                 query = (

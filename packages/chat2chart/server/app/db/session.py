@@ -54,14 +54,12 @@ def get_sync_session():
     return _sync_session()
 
 async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
-    """Get async database session with proper cleanup
+    """Async generator dependency yielding an AsyncSession for FastAPI.
 
-    Implemented as an async generator (yield) so FastAPI correctly treats it as a
-    dependency that yields a session and performs cleanup. Using
-    @asynccontextmanager here returns a context manager object which FastAPI may
-    not unwrap correctly and can lead to the dependency receiving an
-    AsyncGeneratorContextManager instead of the actual session. Using a plain
-    async generator is the recommended FastAPI pattern.
+    Use this pattern so FastAPI receives an async generator (yield) and
+    correctly manages the session lifecycle. Avoid decorating with
+    @asynccontextmanager which returns a context manager object that
+    FastAPI won't iterate as an async generator.
     """
     async with async_session() as session:
         try:
@@ -69,8 +67,6 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
         except Exception:
             await session.rollback()
             raise
-        finally:
-            await session.close()
 
 # Removed duplicate function definition
 

@@ -143,7 +143,9 @@ async def get_query_tabs(
     res = await db.execute(text(
         """
         SELECT tabs, active_key FROM query_tabs
-        WHERE user_id::text = :user_id::text AND COALESCE(organization_id::text,'') = COALESCE(:org_id::text,'') AND COALESCE(project_id::text,'') = COALESCE(:proj_id::text,'')
+        WHERE CAST(user_id AS TEXT) = CAST(:user_id AS TEXT)
+          AND COALESCE(CAST(organization_id AS TEXT), '') = COALESCE(CAST(:org_id AS TEXT), '')
+          AND COALESCE(CAST(project_id AS TEXT), '') = COALESCE(CAST(:proj_id AS TEXT), '')
         ORDER BY updated_at DESC LIMIT 1
         """
     ), {"user_id": user_id, "org_id": organization_id, "proj_id": project_id})

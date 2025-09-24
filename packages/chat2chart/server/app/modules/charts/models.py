@@ -1,4 +1,4 @@
-from app.common.model import BaseModel
+from app.common.model import BaseModel, Base
 from sqlalchemy import UUID, Column, String, Boolean, Integer, ForeignKey, DateTime, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
@@ -86,46 +86,52 @@ class Dashboard(BaseModel):
     deleted_at = Column(DateTime, nullable=True)
     is_deleted = Column(Boolean, default=False)
     last_viewed_at = Column(DateTime, nullable=True)
+    # Relationship to widgets
+    widgets = relationship("DashboardWidget", back_populates="dashboard", cascade="all, delete-orphan")
 
 
-class DashboardWidget(BaseModel):
+class DashboardWidget(Base):
     """Widget model for dashboard components"""
     __tablename__ = "dashboard_widgets"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     dashboard_id = Column(UUID(as_uuid=True), ForeignKey("dashboards.id"), nullable=False)
-    
+
     # Widget identification
     name = Column(String(255), nullable=False)
     widget_type = Column(String(50), nullable=False)  # chart, table, text, image, etc.
     chart_type = Column(String(50), nullable=True)    # bar, line, pie, etc.
-    
+
     # Widget configuration
     config = Column(JSONB, nullable=True)        # Widget-specific configuration
     data_config = Column(JSONB, nullable=True)   # Data source and query configuration
     style_config = Column(JSONB, nullable=True)  # Styling and appearance
-    
+
     # Layout and positioning
     x = Column(Integer, default=0)
     y = Column(Integer, default=0)
     width = Column(Integer, default=4)
     height = Column(Integer, default=3)
     z_index = Column(Integer, default=0)
-    
+
     # Widget state
     is_visible = Column(Boolean, default=True)
     is_locked = Column(Boolean, default=False)
     is_resizable = Column(Boolean, default=True)
     is_draggable = Column(Boolean, default=True)
-    
+
     # Timestamps - match existing database pattern
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, onupdate=func.now())
     deleted_at = Column(DateTime, nullable=True)
     is_deleted = Column(Boolean, default=False)
-    
+
     # Relationships
-    dashboard = relationship("Dashboard")
+    dashboard = relationship("Dashboard", back_populates="widgets")
+
+
+# Add widgets relationship to Dashboard for ORM bi-directional access
+setattr(Dashboard, 'widgets', relationship('DashboardWidget', back_populates='dashboard', cascade='all, delete-orphan'))
 
 
 class DashboardShare(BaseModel):

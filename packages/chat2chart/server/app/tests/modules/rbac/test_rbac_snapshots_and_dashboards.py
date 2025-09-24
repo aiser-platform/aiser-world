@@ -86,8 +86,10 @@ def test_dashboard_create_requires_auth_and_succeeds(client):
         payload = {"name": "Test Dashboard", "project_id": 1}
         res = client.post("/dashboards/", json=payload)
         assert res.status_code in (200, 201)
-        # response should contain created dashboard fields
+        # response should contain created dashboard fields (normalize both shapes)
         j = res.json()
-        assert j.get("name") == payload["name"] or j.get("dashboard") and j["dashboard"].get("name") == payload["name"]
+        # created payload may be returned directly or under 'dashboard' key
+        created = j if j.get('name') else j.get('dashboard') or {}
+        assert created.get("name") == payload["name"]
 
 

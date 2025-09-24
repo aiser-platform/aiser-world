@@ -34,7 +34,8 @@ class ProjectService(
     ) -> ProjectResponse:
         """Create a new project for a user"""
         try:
-            async with get_async_session() as db:
+            from app.db.session import async_session
+            async with async_session() as db:
                 # If no organization specified, create or get default organization
                 if not project_data.organization_id:
                     default_org = await self._get_or_create_default_organization(
@@ -111,7 +112,8 @@ class ProjectService(
     async def get_user_projects(self, user_id: str) -> List[ProjectResponse]:
         """Get all projects accessible to a user"""
         try:
-            async with get_async_session() as db:
+            from app.db.session import async_session
+            async with async_session() as db:
                 projects = await self.repository.get_user_projects(user_id, db)
                 return [ProjectResponse.model_validate(p.__dict__) for p in projects]
         except Exception as e:
@@ -121,7 +123,8 @@ class ProjectService(
     async def get_all(self) -> List[ProjectResponse]:
         """Get all active projects"""
         try:
-            async with get_async_session() as db:
+            from app.db.session import async_session
+            async with async_session() as db:
                 projects = await self.repository.get_all(db)
                 return [ProjectResponse.model_validate(p.__dict__) for p in projects]
         except Exception as e:
@@ -133,7 +136,8 @@ class ProjectService(
     ) -> Optional[Dict[str, Any]]:
         """Get project with data source and conversation counts"""
         try:
-            async with get_async_session() as db:
+            from app.db.session import async_session
+            async with async_session() as db:
                 project = await self.repository.get_project_with_data_sources(
                     project_id, user_id, db
                 )
@@ -150,7 +154,8 @@ class ProjectService(
     ) -> bool:
         """Add a data source to a project"""
         try:
-            async with get_async_session() as db:
+            from app.db.session import async_session
+            async with async_session() as db:
                 result = await self.repository.add_data_source_to_project(
                     project_id, data_source_id, data_source_type, user_id, db
                 )
@@ -185,7 +190,8 @@ class ProjectService(
     ) -> List[Dict[str, Any]]:
         """Get all data sources in a project"""
         try:
-            async with get_async_session() as db:
+            from app.db.session import async_session
+            async with async_session() as db:
                 data_sources = await self.repository.get_project_data_sources(
                     project_id, user_id, db
                 )
@@ -254,7 +260,8 @@ class OrganizationService(
     async def get_all(self) -> List[OrganizationResponse]:
         """Get all organizations"""
         try:
-            async with get_async_session() as db:
+            from app.db.session import async_session
+            async with async_session() as db:
                 organizations = await self.repository.get_all(db)
                 return [
                     OrganizationResponse.model_validate(org.__dict__)
@@ -267,7 +274,8 @@ class OrganizationService(
     async def get(self, organization_id: str) -> Optional[OrganizationResponse]:
         """Get organization by ID"""
         try:
-            async with get_async_session() as db:
+            from app.db.session import async_session
+            async with async_session() as db:
                 organization = await self.repository.get(organization_id, db)
                 if organization:
                     return OrganizationResponse.model_validate(organization.__dict__)
@@ -281,7 +289,8 @@ class OrganizationService(
     ) -> OrganizationResponse:
         """Create a new organization"""
         try:
-            async with get_async_session() as db:
+            from app.db.session import async_session
+            async with async_session() as db:
                 organization = await self.repository.create(
                     organization_data.model_dump(), db
                 )
@@ -295,7 +304,8 @@ class OrganizationService(
     ) -> OrganizationResponse:
         """Update organization"""
         try:
-            async with get_async_session() as db:
+            from app.db.session import async_session
+            async with async_session() as db:
                 organization = await self.repository.update(
                     organization_id, organization_data.model_dump(), db
                 )
@@ -307,7 +317,8 @@ class OrganizationService(
     async def create_default_organization(self, user_id: str) -> OrganizationResponse:
         """Create a default organization for a new user"""
         try:
-            async with get_async_session() as db:
+            from app.db.session import async_session
+            async with async_session() as db:
                 # Create default organization
                 org_data = OrganizationCreate(
                     name="Default Organization",
@@ -332,7 +343,8 @@ class OrganizationService(
     async def get_user_organizations(self, user_id: str) -> List[OrganizationResponse]:
         """Get all organizations a user belongs to"""
         try:
-            async with get_async_session() as db:
+            from app.db.session import async_session
+            async with async_session() as db:
                 # Get organizations where user is a member
                 query = (
                     select(Organization)
@@ -357,7 +369,8 @@ class OrganizationService(
     async def get_all(self) -> List[OrganizationResponse]:
         """Get all active organizations"""
         try:
-            async with get_async_session() as db:
+            from app.db.session import async_session
+            async with async_session() as db:
                 organizations = await self.repository.get_all(db)
                 return [
                     OrganizationResponse.model_validate(org.__dict__)
@@ -372,7 +385,8 @@ class OrganizationService(
     ) -> Optional[Dict[str, Any]]:
         """Get organization summary with counts"""
         try:
-            async with get_async_session() as db:
+            from app.db.session import async_session
+            async with async_session() as db:
                 summary = await self.repository.get_organization_summary(
                     organization_id, db
                 )

@@ -73,17 +73,14 @@ class JWTCookieBearer(HTTPBearer):
         super(JWTCookieBearer, self).__init__(auto_error=auto_error)
 
     async def __call__(self, request: Request):
-        token = request.cookies.get("access_token")
+        # Prefer namespaced cookies to avoid collisions with other services
+        token = request.cookies.get("c2c_access_token") or request.cookies.get("access_token")
         try:
             auth_header = await super(JWTCookieBearer, self).__call__(request)
             if auth_header and auth_header.credentials:
                 token = auth_header.credentials
         except HTTPException:
-            if not token:
-                # In test/dev environments allow a default test token instead of failing
-                # This enables test suites that monkeypatch dependencies to pass without
-                # requiring a real JWT. In production, token should be present.
-                return 'test-token'
+            pass
 
         if not self.verify_jwt(token):
             raise HTTPException(
@@ -95,10 +92,6 @@ class JWTCookieBearer(HTTPBearer):
         isTokenValid: bool = False
 
         try:
-            # Allow test-suite token shortcut
-            if jwtoken == 'test-token':
-                return True
-
             payload = Auth().decodeJWT(jwtoken)
         except:
             payload = None

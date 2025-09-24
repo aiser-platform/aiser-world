@@ -377,9 +377,9 @@ async def sign_out():
 
 
 @router.post("/sign-up", response_model=SignInResponse)
-async def sign_up(user_in: UserCreate):
+async def sign_up(user_in: UserCreate, response: Response):
     try:
-        return await service.sign_up(user_in)
+        return await service.sign_up(user_in, response)
     except ValueError as e:
         raise e
     except Exception as e:

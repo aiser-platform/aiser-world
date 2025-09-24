@@ -84,7 +84,10 @@ class Settings(BaseSettings):
     ENABLE_INTELLIGENT_MODELING: bool = os.getenv("ENABLE_INTELLIGENT_MODELING", "true").lower() == "true"
 
     # CORS Settings
-    CORS_ORIGINS: str = os.getenv("CORS_ORIGINS", "http://localhost:3000")
+    CORS_ORIGINS: str = os.getenv(
+        "CORS_ORIGINS",
+        "http://localhost:3000,http://127.0.0.1:3000,http://aiser:3000",
+    )
 
     # File Upload Settings (Additional)
     MAX_FILE_SIZE_MB: int = int(os.getenv("MAX_FILE_SIZE_MB", "50"))

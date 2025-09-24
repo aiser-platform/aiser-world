@@ -29,7 +29,7 @@ const AuthContext = createContext<AuthContextType>({
     setLoginError: () => null,
 });
 
-const AUTH_COOKIE_KEYS = ['access_token', 'refresh_token', 'user'];
+const AUTH_COOKIE_KEYS = ['c2c_access_token', 'refresh_token', 'user'];
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const router = useRouter();
@@ -41,12 +41,41 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     useEffect(() => {
         async function loadUserFromCookies() {
             console.log('Loading user from cookies...');
-            const accessToken = Cookies.get('access_token');
+            // Prefer namespaced server-set JWT, fall back to legacy access_token
+            let accessToken = Cookies.get('c2c_access_token') || Cookies.get('access_token');
             const userInfo = Cookies.get(AUTH_COOKIE_KEYS[2]);
             
             console.log('Access token from cookies:', accessToken);
             console.log('User info from cookies:', userInfo);
             
+            // If we have a demo token from frontend, attempt to upgrade it to a real JWT
+            if (accessToken && accessToken.startsWith('demo_token_')) {
+                try {
+                    console.log('Found demo token, attempting upgrade...');
+                    const upgradeRes = await fetch(`${AUTH_URL}/auth/upgrade-demo`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({ demo_token: accessToken, user: userInfo }),
+                    });
+                    if (upgradeRes.ok) {
+                        const up = await upgradeRes.json();
+                        if (up.access_token) {
+                            // persist namespaced cookie for client-side and server-side
+                            Cookies.set('c2c_access_token', up.access_token, { expires: 7, path: '/' });
+                            Cookies.set('access_token', up.access_token, { expires: 7, path: '/' });
+                            Cookies.remove('user', { path: '/' });
+                            accessToken = up.access_token;
+                            console.log('Demo token upgraded to real JWT');
+                        }
+                    } else {
+                        console.warn('Upgrade demo failed', await upgradeRes.text());
+                    }
+                } catch (e) {
+                    console.error('Upgrade-demo error', e);
+                }
+            }
+
             if (accessToken) {
                 try {
                     // Try enterprise endpoint first
@@ -80,6 +109,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                             Cookies.remove(key, { path: '/' });
                         }
                         Cookies.remove('access_token', { path: '/' });
+                        Cookies.remove('c2c_access_token', { path: '/' });
                         setUser(null);
                     }
                 } catch (error) {

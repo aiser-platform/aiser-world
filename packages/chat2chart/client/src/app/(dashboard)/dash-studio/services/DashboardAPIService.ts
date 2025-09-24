@@ -1,4 +1,5 @@
 // Dashboard API Service - Integration with backend API routes
+import { fetchWithAuth } from '@/services/apiService';
 export class DashboardAPIService {
   private baseURL: string;
 
@@ -6,30 +7,44 @@ export class DashboardAPIService {
     this.baseURL = baseURL;
   }
 
+  private withCreds(init?: RequestInit): RequestInit {
+    const headers: Record<string, string> = {
+      ...(init?.headers as Record<string, string> | undefined),
+    };
+    // Use cookies for authentication (HttpOnly access_token). Do NOT fallback to localStorage.
+    return { ...(init || {}), credentials: 'include', headers };
+  }
+
   // Dashboard Management (Project-scoped)
-         async createDashboard(dashboardData: any, organizationId: string = 'aiser-dev-org', projectId: string = 'development-project') {
+         async createDashboard(dashboardData: any, organizationId?: string, projectId?: string) {
     try {
-      // Try project-scoped API first
+      // Try project-scoped API first only if numeric IDs are provided
       let response;
-      try {
-        response = await fetch(`${this.baseURL}/charts/api/organizations/${organizationId}/projects/${projectId}/dashboards`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(dashboardData),
-        });
-        if (!response.ok) {
-          throw new Error(`Project-scoped API failed: ${response.status}`);
+      const canUseProject = organizationId && projectId && /^\d+$/.test(String(organizationId)) && /^\d+$/.test(String(projectId));
+      if (canUseProject) {
+        try {
+          response = await fetchWithAuth(`${this.baseURL}/charts/api/organizations/${organizationId}/projects/${projectId}/dashboards`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(dashboardData),
+          });
+          if (!response.ok) {
+            throw new Error(`Project-scoped API failed: ${response.status}`);
+          }
+        } catch (projectError) {
+          console.log('Project-scoped API not available, falling back to global API');
+          response = await fetchWithAuth(`${this.baseURL}/charts/dashboards/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(dashboardData),
+          });
         }
-      } catch (projectError) {
-        console.log('Project-scoped API not available, falling back to global API');
-        // Fallback to global API
-        response = await fetch(`${this.baseURL}/charts/dashboards/`, {
+      } else {
+        response = await fetchWithAuth(`${this.baseURL}/charts/dashboards/`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(dashboardData),
         });
       }
@@ -47,7 +62,7 @@ export class DashboardAPIService {
 
   async getDashboard(dashboardId: string) {
     try {
-      const response = await fetch(`${this.baseURL}/charts/dashboards/${dashboardId}`);
+      const response = await fetch(`${this.baseURL}/charts/dashboards/${dashboardId}`, this.withCreds());
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -62,13 +77,13 @@ export class DashboardAPIService {
 
   async updateDashboard(dashboardId: string, dashboardData: any) {
     try {
-      const response = await fetch(`${this.baseURL}/charts/dashboards/${dashboardId}`, {
+      const response = await fetch(`${this.baseURL}/charts/dashboards/${dashboardId}`, this.withCreds({
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(dashboardData),
-      });
+      }));
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -83,9 +98,7 @@ export class DashboardAPIService {
 
   async deleteDashboard(dashboardId: string) {
     try {
-      const response = await fetch(`${this.baseURL}/charts/dashboards/${dashboardId}`, {
-        method: 'DELETE',
-      });
+      const response = await fetch(`${this.baseURL}/charts/dashboards/${dashboardId}`, this.withCreds({ method: 'DELETE' }));
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -100,7 +113,7 @@ export class DashboardAPIService {
 
   async listDashboards() {
     try {
-      const response = await fetch(`${this.baseURL}/charts/dashboards/`);
+      const response = await fetch(`${this.baseURL}/charts/dashboards/`, this.withCreds());
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -116,13 +129,13 @@ export class DashboardAPIService {
   // Widget Management
   async createWidget(dashboardId: string, widgetData: any) {
     try {
-      const response = await fetch(`${this.baseURL}/charts/dashboards/${dashboardId}/widgets`, {
+      const response = await fetch(`${this.baseURL}/charts/dashboards/${dashboardId}/widgets`, this.withCreds({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(widgetData),
-      });
+      }));
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -137,13 +150,13 @@ export class DashboardAPIService {
 
   async updateWidget(dashboardId: string, widgetId: string, widgetData: any) {
     try {
-      const response = await fetch(`${this.baseURL}/charts/dashboards/${dashboardId}/widgets/${widgetId}`, {
+      const response = await fetch(`${this.baseURL}/charts/dashboards/${dashboardId}/widgets/${widgetId}`, this.withCreds({
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(widgetData),
-      });
+      }));
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -158,9 +171,7 @@ export class DashboardAPIService {
 
   async deleteWidget(dashboardId: string, widgetId: string) {
     try {
-      const response = await fetch(`${this.baseURL}/charts/dashboards/${dashboardId}/widgets/${widgetId}`, {
-        method: 'DELETE',
-      });
+      const response = await fetch(`${this.baseURL}/charts/dashboards/${dashboardId}/widgets/${widgetId}`, this.withCreds({ method: 'DELETE' }));
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -175,7 +186,7 @@ export class DashboardAPIService {
 
   async listWidgets(dashboardId: string) {
     try {
-      const response = await fetch(`${this.baseURL}/charts/dashboards/${dashboardId}/widgets`);
+      const response = await fetch(`${this.baseURL}/charts/dashboards/${dashboardId}/widgets`, this.withCreds());
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -191,13 +202,13 @@ export class DashboardAPIService {
   // Dashboard Sharing
   async shareDashboard(dashboardId: string, shareData: any) {
     try {
-      const response = await fetch(`${this.baseURL}/charts/dashboards/${dashboardId}/share`, {
+      const response = await fetch(`${this.baseURL}/charts/dashboards/${dashboardId}/share`, this.withCreds({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(shareData),
-      });
+      }));
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -212,11 +223,11 @@ export class DashboardAPIService {
 
   async publishDashboard(dashboardId: string, makePublic: boolean = true) {
     try {
-      const response = await fetch(`${this.baseURL}/charts/dashboards/${dashboardId}/publish`, {
+      const response = await fetch(`${this.baseURL}/charts/dashboards/${dashboardId}/publish`, this.withCreds({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ make_public: makePublic })
-      });
+      }));
 
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       return await response.json();
@@ -228,11 +239,11 @@ export class DashboardAPIService {
 
   async createEmbed(dashboardId: string, options: any = {}) {
     try {
-      const response = await fetch(`${this.baseURL}/charts/dashboards/${dashboardId}/embed`, {
+      const response = await fetch(`${this.baseURL}/charts/dashboards/${dashboardId}/embed`, this.withCreds({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(options)
-      });
+      }));
 
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       return await response.json();
@@ -244,7 +255,7 @@ export class DashboardAPIService {
 
   async listEmbeds(dashboardId: string) {
     try {
-      const response = await fetch(`${this.baseURL}/charts/dashboards/${dashboardId}/embeds`);
+      const response = await fetch(`${this.baseURL}/charts/dashboards/${dashboardId}/embeds`, this.withCreds());
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       return await response.json();
     } catch (error) {
@@ -255,7 +266,7 @@ export class DashboardAPIService {
 
   async revokeEmbed(dashboardId: string, embedId: string) {
     try {
-      const response = await fetch(`${this.baseURL}/charts/dashboards/${dashboardId}/embeds/${embedId}`, { method: 'DELETE' });
+      const response = await fetch(`${this.baseURL}/charts/dashboards/${dashboardId}/embeds/${embedId}`, this.withCreds({ method: 'DELETE' }));
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       return await response.json();
     } catch (error) {
@@ -267,7 +278,7 @@ export class DashboardAPIService {
   // Dashboard Export
   async exportDashboard(dashboardId: string, format: string = 'json') {
     try {
-      const response = await fetch(`${this.baseURL}/charts/dashboards/${dashboardId}/export?format=${format}`);
+      const response = await fetch(`${this.baseURL}/charts/dashboards/${dashboardId}/export?format=${format}`, this.withCreds());
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);

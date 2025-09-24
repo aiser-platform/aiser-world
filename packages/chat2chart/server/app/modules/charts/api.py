@@ -25,7 +25,26 @@ from datetime import datetime
 from sqlalchemy import select
 from app.modules.authentication.deps.auth_bearer import JWTCookieBearer
 from app.modules.authentication.auth import Auth
-from fastapi import APIRouter, Depends, HTTPException, Body, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Body, UploadFile, File, Request
+from typing import Optional
+
+
+async def _optional_token(request: Request) -> Optional[str]:
+    """Read token from namespaced cookie, legacy cookie, or Authorization header without enforcing.
+
+    Returns raw token string (without Bearer prefix) or None.
+    """
+    token = None
+    # prefer namespaced server-set cookie
+    token = request.cookies.get('c2c_access_token') or request.cookies.get('access_token')
+    # Authorization header may contain 'Bearer <token>'
+    auth = request.headers.get('Authorization') or request.headers.get('authorization')
+    if not token and auth:
+        if auth.lower().startswith('bearer '):
+            token = auth.split(None, 1)[1].strip()
+        else:
+            token = auth
+    return token
 from pydantic import BaseModel
 import logging
 import json
@@ -423,7 +442,8 @@ async def save_chart(chart_data: Dict[str, Any], current_token: str = Depends(JW
 
         # Persist chart
         from app.modules.charts.models import ChatVisualization
-        async with get_async_session() as db:
+        from app.db.session import async_session
+        async with async_session() as db:
             chart = ChatVisualization(
                 title=chart_data.get('name'),
                 chart_type=chart_data.get('type'),
@@ -444,7 +464,7 @@ async def save_chart(chart_data: Dict[str, Any], current_token: str = Depends(JW
         raise HTTPException(status_code=500, detail=f"Failed to save chart: {str(e)}")
 
 @router.get("/builder/list")
-async def list_charts(current_token: str = Depends(JWTCookieBearer()), chart_type: str = None, limit: int = 50, offset: int = 0):
+async def list_charts(current_token: str = Depends(JWTCookieBearer()), chart_type: Optional[str] = None, limit: int = 50, offset: int = 0):
     """List charts owned by the user or active charts."""
     try:
         user_payload = Auth().decodeJWT(current_token) or {}
@@ -454,7 +474,8 @@ async def list_charts(current_token: str = Depends(JWTCookieBearer()), chart_typ
             user_id = 0
 
         from app.modules.charts.models import ChatVisualization
-        async with get_async_session() as db:
+        from app.db.session import async_session
+        async with async_session() as db:
             query = select(ChatVisualization).where((ChatVisualization.user_id == user_id) | (ChatVisualization.is_active == True))
             if chart_type:
                 query = query.where(ChatVisualization.chart_type == chart_type)
@@ -479,7 +500,8 @@ async def get_chart(chart_id: str, current_token: str = Depends(JWTCookieBearer(
             user_id = 0
 
         from app.modules.charts.models import ChatVisualization
-        async with get_async_session() as db:
+        from app.db.session import async_session
+        async with async_session() as db:
             res = await db.execute(select(ChatVisualization).where(ChatVisualization.id == chart_id))
             chart = res.scalar_one_or_none()
             if not chart:
@@ -510,7 +532,8 @@ async def update_chart(chart_id: str, chart_data: Dict[str, Any], current_token:
             user_id = 0
 
         from app.modules.charts.models import ChatVisualization
-        async with get_async_session() as db:
+        from app.db.session import async_session
+        async with async_session() as db:
             res = await db.execute(select(ChatVisualization).where(ChatVisualization.id == chart_id))
             chart = res.scalar_one_or_none()
             if not chart:
@@ -541,7 +564,8 @@ async def delete_chart(chart_id: str, current_token: str = Depends(JWTCookieBear
             user_id = 0
 
         from app.modules.charts.models import ChatVisualization
-        async with get_async_session() as db:
+        from app.db.session import async_session
+        async with async_session() as db:
             res = await db.execute(select(ChatVisualization).where(ChatVisualization.id == chart_id))
             chart = res.scalar_one_or_none()
             if not chart:
@@ -642,47 +666,31 @@ async def share_chart(chart_data: Dict[str, Any]):
 async def get_project_dashboards(
     organization_id: str,
     project_id: str,
-    user_id: str = None,
     limit: int = 50,
-    offset: int = 0
+    offset: int = 0,
+    current_token: str = Depends(JWTCookieBearer()),
+    db: AsyncSession = Depends(get_async_session)
 ):
-    """Get dashboards for a specific project (project-scoped)"""
+    """Get dashboards for a specific project (project-scoped) - DB backed."""
     try:
         logger.info(f"📊 Getting dashboards for project {project_id} in organization {organization_id}")
-        
-        # Mock implementation - replace with actual database service
-        mock_dashboards = [
-            {
-                "id": f"dashboard_{project_id}_1",
-                "name": "Project Sales Dashboard",
-                "description": f"Sales dashboard for project {project_id}",
-                "project_id": int(project_id),
-                "organization_id": int(organization_id),
-                "layout_config": {"grid_size": 12, "widgets": []},
-                "theme_config": {"primary_color": "#1890ff"},
-                "global_filters": {},
-                "refresh_interval": 300,
-                "is_public": False,
-                "is_template": False,
-                "created_by": int(user_id) if user_id else 1,
-                "max_widgets": 10,
-                "max_pages": 5,
-                "created_at": "2025-01-10T00:00:00Z",
-                "updated_at": "2025-01-10T00:00:00Z",
-                "last_viewed_at": "2025-01-10T00:00:00Z"
-            }
-        ]
-        
-        return {
-            "success": True,
-            "dashboards": mock_dashboards[offset:offset + limit],
-            "organization_id": organization_id,
-            "project_id": project_id,
-            "total": len(mock_dashboards),
-            "limit": limit,
-            "offset": offset
-        }
-        
+        # Determine caller user id
+        user_payload = Auth().decodeJWT(current_token) or {}
+        try:
+            auth_user_id = int(user_payload.get('id') or user_payload.get('sub') or 0)
+        except Exception:
+            auth_user_id = None
+
+        dashboard_service = DashboardService(db)
+        result = await dashboard_service.list_dashboards(
+            project_id=int(project_id),
+            user_id=auth_user_id,
+            limit=limit,
+            offset=offset
+        )
+        return {"success": True, "dashboards": result.get('dashboards', []), "total": result.get('total', 0), "limit": limit, "offset": offset}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"❌ Failed to get project dashboards: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -692,39 +700,36 @@ async def get_project_dashboards(
 async def create_project_dashboard(
     organization_id: str,
     project_id: str,
-    dashboard: DashboardCreateSchema
+    dashboard: DashboardCreateSchema,
+    current_token: str = Depends(JWTCookieBearer()),
+    db: AsyncSession = Depends(get_async_session)
 ):
-    """Create a new dashboard for a specific project"""
+    """Create a new dashboard for a specific project - DB backed and ownership checked."""
     try:
         logger.info(f"🏗️ Creating dashboard for project {project_id} in organization {organization_id}: {dashboard.name}")
-        
-        # Mock implementation - replace with actual database service
-        dashboard_data = {
-            "id": f"dashboard_{project_id}_{hash(dashboard.name)}",
-            "name": dashboard.name,
-            "description": dashboard.description,
-            "project_id": int(project_id),
-            "organization_id": int(organization_id),
-            "layout_config": dashboard.layout_config,
-            "theme_config": dashboard.theme_config,
-            "global_filters": dashboard.global_filters,
-            "refresh_interval": dashboard.refresh_interval,
-            "is_public": dashboard.is_public,
-            "is_template": dashboard.is_template,
-            "created_by": 1,  # TODO: Get from auth context
-            "max_widgets": 10,
-            "max_pages": 5,
-            "created_at": "2025-01-10T00:00:00Z",
-            "updated_at": None,
-            "last_viewed_at": None
-        }
-        
-        return {
-            "success": True,
-            "message": "Dashboard created successfully",
-            "dashboard": dashboard_data
-        }
-        
+        # Authenticate caller
+        user_payload = Auth().decodeJWT(current_token) or {}
+        try:
+            user_id = int(user_payload.get('id') or user_payload.get('sub') or 0)
+        except Exception:
+            user_id = 0
+
+        # Ensure project belongs to organization
+        from app.modules.projects.models import Project
+        from app.db.session import async_session
+        async with async_session() as sdb:
+            pres = await sdb.execute(select(Project).where(Project.id == int(project_id)))
+            proj = pres.scalar_one_or_none()
+            if not proj or proj.organization_id != int(organization_id):
+                raise HTTPException(status_code=400, detail='Project does not belong to organization')
+
+        # Set project_id on payload and persist
+        dashboard.project_id = int(project_id)
+        dashboard_service = DashboardService(db)
+        created = await dashboard_service.create_dashboard(dashboard, user_id)
+        return {"success": True, "message": "Dashboard created successfully", "dashboard": created}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"❌ Failed to create project dashboard: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -734,38 +739,36 @@ async def create_project_dashboard(
 async def get_project_dashboard(
     organization_id: str,
     project_id: str,
-    dashboard_id: str
+    dashboard_id: str,
+    current_token: str = Depends(JWTCookieBearer()),
+    db: AsyncSession = Depends(get_async_session)
 ):
-    """Get a specific dashboard for a project"""
+    """Get a specific dashboard for a project (DB backed)"""
     try:
         logger.info(f"📊 Getting dashboard {dashboard_id} for project {project_id} in organization {organization_id}")
-        
-        # Mock implementation - replace with actual database service
-        mock_dashboard = {
-            "id": dashboard_id,
-            "name": f"Dashboard {dashboard_id}",
-            "description": f"Dashboard for project {project_id}",
-            "project_id": int(project_id),
-            "organization_id": int(organization_id),
-            "layout_config": {"grid_size": 12, "widgets": []},
-            "theme_config": {"primary_color": "#1890ff"},
-            "global_filters": {},
-            "refresh_interval": 300,
-            "is_public": False,
-            "is_template": False,
-            "created_by": 1,
-            "max_widgets": 10,
-            "max_pages": 5,
-            "created_at": "2025-01-10T00:00:00Z",
-            "updated_at": "2025-01-10T00:00:00Z",
-            "last_viewed_at": None
-        }
-        
-        return {
-            "success": True,
-            "dashboard": mock_dashboard
-        }
-        
+
+        # Resolve caller user id (may be dict in tests)
+        if isinstance(current_token, dict):
+            user_payload = current_token
+        else:
+            user_payload = Auth().decodeJWT(current_token) or {}
+        try:
+            user_id = int(user_payload.get('id') or user_payload.get('sub') or 0)
+        except Exception:
+            user_id = 0
+
+        dashboard_service = DashboardService(db)
+        dashboard = await dashboard_service.get_dashboard(dashboard_id, user_id)
+
+        # Enforce project/org scope
+        proj_pid = dashboard.get('project_id')
+        if proj_pid is not None and int(proj_pid) != int(project_id):
+            raise HTTPException(status_code=404, detail='Dashboard not found')
+
+        return {"success": True, "dashboard": dashboard}
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"❌ Failed to get project dashboard: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -776,39 +779,24 @@ async def update_project_dashboard(
     organization_id: str,
     project_id: str,
     dashboard_id: str,
-    dashboard: DashboardUpdateSchema
+    dashboard: DashboardUpdateSchema,
+    current_token: str = Depends(JWTCookieBearer()),
+    db: AsyncSession = Depends(get_async_session)
 ):
-    """Update a dashboard for a specific project"""
+    """Update a dashboard for a specific project - DB backed with permission checks."""
     try:
         logger.info(f"✏️ Updating dashboard {dashboard_id} for project {project_id} in organization {organization_id}")
-        
-        # Mock implementation - replace with actual database service
-        updated_dashboard = {
-            "id": dashboard_id,
-            "name": dashboard.name or f"Dashboard {dashboard_id}",
-            "description": dashboard.description,
-            "project_id": int(project_id),
-            "organization_id": int(organization_id),
-            "layout_config": dashboard.layout_config,
-            "theme_config": dashboard.theme_config,
-            "global_filters": dashboard.global_filters,
-            "refresh_interval": dashboard.refresh_interval,
-            "is_public": dashboard.is_public,
-            "is_template": dashboard.is_template,
-            "created_by": 1,
-            "max_widgets": 10,
-            "max_pages": 5,
-            "created_at": "2025-01-10T00:00:00Z",
-            "updated_at": "2025-01-10T00:00:00Z",
-            "last_viewed_at": None
-        }
-        
-        return {
-            "success": True,
-            "message": "Dashboard updated successfully",
-            "dashboard": updated_dashboard
-        }
-        
+        user_payload = Auth().decodeJWT(current_token) or {}
+        try:
+            user_id = int(user_payload.get('id') or user_payload.get('sub') or 0)
+        except Exception:
+            user_id = 0
+
+        dashboard_service = DashboardService(db)
+        updated = await dashboard_service.update_dashboard(dashboard_id, dashboard, user_id)
+        return {"success": True, "message": "Dashboard updated successfully", "dashboard": updated}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"❌ Failed to update project dashboard: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -818,20 +806,26 @@ async def update_project_dashboard(
 async def delete_project_dashboard(
     organization_id: str,
     project_id: str,
-    dashboard_id: str
+    dashboard_id: str,
+    current_token: str = Depends(JWTCookieBearer()),
+    db: AsyncSession = Depends(get_async_session)
 ):
-    """Delete a dashboard for a specific project"""
+    """Delete a dashboard for a specific project - DB backed with permission checks."""
     try:
         logger.info(f"🗑️ Deleting dashboard {dashboard_id} for project {project_id} in organization {organization_id}")
-        
-        # Mock implementation - replace with actual database service
-        
-        return {
-            "success": True,
-            "message": "Dashboard deleted successfully",
-            "dashboard_id": dashboard_id
-        }
-        
+        user_payload = Auth().decodeJWT(current_token) or {}
+        try:
+            user_id = int(user_payload.get('id') or user_payload.get('sub') or 0)
+        except Exception:
+            user_id = 0
+
+        dashboard_service = DashboardService(db)
+        success = await dashboard_service.delete_dashboard(dashboard_id, user_id)
+        if not success:
+            raise HTTPException(status_code=404, detail='Dashboard not found')
+        return {"success": True, "message": "Dashboard deleted successfully", "dashboard_id": dashboard_id}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"❌ Failed to delete project dashboard: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -845,36 +839,49 @@ async def create_dashboard(
     db: AsyncSession = Depends(get_async_session)
 ):
     """
-    Create a new dashboard
+    Create a new dashboard. Auth is enforced via dependency which reads the access_token cookie
+    or Authorization header (preferred). This avoids manual cookie parsing and brittle checks.
     """
     try:
         logger.info(f"🏗️ Creating dashboard: {dashboard.name}")
-        
-        # Use real database service
-        # Enforce org/project ownership using JWT
-        user_payload = Auth().decodeJWT(current_token) or {}
-        user_id = int(user_payload.get('id') or user_payload.get('sub') or 0)
+
+        # Resolve user from dependency-provided token
+        user_payload = Auth().decodeJWT(current_token) if current_token else {}
+        if not user_payload:
+            logger.warning('Attempt to create dashboard without valid JWT')
+            raise HTTPException(status_code=401, detail='Authentication required to create dashboards; ensure you are logged in and cookies are enabled (access_token).')
+        try:
+            user_id = int(user_payload.get('id') or user_payload.get('sub') or 0)
+        except Exception:
+            user_id = 0
+
         org_id = int(user_payload.get('organization_id') or 0)
         # Ensure dashboard.project_id belongs to org (best-effort)
         if dashboard.project_id and org_id and dashboard.project_id:
             # project ownership validated in Project service when creating
             pass
+
         dashboard_service = DashboardService(db)
-        created_dashboard = await dashboard_service.create_dashboard(dashboard, created_by=user_id)
-        
+        created_dashboard = await dashboard_service.create_dashboard(dashboard, user_id)
+
         return created_dashboard
         
+    except HTTPException:
+        # Let HTTPExceptions (401/403/422) propagate to the client unchanged
+        raise
     except Exception as e:
-        logger.error(f"❌ Failed to create dashboard: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to create dashboard: {str(e)}")
+        logger.exception("❌ Failed to create dashboard")
+        # Return the exception message if available to help client-side debugging
+        raise HTTPException(status_code=500, detail=f"Failed to create dashboard: {repr(e)}")
 
 
 @router.get("/dashboards/", response_model=List[DashboardResponseSchema])
 async def list_dashboards(
-    user_id: str = None,
-    project_id: int = None,
+    user_id: Optional[str] = None,
+    project_id: Optional[int] = None,
     limit: int = 50,
     offset: int = 0,
+    current_token: str = Depends(JWTCookieBearer()),
     db: AsyncSession = Depends(get_async_session)
 ):
     """
@@ -884,15 +891,20 @@ async def list_dashboards(
         logger.info(f"📋 Listing dashboards for user: {user_id}, project: {project_id}")
         
         # Use real database service
+        user_payload = Auth().decodeJWT(current_token) or {}
+        try:
+            auth_user_id = int(user_payload.get('id') or user_payload.get('sub') or 0)
+        except Exception:
+            auth_user_id = None
+
         dashboard_service = DashboardService(db)
-        dashboards = await dashboard_service.list_dashboards(
-            user_id=user_id,
+        result = await dashboard_service.list_dashboards(
+            user_id=auth_user_id,
             project_id=project_id,
             limit=limit,
             offset=offset
         )
-        
-        return dashboards
+        return result.get("dashboards", [])
         
     except Exception as e:
         logger.error(f"❌ Failed to list dashboards: {str(e)}")
@@ -902,6 +914,7 @@ async def list_dashboards(
 @router.get("/dashboards/{dashboard_id}", response_model=DashboardResponseSchema)
 async def get_dashboard(
     dashboard_id: str,
+    request: Request,
     db: AsyncSession = Depends(get_async_session)
 ):
     """
@@ -910,9 +923,17 @@ async def get_dashboard(
     try:
         logger.info(f"📊 Getting dashboard: {dashboard_id}")
         
-        # Use real database service
+        # Resolve optional token to determine caller id for permission checks
+        token = await _optional_token(request)
+        user_payload = Auth().decodeJWT(token) if token else {}
+        try:
+            caller_id = int(user_payload.get('id') or user_payload.get('sub') or 0)
+        except Exception:
+            caller_id = 0
+
         dashboard_service = DashboardService(db)
-        dashboard = await dashboard_service.get_dashboard(dashboard_id)
+        # For unauthenticated callers, pass user_id=0 to return only public dashboards
+        dashboard = await dashboard_service.get_dashboard(dashboard_id, user_id=caller_id)
         
         if not dashboard:
             raise HTTPException(status_code=404, detail="Dashboard not found")
@@ -930,6 +951,7 @@ async def get_dashboard(
 async def update_dashboard(
     dashboard_id: str, 
     dashboard: DashboardUpdateSchema,
+    current_token: str = Depends(JWTCookieBearer()),
     db: AsyncSession = Depends(get_async_session)
 ):
     """
@@ -939,8 +961,14 @@ async def update_dashboard(
         logger.info(f"✏️ Updating dashboard: {dashboard_id}")
         
         # Use real database service
+        user_payload = Auth().decodeJWT(current_token) or {}
+        try:
+            user_id = int(user_payload.get('id') or user_payload.get('sub') or 0)
+        except Exception:
+            user_id = 0
+
         dashboard_service = DashboardService(db)
-        updated_dashboard = await dashboard_service.update_dashboard(dashboard_id, dashboard)
+        updated_dashboard = await dashboard_service.update_dashboard(dashboard_id, dashboard, user_id)
         
         if not updated_dashboard:
             raise HTTPException(status_code=404, detail="Dashboard not found")
@@ -957,6 +985,7 @@ async def update_dashboard(
 @router.delete("/dashboards/{dashboard_id}")
 async def delete_dashboard(
     dashboard_id: str,
+    current_token: str = Depends(JWTCookieBearer()),
     db: AsyncSession = Depends(get_async_session)
 ):
     """
@@ -965,9 +994,15 @@ async def delete_dashboard(
     try:
         logger.info(f"🗑️ Deleting dashboard: {dashboard_id}")
         
-        # Use real database service
+        # Use real database service and enforce ownership
+        user_payload = Auth().decodeJWT(current_token) or {}
+        try:
+            user_id = int(user_payload.get('id') or user_payload.get('sub') or 0)
+        except Exception:
+            user_id = 0
+
         dashboard_service = DashboardService(db)
-        success = await dashboard_service.delete_dashboard(dashboard_id)
+        success = await dashboard_service.delete_dashboard(dashboard_id, user_id)
         
         if not success:
             raise HTTPException(status_code=404, detail="Dashboard not found")
@@ -987,136 +1022,85 @@ async def delete_dashboard(
 
 # 🧩 Widget Management Endpoints
 @router.post("/dashboards/{dashboard_id}/widgets", response_model=DashboardWidgetResponseSchema)
-async def create_widget(dashboard_id: str, widget: DashboardWidgetCreateSchema):
-    """
-    Create a new widget in a dashboard
-    """
+async def create_widget(dashboard_id: str, widget: Dict[str, Any] = Body(...), current_token: str = Depends(JWTCookieBearer()), db: AsyncSession = Depends(get_async_session)):
+    """Create a new widget in a dashboard (DB-backed). Accepts body without dashboard_id and injects it from the path."""
     try:
-        logger.info(f"🧩 Creating widget in dashboard {dashboard_id}: {widget.name}")
-        
-        # Mock implementation - replace with actual database service
-        widget_data = {
-            "id": f"widget_{hash(widget.name)}",
-            "dashboard_id": dashboard_id,
-            "name": widget.name,
-            "widget_type": widget.widget_type,
-            "chart_type": widget.chart_type,
-            "config": widget.config,
-            "data_config": widget.data_config,
-            "style_config": widget.style_config,
-            "x": widget.x,
-            "y": widget.y,
-            "width": widget.width,
-            "height": widget.height,
-            "z_index": widget.z_index,
-            "is_visible": widget.is_visible,
-            "is_locked": widget.is_locked,
-            "is_resizable": widget.is_resizable,
-            "is_draggable": widget.is_draggable,
-            "created_at": "2025-01-10T00:00:00Z",
-            "updated_at": None
-        }
-        
-        return widget_data
-        
+        # Resolve user id
+        if isinstance(current_token, dict):
+            user_payload = current_token
+        else:
+            user_payload = Auth().decodeJWT(current_token) or {}
+        try:
+            user_id = int(user_payload.get('id') or user_payload.get('sub') or 0)
+        except Exception:
+            user_id = 0
+
+        # Ensure dashboard_id present in payload for validation
+        widget_payload = dict(widget)
+        widget_payload.setdefault('dashboard_id', dashboard_id)
+
+        # Validate against schema
+        widget_model = DashboardWidgetCreateSchema(**widget_payload)
+
+        dashboard_service = DashboardService(db)
+        created = await dashboard_service.create_widget(dashboard_id, widget_model, user_id)
+        return created
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"❌ Failed to create widget: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to create widget: {str(e)}")
 
 
 @router.get("/dashboards/{dashboard_id}/widgets", response_model=List[DashboardWidgetResponseSchema])
-async def list_widgets(dashboard_id: str):
-    """
-    List all widgets in a dashboard
-    """
+async def list_widgets(dashboard_id: str, current_token: str = Depends(JWTCookieBearer()), db: AsyncSession = Depends(get_async_session)):
+    """List widgets for a dashboard (DB-backed)."""
     try:
-        logger.info(f"📋 Listing widgets for dashboard: {dashboard_id}")
-        
-        # Mock implementation - replace with actual database service
-        mock_widgets = [
-            {
-                "id": "widget_1",
-                "dashboard_id": dashboard_id,
-                "name": "Sales Chart",
-                "widget_type": "chart",
-                "chart_type": "bar",
-                "config": {"title": "Monthly Sales"},
-                "data_config": {"data_source": "sales_data"},
-                "style_config": {"color": "#1890ff"},
-                "x": 0,
-                "y": 0,
-                "width": 6,
-                "height": 4,
-                "z_index": 0,
-                "is_visible": True,
-                "is_locked": False,
-                "is_resizable": True,
-                "is_draggable": True,
-                "created_at": "2025-01-10T00:00:00Z",
-                "updated_at": None
-            },
-            {
-                "id": "widget_2",
-                "dashboard_id": dashboard_id,
-                "name": "Revenue Table",
-                "widget_type": "table",
-                "chart_type": None,
-                "config": {"columns": ["Month", "Revenue"]},
-                "data_config": {"data_source": "revenue_data"},
-                "style_config": {"theme": "light"},
-                "x": 6,
-                "y": 0,
-                "width": 6,
-                "height": 4,
-                "z_index": 0,
-                "is_visible": True,
-                "is_locked": False,
-                "is_resizable": True,
-                "is_draggable": True,
-                "created_at": "2025-01-10T00:00:00Z",
-                "updated_at": None
-            }
-        ]
-        
-        return mock_widgets
-        
+        if isinstance(current_token, dict):
+            user_payload = current_token
+        else:
+            user_payload = Auth().decodeJWT(current_token) or {}
+        try:
+            user_id = int(user_payload.get('id') or user_payload.get('sub') or 0)
+        except Exception:
+            user_id = 0
+
+        dashboard_service = DashboardService(db)
+        widgets = await dashboard_service.list_widgets(dashboard_id, user_id)
+        return widgets
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"❌ Failed to list widgets: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to list widgets: {str(e)}")
 
 
 @router.put("/dashboards/{dashboard_id}/widgets/{widget_id}", response_model=DashboardWidgetResponseSchema)
-async def update_widget(dashboard_id: str, widget_id: str, widget: DashboardWidgetUpdateSchema):
+async def update_widget(dashboard_id: str, widget_id: str, widget: DashboardWidgetUpdateSchema, current_token: str = Depends(JWTCookieBearer()), db: AsyncSession = Depends(get_async_session)):
     """
     Update a widget
     """
     try:
         logger.info(f"✏️ Updating widget {widget_id} in dashboard {dashboard_id}")
         
-        # Mock implementation - replace with actual database service
-        updated_widget = {
-            "id": widget_id,
-            "dashboard_id": dashboard_id,
-            "name": widget.name or f"Widget {widget_id}",
-            "widget_type": widget.widget_type,
-            "chart_type": widget.chart_type,
-            "config": widget.config,
-            "data_config": widget.data_config,
-            "style_config": widget.style_config,
-            "x": widget.x,
-            "y": widget.y,
-            "width": widget.width,
-            "height": widget.height,
-            "z_index": widget.z_index,
-            "is_visible": widget.is_visible,
-            "is_locked": widget.is_locked,
-            "is_resizable": widget.is_resizable,
-            "is_draggable": widget.is_draggable,
-            "created_at": "2025-01-10T00:00:00Z",
-            "updated_at": "2025-01-10T00:00:00Z"
-        }
-        
-        return updated_widget
+        try:
+            if isinstance(current_token, dict):
+                user_payload = current_token
+            else:
+                user_payload = Auth().decodeJWT(current_token) or {}
+            try:
+                user_id = int(user_payload.get('id') or user_payload.get('sub') or 0)
+            except Exception:
+                user_id = 0
+
+            dashboard_service = DashboardService(db)
+            updated = await dashboard_service.update_widget(dashboard_id, widget_id, widget, user_id)
+            return updated
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"❌ Failed to update widget {widget_id}: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Failed to update widget: {str(e)}")
         
     except Exception as e:
         logger.error(f"❌ Failed to update widget {widget_id}: {str(e)}")
@@ -1124,20 +1108,31 @@ async def update_widget(dashboard_id: str, widget_id: str, widget: DashboardWidg
 
 
 @router.delete("/dashboards/{dashboard_id}/widgets/{widget_id}")
-async def delete_widget(dashboard_id: str, widget_id: str):
+async def delete_widget(dashboard_id: str, widget_id: str, current_token: str = Depends(JWTCookieBearer()), db: AsyncSession = Depends(get_async_session)):
     """
     Delete a widget
     """
     try:
         logger.info(f"🗑️ Deleting widget {widget_id} from dashboard {dashboard_id}")
         
-        # Mock implementation - replace with actual database service
-        
-        return {
-            "success": True,
-            "message": "Widget deleted successfully",
-            "widget_id": widget_id
-        }
+        try:
+            if isinstance(current_token, dict):
+                user_payload = current_token
+            else:
+                user_payload = Auth().decodeJWT(current_token) or {}
+            try:
+                user_id = int(user_payload.get('id') or user_payload.get('sub') or 0)
+            except Exception:
+                user_id = 0
+
+            dashboard_service = DashboardService(db)
+            success = await dashboard_service.delete_widget(dashboard_id, widget_id, user_id)
+            return {"success": success, "message": "Widget deleted successfully", "widget_id": widget_id}
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"❌ Failed to delete widget {widget_id}: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Failed to delete widget: {str(e)}")
         
     except Exception as e:
         logger.error(f"❌ Failed to delete widget {widget_id}: {str(e)}")
@@ -1200,57 +1195,58 @@ async def share_dashboard(dashboard_id: str, share_request: DashboardShareCreate
         except Exception:
             user_id = 0
 
-        from app.modules.charts.models import DashboardShare, Dashboard
-        async with get_async_session() as db:
-            # Basic permission: only owner/org_admin can share
-            res = await db.execute(select(Dashboard).where(Dashboard.id == dashboard_id))
-            db_dash = res.scalar_one_or_none()
-            if not db_dash:
-                raise HTTPException(status_code=404, detail="Dashboard not found")
-            if db_dash.created_by and db_dash.created_by != user_id:
-                # try org admin check via project->organization
-                org_id = None
-                if db_dash.project_id:
-                    from app.modules.projects.models import Project
-                    pres = await db.execute(select(Project).where(Project.id == db_dash.project_id))
-                    proj = pres.scalar_one_or_none()
-                    if proj:
-                        org_id = proj.organization_id
-                if org_id:
-                    from app.modules.projects.models import OrganizationUser
-                    our = await db.execute(select(OrganizationUser).where(OrganizationUser.user_id == user_id, OrganizationUser.organization_id == org_id))
-                    our_row = our.scalar_one_or_none()
-                    if not our_row or our_row.role not in ('owner', 'admin'):
+            from app.modules.charts.models import DashboardShare, Dashboard
+            from app.db.session import async_session
+            async with async_session() as db:
+                # Basic permission: only owner/org_admin can share
+                res = await db.execute(select(Dashboard).where(Dashboard.id == dashboard_id))
+                db_dash = res.scalar_one_or_none()
+                if not db_dash:
+                    raise HTTPException(status_code=404, detail="Dashboard not found")
+                if db_dash.created_by and db_dash.created_by != user_id:
+                    # try org admin check via project->organization
+                    org_id = None
+                    if db_dash.project_id:
+                        from app.modules.projects.models import Project
+                        pres = await db.execute(select(Project).where(Project.id == db_dash.project_id))
+                        proj = pres.scalar_one_or_none()
+                        if proj:
+                            org_id = proj.organization_id
+                    if org_id:
+                        from app.modules.projects.models import OrganizationUser
+                        our = await db.execute(select(OrganizationUser).where(OrganizationUser.user_id == user_id, OrganizationUser.organization_id == org_id))
+                        our_row = our.scalar_one_or_none()
+                        if not our_row or our_row.role not in ('owner', 'admin'):
+                            raise HTTPException(status_code=403, detail="Insufficient permissions to share dashboard")
+                    else:
                         raise HTTPException(status_code=403, detail="Insufficient permissions to share dashboard")
-                else:
-                    raise HTTPException(status_code=403, detail="Insufficient permissions to share dashboard")
 
-            share = DashboardShare(
-                dashboard_id=dashboard_id,
-                shared_by=user_id,
-                shared_with=share_request.shared_with,
-                permission=share_request.permission,
-                expires_at=share_request.expires_at,
-                is_active=share_request.is_active,
-                share_token=f"share_{hash((dashboard_id, share_request.shared_with, share_request.permission))}"
-            )
-            db.add(share)
-            await db.flush()
-            await db.refresh(share)
-            return {
-                "id": str(share.id),
-                "dashboard_id": dashboard_id,
-                "shared_by": share.shared_by,
-                "shared_with": share.shared_with,
-                "permission": share.permission,
-                "expires_at": share.expires_at,
-                "is_active": share.is_active,
-                "share_token": share.share_token,
-                "access_count": share.access_count,
-                "last_accessed_at": share.last_accessed_at,
-                "created_at": share.created_at,
-                "updated_at": share.updated_at
-            }
+                share = DashboardShare(
+                    dashboard_id=dashboard_id,
+                    shared_by=user_id,
+                    shared_with=share_request.shared_with,
+                    permission=share_request.permission,
+                    expires_at=share_request.expires_at,
+                    is_active=share_request.is_active,
+                    share_token=f"share_{hash((dashboard_id, share_request.shared_with, share_request.permission))}"
+                )
+                db.add(share)
+                await db.flush()
+                await db.refresh(share)
+                return {
+                    "id": str(share.id),
+                    "dashboard_id": dashboard_id,
+                    "shared_by": share.shared_by,
+                    "shared_with": share.shared_with,
+                    "permission": share.permission,
+                    "expires_at": share.expires_at,
+                    "is_active": share.is_active,
+                    "share_token": share.share_token,
+                    "access_count": share.access_count,
+                    "last_accessed_at": share.last_accessed_at,
+                    "created_at": share.created_at,
+                    "updated_at": share.updated_at
+                }
         
     except Exception as e:
         logger.error(f"❌ Failed to share dashboard {dashboard_id}: {str(e)}")
@@ -1268,9 +1264,9 @@ async def publish_dashboard(dashboard_id: str, make_public: bool = True, current
             user_id = 0
 
         # In real impl, load dashboard and check ownership/org membership
-        user_id = int(user_payload.get('id') or user_payload.get('sub') or 0)
-        async with get_async_session() as sdb:
-            from app.modules.charts.models import Dashboard
+        from app.db.session import async_session
+        from app.modules.charts.models import Dashboard
+        async with async_session() as sdb:
             res = await sdb.execute(select(Dashboard).where(Dashboard.id == dashboard_id))
             db_dash = res.scalar_one_or_none()
             if not db_dash:
@@ -1299,7 +1295,8 @@ async def create_dashboard_embed(dashboard_id: str, options: Dict[str, Any] = Bo
 
         # Permission check: only owner or org admin can create embed
         from app.modules.charts.models import DashboardEmbed, Dashboard
-        async with get_async_session() as sdb:
+        from app.db.session import async_session
+        async with async_session() as sdb:
             res = await sdb.execute(select(Dashboard).where(Dashboard.id == dashboard_id))
             db_dash = res.scalar_one_or_none()
             if not db_dash:
@@ -1349,7 +1346,8 @@ async def serve_embedded_dashboard(dashboard_id: str, token: Optional[str] = Non
             raise HTTPException(status_code=401, detail="Embed token required")
 
         from app.modules.charts.models import DashboardEmbed, Dashboard
-        async with get_async_session() as sdb:
+        from app.db.session import async_session
+        async with async_session() as sdb:
             res = await sdb.execute(select(DashboardEmbed).where(DashboardEmbed.embed_token == token, DashboardEmbed.dashboard_id == dashboard_id, DashboardEmbed.is_active == True))
             embed = res.scalar_one_or_none()
             if not embed:
