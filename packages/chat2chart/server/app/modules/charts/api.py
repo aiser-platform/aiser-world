@@ -25,6 +25,7 @@ from datetime import datetime
 from sqlalchemy import select
 from app.modules.authentication.deps.auth_bearer import JWTCookieBearer
 from app.modules.authentication.auth import Auth
+from app.core.config import settings
 from fastapi import APIRouter, Depends, HTTPException, Body, UploadFile, File, Request
 from typing import Optional
 
@@ -835,6 +836,7 @@ async def delete_project_dashboard(
 @router.post("/dashboards/", response_model=DashboardResponseSchema)
 async def create_dashboard(
     dashboard: DashboardCreateSchema,
+    request: Request,
     current_token: str = Depends(JWTCookieBearer()),
     db: AsyncSession = Depends(get_async_session)
 ):
@@ -843,13 +845,35 @@ async def create_dashboard(
     or Authorization header (preferred). This avoids manual cookie parsing and brittle checks.
     """
     try:
-        logger.info(f"🏗️ Creating dashboard: {dashboard.name}")
+        # Debug: log cookies and Authorization header to help diagnose client auth issues
+        try:
+            cookie_summary = {k: (v[:64] + '...') if isinstance(v, str) and len(v) > 64 else v for k, v in dict(request.cookies or {}).items()}
+            logger.info(f"🏗️ Creating dashboard: {dashboard.name} - incoming cookies: {cookie_summary}")
+            logger.info(f"Incoming Authorization header present: {bool(request.headers.get('Authorization'))}")
+        except Exception:
+            logger.info("🏗️ Creating dashboard: failed to read request debug info")
 
         # Resolve user from dependency-provided token
         user_payload = Auth().decodeJWT(current_token) if current_token else {}
         if not user_payload:
-            logger.warning('Attempt to create dashboard without valid JWT')
-            raise HTTPException(status_code=401, detail='Authentication required to create dashboards; ensure you are logged in and cookies are enabled (access_token).')
+            # In development, allow demo_token pattern to be used as fallback to identify user
+            if settings.ENVIRONMENT == 'development':
+                demo_token = request.cookies.get('access_token') or request.cookies.get('demo_token')
+                if demo_token:
+                    try:
+                        parts = str(demo_token).split("_")
+                        maybe_id = None
+                        if len(parts) >= 3 and parts[0] == 'demo' and parts[1] == 'token':
+                            maybe_id = parts[2]
+                        if maybe_id and any(c.isdigit() for c in maybe_id):
+                            digits = ''.join([c for c in maybe_id if c.isdigit()])
+                            user_payload = { 'id': digits, 'user_id': digits, 'sub': digits }
+                            logger.info(f"Using demo_token fallback user id={digits} for create_dashboard (dev only)")
+                    except Exception:
+                        user_payload = {}
+            if not user_payload:
+                logger.warning('Attempt to create dashboard without valid JWT')
+                raise HTTPException(status_code=401, detail='Authentication required to create dashboards; ensure you are logged in and cookies are enabled (access_token).')
         try:
             user_id = int(user_payload.get('id') or user_payload.get('sub') or 0)
         except Exception:
