@@ -187,25 +187,78 @@ class UserService(BaseService[User, UserCreate, UserUpdate, UserResponse]):
             logger.error(f"Error signing up user: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
-    async def refresh_token(self, request: RefreshTokenRequest) -> RefreshTokenResponse:
+    async def refresh_token(self, request: RefreshTokenRequest, response: Response) -> RefreshTokenResponse:
         """
-        Refresh access token using refresh token
+        Refresh access token using refresh token (rotate refresh token)
+        - Validate refresh token JWE/JWT
+        - Ensure it's not revoked in DB
+        - Revoke old refresh token and persist the new one
+        - Set new cookies (access + refresh)
         """
         try:
-            # Decrypt JWE token
-            decrypted_token = self.auth.decodeRefreshJWE(request.refresh_token)
-            if not decrypted_token:
-                raise HTTPException(status_code=401, detail="Invalid token")
+            raw_refresh = request.refresh_token
+            if not raw_refresh:
+                raise HTTPException(status_code=401, detail="Missing refresh token")
+
+            # Check persisted token revocation
+            if await self.auth_service.is_token_revoked(raw_refresh):
+                raise HTTPException(status_code=401, detail="Refresh token revoked or invalid")
+
+            # Decrypt JWE token to get inner JWT (if encrypted)
+            decrypted_token = self.auth.decodeRefreshJWE(raw_refresh)
+            jwt_token_to_check = decrypted_token or raw_refresh
 
             # Decode JWT claims
-            decoded_token = self.auth.decodeRefreshJWT(decrypted_token)
+            decoded_token = self.auth.decodeRefreshJWT(jwt_token_to_check)
             if not decoded_token:
-                raise HTTPException(status_code=401, detail="Token expired")
+                raise HTTPException(status_code=401, detail="Refresh token expired or invalid")
 
-            # Generate new token pair
-            return RefreshTokenResponse(
-                **self.auth.signJWT(user_id=decoded_token["user_id"])
+            user_id = decoded_token.get("user_id") or decoded_token.get("sub")
+            if not user_id:
+                raise HTTPException(status_code=401, detail="Invalid refresh token payload")
+
+            # Revoke old refresh token record to prevent reuse
+            try:
+                await self.auth_service.revoke_refresh_token(raw_refresh)
+            except Exception:
+                logger.exception("Failed to revoke old refresh token during rotation")
+
+            # Issue new token pair
+            new_pair = self.auth.signJWT(user_id=str(user_id))
+
+            # Persist new refresh token server-side
+            try:
+                await self.auth_service.persist_refresh_token(int(user_id), new_pair.get("refresh_token"), self.auth.JWT_REFRESH_EXP_TIME_MINUTES)
+            except Exception:
+                logger.exception("Failed to persist new refresh token")
+
+            # Set cookies for new tokens
+            secure_flag = False if settings.ENVIRONMENT == 'development' else True
+            samesite_setting = 'none' if secure_flag else 'lax'
+            response.set_cookie(
+                key="c2c_access_token",
+                value=new_pair.get("access_token"),
+                max_age=self.auth.JWT_EXP * 60,
+                expires=self.auth.JWT_EXP * 60,
+                httponly=True,
+                secure=secure_flag,
+                samesite=samesite_setting,
+                path='/'
             )
+            response.set_cookie(
+                key="refresh_token",
+                value=new_pair.get("refresh_token"),
+                max_age=self.auth.JWT_REFRESH_EXP_TIME_MINUTES * 60,
+                expires=self.auth.JWT_REFRESH_EXP_TIME_MINUTES * 60,
+                httponly=True,
+                secure=secure_flag,
+                samesite=samesite_setting,
+                path='/'
+            )
+
+            return RefreshTokenResponse(**{"access_token": new_pair.get("access_token"), "expires_in": self.auth.JWT_EXP * 60})
+        except HTTPException:
+            raise
         except Exception as e:
             logger.error(f"Error refreshing token: {e}")
             raise HTTPException(status_code=401, detail=str(e))
