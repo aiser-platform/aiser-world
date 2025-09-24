@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, Request, Response, HTTPException, Body
+import logging
 from app.modules.authentication.deps.auth_bearer import JWTCookieBearer
 from app.modules.authentication.auth import Auth
 from app.core.config import settings
@@ -6,6 +7,7 @@ import json
 from urllib.parse import unquote
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.get("/auth/whoami")
