@@ -21,6 +21,9 @@ from .schemas import (
 from .services import ProjectService, OrganizationService
 from app.modules.authentication.deps.auth_bearer import JWTCookieBearer
 from app.modules.authentication.auth import Auth
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 project_service = ProjectService()

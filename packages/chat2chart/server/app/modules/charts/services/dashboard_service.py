@@ -19,6 +19,8 @@ from app.modules.charts.schemas import (
     DashboardWidgetCreateSchema as WidgetCreateSchema,
     DashboardWidgetResponseSchema as WidgetResponseSchema,
 )
+from app.modules.projects.services import ProjectService
+from app.modules.projects.schemas import ProjectCreate
 from fastapi import HTTPException
 
 logger = logging.getLogger(__name__)
@@ -181,6 +183,45 @@ class DashboardService:
         try:
             logger.info(f"📊 Creating dashboard: {dashboard_data.name}")
             
+            # If no project_id was provided, try to ensure the user has a default project
+            if not dashboard_data.project_id:
+                try:
+                    proj_service = ProjectService()
+                    user_projects = await proj_service.get_user_projects(str(user_id))
+                    if user_projects and len(user_projects) > 0:
+                        dashboard_data.project_id = user_projects[0].id
+                    else:
+                        # create a default project under user's default org
+                        default_org = None
+                        try:
+                            from app.modules.projects.services import OrganizationService
+                            org_svc = OrganizationService()
+                            default_orgs = await org_svc.get_user_organizations(str(user_id))
+                            if default_orgs and len(default_orgs) > 0:
+                                default_org = default_orgs[0]
+                        except Exception:
+                            default_org = None
+
+                        if not default_org:
+                            # create default organization
+                            try:
+                                org_svc = OrganizationService()
+                                default_org = await org_svc.create_default_organization(str(user_id))
+                            except Exception:
+                                default_org = None
+
+                        if default_org:
+                            try:
+                                new_proj = ProjectCreate(name="Default Project", description="Auto-created default project for user", organization_id=default_org.id)
+                                created_proj = await proj_service.create_project(new_proj, str(user_id))
+                                dashboard_data.project_id = created_proj.id
+                            except Exception:
+                                # best-effort; leave project_id None if creation fails
+                                pass
+                except Exception:
+                    # best-effort only: if any error occurs trying to infer/create project/org, ignore and continue
+                    pass
+
             # Create dashboard
             created_by_value = user_id if user_id and user_id > 0 else None
             dashboard = Dashboard(

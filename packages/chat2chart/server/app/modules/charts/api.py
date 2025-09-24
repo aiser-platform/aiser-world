@@ -888,8 +888,16 @@ async def create_dashboard(
 
         dashboard_service = DashboardService(db)
         created_dashboard = await dashboard_service.create_dashboard(dashboard, user_id)
-        
-        return created_dashboard
+
+        # Normalize response for frontend clients: include top-level id and dashboard object
+        try:
+            if isinstance(created_dashboard, dict):
+                dash_id = created_dashboard.get('id')
+            else:
+                dash_id = getattr(created_dashboard, 'id', None)
+            return {"success": True, "dashboard": created_dashboard, "id": str(dash_id) if dash_id is not None else None}
+        except Exception:
+            return {"success": True, "dashboard": created_dashboard}
         
     except HTTPException:
         # Let HTTPExceptions (401/403/422) propagate to the client unchanged

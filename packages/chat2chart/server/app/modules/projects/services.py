@@ -94,6 +94,7 @@ class ProjectService(
                 max_projects=5,
             )
 
+            # Repository.create now accepts an optional db session
             organization = await self.__org_repository.create(org_data.model_dump(), db)
 
             # Add user as owner

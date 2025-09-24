@@ -132,14 +132,32 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             logger.error(f"Error fetching records: {str(e)}")
             raise
 
-    async def create(self, obj_in: CreateSchemaType) -> ModelType:
-        """Create a new record"""
+    async def create(self, obj_in: CreateSchemaType, db: Optional[Any] = None) -> ModelType:
+        """Create a new record.
+
+        Accepts an optional `db` AsyncSession for callers that manage sessions
+        externally. If `db` is not provided, uses the repository's session
+        provider (`self.db.get_session()`). Returns the created model instance.
+        """
         try:
             from app.common.utils import jsonable_encoder
 
             obj_in_data = jsonable_encoder(obj_in)
             db_obj = self.model(**obj_in_data)
-            return await self.db.add(db_obj)
+
+            # If an external session is provided, use it (caller owns commit)
+            if db is not None:
+                db.add(db_obj)
+                await db.flush()
+                await db.refresh(db_obj)
+                return db_obj
+
+            # Otherwise use internal session manager
+            async with self.db.get_session() as session:
+                session.add(db_obj)
+                await session.flush()
+                await session.refresh(db_obj)
+                return db_obj
         except Exception as e:
             raise e
 

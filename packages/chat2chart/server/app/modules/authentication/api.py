@@ -26,6 +26,12 @@ async def whoami_raw(request: Request):
     }
 
 
+@router.post("/auth/echo")
+async def auth_echo(payload: dict | None = Body(None)):
+    """Dev helper: echo back the received JSON body to validate POST handling."""
+    return {"received": payload}
+
+
 @router.post("/auth/upgrade-demo")
 async def upgrade_demo(request: Request, response: Response, payload: dict | None = Body(None)):
     """Dev helper: upgrade demo_token_* / user cookie into a real c2c_access_token JWT.
@@ -142,5 +148,78 @@ async def upgrade_demo(request: Request, response: Response, payload: dict | Non
         result["access_token"] = token_pair.get("access_token")
         result["refresh_token"] = token_pair.get("refresh_token")
     return result
+
+
+@router.post("/auth/dev-create-dashboard")
+async def dev_create_dashboard(request: Request, payload: dict | None = Body(None)):
+    """Dev-only helper: create a dashboard for an inferred demo user.
+
+    Accepts a minimal dashboard payload in the body or a legacy `demo_token` / `user` value
+    to infer the user id. Only enabled when ENVIRONMENT == 'development'. Returns the
+    created dashboard JSON on success.
+    """
+    if settings.ENVIRONMENT != "development":
+        raise HTTPException(status_code=403, detail="Not allowed in this environment")
+
+    cookies = request.cookies or {}
+    user_cookie = cookies.get("user")
+    demo_token = cookies.get("access_token")
+    body = payload or {}
+
+    if not demo_token and body.get("demo_token"):
+        demo_token = body.get("demo_token")
+    if not user_cookie and body.get("user"):
+        user_cookie = body.get("user")
+
+    resolved = {}
+    if user_cookie:
+        try:
+            raw = unquote(user_cookie)
+            resolved = json.loads(raw)
+        except Exception:
+            resolved = {}
+
+    if not resolved.get("user_id") and demo_token:
+        try:
+            parts = demo_token.split("_")
+            if len(parts) >= 3 and parts[0] == "demo" and parts[1] == "token":
+                maybe_id = parts[2]
+                digits = ''.join([c for c in maybe_id if c.isdigit()])
+                if digits:
+                    resolved["user_id"] = digits
+        except Exception:
+            pass
+
+    if not resolved.get("user_id"):
+        raise HTTPException(status_code=400, detail="Could not resolve demo user id")
+
+    user_id = str(resolved.get("user_id"))
+
+    # Build dashboard payload from request body (best-effort)
+    dash_payload = {
+        "name": body.get("name", "Dev Dashboard"),
+        "description": body.get("description"),
+        "layout_config": body.get("layout_config") or {},
+        "theme_config": body.get("theme_config") or {},
+        "global_filters": body.get("global_filters") or {"items": []},
+        "refresh_interval": body.get("refresh_interval") or 300,
+        "is_public": bool(body.get("is_public", False)),
+        "is_template": bool(body.get("is_template", False)),
+        "project_id": body.get("project_id")
+    }
+
+    try:
+        from app.modules.charts.services.dashboard_service import DashboardService
+        from app.db.session import async_session
+        from app.modules.charts.schemas import DashboardCreateSchema
+
+        schema = DashboardCreateSchema.model_validate(dash_payload)
+        async with async_session() as db:
+            svc = DashboardService(db)
+            created = await svc.create_dashboard(schema, int(user_id))
+            return {"success": True, "dashboard": created}
+    except Exception as e:
+        logger.exception("Dev create dashboard failed")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
