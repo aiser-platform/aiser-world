@@ -41,7 +41,7 @@ class StreamingChatService:
             conversation_id = conversation_id or str(uuid4())
 
             # Check cache first for cost optimization
-            cache_key = self._get_cache_key(user_query, data_source_id)
+            cache_key = self._get_cache_key(user_query, data_source_id, conversation_id)
             cached_response = self._get_cached_response(cache_key)
 
             if cached_response:
@@ -136,11 +136,12 @@ class StreamingChatService:
             logger.error(f"❌ Streaming chat failed: {str(e)}")
             yield f"data: {json.dumps({'type': 'error', 'content': 'Sorry, I encountered an error. Please try again.'})}\n\n"
 
-    def _get_cache_key(self, query: str, data_source_id: Optional[str]) -> str:
+    def _get_cache_key(self, query: str, data_source_id: Optional[str], conversation_id: Optional[str] = None) -> str:
         """Generate cache key for response caching"""
         import hashlib
 
-        content = f"{query}:{data_source_id or 'no_data'}"
+        # Include conversation_id in cache key to make each conversation unique
+        content = f"{query}:{data_source_id or 'no_data'}:{conversation_id or 'no_conversation'}"
         return hashlib.md5(content.encode()).hexdigest()
 
     def _get_cached_response(self, cache_key: str) -> Optional[str]:
@@ -294,3 +295,9 @@ class StreamingChatService:
             "cached_responses": cached_responses,
             "cache_hit_potential": f"{(cached_responses / max(active_sessions, 1)) * 100:.1f}%",
         }
+
+    def clear_cache(self):
+        """Clear all cached responses and sessions"""
+        self._response_cache.clear()
+        self._session_cache.clear()
+        logger.info("🧹 Cache cleared successfully")

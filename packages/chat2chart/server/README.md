@@ -28,7 +28,7 @@ pip install -r requirements.txt
 #### Start server
 
 ```
-fastrun start
+pip
 ```
 
 #### DB revision

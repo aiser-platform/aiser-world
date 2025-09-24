@@ -9,9 +9,7 @@
  */
 
 export const getBackendUrl = (): string => {
-  // Priority 1: Explicit environment v
-  // 
-  // ariable (production, staging, on-premise)
+  // Priority 1: Explicit environment variable (production, staging, on-premise)
   if (process.env.NEXT_PUBLIC_BACKEND_URL) {
     return process.env.NEXT_PUBLIC_BACKEND_URL;
   }
