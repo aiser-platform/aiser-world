@@ -427,238 +427,48 @@ async def get_mcp_chart_recommendations(data_analysis: Dict[str, Any] = Body(...
 # 🎨 Chart Builder Endpoints
 @router.post("/builder/save")
 async def save_chart(chart_data: Dict[str, Any], current_token: str = Depends(JWTCookieBearer())):
-    """Persist a chart configuration created in the chart builder."""
-    try:
-        # Validate chart data
-        required_fields = ['name', 'type', 'config', 'data']
-        for field in required_fields:
-            if field not in chart_data:
-                raise HTTPException(status_code=400, detail=f"Missing required field: {field}")
-
-        user_payload = Auth().decodeJWT(current_token) or {}
-        try:
-            user_id = int(user_payload.get('id') or user_payload.get('sub') or 0)
-        except Exception:
-            user_id = 0
-
-        # Persist chart
-        from app.modules.charts.models import ChatVisualization
-        from app.db.session import async_session
-        async with async_session() as db:
-            chart = ChatVisualization(
-                title=chart_data.get('name'),
-                chart_type=chart_data.get('type'),
-                form_data=chart_data.get('config'),
-                result=chart_data.get('data'),
-                user_id=user_id,
-                is_active=True
-            )
-            db.add(chart)
-            await db.flush()
-            await db.refresh(chart)
-
-            return {"success": True, "message": "Chart saved successfully", "chart": {"id": str(chart.id), "name": chart.title}}
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"❌ Failed to save chart: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to save chart: {str(e)}")
+    """Deprecated chart-builder save endpoint. Use `/charts/dashboards/` or widget APIs instead."""
+    logger.warning("Deprecated endpoint called: /builder/save - use dashboards/widgets APIs instead")
+    raise HTTPException(status_code=410, detail="/builder endpoints are deprecated; use dashboard and widget APIs")
 
 @router.get("/builder/list")
 async def list_charts(current_token: str = Depends(JWTCookieBearer()), chart_type: Optional[str] = None, limit: int = 50, offset: int = 0):
-    """List charts owned by the user or active charts."""
-    try:
-        user_payload = Auth().decodeJWT(current_token) or {}
-        try:
-            user_id = int(user_payload.get('id') or user_payload.get('sub') or 0)
-        except Exception:
-            user_id = 0
-
-        from app.modules.charts.models import ChatVisualization
-        from app.db.session import async_session
-        async with async_session() as db:
-            query = select(ChatVisualization).where((ChatVisualization.user_id == user_id) | (ChatVisualization.is_active == True))
-            if chart_type:
-                query = query.where(ChatVisualization.chart_type == chart_type)
-            res = await db.execute(query)
-            charts = res.scalars().all()
-            items = []
-            for c in charts:
-                items.append({"id": str(c.id), "name": c.title, "type": c.chart_type, "created_at": c.created_at, "updated_at": c.updated_at, "user_id": c.user_id})
-            return {"success": True, "charts": items[offset:offset+limit], "total": len(items), "limit": limit, "offset": offset}
-    except Exception as e:
-        logger.error(f"❌ Failed to list charts: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to list charts: {str(e)}")
+    """Deprecated chart-builder list endpoint."""
+    logger.warning("Deprecated endpoint called: /builder/list - use dashboard/widget listing instead")
+    raise HTTPException(status_code=410, detail="/builder endpoints are deprecated; use dashboard and widget APIs")
 
 @router.get("/builder/{chart_id}")
 async def get_chart(chart_id: str, current_token: str = Depends(JWTCookieBearer())):
-    """Get a specific chart by ID with permission checks."""
-    try:
-        user_payload = Auth().decodeJWT(current_token) or {}
-        try:
-            user_id = int(user_payload.get('id') or user_payload.get('sub') or 0)
-        except Exception:
-            user_id = 0
-
-        from app.modules.charts.models import ChatVisualization
-        from app.db.session import async_session
-        async with async_session() as db:
-            res = await db.execute(select(ChatVisualization).where(ChatVisualization.id == chart_id))
-            chart = res.scalar_one_or_none()
-            if not chart:
-                raise HTTPException(status_code=404, detail="Chart not found")
-            if chart.user_id and chart.user_id != user_id and not chart.is_active:
-                raise HTTPException(status_code=403, detail="Access denied")
-            return {"success": True, "chart": {"id": str(chart.id), "name": chart.title, "type": chart.chart_type, "config": chart.form_data, "data": chart.result, "created_at": chart.created_at, "updated_at": chart.updated_at}}
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"❌ Failed to get chart {chart_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to get chart: {str(e)}")
+    """Deprecated chart-builder get endpoint."""
+    logger.warning("Deprecated endpoint called: /builder/{chart_id} - use dashboard/widget APIs instead")
+    raise HTTPException(status_code=410, detail="/builder endpoints are deprecated; use dashboard and widget APIs")
 
 @router.put("/builder/{chart_id}")
 async def update_chart(chart_id: str, chart_data: Dict[str, Any], current_token: str = Depends(JWTCookieBearer())):
-    """Update an existing chart with ownership check."""
-    try:
-        logger.info(f"✏️ Updating chart: {chart_id}")
-        required_fields = ['name', 'type', 'config', 'data']
-        for field in required_fields:
-            if field not in chart_data:
-                raise HTTPException(status_code=400, detail=f"Missing required field: {field}")
-
-        user_payload = Auth().decodeJWT(current_token) or {}
-        try:
-            user_id = int(user_payload.get('id') or user_payload.get('sub') or 0)
-        except Exception:
-            user_id = 0
-
-        from app.modules.charts.models import ChatVisualization
-        from app.db.session import async_session
-        async with async_session() as db:
-            res = await db.execute(select(ChatVisualization).where(ChatVisualization.id == chart_id))
-            chart = res.scalar_one_or_none()
-            if not chart:
-                raise HTTPException(status_code=404, detail="Chart not found")
-            if chart.user_id and chart.user_id != user_id:
-                raise HTTPException(status_code=403, detail="Access denied")
-            chart.title = chart_data.get('name')
-            chart.chart_type = chart_data.get('type')
-            chart.form_data = chart_data.get('config')
-            chart.result = chart_data.get('data')
-            await db.flush()
-            await db.refresh(chart)
-            return {"success": True, "message": "Chart updated successfully", "chart": {"id": str(chart.id), "name": chart.title}}
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"❌ Failed to update chart {chart_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to update chart: {str(e)}")
+    """Deprecated chart-builder update endpoint."""
+    logger.warning("Deprecated endpoint called: PUT /builder/{chart_id} - use dashboard/widget APIs instead")
+    raise HTTPException(status_code=410, detail="/builder endpoints are deprecated; use dashboard and widget APIs")
 
 @router.delete("/builder/{chart_id}")
 async def delete_chart(chart_id: str, current_token: str = Depends(JWTCookieBearer())):
-    """Delete a chart if owned by request user."""
-    try:
-        user_payload = Auth().decodeJWT(current_token) or {}
-        try:
-            user_id = int(user_payload.get('id') or user_payload.get('sub') or 0)
-        except Exception:
-            user_id = 0
-
-        from app.modules.charts.models import ChatVisualization
-        from app.db.session import async_session
-        async with async_session() as db:
-            res = await db.execute(select(ChatVisualization).where(ChatVisualization.id == chart_id))
-            chart = res.scalar_one_or_none()
-            if not chart:
-                raise HTTPException(status_code=404, detail="Chart not found")
-            if chart.user_id and chart.user_id != user_id:
-                raise HTTPException(status_code=403, detail="Access denied")
-            await db.delete(chart)
-            await db.flush()
-            return {"success": True, "message": "Chart deleted successfully", "chart_id": chart_id}
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"❌ Failed to delete chart {chart_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to delete chart: {str(e)}")
+    """Deprecated chart-builder delete endpoint."""
+    logger.warning("Deprecated endpoint called: DELETE /builder/{chart_id} - use dashboard/widget APIs instead")
+    raise HTTPException(status_code=410, detail="/builder endpoints are deprecated; use dashboard and widget APIs")
 
 @router.post("/builder/export")
 async def export_chart(chart_data: Dict[str, Any]):
-    """
-    Export chart as various formats (PNG, SVG, PDF)
-    """
-    try:
-        logger.info(f"📤 Exporting chart: {chart_data.get('name', 'Unnamed Chart')}")
-        
-        # This would integrate with ECharts export functionality
-        # For now, return success response
-        
-        return {
-            "success": True,
-            "message": "Chart exported successfully",
-            "export_url": f"/exports/chart_{hash(str(chart_data))}.png",
-            "formats": ["PNG", "SVG", "PDF"]
-        }
-        
-    except Exception as e:
-        logger.error(f"❌ Failed to export chart: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to export chart: {str(e)}")
+    logger.warning("Deprecated endpoint called: /builder/export - use dashboard export APIs")
+    raise HTTPException(status_code=410, detail="/builder endpoints are deprecated; use dashboard export APIs")
 
 @router.post("/builder/import")
 async def import_chart(file: UploadFile = File(...)):
-    """
-    Import chart from file (JSON, CSV, etc.)
-    """
-    try:
-        logger.info(f"📥 Importing chart from file: {file.filename}")
-        
-        # Read file content
-        content = await file.read()
-        
-        if file.filename.endswith('.json'):
-            chart_data = json.loads(content.decode('utf-8'))
-        else:
-            raise HTTPException(status_code=400, detail="Unsupported file format. Please use JSON.")
-        
-        # Validate imported chart data
-        required_fields = ['name', 'type', 'config', 'data']
-        for field in required_fields:
-            if field not in chart_data:
-                raise HTTPException(status_code=400, detail=f"Invalid chart file: missing {field}")
-        
-        return {
-            "success": True,
-            "message": "Chart imported successfully",
-            "chart": chart_data
-        }
-        
-    except Exception as e:
-        logger.error(f"❌ Failed to import chart: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to import chart: {str(e)}")
+    logger.warning("Deprecated endpoint called: /builder/import - use dashboard import APIs")
+    raise HTTPException(status_code=410, detail="/builder endpoints are deprecated; use dashboard APIs")
 
 @router.post("/builder/share")
 async def share_chart(chart_data: Dict[str, Any]):
-    """
-    Share chart with other users or make it public
-    """
-    try:
-        logger.info(f"🔗 Sharing chart: {chart_data.get('name', 'Unnamed Chart')}")
-        
-        # Generate shareable link
-        share_id = f"share_{hash(str(chart_data))}"
-        share_url = f"/chart-builder?share={share_id}"
-        
-        return {
-            "success": True,
-            "message": "Chart shared successfully",
-            "share_id": share_id,
-            "share_url": share_url,
-            "is_public": chart_data.get('is_public', False)
-        }
-        
-    except Exception as e:
-        logger.error(f"❌ Failed to share chart: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to share chart: {str(e)}")
+    logger.warning("Deprecated endpoint called: /builder/share - use dashboard share/embed APIs")
+    raise HTTPException(status_code=410, detail="/builder endpoints are deprecated; use dashboard share/embed APIs")
 
 
 # 🏗️ PROJECT-SCOPED DASHBOARD ENDPOINTS
