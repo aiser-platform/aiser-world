@@ -123,6 +123,14 @@ async def get_projects(
         except Exception:
             user_id = None
 
+        # Debugging: log incoming cookies and Authorization header to help diagnose client auth issues
+        try:
+            cookie_summary = {k: (v[:64] + '...') if isinstance(v, str) and len(v) > 64 else v for k, v in dict(request.cookies or {}).items()}
+            logger.info(f"📋 get_projects incoming cookies: {cookie_summary}")
+            logger.info(f"Authorization header present: {bool(request.headers.get('Authorization'))}")
+        except Exception:
+            logger.info("📋 get_projects: failed to read request debug info")
+
         # Get real projects from database for the user
         if not user_id:
             # If no authenticated user, return public projects only

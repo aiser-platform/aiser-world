@@ -747,7 +747,7 @@ async def get_project_dashboard(
     """Get a specific dashboard for a project (DB backed)"""
     try:
         logger.info(f"📊 Getting dashboard {dashboard_id} for project {project_id} in organization {organization_id}")
-
+        
         # Resolve caller user id (may be dict in tests)
         if isinstance(current_token, dict):
             user_payload = current_token
@@ -853,29 +853,30 @@ async def create_dashboard(
         except Exception:
             logger.info("🏗️ Creating dashboard: failed to read request debug info")
 
-        # Resolve user from dependency-provided token
-        user_payload = Auth().decodeJWT(current_token) if current_token else {}
-        if not user_payload:
-            # In development, allow demo_token pattern to be used as fallback to identify user
-            if settings.ENVIRONMENT == 'development':
-                demo_token = request.cookies.get('access_token') or request.cookies.get('demo_token')
-                if demo_token:
-                    try:
-                        parts = str(demo_token).split("_")
-                        maybe_id = None
-                        if len(parts) >= 3 and parts[0] == 'demo' and parts[1] == 'token':
-                            maybe_id = parts[2]
-                        if maybe_id and any(c.isdigit() for c in maybe_id):
-                            digits = ''.join([c for c in maybe_id if c.isdigit()])
-                            user_payload = { 'id': digits, 'user_id': digits, 'sub': digits }
-                            logger.info(f"Using demo_token fallback user id={digits} for create_dashboard (dev only)")
-                    except Exception:
-                        user_payload = {}
-            if not user_payload:
-                logger.warning('Attempt to create dashboard without valid JWT')
-                raise HTTPException(status_code=401, detail='Authentication required to create dashboards; ensure you are logged in and cookies are enabled (access_token).')
+        # Resolve user via central helper - prefer dependency injection where possible
         try:
-            user_id = int(user_payload.get('id') or user_payload.get('sub') or 0)
+            # If the dependency injection provided a token dict, use it; else derive from request
+            if isinstance(current_token, dict):
+                user_payload = current_token
+            else:
+                user_payload = Auth().decodeJWT(current_token) if current_token else {}
+        except Exception:
+            user_payload = {}
+
+        # Final fallback: use central helper dependency if available on request state
+        try:
+            from app.modules.authentication.deps.auth_bearer import current_user_payload
+            fallback_payload = await current_user_payload(request)
+            if not user_payload and fallback_payload:
+                user_payload = fallback_payload
+        except Exception:
+            pass
+
+        if not user_payload:
+            logger.warning('Attempt to create dashboard without valid JWT')
+            raise HTTPException(status_code=401, detail='Authentication required to create dashboards; ensure you are logged in and cookies are enabled (access_token).')
+        try:
+        user_id = int(user_payload.get('id') or user_payload.get('sub') or 0)
         except Exception:
             user_id = 0
 
@@ -887,7 +888,7 @@ async def create_dashboard(
 
         dashboard_service = DashboardService(db)
         created_dashboard = await dashboard_service.create_dashboard(dashboard, user_id)
-
+        
         return created_dashboard
         
     except HTTPException:
@@ -1219,58 +1220,58 @@ async def share_dashboard(dashboard_id: str, share_request: DashboardShareCreate
         except Exception:
             user_id = 0
 
-            from app.modules.charts.models import DashboardShare, Dashboard
+        from app.modules.charts.models import DashboardShare, Dashboard
             from app.db.session import async_session
             async with async_session() as db:
-                # Basic permission: only owner/org_admin can share
-                res = await db.execute(select(Dashboard).where(Dashboard.id == dashboard_id))
-                db_dash = res.scalar_one_or_none()
-                if not db_dash:
-                    raise HTTPException(status_code=404, detail="Dashboard not found")
-                if db_dash.created_by and db_dash.created_by != user_id:
-                    # try org admin check via project->organization
-                    org_id = None
-                    if db_dash.project_id:
-                        from app.modules.projects.models import Project
-                        pres = await db.execute(select(Project).where(Project.id == db_dash.project_id))
-                        proj = pres.scalar_one_or_none()
-                        if proj:
-                            org_id = proj.organization_id
-                    if org_id:
-                        from app.modules.projects.models import OrganizationUser
-                        our = await db.execute(select(OrganizationUser).where(OrganizationUser.user_id == user_id, OrganizationUser.organization_id == org_id))
-                        our_row = our.scalar_one_or_none()
-                        if not our_row or our_row.role not in ('owner', 'admin'):
-                            raise HTTPException(status_code=403, detail="Insufficient permissions to share dashboard")
-                    else:
+            # Basic permission: only owner/org_admin can share
+            res = await db.execute(select(Dashboard).where(Dashboard.id == dashboard_id))
+            db_dash = res.scalar_one_or_none()
+            if not db_dash:
+                raise HTTPException(status_code=404, detail="Dashboard not found")
+            if db_dash.created_by and db_dash.created_by != user_id:
+                # try org admin check via project->organization
+                org_id = None
+                if db_dash.project_id:
+                    from app.modules.projects.models import Project
+                    pres = await db.execute(select(Project).where(Project.id == db_dash.project_id))
+                    proj = pres.scalar_one_or_none()
+                    if proj:
+                        org_id = proj.organization_id
+                if org_id:
+                    from app.modules.projects.models import OrganizationUser
+                    our = await db.execute(select(OrganizationUser).where(OrganizationUser.user_id == user_id, OrganizationUser.organization_id == org_id))
+                    our_row = our.scalar_one_or_none()
+                    if not our_row or our_row.role not in ('owner', 'admin'):
                         raise HTTPException(status_code=403, detail="Insufficient permissions to share dashboard")
+                else:
+                    raise HTTPException(status_code=403, detail="Insufficient permissions to share dashboard")
 
-                share = DashboardShare(
-                    dashboard_id=dashboard_id,
-                    shared_by=user_id,
-                    shared_with=share_request.shared_with,
-                    permission=share_request.permission,
-                    expires_at=share_request.expires_at,
-                    is_active=share_request.is_active,
-                    share_token=f"share_{hash((dashboard_id, share_request.shared_with, share_request.permission))}"
-                )
-                db.add(share)
-                await db.flush()
-                await db.refresh(share)
-                return {
-                    "id": str(share.id),
-                    "dashboard_id": dashboard_id,
-                    "shared_by": share.shared_by,
-                    "shared_with": share.shared_with,
-                    "permission": share.permission,
-                    "expires_at": share.expires_at,
-                    "is_active": share.is_active,
-                    "share_token": share.share_token,
-                    "access_count": share.access_count,
-                    "last_accessed_at": share.last_accessed_at,
-                    "created_at": share.created_at,
-                    "updated_at": share.updated_at
-                }
+            share = DashboardShare(
+                dashboard_id=dashboard_id,
+                shared_by=user_id,
+                shared_with=share_request.shared_with,
+                permission=share_request.permission,
+                expires_at=share_request.expires_at,
+                is_active=share_request.is_active,
+                share_token=f"share_{hash((dashboard_id, share_request.shared_with, share_request.permission))}"
+            )
+            db.add(share)
+            await db.flush()
+            await db.refresh(share)
+            return {
+                "id": str(share.id),
+                "dashboard_id": dashboard_id,
+                "shared_by": share.shared_by,
+                "shared_with": share.shared_with,
+                "permission": share.permission,
+                "expires_at": share.expires_at,
+                "is_active": share.is_active,
+                "share_token": share.share_token,
+                "access_count": share.access_count,
+                "last_accessed_at": share.last_accessed_at,
+                "created_at": share.created_at,
+                "updated_at": share.updated_at
+            }
         
     except Exception as e:
         logger.error(f"❌ Failed to share dashboard {dashboard_id}: {str(e)}")
@@ -1289,7 +1290,7 @@ async def publish_dashboard(dashboard_id: str, make_public: bool = True, current
 
         # In real impl, load dashboard and check ownership/org membership
         from app.db.session import async_session
-        from app.modules.charts.models import Dashboard
+            from app.modules.charts.models import Dashboard
         async with async_session() as sdb:
             res = await sdb.execute(select(Dashboard).where(Dashboard.id == dashboard_id))
             db_dash = res.scalar_one_or_none()

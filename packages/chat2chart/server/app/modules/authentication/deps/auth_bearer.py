@@ -5,6 +5,9 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
 from app.modules.authentication import Auth
+import logging
+
+logger = logging.getLogger(__name__)
 
 get_bearer_token = HTTPBearer(auto_error=False)
 
@@ -83,6 +86,12 @@ class JWTCookieBearer(HTTPBearer):
             pass
 
         if not self.verify_jwt(token):
+            # Log token debug info (mask token) to help diagnose client issues
+            try:
+                masked = (token[:8] + '...') if isinstance(token, str) and len(token) > 8 else token
+                logger.info(f"JWTCookieBearer rejected token: {masked}; Authorization header present: {bool(request.headers.get('Authorization'))}; cookies: {list(request.cookies.keys())}")
+            except Exception:
+                logger.info("JWTCookieBearer rejected token and failed to read request details")
             raise HTTPException(
                 status_code=403, detail="Invalid token or expired token."
             )
@@ -101,3 +110,46 @@ class JWTCookieBearer(HTTPBearer):
 
 
 CookieDep = Depends(JWTCookieBearer())
+
+
+async def current_user_payload(request: Request) -> dict:
+    """Resolve the current user payload from cookie or Authorization header.
+
+    Returns an empty dict if no valid token is present. In development, will
+    try to infer a demo user id from legacy demo_token cookie patterns.
+    """
+    token = request.cookies.get("c2c_access_token") or request.cookies.get("access_token")
+    # Authorization header may contain 'Bearer <token>'
+    auth_header = request.headers.get('Authorization') or request.headers.get('authorization')
+    if not token and auth_header:
+        if auth_header.lower().startswith('bearer '):
+            token = auth_header.split(None, 1)[1].strip()
+        else:
+            token = auth_header
+
+    payload = {}
+    if token:
+        try:
+            payload = Auth().decodeJWT(token) or {}
+        except Exception:
+            payload = {}
+
+    # Development fallback: infer user id from demo_token pattern demo_token_<id>_...
+    from app.core.config import settings
+    if not payload and settings.ENVIRONMENT == 'development':
+        demo_token = request.cookies.get('access_token') or request.cookies.get('demo_token')
+        if demo_token:
+            try:
+                parts = str(demo_token).split("_")
+                if len(parts) >= 3 and parts[0] == 'demo' and parts[1] == 'token':
+                    maybe_id = parts[2]
+                    digits = ''.join([c for c in maybe_id if c.isdigit()])
+                    if digits:
+                        payload = { 'id': digits, 'user_id': digits, 'sub': digits }
+            except Exception:
+                payload = {}
+
+    return payload
+
+
+CurrentUserPayloadDep = Depends(current_user_payload)
