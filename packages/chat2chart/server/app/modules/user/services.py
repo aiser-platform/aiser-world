@@ -14,6 +14,7 @@ from app.modules.user.models import User
 from app.modules.user.repository import UserRepository
 from app.modules.user.schemas import UserCreate, UserResponse, UserUpdate
 from fastapi import HTTPException, Request, Response
+from app.modules.authentication.services import AuthService
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,7 @@ class UserService(BaseService[User, UserCreate, UserUpdate, UserResponse]):
     def __init__(self):
         self.repository = UserRepository()
         self.auth = Auth()
+        self.auth_service = AuthService()
         super().__init__(self.repository)
 
     async def create_user(self, user_in: UserCreate) -> User:
@@ -96,10 +98,17 @@ class UserService(BaseService[User, UserCreate, UserUpdate, UserResponse]):
             **self.auth.signJWT(**jwt_payload)
         )
 
-        # Set cookies with HttpOnly and SameSite=None to allow cross-site frontend to send cookies
+        # Persist refresh token server-side for revocation and rotation
+        try:
+            await self.auth_service.persist_refresh_token(int(user.id), sign_in.refresh_token, self.auth.JWT_REFRESH_EXP_TIME_MINUTES)
+        except Exception:
+            # Non-fatal if DB persist fails; log in production
+            pass
+
+        # Set cookies with HttpOnly and SameSite handling
         secure_flag = False if settings.ENVIRONMENT == 'development' else True
-        # For cross-site frontend (localhost:3000) during development, set SameSite=None so cookie is sent
-        samesite_setting = 'none'
+        # Use SameSite=None only if secure_flag (browsers require Secure with SameSite=None). For local dev, use Lax.
+        samesite_setting = 'none' if secure_flag else 'lax'
         response.set_cookie(
             key="c2c_access_token",
             value=sign_in.access_token,

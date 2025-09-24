@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Request, Response, HTTPException, Body
 import logging
 from app.modules.authentication.deps.auth_bearer import JWTCookieBearer
 from app.modules.authentication.auth import Auth
+from app.modules.authentication.services import AuthService
 from app.core.config import settings
 import json
 from urllib.parse import unquote
@@ -148,6 +149,36 @@ async def upgrade_demo(request: Request, response: Response, payload: dict | Non
         result["access_token"] = token_pair.get("access_token")
         result["refresh_token"] = token_pair.get("refresh_token")
     return result
+
+
+@router.post("/auth/logout")
+async def logout(request: Request, response: Response, current_token: str = Depends(JWTCookieBearer())):
+    """Logout user: revoke refresh token and clear cookies"""
+    try:
+        # Attempt to revoke persisted refresh token (if present)
+        auth_service = AuthService()
+        # Try cookie first
+        refresh_token = request.cookies.get('refresh_token')
+        # Fallback: Authorization header may contain bearer refresh token (rare)
+        if not refresh_token:
+            auth_header = request.headers.get('Authorization') or request.headers.get('authorization')
+            if auth_header and auth_header.lower().startswith('bearer '):
+                refresh_token = auth_header.split(None, 1)[1].strip()
+
+        if refresh_token:
+            try:
+                await auth_service.revoke_refresh_token(refresh_token)
+            except Exception:
+                logger.exception('Failed to revoke refresh token during logout')
+
+        # Clear cookies
+        response.delete_cookie('c2c_access_token', path='/')
+        response.delete_cookie('refresh_token', path='/')
+
+        return {"success": True, "message": "Logged out"}
+    except Exception as e:
+        logger.error(f"Logout failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/auth/dev-create-dashboard")

@@ -62,12 +62,20 @@ class Auth:
         )
 
         try:
+            # Ensure SECRET key meets length requirements for A256GCM (32 bytes)
+            secret_bytes = self.SECRET.encode() if isinstance(self.SECRET, str) else self.SECRET
+            if len(secret_bytes) < 32:
+                # pad secret
+                secret_bytes = secret_bytes.ljust(32, b"0")
+            elif len(secret_bytes) > 32:
+                secret_bytes = secret_bytes[:32]
+
             jwe_token = jwe.encrypt(
-                refresh_jwt, self.SECRET, algorithm="dir", encryption="A256GCM"
+                refresh_jwt, secret_bytes, algorithm="dir", encryption="A256GCM"
             )
             return jwe_token
         except Exception:
-            # Fallback to return signed JWT if JWE fails (e.g., key length)
+            # Fallback to return signed JWT if JWE fails (e.g., unexpected environment)
             return refresh_jwt
 
     def signJWT(self, **kwargs) -> Dict[str, str]:
