@@ -13,7 +13,14 @@ export async function fetchWithAuth(input: RequestInfo, init: RequestInit = {}) 
           try {
             const body = await up.json();
             if (body && body.access_token) {
-              document.cookie = `c2c_access_token=${body.access_token}; path=/; samesite=lax`; // client-side fallback for dev
+              // client-side fallback cookie for dev
+              try {
+                document.cookie = `c2c_access_token=${body.access_token}; path=/; samesite=lax`;
+              } catch (e) {
+                // ignore
+              }
+              // also include Authorization header on retry in case cookies are blocked
+              (cfg.headers as Record<string, string>)['Authorization'] = `Bearer ${body.access_token}`;
             }
           } catch (e) {
             // ignore parse errors
