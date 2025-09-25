@@ -279,9 +279,28 @@ class DashboardService:
                 max_pages=5,
             )
             
+            # Dump debug info to a file in the container to inspect types at runtime
+            try:
+                with open('/tmp/dashboard_service_debug.log', 'a') as _f:
+                    _f.write(f"DEBUG_PRE_INSERT created_by_value={created_by_value!r} type={type(created_by_value)} final_created_by={final_created_by!r} type_final={type(final_created_by)}\n")
+            except Exception:
+                pass
+
             self.db.add(dashboard)
             await self.db.commit()
             await self.db.refresh(dashboard)
+
+            # If we resolved a UUID for created_by after creation, persist it with a safe UPDATE
+            try:
+                if final_created_by:
+                    await self.db.execute(
+                        update(Dashboard).where(Dashboard.id == dashboard.id).values(created_by=final_created_by)
+                    )
+                    await self.db.commit()
+                    await self.db.refresh(dashboard)
+            except Exception:
+                # Non-fatal: dashboard created without created_by set
+                await self.db.rollback()
             
             # Convert to response format
             return {
