@@ -274,7 +274,8 @@ class DashboardService:
                 refresh_interval=dashboard_data.refresh_interval or 300,
                 is_public=dashboard_data.is_public or False,
                 is_template=dashboard_data.is_template or False,
-                created_by=final_created_by,
+                # created_by intentionally omitted on INSERT to avoid datatype mismatch;
+                # will be set via UPDATE after insert if final_created_by is available.
                 max_widgets=10,
                 max_pages=5,
             )
