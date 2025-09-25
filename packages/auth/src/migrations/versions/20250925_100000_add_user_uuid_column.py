@@ -31,11 +31,11 @@ def upgrade() -> None:
         # Add nullable UUID column
         op.add_column('users', sa.Column('id_new', sa.dialects.postgresql.UUID(as_uuid=True), nullable=True))
         # Populate with generated UUIDs
-        try:
-            conn.execute("UPDATE users SET id_new = gen_random_uuid() WHERE id_new IS NULL;")
-        except Exception:
-            # fallback to uuid_generate_v4
-            conn.execute("UPDATE users SET id_new = uuid_generate_v4() WHERE id_new IS NULL;")
+    try:
+        conn.execute(sa.text("UPDATE users SET id_new = gen_random_uuid() WHERE id_new IS NULL;"))
+    except Exception:
+        # fallback to uuid_generate_v4
+        conn.execute(sa.text("UPDATE users SET id_new = uuid_generate_v4() WHERE id_new IS NULL;"))
 
     # add index for new id column
     if 'users_id_new_idx' not in [i['name'] for i in insp.get_indexes('users')]:

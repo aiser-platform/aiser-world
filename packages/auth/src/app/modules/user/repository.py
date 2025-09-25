@@ -49,16 +49,35 @@ class UserRepository(BaseRepository[User, UserCreate | UserCreateInternal, UserU
         :return: User instance or None
         """
         # Normalize incoming id: if string looks like UUID, compare as UUID; else keep as int
+        # Normalize incoming id and query by either UUID/text match or legacy id
         try:
-            # attempt to cast numeric strings to int first
             if isinstance(user_id, str) and user_id.isdigit():
-                lookup_id = int(user_id)
+                # numeric string - keep as integer for legacy comparisons
+                numeric_id = int(user_id)
             else:
-                lookup_id = user_id
+                numeric_id = None
         except Exception:
-            lookup_id = user_id
+            numeric_id = None
 
-        query = select(self.model).filter(self.model.id == lookup_id)
+        # Build safe query: try to match id_new or id (cast to text) or legacy numeric id
+        from sqlalchemy import or_, cast, String
+
+        str_id = str(user_id)
+        id_new_attr = getattr(self.model, 'id_new', None)
+
+        clauses = []
+        # Compare textual form of primary id to avoid casting errors
+        clauses.append(cast(self.model.id, String) == str_id)
+        if id_new_attr is not None:
+            clauses.append(id_new_attr == str_id)
+        if numeric_id is not None:
+            # legacy integer FK match
+            try:
+                clauses.append(self.model.legacy_id == numeric_id)
+            except Exception:
+                pass
+
+        query = select(self.model).where(or_(*clauses))
         result = db.execute(query)
         return result.scalars().first()
 
@@ -113,8 +132,8 @@ class UserRepository(BaseRepository[User, UserCreate | UserCreateInternal, UserU
                 },
             )
             db.commit()
-            # refresh user object from DB
-            db.refresh(user)
+            # Do not refresh ORM object to avoid casting issues on mixed-schema DBs
+            # Caller can re-query if fresh values are required.
             return user
         except Exception as e:
             db.rollback()
