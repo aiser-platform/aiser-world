@@ -6,6 +6,10 @@ from app.modules.authentication.services import AuthService
 from app.core.config import settings
 import json
 from urllib.parse import unquote
+from fastapi import Header
+from app.db.session import async_session
+from sqlalchemy import select
+from app.modules.user.models import User as ChatUser
 from sqlalchemy import select
 from app.db.session import async_session
 from app.modules.user.models import User
@@ -200,6 +204,61 @@ async def upgrade_demo(request: Request, response: Response, payload: dict | Non
         result["access_token"] = token_pair.get("access_token")
         result["refresh_token"] = token_pair.get("refresh_token")
     return result
+
+
+@router.post("/internal/provision-user")
+async def provision_user(payload: dict = Body(...), x_internal_auth: str | None = Header(None)):
+    """Internal endpoint: provision or upsert a minimal user record in chat2chart DB.
+
+    Expected payload: {"id": "<uuid>", "email": "...", "username": "...", "roles": [..]}
+    Protect with `X-Internal-Auth` header containing a shared secret (ENV: INTERNAL_PROVISION_SECRET).
+    This endpoint is idempotent and safe for retries.
+    """
+    # Simple auth for internal calls
+    secret = getattr(settings, 'INTERNAL_PROVISION_SECRET', '')
+    if not secret or x_internal_auth != secret:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    uid = payload.get('id')
+    email = payload.get('email')
+    username = payload.get('username')
+
+    if not uid or not email:
+        raise HTTPException(status_code=400, detail='Missing id or email')
+
+    try:
+        async with async_session() as db:
+            # Try to find existing user by email
+            q = select(ChatUser).where(ChatUser.email == email)
+            res = await db.execute(q)
+            u = res.scalar_one_or_none()
+            if u:
+                # Update username if changed
+                changed = False
+                if username and getattr(u, 'username', None) != username:
+                    u.username = username
+                    changed = True
+                if changed:
+                    await db.commit()
+                    await db.refresh(u)
+                return {"created": False, "id": str(u.id)}
+
+            # Create new user with provided UUID
+            from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+            import uuid as _uuid
+            try:
+                new_uuid = _uuid.UUID(str(uid))
+            except Exception:
+                new_uuid = _uuid.uuid4()
+
+            new_user = ChatUser(id=new_uuid, username=username or email.split('@')[0], email=email, password='')
+            db.add(new_user)
+            await db.commit()
+            await db.refresh(new_user)
+            return {"created": True, "id": str(new_user.id)}
+    except Exception as e:
+        logger.exception('Failed to provision user')
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/auth/logout")
