@@ -719,9 +719,9 @@ async def create_dashboard(
         except Exception:
             resolved_user = None
 
-        if resolved_user:
-            # pass UUID to service
-            user_id = resolved_user
+        # Pass resolved_user (UUID or None) to service to avoid datatype mismatches
+        user_id = resolved_user
+        if user_id:
             logger.info(f"Resolved user id for create_dashboard: {user_id}")
 
         org_id = int(user_payload.get('organization_id') or 0)
@@ -1176,7 +1176,7 @@ async def publish_dashboard(dashboard_id: str, make_public: bool = True, current
 
         # In real impl, load dashboard and check ownership/org membership
         from app.db.session import async_session
-        from app.modules.charts.models import Dashboard
+            from app.modules.charts.models import Dashboard
         async with async_session() as sdb:
             res = await sdb.execute(select(Dashboard).where(Dashboard.id == dashboard_id))
             db_dash = res.scalar_one_or_none()
