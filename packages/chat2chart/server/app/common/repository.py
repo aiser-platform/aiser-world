@@ -153,11 +153,22 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
                 return db_obj
 
             # Otherwise use internal session manager
-            async with self.db.get_session() as session:
-                session.add(db_obj)
-                await session.flush()
-                await session.refresh(db_obj)
-                return db_obj
+            # self.db.get_session() may be a coroutine factory; ensure it's awaited properly
+            get_sess = self.db.get_session
+            if callable(get_sess):
+                # If get_session returns an async context manager, await it correctly
+                async with await get_sess() as session:
+                    session.add(db_obj)
+                    await session.flush()
+                    await session.refresh(db_obj)
+                    return db_obj
+            else:
+                # Fallback: assume it's already an async context manager
+                async with get_sess as session:
+                    session.add(db_obj)
+                    await session.flush()
+                    await session.refresh(db_obj)
+                    return db_obj
         except Exception as e:
             raise e
 

@@ -66,8 +66,13 @@ class ProjectRepository(BaseRepository[Project, ProjectCreate, ProjectUpdate]):
             if not project:
                 return None
 
-            # Check if user has access
-            if project.owner_id != user_id and not project.is_public:
+            # Check if user has access (coerce types)
+            try:
+                _uid = int(user_id)
+            except Exception:
+                _uid = None
+
+            if (_uid is not None and project.owner_id != _uid) and not project.is_public:
                 return None
 
             # Get data source count

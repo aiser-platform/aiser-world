@@ -65,7 +65,9 @@ services:
 
   # Chat2Chart Server
   chat2chart-server:
-    image: python:3.11-slim
+    build:
+      context: ./packages/chat2chart/server
+      dockerfile: Dockerfile.dev
     container_name: aiser-chat2chart-dev
     working_dir: /app
     env_file: .env  # Moved here

@@ -63,7 +63,9 @@ class Organization(BaseModel):
     stripe_subscription_id = Column(String(255), nullable=True)
     subscription_status = Column(String(20), nullable=False, default="active")
     trial_ends_at = Column(DateTime, nullable=True)
-    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+    import uuid
+    created_by = Column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
 
     # Relationships
     user_organizations = relationship("UserOrganization", back_populates="organization")
@@ -79,7 +81,7 @@ class UserOrganization(BaseModel):
     __tablename__ = "user_organizations"
 
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
     role_id = Column(Integer, ForeignKey("roles.id"), nullable=False)
     is_owner = Column(Boolean, nullable=False, default=False)
@@ -112,7 +114,9 @@ class UserProject(BaseModel):
     __tablename__ = "user_projects"
 
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+    import uuid
+    user_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
     role_id = Column(Integer, ForeignKey("roles.id"), nullable=False)
     joined_at = Column(DateTime, nullable=False, server_default=func.now())
@@ -149,7 +153,7 @@ class AIUsageLog(BaseModel):
 
     id = Column(Integer, primary_key=True)
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=True)
     operation_type = Column(String(50), nullable=False)
     model_used = Column(String(100), nullable=False)

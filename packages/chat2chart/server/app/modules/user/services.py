@@ -1,5 +1,6 @@
 import logging
 from typing import List, Optional
+import uuid
 
 from app.common.service import BaseService
 from app.core.config import settings
@@ -60,11 +61,29 @@ class UserService(BaseService[User, UserCreate, UserUpdate, UserResponse]):
             return None
         return user
 
-    async def get_user(self, user_id: int) -> Optional[User]:
-        """Get user by ID"""
-        user = await self.repository.get(user_id)
+    async def get_user(self, user_id: str | int) -> Optional[User]:
+        """Get user by ID. Accepts UUID string or int and normalizes to the correct type
 
-        return UserResponse(**user.__dict__) if user else None
+        The project uses UUID primary keys for users in the chat2chart service. When a
+        JWT contains the user id as a string we must convert it to a uuid.UUID so SQLAlchemy
+        binds the correct database type and avoids `uuid = varchar` operator errors.
+        """
+        # Normalize incoming id to either uuid.UUID or int depending on the stored column type
+        try:
+            if isinstance(user_id, str):
+                try:
+                    normalized_id = uuid.UUID(user_id)
+                except Exception:
+                    # fallback to int if not a UUID string
+                    normalized_id = int(user_id)
+            else:
+                normalized_id = user_id
+
+            user = await self.repository.get(normalized_id)
+            return UserResponse(**user.__dict__) if user else None
+        except Exception as e:
+            logger.exception(f"Failed to get user {user_id}: {e}")
+            return None
 
     async def update_user(self, user_id: int, user_in: UserUpdate) -> User:
         """Update user profile"""

@@ -1,5 +1,7 @@
 from datetime import datetime
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+import uuid
 from sqlalchemy.orm import relationship
 from app.common.model import BaseModel
 
@@ -8,7 +10,7 @@ class DeviceSession(BaseModel):
     __tablename__ = "device_sessions"
 
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     device_id = Column(String(255), nullable=False)
     device_type = Column(String(50))
     device_name = Column(String(100))

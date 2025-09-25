@@ -10,12 +10,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Copy and install python deps if present
 COPY requirements.txt ./
+# Install Python dependencies at build time to avoid long installs on container start
 RUN if [ -f requirements.txt ]; then pip install --no-cache-dir -r requirements.txt; fi
 
 # Copy source
 COPY . .
 
 # Default command (docker-compose can override with a command)
-CMD ["bash", "-lc", "python scripts/setup_database.py && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"]
+CMD ["bash", "-lc", "python scripts/setup_database.py && uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-level info"]
 
 

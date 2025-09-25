@@ -23,7 +23,7 @@ def upgrade() -> None:
         sa.Column('name', sa.String(length=255), nullable=False),
         sa.Column('description', sa.Text(), nullable=True),
         sa.Column('project_id', sa.Integer(), nullable=True),
-        sa.Column('created_by', sa.Integer(), nullable=True),
+        sa.Column('created_by', postgresql.UUID(as_uuid=True), nullable=True),
         sa.Column('layout_config', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column('theme_config', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column('global_filters', postgresql.JSONB(astext_type=sa.Text()), nullable=True),

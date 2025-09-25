@@ -21,13 +21,11 @@ apt-get update -qq && apt-get install -y -qq --no-install-recommends \
     lsb-release \
     wget
 
-# Install dependencies directly with pip
-echo "📦 Installing Python dependencies..."
+echo "🚀 Running database migrations..."
 cd /app
 
-pip install --no-cache-dir fastapi uvicorn alembic asyncpg psycopg2-binary sqlalchemy cryptography passlib python-jose email-validator pydantic pydantic-settings openai litellm boto3 colorama pandas numpy pillow redis python-dotenv python-multipart
-
-echo "🚀 Running database migrations..."
+# NOTE: Python dependencies are installed at image build time via Dockerfile. Avoid
+# installing large wheels at container runtime to prevent OOMs and long startup.
 export PYTHONPATH=/app:$PYTHONPATH
 echo "Python path: $PYTHONPATH"
 echo "Testing Python import..."
@@ -39,4 +37,5 @@ python -c "import sys; print('Python path:', sys.path); import app.core.config; 
 # alembic stamp head || alembic upgrade head
 
 echo "🚀 Starting chat2chart service..."
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+# Run uvicorn without --reload in container to avoid multiple bind attempts by PID1
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-level info

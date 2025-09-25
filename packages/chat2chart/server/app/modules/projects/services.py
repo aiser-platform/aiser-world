@@ -71,11 +71,17 @@ class ProjectService(
         """Get or create a default organization for a user"""
         try:
             # Check if user already has a default organization
+            # Normalize user_id to int when possible to avoid SQL type-mismatch
+            try:
+                _uid = int(user_id)
+            except Exception:
+                _uid = None
+
             query = (
                 select(Organization)
                 .join(OrganizationUser)
                 .where(
-                    OrganizationUser.user_id == user_id,
+                    (OrganizationUser.user_id == _uid) if _uid is not None else (OrganizationUser.user_id == user_id),
                     OrganizationUser.role == "owner",
                     Organization.is_active,
                 )
@@ -87,8 +93,12 @@ class ProjectService(
                 return existing_org
 
             # Create new default organization
+            # Ensure slug is always populated to satisfy DB not-null constraint
+            default_name = "My Organization"
+            slug = "my-organization"
             org_data = OrganizationCreate(
-                name="My Organization",
+                name=default_name,
+                slug=slug,
                 description="Your personal organization",
                 plan_type="free",
                 max_projects=5,
@@ -99,7 +109,7 @@ class ProjectService(
 
             # Add user as owner
             user_org = OrganizationUser(
-                organization_id=organization.id, user_id=user_id, role="owner"
+                organization_id=organization.id, user_id=(int(user_id) if str(user_id).isdigit() else user_id), role="owner"
             )
             db.add(user_org)
             await db.commit()
@@ -346,12 +356,18 @@ class OrganizationService(
         try:
             from app.db.session import async_session
             async with async_session() as db:
+                # Normalize user_id to int when possible to avoid SQL type-mismatch
+                try:
+                    _uid = int(user_id)
+                except Exception:
+                    _uid = None
+
                 # Get organizations where user is a member
                 query = (
                     select(Organization)
                     .join(OrganizationUser)
                     .where(
-                        OrganizationUser.user_id == user_id,
+                        (OrganizationUser.user_id == _uid) if _uid is not None else (OrganizationUser.user_id == user_id),
                         OrganizationUser.is_active,
                     )
                 )

@@ -21,16 +21,36 @@ export class DashboardAPIService {
       // Ensure we have a project_id when possible: if not supplied, try to infer from current user
       if (!dashboardData.project_id) {
         try {
-          const whoami = await fetchWithAuth(`${this.baseURL}/auth/whoami`);
+          const whoamiResp = await fetchWithAuth(`${this.baseURL}/auth/whoami`);
+          // fetchWithAuth returns a Response; parse JSON if available
+          let whoami: any = null;
+          if (whoamiResp && typeof whoamiResp.json === 'function') {
+            try {
+              whoami = await whoamiResp.json();
+            } catch (err) {
+              whoami = null;
+            }
+          }
+
           if (whoami?.authenticated && whoami.payload) {
             const uid = whoami.payload?.id || whoami.payload?.user_id || whoami.payload?.sub;
             if (uid) {
               // fetch user's projects and pick the first active project as default
-              const projRes = await fetchWithAuth(`${this.baseURL}/api/projects?user_id=${uid}`);
-              if (projRes && Array.isArray(projRes) && projRes.length > 0) {
-                dashboardData.project_id = projRes[0].id;
+              const projResResp = await fetchWithAuth(`${this.baseURL}/api/projects?user_id=${uid}`);
+              let projRes: any = null;
+              if (projResResp && typeof projResResp.json === 'function') {
+                try {
+                  projRes = await projResResp.json();
+                } catch (err) {
+                  projRes = null;
+                }
+              }
+
+              if (projRes && Array.isArray(projRes.items ? projRes.items : projRes) && (projRes.items ? projRes.items.length : projRes.length) > 0) {
+                const list = projRes.items ? projRes.items : projRes;
+                dashboardData.project_id = list[0].id;
                 // if organizationId not provided, try to set from project
-                if (!organizationId && projRes[0].organization_id) organizationId = String(projRes[0].organization_id);
+                if (!organizationId && list[0].organization_id) organizationId = String(list[0].organization_id);
               }
             }
           }

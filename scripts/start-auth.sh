@@ -19,8 +19,15 @@ echo "Python path: $PYTHONPATH"
 echo "Testing Python import..."
 python -c "import sys; print('Python path:', sys.path); import app.core.config; print('Import successful')"
 
-# Run database migrations
-python -m alembic upgrade head
+# Run database migrations: try upgrade, fallback to stamping head to avoid DuplicateTable in dev
+echo "🚧 Applying alembic migrations (upgrade head)"
+if python -m alembic upgrade head; then
+    echo "✅ Alembic upgrade applied"
+else
+    echo "⚠️ Alembic upgrade failed; stamping current DB as head to avoid re-applying migrations"
+    # Stamp the DB to head so alembic won't attempt to recreate existing tables in dev environments
+    python -m alembic stamp head || true
+fi
 
 echo "🚀 Starting auth service..."
 uvicorn src.app.main:app --host 0.0.0.0 --port 5000 --reload

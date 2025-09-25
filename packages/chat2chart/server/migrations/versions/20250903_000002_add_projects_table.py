@@ -7,6 +7,7 @@ Create Date: 2025-09-03 00:00:02.000000
 """
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = 'add_projects_001'
@@ -23,7 +24,8 @@ def upgrade() -> None:
         sa.Column('name', sa.String(length=100), nullable=False),
         sa.Column('description', sa.Text(), nullable=True),
         sa.Column('organization_id', sa.Integer(), nullable=False),
-        sa.Column('created_by', sa.Integer(), nullable=False),
+        # Align created_by type with users.id (UUID) used across chat2chart service
+        sa.Column('created_by', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('is_public', sa.Boolean(), nullable=True),
         sa.Column('is_active', sa.Boolean(), nullable=True),
         sa.Column('settings', sa.Text(), nullable=True),

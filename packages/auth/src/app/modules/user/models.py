@@ -1,4 +1,6 @@
 from sqlalchemy import Boolean, Column, DateTime, Integer, String
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+import uuid
 from sqlalchemy.orm import relationship
 
 from app.modules.authentication.models import UserAuthentication
@@ -9,7 +11,7 @@ from app.common.model import BaseModel
 class User(BaseModel, UserAuthentication):
     __tablename__ = "users"
 
-    id = Column(Integer, primary_key=True)
+    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     username = Column(String(50), nullable=False)
     email = Column(String(100), nullable=False)
 
