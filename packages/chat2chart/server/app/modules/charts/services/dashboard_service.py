@@ -293,15 +293,31 @@ class DashboardService:
 
             # If we resolved a UUID for created_by after creation, persist it with a safe UPDATE
             try:
-                if final_created_by:
+                # Only persist created_by if it's a UUID or a UUID-string to avoid type mismatches
+                should_update = False
+                uuid_value = None
+                if isinstance(final_created_by, uuid.UUID):
+                    should_update = True
+                    uuid_value = final_created_by
+                elif isinstance(final_created_by, str):
+                    try:
+                        uuid_value = uuid.UUID(final_created_by)
+                        should_update = True
+                    except Exception:
+                        should_update = False
+
+                if should_update and uuid_value is not None:
                     await self.db.execute(
-                        update(Dashboard).where(Dashboard.id == dashboard.id).values(created_by=final_created_by)
+                        update(Dashboard).where(Dashboard.id == dashboard.id).values(created_by=uuid_value)
                     )
                     await self.db.commit()
                     await self.db.refresh(dashboard)
             except Exception:
                 # Non-fatal: dashboard created without created_by set
-                await self.db.rollback()
+                try:
+                    await self.db.rollback()
+                except Exception:
+                    pass
             
             # Convert to response format
             return {
