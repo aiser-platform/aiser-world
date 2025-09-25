@@ -165,25 +165,34 @@ class UserService(BaseService):
         # Generate device ID for session
         device_id = uuid.uuid4()
 
-        # Include device_id in JWT payload
+        # Include device_id in JWT payload and create tokens
         tokens = self.auth.signJWT(
             user_id=user.id, email=user.email, device_id=str(device_id)
         )
 
-        # TODO: Fix device session creation - temporarily disabled
-        # Create device session
-        # await self.device_repo.create(
-        #     DeviceSessionCreate(
-        #         user_id=user.id,
-        #         device_id=device_id,
-        #         is_active=True,
-        #         device_name=device_info.device_name,
-        #         device_type=device_info.device_type,
-        #         ip_address=device_info.ip_address,
-        #         user_agent=device_info.user_agent,
-        #         refresh_token=tokens.get("refresh_token"),
-        #     )
-        # )
+        # Persist device session with refresh token for rotation/revocation
+        try:
+            refresh = tokens.get('refresh_token')
+            if refresh:
+                # compute expiry (align with auth settings)
+                expires_at = datetime.utcnow() + timedelta(minutes=self.auth.JWT_REFRESH_EXP_TIME_MINUTES)
+                # Use repository to create session
+                await self.device_repo.create(
+                    DeviceSessionCreate(
+                        user_id=user.id,
+                        device_id=str(device_id),
+                        is_active=True,
+                        device_name=device_info.device_name,
+                        device_type=device_info.device_type,
+                        ip_address=device_info.ip_address,
+                        user_agent=device_info.user_agent,
+                        refresh_token=refresh,
+                        refresh_token_expires_at=expires_at,
+                    )
+                )
+        except Exception:
+            # Non-fatal: continue to return tokens even if persistence fails
+            logger.exception('Failed to persist device session')
 
         # Return tokens and user information
         return SignInResponse(
