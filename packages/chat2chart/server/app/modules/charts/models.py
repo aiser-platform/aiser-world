@@ -63,7 +63,9 @@ class Dashboard(BaseModel):
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=True)
-    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)  # Changed to Integer to match users table
+    # created_by stored as UUID to match `users.id` primary key
+    from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+    created_by = Column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     
     # Dashboard settings
     layout_config = Column(JSONB, nullable=True)  # Grid layout configuration

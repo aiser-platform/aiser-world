@@ -46,7 +46,7 @@ class OrganizationUser(BaseModel):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     role = Column(String(50), default="member")  # owner, admin, member
     is_active = Column(Boolean, default=True)
     
@@ -64,7 +64,9 @@ class Project(BaseModel):
     name = Column(String(100), nullable=False)
     description = Column(Text, nullable=True)
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
-    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    # created_by stored as UUID to match `users.id` primary key
+    from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+    created_by = Column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     
     # Project settings
     is_public = Column(Boolean, default=False)
