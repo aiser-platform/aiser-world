@@ -241,20 +241,41 @@ async def provision_user(payload: dict = Body(...), x_internal_auth: str | None 
 
     try:
         async with async_session() as db:
-            # Try to find existing user by email
-            q = select(ChatUser).where(ChatUser.email == email)
-            res = await db.execute(q)
-            u = res.scalar_one_or_none()
-            if u:
-                # Update username if changed
-                changed = False
-                if username and getattr(u, 'username', None) != username:
-                    u.username = username
-                    changed = True
-                if changed:
-                    await db.commit()
-                    await db.refresh(u)
-                return {"created": False, "id": str(u.id)}
+            # Try to find existing user by email using a minimal column projection.
+            # Some development databases may be mid-migration and miss newer columns
+            # (e.g. legacy_id). Selecting only safe columns avoids Datatype/Column
+            # mismatch errors when the model expects fields the DB doesn't have.
+            try:
+                q = select(ChatUser.id, ChatUser.username, ChatUser.email).where(ChatUser.email == email)
+                res = await db.execute(q)
+                row = res.one_or_none()
+                if row:
+                    existing_id = row[0]
+                    # Update username if changed using a targeted update to avoid loading missing cols
+                    if username:
+                        await db.execute(
+                            ChatUser.__table__.update().where(ChatUser.__table__.c.email == email).values(username=username)
+                        )
+                        await db.commit()
+                    return {"created": False, "id": str(existing_id)}
+            except Exception:
+                # Fallback: try full ORM lookup but tolerate schema mismatch errors
+                try:
+                    q = select(ChatUser).where(ChatUser.email == email)
+                    res = await db.execute(q)
+                    u = res.scalar_one_or_none()
+                    if u:
+                        changed = False
+                        if username and getattr(u, 'username', None) != username:
+                            u.username = username
+                            changed = True
+                        if changed:
+                            await db.commit()
+                            await db.refresh(u)
+                        return {"created": False, "id": str(u.id)}
+                except Exception:
+                    # swallow and proceed to create new user
+                    pass
 
             # Create new user with provided UUID
             from sqlalchemy.dialects.postgresql import UUID as PG_UUID
@@ -264,11 +285,12 @@ async def provision_user(payload: dict = Body(...), x_internal_auth: str | None 
             except Exception:
                 new_uuid = _uuid.uuid4()
 
-            new_user = ChatUser(id=new_uuid, username=username or email.split('@')[0], email=email, password='')
-            db.add(new_user)
+            # Use a targeted INSERT to avoid touching missing optional columns
+            ins = ChatUser.__table__.insert().values(id=new_uuid, username=(username or email.split('@')[0]), email=email, password='')
+            await db.execute(ins)
             await db.commit()
-            await db.refresh(new_user)
-            return {"created": True, "id": str(new_user.id)}
+            # Read back the created user id
+            return {"created": True, "id": str(new_uuid)}
     except Exception as e:
         logger.exception('Failed to provision user')
         raise HTTPException(status_code=500, detail=str(e))
