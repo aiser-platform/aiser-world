@@ -234,6 +234,7 @@ class DashboardService:
                 created_by_value = await self._resolve_user_uuid(user_id)
             except Exception:
                 created_by_value = None
+            logger.info(f"Resolved created_by_value: {created_by_value} (type={type(created_by_value)})")
             dashboard = Dashboard(
                 name=dashboard_data.name,
                 description=dashboard_data.description,
