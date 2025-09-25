@@ -38,9 +38,7 @@ services:
 
   # Authentication Service
   auth-service:
-    build:
-      context: ./packages/auth-service
-      dockerfile: Dockerfile
+    image: python:3.11-slim
     container_name: aiser-auth-dev
     working_dir: /app
     env_file: .env  # Moved here
@@ -57,14 +55,14 @@ services:
       - ENVIRONMENT=${ENVIRONMENT:-development}
       - CHAT2CHART_PROVISION_URL=http://chat2chart-server:8000/internal/provision-user
       - INTERNAL_PROVISION_SECRET=dev-internal-secret
-      - PYTHONPATH=/app/src
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
-      - ./packages/auth/src:/app/src
+      - ./packages/auth:/app
+      - ./scripts/start-auth.sh:/start.sh
       - auth_poetry_cache:/root/.cache/pypoetry
-    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "5000"]
+    command: ["bash", "/start.sh"]
     restart: unless-stopped
 
   # Chat2Chart Server

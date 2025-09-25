@@ -2,7 +2,7 @@ import logging
 from datetime import datetime
 from typing import List, Optional
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.common.repository import BaseRepository
@@ -94,12 +94,27 @@ class UserRepository(BaseRepository[User, UserCreate | UserCreateInternal, UserU
             Updated User instance
         """
         try:
-            user.verification_attempts += 1
-            user.verification_sent_at = datetime.utcnow()
-
+            # Use a raw UPDATE statement to avoid DB type casting issues between
+            # integer and UUID primary keys during migration. This writes the
+            # verification attempt counters without relying on ORM-level type
+            # coercion which may append ::UUID and fail when the underlying
+            # column is still integer in dev databases.
+            now = datetime.utcnow()
+            query = text(
+                "UPDATE users SET verification_attempts = :attempts, verification_sent_at = :sent_at, updated_at = :updated_at WHERE id = :id"
+            )
+            db.execute(
+                query,
+                {
+                    "attempts": (user.verification_attempts or 0) + 1,
+                    "sent_at": now,
+                    "updated_at": now,
+                    "id": user.id,
+                },
+            )
             db.commit()
+            # refresh user object from DB
             db.refresh(user)
-
             return user
         except Exception as e:
             db.rollback()

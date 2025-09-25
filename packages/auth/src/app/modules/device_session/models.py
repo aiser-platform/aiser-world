@@ -24,3 +24,4 @@ class DeviceSession(BaseModel):
 
     # Relationships
     user = relationship("User", back_populates="device_sessions")
+
