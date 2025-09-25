@@ -6,6 +6,9 @@ from app.modules.authentication.services import AuthService
 from app.core.config import settings
 import json
 from urllib.parse import unquote
+from sqlalchemy import select
+from app.db.session import async_session
+from app.modules.user.models import User
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -117,7 +120,55 @@ async def upgrade_demo(request: Request, response: Response, payload: dict | Non
         raise HTTPException(status_code=400, detail="Could not resolve demo user id")
 
     # Build minimal claims and issue JWT
+    # Attempt to resolve the demo legacy id to the canonical UUID present in
+    # this service's users table (chat2chart DB). Prefer email/username, then
+    # legacy numeric id. This keeps the dev flow clean without adding new
+    # migration columns.
     user_id = str(payload.get("user_id"))
+    resolved_user_id = None
+    try:
+        # try email/username/legacy lookup in local users table
+        maybe_int = None
+        try:
+            maybe_int = int(payload.get("user_id"))
+        except Exception:
+            maybe_int = None
+
+        async def _resolve():
+            async with async_session() as sdb:
+                q = None
+                if payload.get("email"):
+                    q = select(User).where(User.email == payload.get("email"))
+                elif payload.get("username"):
+                    q = select(User).where(User.username == payload.get("username"))
+                elif maybe_int is not None:
+                    # Many installs kept legacy integer id; user model may have legacy_id
+                    try:
+                        q = select(User).where(User.legacy_id == maybe_int)
+                    except Exception:
+                        q = None
+
+                if q is not None:
+                    pres = await sdb.execute(q)
+                    u = pres.scalar_one_or_none()
+                    if u:
+                        return str(u.id)
+            return None
+
+        try:
+            # run resolver
+            import asyncio
+            resolved = asyncio.get_event_loop().run_until_complete(_resolve())
+            if resolved:
+                resolved_user_id = resolved
+        except Exception:
+            resolved_user_id = None
+    except Exception:
+        resolved_user_id = None
+
+    if resolved_user_id:
+        user_id = resolved_user_id
+
     claims = {"id": user_id, "user_id": user_id, "sub": user_id, "email": payload.get("email")}
     token_pair = Auth().signJWT(**claims)
 
