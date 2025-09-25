@@ -53,6 +53,8 @@ services:
       - SECRET_KEY=${SECRET_KEY:-dev-secret-key}
       - DEBUG=${DEBUG:-True}
       - ENVIRONMENT=${ENVIRONMENT:-development}
+      - CHAT2CHART_PROVISION_URL=${CHAT2CHART_PROVISION_URL:-http://chat2chart-server:8000/auth/internal/provision-user}
+      - INTERNAL_PROVISION_SECRET=${INTERNAL_PROVISION_SECRET:-dev-internal-secret}
     depends_on:
       postgres:
         condition: service_healthy
@@ -79,7 +81,8 @@ services:
       - POSTGRES_USER=${POSTGRES_USER:-aiser}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-aiser_password}
       - POSTGRES_PORT=${POSTGRES_PORT:-5432}
-      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-aiser}:${POSTGRES_PASSWORD:-aiser_password}@postgres:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-aiser_chat2chart}
+      # Force chat2chart to use the dedicated chat2chart DB to avoid cross-DB FK type mismatches
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-aiser}:${POSTGRES_PASSWORD:-aiser_password}@postgres:${POSTGRES_PORT:-5432}/aiser_chat2chart
       - SECRET_KEY=${SECRET_KEY:-dev-secret-key}
       - ENVIRONMENT=${ENVIRONMENT:-development}
       - DEBUG=${DEBUG:-True}
@@ -93,6 +96,7 @@ services:
       - AZURE_OPENAI_DEPLOYMENT_NAME=${AZURE_OPENAI_DEPLOYMENT_NAME:-gpt-5-mini}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_MODEL_ID=${OPENAI_MODEL_ID:-gpt-4o-mini}
+      - INTERNAL_PROVISION_SECRET=${INTERNAL_PROVISION_SECRET:-dev-internal-secret}
     depends_on:
       postgres:
         condition: service_healthy
