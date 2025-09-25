@@ -1,5 +1,4 @@
 from sqlalchemy import Boolean, Column, DateTime, Integer, String
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 import uuid
 from sqlalchemy.orm import relationship
 
@@ -11,7 +10,10 @@ from app.common.model import BaseModel
 class User(BaseModel, UserAuthentication):
     __tablename__ = "users"
 
-    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    # Use a flexible textual primary key in dev to tolerate mixed integer/UUID
+    # during migration. We store UUID strings here; legacy integer ids remain
+    # usable via repository lookup logic until full migration completes.
+    id = Column(String(64), primary_key=True, default=lambda: str(uuid.uuid4()))
     username = Column(String(50), nullable=False)
     email = Column(String(100), nullable=False)
 
