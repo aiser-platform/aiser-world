@@ -28,6 +28,8 @@ from app.modules.authentication.auth import Auth
 from app.core.config import settings
 from fastapi import APIRouter, Depends, HTTPException, Body, UploadFile, File, Request
 from typing import Optional
+from app.db.session import async_session
+from app.modules.user.models import User
 
 
 async def _optional_token(request: Request) -> Optional[str]:
@@ -688,10 +690,51 @@ async def create_dashboard(
         logger.info(f"user_payload for create_dashboard: {user_payload}")
         print(f"DEBUG create_dashboard user_payload={user_payload}")
 
+        # Try to resolve user to canonical UUID from DB (best-effort) to avoid datatype mismatches
+        resolved_user = None
+        try:
+            async with async_session() as sdb:
+                # prefer email, then username, then numeric id
+                if user_payload.get('email'):
+                    q = select(User).where(User.email == user_payload.get('email'))
+                elif user_payload.get('username'):
+                    q = select(User).where(User.username == user_payload.get('username'))
+                else:
+                    # fallback: if payload contains numeric id, try legacy lookup
+                    maybe = user_payload.get('user_id') or user_payload.get('id') or user_payload.get('sub')
+                    try:
+                        maybe_int = int(maybe)
+                    except Exception:
+                        maybe_int = None
+                    if maybe_int is not None:
+                        q = select(User).where(User.legacy_id == maybe_int)
+                    else:
+                        q = None
+
+                if q is not None:
+                    pres = await sdb.execute(q)
+                    u = pres.scalar_one_or_none()
+                    if u:
+                        resolved_user = u.id
+        except Exception:
+            resolved_user = None
+
+        if resolved_user:
+            # pass UUID to service
+            user_id = resolved_user
+            logger.info(f"Resolved user id for create_dashboard: {user_id}")
+
         org_id = int(user_payload.get('organization_id') or 0)
         # Ensure dashboard.project_id belongs to org (best-effort)
         if dashboard.project_id and org_id and dashboard.project_id:
             # project ownership validated in Project service when creating
+            pass
+
+        # Persist debug info to file to aid CI runs where stdout may be captured
+        try:
+            with open('/tmp/dashboard_debug.log', 'a') as f:
+                f.write(f"CREATE_REQUEST user_payload={user_payload}\n")
+        except Exception:
             pass
 
         dashboard_service = DashboardService(db)
@@ -714,6 +757,33 @@ async def create_dashboard(
         logger.exception("❌ Failed to create dashboard")
         # Return the exception message if available to help client-side debugging
         raise HTTPException(status_code=500, detail=f"Failed to create dashboard: {repr(e)}")
+
+
+@router.post("/dashboards/debug-create")
+async def debug_create_dashboard(
+    dashboard: DashboardCreateSchema,
+    request: Request,
+    current_token: str = Depends(JWTCookieBearer()),
+    db: AsyncSession = Depends(get_async_session),
+):
+    """Dev-only endpoint: resolve user payload -> final created_by without inserting to DB."""
+    try:
+        if isinstance(current_token, dict):
+            user_payload = current_token
+        else:
+            user_payload = Auth().decodeJWT(current_token) or {}
+
+        dashboard_service = DashboardService(db)
+        resolved = await dashboard_service._resolve_user_uuid(user_payload)
+
+        # Map to readable types
+        return {
+            "user_payload": user_payload,
+            "resolved_created_by": str(resolved) if resolved else None,
+            "resolved_type": str(type(resolved)),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/dashboards/", response_model=List[DashboardResponseSchema])
