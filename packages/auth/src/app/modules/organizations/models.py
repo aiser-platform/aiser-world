@@ -9,6 +9,8 @@ from sqlalchemy import (
     Numeric,
     ForeignKey,
 )
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+import uuid
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -63,8 +65,6 @@ class Organization(BaseModel):
     stripe_subscription_id = Column(String(255), nullable=True)
     subscription_status = Column(String(20), nullable=False, default="active")
     trial_ends_at = Column(DateTime, nullable=True)
-    from sqlalchemy.dialects.postgresql import UUID as PG_UUID
-    import uuid
     created_by = Column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
 
     # Relationships
@@ -114,8 +114,6 @@ class UserProject(BaseModel):
     __tablename__ = "user_projects"
 
     id = Column(Integer, primary_key=True)
-    from sqlalchemy.dialects.postgresql import UUID as PG_UUID
-    import uuid
     user_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
     role_id = Column(Integer, ForeignKey("roles.id"), nullable=False)
