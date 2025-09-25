@@ -1,0 +1,42 @@
+name: Integration Tests (docker-compose)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Start services (docker-compose)
+        working-directory: ${{ github.workspace }}
+        run: |
+          # Ensure docker-compose v2 is available as `docker compose`
+          docker compose -f docker-compose.dev.yml pull || true
+          docker compose -f docker-compose.dev.yml up -d --build postgres redis chat2chart-server auth-service cube-server || true
+          # Wait for services to become healthy
+          timeout=0
+          until docker exec aiser-postgres-dev pg_isready -U ${POSTGRES_USER:-aiser} -d ${POSTGRES_DB:-aiser_world} >/dev/null 2>&1 || [ $timeout -gt 60 ]; do
+            sleep 2; timeout=$((timeout+1)); echo "waiting for postgres...";
+          done
+          sleep 6
+
+      - name: Run integration test inside chat2chart container
+        continue-on-error: false
+        run: |
+          docker exec aiser-chat2chart-dev /bin/bash -lc "pip install -q pytest pytest-asyncio && pytest -q app/tests/modules/auth/test_upgrade_and_dashboard_crud.py::test_upgrade_and_dashboard_crud -q -s --disable-warnings"
+
+      - name: Tear down
+        if: always()
+        run: |
+          docker compose -f docker-compose.dev.yml down --remove-orphans
+
+
