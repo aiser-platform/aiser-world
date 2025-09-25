@@ -237,6 +237,33 @@ class DashboardService:
             logger.info(f"Resolved created_by_value: {created_by_value} (type={type(created_by_value)})")
             # Also print to stdout for immediate visibility in container logs during tests
             print(f"DEBUG: Resolved created_by_value={created_by_value!r}, type={type(created_by_value)}")
+
+            # Ensure created_by is a UUID (or None). If a legacy int slipped through, map it to UUID.
+            final_created_by = None
+            try:
+                if isinstance(created_by_value, uuid.UUID):
+                    final_created_by = created_by_value
+                elif isinstance(created_by_value, str):
+                    # try to parse as UUID
+                    try:
+                        final_created_by = uuid.UUID(created_by_value)
+                    except Exception:
+                        # maybe a numeric string representing legacy id
+                        if created_by_value.isdigit():
+                            q = select(User).where(User.legacy_id == int(created_by_value))
+                            res = await self.db.execute(q)
+                            u = res.scalar_one_or_none()
+                            if u:
+                                final_created_by = u.id
+                elif isinstance(created_by_value, int):
+                    q = select(User).where(User.legacy_id == created_by_value)
+                    res = await self.db.execute(q)
+                    u = res.scalar_one_or_none()
+                    if u:
+                        final_created_by = u.id
+            except Exception:
+                final_created_by = None
+
             dashboard = Dashboard(
                 name=dashboard_data.name,
                 description=dashboard_data.description,
@@ -247,7 +274,7 @@ class DashboardService:
                 refresh_interval=dashboard_data.refresh_interval or 300,
                 is_public=dashboard_data.is_public or False,
                 is_template=dashboard_data.is_template or False,
-                created_by=created_by_value,
+                created_by=final_created_by,
                 max_widgets=10,
                 max_pages=5,
             )
