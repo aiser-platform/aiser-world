@@ -26,7 +26,7 @@ class ChatVisualization(BaseModel):
     message_id = Column(UUID, nullable=True)
     
     # User and organization fields
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     conversation_id = Column(UUID, ForeignKey("conversation.id"), nullable=True)
     tenant_id = Column(String(50), default='default')
     
@@ -44,7 +44,7 @@ class DashboardEmbed(BaseModel):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     dashboard_id = Column(UUID(as_uuid=True), ForeignKey("dashboards.id"), nullable=False)
-    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     embed_token = Column(String(255), nullable=False)
     options = Column(JSONB, nullable=True)
     expires_at = Column(DateTime, nullable=True)
@@ -140,8 +140,8 @@ class DashboardShare(BaseModel):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     dashboard_id = Column(UUID(as_uuid=True), ForeignKey("dashboards.id"), nullable=False)
-    shared_by = Column(Integer, ForeignKey("users.id"), nullable=False)  # Changed to Integer to match users table
-    shared_with = Column(Integer, ForeignKey("users.id"), nullable=True)  # Changed to Integer to match users table
+    shared_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    shared_with = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     
     # Share settings
     permission = Column(String(20), default="view")  # view, edit, admin

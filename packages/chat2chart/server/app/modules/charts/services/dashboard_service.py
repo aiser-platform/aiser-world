@@ -11,6 +11,8 @@ from sqlalchemy import select, update, delete, and_, or_
 from sqlalchemy.orm import selectinload
 
 from app.modules.charts.models import Dashboard, DashboardWidget
+from app.modules.user.models import User
+import uuid
 from sqlalchemy import func
 from app.modules.charts.schemas import (
     DashboardCreateSchema,
@@ -34,7 +36,7 @@ class DashboardService:
     async def list_dashboards(
         self,
         project_id: Optional[int] = None,
-        user_id: Optional[int] = None,
+        user_id: Optional[int | str] = None,
         offset: int = 0, 
         limit: int = 20,
         search: Optional[str] = None
@@ -49,8 +51,10 @@ class DashboardService:
             if project_id is not None:
                 conditions.append(Dashboard.project_id == project_id)
             if user_id is not None:
+                # Normalize user id to UUID when possible to compare against Dashboard.created_by
+                user_uuid = await self._resolve_user_uuid(user_id)
                 # authenticated user: return dashboards they own plus public ones
-                conditions.append(or_(Dashboard.created_by == user_id, Dashboard.is_public == True))
+                conditions.append(or_(Dashboard.created_by == user_uuid, Dashboard.is_public == True))
             else:
                 # unauthenticated: only public dashboards
                 conditions.append(Dashboard.is_public == True)
@@ -111,7 +115,7 @@ class DashboardService:
             logger.error(f"❌ Failed to list dashboards: {str(e)}")
             raise e
     
-    async def get_dashboard(self, dashboard_id: str, user_id: int) -> Dict[str, Any]:
+    async def get_dashboard(self, dashboard_id: str, user_id: int | str) -> Dict[str, Any]:
         """Get a specific dashboard by ID"""
         try:
             logger.info(f"📊 Getting dashboard: {dashboard_id}")
@@ -127,8 +131,9 @@ class DashboardService:
             if not dashboard:
                 raise HTTPException(status_code=404, detail="Dashboard not found")
             
-            # Check permissions
-            if dashboard.created_by is not None and dashboard.created_by != user_id and not dashboard.is_public:
+            # Check permissions (resolve user id -> uuid for comparison)
+            resolved_uuid = await self._resolve_user_uuid(user_id)
+            if dashboard.created_by is not None and dashboard.created_by != resolved_uuid and not dashboard.is_public:
                 raise HTTPException(status_code=403, detail="Access denied")
             
             # Convert to response format
@@ -177,7 +182,7 @@ class DashboardService:
     async def create_dashboard(
         self,
         dashboard_data: DashboardCreateSchema,
-        user_id: int,
+        user_id: int | str,
     ) -> Dict[str, Any]:
         """Create a new dashboard"""
         try:
@@ -223,7 +228,12 @@ class DashboardService:
                     pass
 
             # Create dashboard
-            created_by_value = user_id if user_id and user_id > 0 else None
+            # Resolve provided user id (could be legacy int) into UUID matching users.id
+            created_by_value = None
+            try:
+                created_by_value = await self._resolve_user_uuid(user_id)
+            except Exception:
+                created_by_value = None
             dashboard = Dashboard(
                 name=dashboard_data.name,
                 description=dashboard_data.description,
@@ -273,7 +283,7 @@ class DashboardService:
         self, 
         dashboard_id: str, 
         dashboard_data: DashboardUpdateSchema, 
-        user_id: int
+        user_id: int | str
     ) -> Dict[str, Any]:
         """Update an existing dashboard"""
         try:
@@ -288,7 +298,8 @@ class DashboardService:
                 raise HTTPException(status_code=404, detail="Dashboard not found")
             
             # Check permissions
-            if dashboard.created_by is not None and dashboard.created_by != user_id:
+            resolved_uuid = await self._resolve_user_uuid(user_id)
+            if dashboard.created_by is not None and dashboard.created_by != resolved_uuid:
                 raise HTTPException(status_code=403, detail="Access denied")
             
             # Update fields
@@ -328,7 +339,7 @@ class DashboardService:
             await self.db.rollback()
             raise e
     
-    async def delete_dashboard(self, dashboard_id: str, user_id: int) -> bool:
+    async def delete_dashboard(self, dashboard_id: str, user_id: int | str) -> bool:
         """Delete a dashboard"""
         try:
             logger.info(f"📊 Deleting dashboard: {dashboard_id}")
@@ -342,7 +353,8 @@ class DashboardService:
                 raise HTTPException(status_code=404, detail="Dashboard not found")
             
             # Check permissions
-            if dashboard.created_by is not None and dashboard.created_by != user_id:
+            resolved_uuid = await self._resolve_user_uuid(user_id)
+            if dashboard.created_by is not None and dashboard.created_by != resolved_uuid:
                 raise HTTPException(status_code=403, detail="Access denied")
             
             # Delete dashboard (cascade will handle widgets)
@@ -359,7 +371,7 @@ class DashboardService:
             raise e
 
     # -------------------- Widget CRUD --------------------
-    async def create_widget(self, dashboard_id: str, widget_data: WidgetCreateSchema, user_id: int) -> Dict[str, Any]:
+    async def create_widget(self, dashboard_id: str, widget_data: WidgetCreateSchema, user_id: int | str) -> Dict[str, Any]:
         """Create a widget attached to a dashboard"""
         try:
             logger.info(f"🧩 Creating widget on dashboard {dashboard_id}: {widget_data.name}")
@@ -370,7 +382,8 @@ class DashboardService:
             db_dash = res.scalar_one_or_none()
             if not db_dash:
                 raise HTTPException(status_code=404, detail="Dashboard not found")
-            if db_dash.created_by is not None and db_dash.created_by != user_id:
+            resolved_uuid = await self._resolve_user_uuid(user_id)
+            if db_dash.created_by is not None and db_dash.created_by != resolved_uuid:
                 raise HTTPException(status_code=403, detail="Access denied to add widget")
 
             widget = DashboardWidget(
@@ -422,7 +435,7 @@ class DashboardService:
             await self.db.rollback()
             raise e
 
-    async def list_widgets(self, dashboard_id: str, user_id: int) -> List[Dict[str, Any]]:
+    async def list_widgets(self, dashboard_id: str, user_id: int | str) -> List[Dict[str, Any]]:
         """List widgets for a dashboard"""
         try:
             logger.info(f"📋 Listing widgets for dashboard {dashboard_id}")
@@ -432,7 +445,8 @@ class DashboardService:
             db_dash = res.scalar_one_or_none()
             if not db_dash:
                 raise HTTPException(status_code=404, detail="Dashboard not found")
-            if db_dash.created_by is not None and db_dash.created_by != user_id and not db_dash.is_public:
+            resolved_uuid = await self._resolve_user_uuid(user_id)
+            if db_dash.created_by is not None and db_dash.created_by != resolved_uuid and not db_dash.is_public:
                 raise HTTPException(status_code=403, detail="Access denied to list widgets")
 
             wq = select(DashboardWidget).where(DashboardWidget.dashboard_id == dashboard_id, DashboardWidget.is_deleted == False)
@@ -464,7 +478,7 @@ class DashboardService:
             logger.error(f"❌ Failed to list widgets for {dashboard_id}: {e}")
             raise e
 
-    async def update_widget(self, dashboard_id: str, widget_id: str, widget_data: WidgetCreateSchema, user_id: int) -> Dict[str, Any]:
+    async def update_widget(self, dashboard_id: str, widget_id: str, widget_data: WidgetCreateSchema, user_id: int | str) -> Dict[str, Any]:
         """Update a widget"""
         try:
             logger.info(f"✏️ Updating widget {widget_id} on dashboard {dashboard_id}")
@@ -476,7 +490,8 @@ class DashboardService:
             # Permission check against parent dashboard
             dres = await self.db.execute(select(Dashboard).where(Dashboard.id == dashboard_id))
             db_dash = dres.scalar_one_or_none()
-            if db_dash and db_dash.created_by is not None and db_dash.created_by != user_id:
+            resolved_uuid = await self._resolve_user_uuid(user_id)
+            if db_dash and db_dash.created_by is not None and db_dash.created_by != resolved_uuid:
                 raise HTTPException(status_code=403, detail="Access denied to update widget")
 
             # Update allowed fields
@@ -494,7 +509,7 @@ class DashboardService:
             await self.db.rollback()
             raise e
 
-    async def delete_widget(self, dashboard_id: str, widget_id: str, user_id: int) -> bool:
+    async def delete_widget(self, dashboard_id: str, widget_id: str, user_id: int | str) -> bool:
         """Delete a widget"""
         try:
             logger.info(f"🗑️ Deleting widget {widget_id} from dashboard {dashboard_id}")
@@ -505,8 +520,38 @@ class DashboardService:
 
             dres = await self.db.execute(select(Dashboard).where(Dashboard.id == dashboard_id))
             db_dash = dres.scalar_one_or_none()
-            if db_dash and db_dash.created_by is not None and db_dash.created_by != user_id:
+            resolved_uuid = await self._resolve_user_uuid(user_id)
+            if db_dash and db_dash.created_by is not None and db_dash.created_by != resolved_uuid:
                 raise HTTPException(status_code=403, detail="Access denied to delete widget")
+
+    async def _resolve_user_uuid(self, user_id: int | str | None):
+        """Resolve legacy integer user id or UUID string to the canonical users.id (UUID).
+
+        Returns a UUID string or None.
+        """
+        if not user_id:
+            return None
+        try:
+            # If already looks like UUID, return uuid.UUID
+            if isinstance(user_id, str):
+                try:
+                    return uuid.UUID(user_id)
+                except Exception:
+                    # continue to check numeric legacy id
+                    pass
+
+            # If numeric (int or digit-string), try to find matching user by legacy_id
+            legacy_val = int(user_id) if not isinstance(user_id, uuid.UUID) else None
+            if legacy_val is not None:
+                q = select(User).where(User.legacy_id == legacy_val)
+                res = await self.db.execute(q)
+                user = res.scalar_one_or_none()
+                if user:
+                    return user.id
+
+        except Exception:
+            return None
+        return None
 
             await self.db.delete(widget)
             await self.db.commit()
