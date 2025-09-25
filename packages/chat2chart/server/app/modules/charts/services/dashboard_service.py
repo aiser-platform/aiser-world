@@ -524,31 +524,76 @@ class DashboardService:
             if db_dash and db_dash.created_by is not None and db_dash.created_by != resolved_uuid:
                 raise HTTPException(status_code=403, detail="Access denied to delete widget")
 
-    async def _resolve_user_uuid(self, user_id: int | str | None):
+    async def _resolve_user_uuid(self, user_id: int | str | dict | None):
         """Resolve legacy integer user id or UUID string to the canonical users.id (UUID).
 
         Returns a UUID string or None.
         """
         if not user_id:
             return None
-        try:
-            # If already looks like UUID, return uuid.UUID
-            if isinstance(user_id, str):
-                try:
-                    return uuid.UUID(user_id)
-                except Exception:
-                    # continue to check numeric legacy id
-                    pass
 
-            # If numeric (int or digit-string), try to find matching user by legacy_id
-            legacy_val = int(user_id) if not isinstance(user_id, uuid.UUID) else None
-            if legacy_val is not None:
-                q = select(User).where(User.legacy_id == legacy_val)
+        # If a payload dict was passed, try to resolve by explicit fields
+        if isinstance(user_id, dict):
+            # Try exact UUID fields first
+            for fld in ('id', 'user_id', 'sub'):
+                val = user_id.get(fld)
+                if val:
+                    try:
+                        return uuid.UUID(str(val))
+                    except Exception:
+                        # keep trying
+                        pass
+            # Try email/username lookup
+            email = user_id.get('email') or user_id.get('e')
+            username = user_id.get('username') or user_id.get('user')
+            if email:
+                q = select(User).where(User.email == email)
                 res = await self.db.execute(q)
                 user = res.scalar_one_or_none()
                 if user:
                     return user.id
+            if username:
+                q = select(User).where(User.username == username)
+                res = await self.db.execute(q)
+                user = res.scalar_one_or_none()
+                if user:
+                    return user.id
+            # Fallback to numeric id in payload
+            try:
+                maybe = user_id.get('user_id') or user_id.get('id')
+                if maybe and str(maybe).isdigit():
+                    legacy_val = int(maybe)
+                else:
+                    legacy_val = None
+            except Exception:
+                legacy_val = None
+            if legacy_val is None:
+                return None
+        else:
+            # Not a dict: handle str/int/uuid
+            try:
+                # If already looks like UUID, return uuid.UUID
+                if isinstance(user_id, str):
+                    try:
+                        return uuid.UUID(user_id)
+                    except Exception:
+                        # continue to check numeric legacy id
+                        pass
 
+                # If numeric (int or digit-string), try to find matching user by legacy_id
+                legacy_val = int(user_id) if not isinstance(user_id, uuid.UUID) else None
+            except Exception:
+                return None
+
+        # At this point, legacy_val should be set
+        try:
+            if legacy_val is None:
+                return None
+            q = select(User).where((User.legacy_id == legacy_val) | (User.id == legacy_val))
+            res = await self.db.execute(q)
+            user = res.scalar_one_or_none()
+            if user:
+                return user.id
         except Exception:
             return None
         return None
