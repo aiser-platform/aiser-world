@@ -7,6 +7,7 @@ from app.core.config import settings
 import json
 from urllib.parse import unquote
 from fastapi import Header
+import os
 from app.db.session import async_session
 from sqlalchemy import select
 from app.modules.user.models import User as ChatUser
@@ -214,13 +215,20 @@ async def provision_user(payload: dict = Body(...), x_internal_auth: str | None 
     Protect with `X-Internal-Auth` header containing a shared secret (ENV: INTERNAL_PROVISION_SECRET).
     This endpoint is idempotent and safe for retries.
     """
-    # Simple auth for internal calls. Accept multiple sources for the secret to make
-    # dev/provisioning robust across different env-loading approaches (env file vs
-    # docker-compose env). In production this should be a single strong secret.
-    secret = getattr(settings, 'INTERNAL_PROVISION_SECRET', '') or os.getenv('INTERNAL_PROVISION_SECRET', '')
-    # Accept a safe dev fallback when running in development to avoid CI/dev friction
-    dev_fallback = 'dev-internal-secret'
-    allowed_secrets = {s for s in [secret, dev_fallback] if s}
+    # Simple auth for internal calls. Construct allowed secrets from multiple
+    # sources so dev and CI flows can provision without needing a secret in every
+    # runtime (we still require a secret in production).
+    cfg_secret = getattr(settings, 'INTERNAL_PROVISION_SECRET', '')
+    env_secret = os.getenv('INTERNAL_PROVISION_SECRET', '')
+    allowed_secrets = set()
+    if cfg_secret:
+        allowed_secrets.add(cfg_secret)
+    if env_secret:
+        allowed_secrets.add(env_secret)
+    # In development accept a well-known fallback to reduce friction
+    if settings.ENVIRONMENT == 'development':
+        allowed_secrets.add('dev-internal-secret')
+
     if not x_internal_auth or x_internal_auth not in allowed_secrets:
         raise HTTPException(status_code=403, detail="Forbidden")
 
