@@ -245,7 +245,12 @@ class UserService(BaseService):
                     try:
                         requests.post(provision_url, json=payload, headers=headers, timeout=5)
                     except Exception:
-                        logger.exception("Failed to call chat2chart provision endpoint (non-fatal)")
+                        # Retry using docker service hostname when running in compose network
+                        try:
+                            fallback_url = provision_url.replace('localhost', 'chat2chart-server').replace('127.0.0.1', 'chat2chart-server')
+                            requests.post(fallback_url, json=payload, headers=headers, timeout=5)
+                        except Exception:
+                            logger.exception("Failed to call chat2chart provision endpoint (non-fatal)")
             except Exception:
                 logger.exception("Failed to attempt provisioning user in chat2chart (non-fatal)")
 
