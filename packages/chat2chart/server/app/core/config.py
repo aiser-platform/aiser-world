@@ -89,6 +89,10 @@ class Settings(BaseSettings):
         "http://localhost:3000,http://127.0.0.1:3000,http://aiser:3000",
     )
 
+    # Internal provisioning settings (auth -> chat2chart)
+    CHAT2CHART_PROVISION_URL: Optional[str] = os.getenv("CHAT2CHART_PROVISION_URL", "")
+    INTERNAL_PROVISION_SECRET: str = os.getenv("INTERNAL_PROVISION_SECRET", "")
+
     # File Upload Settings (Additional)
     MAX_FILE_SIZE_MB: int = int(os.getenv("MAX_FILE_SIZE_MB", "50"))
 
