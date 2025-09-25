@@ -173,6 +173,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 } catch (e) {
                     // ignore parse errors
                 }
+                // Log response status and body for debugging Method Not Allowed / 405 issues
+                try {
+                    const txt = await response.text();
+                    console.error('Login response not ok', response.status, txt);
+                } catch (e) {
+                    console.error('Login response read error', e);
+                }
                 throw new Error(errMsg);
             }
 
