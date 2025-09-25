@@ -235,6 +235,8 @@ class DashboardService:
             except Exception:
                 created_by_value = None
             logger.info(f"Resolved created_by_value: {created_by_value} (type={type(created_by_value)})")
+            # Also print to stdout for immediate visibility in container logs during tests
+            print(f"DEBUG: Resolved created_by_value={created_by_value!r}, type={type(created_by_value)}")
             dashboard = Dashboard(
                 name=dashboard_data.name,
                 description=dashboard_data.description,
@@ -590,7 +592,12 @@ class DashboardService:
         try:
             if legacy_val is None:
                 return None
-            q = select(User).where((User.legacy_id == legacy_val) | (User.id == legacy_val))
+            # If legacy_val is an integer, only compare against legacy_id to avoid UUID vs int datatype mismatch
+            if isinstance(legacy_val, int):
+                q = select(User).where(User.legacy_id == legacy_val)
+            else:
+                # legacy_val may be a UUID string/object - compare against id
+                q = select(User).where(User.id == legacy_val)
             res = await self.db.execute(q)
             user = res.scalar_one_or_none()
             if user:
