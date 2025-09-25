@@ -520,10 +520,8 @@ async def create_project_dashboard(
         logger.info(f"🏗️ Creating dashboard for project {project_id} in organization {organization_id}: {dashboard.name}")
         # Authenticate caller
         user_payload = Auth().decodeJWT(current_token) or {}
-        try:
-            user_id = int(user_payload.get('id') or user_payload.get('sub') or 0)
-        except Exception:
-            user_id = 0
+        # Pass full payload to service for robust resolution between legacy int ids and UUIDs
+        user_id = user_payload
 
         # Ensure project belongs to organization
         from app.modules.projects.models import Project
