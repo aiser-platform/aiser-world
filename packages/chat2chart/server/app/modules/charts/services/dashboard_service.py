@@ -599,6 +599,17 @@ class DashboardService:
             resolved_uuid = await self._resolve_user_uuid(user_id)
             if db_dash and db_dash.created_by is not None and db_dash.created_by != resolved_uuid:
                 raise HTTPException(status_code=403, detail="Access denied to delete widget")
+            # Delete the widget (cascade/constraints handled by DB)
+            await self.db.delete(widget)
+            await self.db.commit()
+            return True
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"❌ Failed to delete widget {widget_id}: {e}")
+            await self.db.rollback()
+            raise e
 
     async def _resolve_user_uuid(self, user_id: int | str | dict | None):
         """Resolve legacy integer user id or UUID string to the canonical users.id (UUID).
@@ -678,11 +689,3 @@ class DashboardService:
         except Exception:
             return None
         return None
-
-            await self.db.delete(widget)
-            await self.db.commit()
-            return True
-        except Exception as e:
-            logger.error(f"❌ Failed to delete widget {widget_id}: {e}")
-            await self.db.rollback()
-            raise e

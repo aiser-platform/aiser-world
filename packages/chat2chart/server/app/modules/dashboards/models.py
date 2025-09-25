@@ -124,8 +124,9 @@ class DashboardShare(BaseModel):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     dashboard_id = Column(UUID(as_uuid=True), ForeignKey("dashboards.id"), nullable=False)
-    shared_by = Column(Integer, ForeignKey("users.id"), nullable=False)
-    shared_with = Column(Integer, ForeignKey("users.id"), nullable=True)
+    from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+    shared_by = Column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    shared_with = Column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
     
     # Share settings
@@ -176,7 +177,7 @@ class DashboardTemplate(BaseModel):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
     # Relationships
-    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_by = Column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     creator = relationship("User")
 
 
@@ -186,7 +187,7 @@ class DashboardAnalytics(BaseModel):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     dashboard_id = Column(UUID(as_uuid=True), ForeignKey("dashboards.id"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    user_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     
     # Analytics data
     event_type = Column(String(50), nullable=False)  # view, edit, share, export, etc.

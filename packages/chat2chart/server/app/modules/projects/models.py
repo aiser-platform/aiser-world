@@ -7,6 +7,7 @@ import uuid
 # Import models from other modules to avoid circular imports
 from app.modules.chats.conversations.models import ChatConversation
 from app.modules.user.models import User
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 
 
 class Organization(BaseModel):
@@ -65,7 +66,6 @@ class Project(BaseModel):
     description = Column(Text, nullable=True)
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
     # created_by stored as UUID to match `users.id` primary key
-    from sqlalchemy.dialects.postgresql import UUID as PG_UUID
     created_by = Column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     
     # Project settings
