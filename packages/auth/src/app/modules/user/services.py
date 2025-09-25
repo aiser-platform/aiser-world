@@ -121,6 +121,13 @@ class UserService(BaseService):
         if not user:
             raise HTTPException(status_code=401, detail="Invalid credentials")
 
+        # Capture commonly used user attributes into locals to avoid triggering
+        # lazy loads that perform PK-based requery (which can fail during
+        # mixed integer/UUID migration states).
+        user_email = getattr(user, 'email', None)
+        user_id = getattr(user, 'id', None)
+        user_username = getattr(user, 'username', None)
+
         if not user.is_verified:
             # Check if verification token expired (1 hour)
             if user.verification_sent_at and (
@@ -129,18 +136,19 @@ class UserService(BaseService):
                 try:
                     # Generate new verification token
                     verification_token = self.auth.create_email_verification_token(
-                        user.email
+                        user_email
                     )
 
                     # Update verification attempt
                     self.repository.update_verification_attempt(user, db)
 
-                    # Send new verification email
+                    # Send new verification email (non-fatal)
                     verification_url = f"{settings.APP_URL}/verify-email"
-                    send_verification_email(
-                        user.email, verification_token, verification_url
-                    )
-                    logger.info(f"New verification email sent to {user.email}")
+                    try:
+                        send_verification_email(user_email, verification_token, verification_url)
+                        logger.info(f"New verification email sent to {user_email}")
+                    except Exception as e:
+                        logger.error(f"Failed to send verification email (non-fatal): {e}")
 
                     return SignInResponse(
                         fallback_url=credentials.fallback_url or "/verify-email",
@@ -150,13 +158,15 @@ class UserService(BaseService):
                     logger.error(f"Failed to send verification email: {e}")
 
             # Generate new verification token
-            verification_token = self.auth.create_email_verification_token(user.email)
+            verification_token = self.auth.create_email_verification_token(user_email)
 
             self.repository.update_verification_attempt(user, db)
 
             verification_url = f"{settings.APP_URL}/verify-email"
-            send_verification_email(user.email, verification_token, verification_url)
-
+            try:
+                send_verification_email(user_email, verification_token, verification_url)
+            except Exception as e:
+                logger.error(f"Failed to send verification email (non-fatal): {e}")
             return SignInResponse(
                 fallback_url=credentials.fallback_url or "/verify-email",
                 message="Please verify your email first",
