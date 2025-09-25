@@ -61,10 +61,11 @@ services:
       postgres:
         condition: service_healthy
     volumes:
-      - ./packages/auth:/app
-      - ./scripts/start-auth.sh:/start.sh
+      - ./packages/auth/src:/app/src
       - auth_poetry_cache:/root/.cache/pypoetry
-    command: ["bash", "/start.sh"]
+    environment:
+      - PYTHONPATH=/app/src
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "5000"]
     restart: unless-stopped
 
   # Chat2Chart Server
