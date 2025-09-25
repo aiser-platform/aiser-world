@@ -28,6 +28,22 @@ class DeviceSessionRepository(
         session = await self.get_by_device_id(device_id)
         if session:
             session.is_active = False
+            # revoke refresh token too
+            try:
+                session.refresh_token_revoked = True
+            except Exception:
+                pass
+            await self.db._session.commit()
+            return True
+        return False
+
+    async def revoke_by_token(self, refresh_token: str) -> bool:
+        query = select(self.model).filter(self.model.refresh_token == refresh_token)
+        result = await self.db._session.execute(query)
+        session = result.scalars().first()
+        if session:
+            session.refresh_token_revoked = True
+            session.is_active = False
             await self.db._session.commit()
             return True
         return False

@@ -21,6 +21,7 @@ class DeviceSessionBase(BaseModel):
     user_agent: str = Field(None)
     is_active: bool = Field(default=True)
     refresh_token: str = Field(...)
+    refresh_token_expires_at: datetime | None = Field(default=None)
 
     class Config:
         json_encoders = {datetime: lambda v: v.isoformat(), UUID: lambda v: str(v)}
