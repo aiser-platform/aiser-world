@@ -683,10 +683,8 @@ async def create_dashboard(
         if not user_payload:
             logger.warning('Attempt to create dashboard without valid JWT')
             raise HTTPException(status_code=401, detail='Authentication required to create dashboards; ensure you are logged in and cookies are enabled (access_token).')
-        try:
-            user_id = int(user_payload.get('id') or user_payload.get('sub') or 0)
-        except Exception:
-            user_id = 0
+        # Keep full payload (dict) so service can resolve legacy integer IDs or UUIDs as needed
+        user_id = user_payload
 
         org_id = int(user_payload.get('organization_id') or 0)
         # Ensure dashboard.project_id belongs to org (best-effort)
