@@ -40,6 +40,8 @@ from app.modules.user.schemas import (
     UserResponse,
     UserUpdate,
 )
+import requests
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -233,6 +235,20 @@ class UserService(BaseService):
                 # Continue execution - user can request resend later
 
             # Return tokens and verification status
+            # Attempt to provision minimal user record in chat2chart service
+            try:
+                provision_url = getattr(settings, 'CHAT2CHART_PROVISION_URL', os.getenv('CHAT2CHART_PROVISION_URL', None))
+                provision_secret = getattr(settings, 'INTERNAL_PROVISION_SECRET', os.getenv('INTERNAL_PROVISION_SECRET', None))
+                if provision_url and provision_secret:
+                    payload = {"id": str(user.id), "email": user.email, "username": user.username, "roles": []}
+                    headers = {"Content-Type": "application/json", "X-Internal-Auth": provision_secret}
+                    try:
+                        requests.post(provision_url, json=payload, headers=headers, timeout=5)
+                    except Exception:
+                        logger.exception("Failed to call chat2chart provision endpoint (non-fatal)")
+            except Exception:
+                logger.exception("Failed to attempt provisioning user in chat2chart (non-fatal)")
+
             return SignUpResponse(
                 **self.auth.signJWT(user_id=user.id, email=user.email),
                 is_verified=user.is_verified,
