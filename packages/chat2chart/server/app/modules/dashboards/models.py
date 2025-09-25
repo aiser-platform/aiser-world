@@ -19,7 +19,8 @@ class Dashboard(BaseModel):
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
     # created_by stored as UUID to match `users.id` primary key
     from sqlalchemy.dialects.postgresql import UUID as PG_UUID
-    created_by = Column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    # Allow nullable so dashboards can be created before we resolve legacy user mapping
+    created_by = Column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     
     # Dashboard settings
     layout_config = Column(JSON, nullable=True)  # Grid layout configuration

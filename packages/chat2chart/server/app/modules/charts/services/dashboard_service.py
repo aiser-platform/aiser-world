@@ -307,6 +307,16 @@ class DashboardService:
                         should_update = False
 
                 if should_update and uuid_value is not None:
+                    # Log the value and its type to aid debugging of datatype mismatches
+                    try:
+                        logger.info(f"DEBUG updating created_by for dashboard {dashboard.id}: uuid_value={uuid_value} (type={type(uuid_value)}) final_created_by={final_created_by} (type={type(final_created_by)})")
+                    except Exception:
+                        pass
+                    # Ensure we also print to stdout so test harness captures it
+                    try:
+                        print(f"DEBUG_UPDATE created_by -> dashboard={dashboard.id} uuid_value={repr(uuid_value)} type={type(uuid_value)} final_created_by={repr(final_created_by)} type_final={type(final_created_by)}")
+                    except Exception:
+                        pass
                     await self.db.execute(
                         update(Dashboard).where(Dashboard.id == dashboard.id).values(created_by=uuid_value)
                     )
