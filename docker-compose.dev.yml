@@ -55,16 +55,13 @@ services:
       - ENVIRONMENT=${ENVIRONMENT:-development}
       - CHAT2CHART_PROVISION_URL=http://chat2chart-server:8000/internal/provision-user
       - INTERNAL_PROVISION_SECRET=dev-internal-secret
-      - CHAT2CHART_PROVISION_URL=${CHAT2CHART_PROVISION_URL:-http://chat2chart-server:8000/internal/provision-user}
-      - INTERNAL_PROVISION_SECRET=dev-internal-secret
+      - PYTHONPATH=/app/src
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
       - ./packages/auth/src:/app/src
       - auth_poetry_cache:/root/.cache/pypoetry
-    environment:
-      - PYTHONPATH=/app/src
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "5000"]
     restart: unless-stopped
 
