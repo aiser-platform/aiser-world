@@ -38,7 +38,9 @@ services:
 
   # Authentication Service
   auth-service:
-    image: python:3.11-slim
+    build:
+      context: ./packages/auth-service
+      dockerfile: Dockerfile
     container_name: aiser-auth-dev
     working_dir: /app
     env_file: .env  # Moved here
