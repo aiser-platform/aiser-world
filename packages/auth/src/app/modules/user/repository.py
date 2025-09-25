@@ -40,7 +40,7 @@ class UserRepository(BaseRepository[User, UserCreate | UserCreateInternal, UserU
         result = db.execute(query)
         return result.scalars().first()
 
-    def get_by_id(self, user_id: int, db: Session) -> Optional[User]:
+    def get_by_id(self, user_id: int | str, db: Session) -> Optional[User]:
         """
         Get a user by ID
 
@@ -48,7 +48,17 @@ class UserRepository(BaseRepository[User, UserCreate | UserCreateInternal, UserU
         :param db: Database session
         :return: User instance or None
         """
-        query = select(self.model).filter(self.model.id == user_id)
+        # Normalize incoming id: if string looks like UUID, compare as UUID; else keep as int
+        try:
+            # attempt to cast numeric strings to int first
+            if isinstance(user_id, str) and user_id.isdigit():
+                lookup_id = int(user_id)
+            else:
+                lookup_id = user_id
+        except Exception:
+            lookup_id = user_id
+
+        query = select(self.model).filter(self.model.id == lookup_id)
         result = db.execute(query)
         return result.scalars().first()
 
