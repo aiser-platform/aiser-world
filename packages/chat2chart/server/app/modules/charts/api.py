@@ -685,6 +685,8 @@ async def create_dashboard(
             raise HTTPException(status_code=401, detail='Authentication required to create dashboards; ensure you are logged in and cookies are enabled (access_token).')
         # Keep full payload (dict) so service can resolve legacy integer IDs or UUIDs as needed
         user_id = user_payload
+        logger.info(f"user_payload for create_dashboard: {user_payload}")
+        print(f"DEBUG create_dashboard user_payload={user_payload}")
 
         org_id = int(user_payload.get('organization_id') or 0)
         # Ensure dashboard.project_id belongs to org (best-effort)
