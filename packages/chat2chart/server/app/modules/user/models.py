@@ -9,8 +9,9 @@ from app.common.model import BaseModel
 class User(BaseModel):
     __tablename__ = "users"
 
-    # Use integer primary key to match existing development DB
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    # Use UUID primary key (modernized). Keep legacy_id for migration compatibility.
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    legacy_id = Column(Integer, unique=True, nullable=True)
     username = Column(String(50), nullable=False, unique=True)
     email = Column(String(100), nullable=False, unique=True)
     # Password hash stored for authentication
