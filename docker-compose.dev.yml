@@ -55,6 +55,8 @@ services:
       - ENVIRONMENT=${ENVIRONMENT:-development}
       - CHAT2CHART_PROVISION_URL=${CHAT2CHART_PROVISION_URL:-http://chat2chart-server:8000/auth/internal/provision-user}
       - INTERNAL_PROVISION_SECRET=${INTERNAL_PROVISION_SECRET:-dev-internal-secret}
+      - CHAT2CHART_PROVISION_URL=${CHAT2CHART_PROVISION_URL:-http://chat2chart-server:8000/auth/internal/provision-user}
+      - INTERNAL_PROVISION_SECRET=${INTERNAL_PROVISION_SECRET:-dev-internal-secret}
     depends_on:
       postgres:
         condition: service_healthy
