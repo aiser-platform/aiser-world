@@ -70,6 +70,21 @@ class ProjectService(
     ) -> Organization:
         """Get or create a default organization for a user"""
         try:
+            # If no user_id provided, create a default organization record
+            # but do not attempt to add a user membership.
+            if not user_id:
+                default_name = "My Organization"
+                slug = "my-organization"
+                org_data = OrganizationCreate(
+                    name=default_name,
+                    slug=slug,
+                    description="Your personal organization",
+                    plan_type="free",
+                    max_projects=5,
+                )
+                organization = await self.__org_repository.create(org_data.model_dump(), db)
+                return organization
+
             # Check if user already has a default organization
             # Normalize user_id to int when possible to avoid SQL type-mismatch
             try:
@@ -92,10 +107,10 @@ class ProjectService(
             if existing_org:
                 return existing_org
 
-            # Create new default organization
-            # Ensure slug is always populated to satisfy DB not-null constraint
+            # Create new default organization with a deterministic slug
             default_name = "My Organization"
-            slug = "my-organization"
+            # include short user fingerprint to reduce slug collisions
+            slug = f"my-organization-{str(user_id)[:8]}"
             org_data = OrganizationCreate(
                 name=default_name,
                 slug=slug,
