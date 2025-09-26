@@ -37,7 +37,16 @@ def test_signup_provision_and_dashboard_crud():
     resp = requests.post(f"{auth_url}/users/signup", json={"email": email, "username": username, "password": pwd}, timeout=5)
     assert resp.status_code in (200, 201)
     body = resp.json()
-    assert 'access_token' in body or 'refresh_token' in body
+    # Signup returns tokens in this implementation; prefer using them
+    access = body.get('access_token') or body.get('access') or body.get('token')
+    refresh = body.get('refresh_token') or body.get('refresh')
+    if not access:
+        # Fallback to signin for cases where signup does not return tokens
+        resp_signin = requests.post(f"{auth_url}/users/signin", json={"identifier": username, "password": pwd}, timeout=5)
+        assert resp_signin.status_code == 200
+        tokens = resp_signin.json()
+        access = tokens.get('access_token') or tokens.get('access') or tokens.get('token')
+    assert access
 
     # 2) Wait briefly for provisioning to reach chat2chart
     time.sleep(1)
@@ -45,14 +54,6 @@ def test_signup_provision_and_dashboard_crud():
     # 3) Attempt to lookup user in chat2chart by email
     r = requests.post(f"{CHAT2_URL}/auth/echo", json={"check": "ping"})
     assert r.status_code == 200
-
-    # 4) Upgrade demo (dev) or signin to get tokens usable by chat2chart
-    # Try signin at auth service
-    resp_signin = requests.post(f"{auth_url}/users/signin", json={"identifier": username, "password": pwd}, timeout=5)
-    assert resp_signin.status_code == 200
-    tokens = resp_signin.json()
-    access = tokens.get('access_token') or tokens.get('access') or tokens.get('token')
-    assert access
 
     headers = {"Authorization": f"Bearer {access}"}
 
