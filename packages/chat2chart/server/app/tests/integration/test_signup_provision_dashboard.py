@@ -48,7 +48,7 @@ def test_signup_provision_and_dashboard_crud():
 
     # 4) Upgrade demo (dev) or signin to get tokens usable by chat2chart
     # Try signin at auth service
-    resp_signin = requests.post(f"{AUTH_URL}/users/signin", json={"identifier": username, "password": pwd})
+    resp_signin = requests.post(f"{auth_url}/users/signin", json={"identifier": username, "password": pwd}, timeout=5)
     assert resp_signin.status_code == 200
     tokens = resp_signin.json()
     access = tokens.get('access_token') or tokens.get('access') or tokens.get('token')
