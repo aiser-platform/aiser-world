@@ -236,6 +236,49 @@ class OrganizationRepository(
     def __init__(self):
         super().__init__(Organization)
 
+    async def create(self, obj_in: OrganizationCreate | dict, db: AsyncSession) -> Organization:
+        """Create organization with sensible defaults for slug and timestamps.
+
+        This ensures CI/dev DBs that have NOT NULL constraints won't error when
+        callers omit optional fields.
+        """
+        try:
+            # Accept either pydantic model or dict
+            if hasattr(obj_in, 'model_dump'):
+                data = obj_in.model_dump()
+            elif isinstance(obj_in, dict):
+                data = obj_in
+            else:
+                data = dict(obj_in)
+
+            # Ensure slug
+            slug = data.get('slug')
+            if not slug:
+                base = (data.get('name') or 'org').lower().strip().replace(' ', '-')
+                import uuid as _uuid
+                slug = f"{base}-{_uuid.uuid4().hex[:6]}"
+                data['slug'] = slug
+
+            # Ensure timestamps
+            from datetime import datetime
+            now = datetime.utcnow()
+            if 'created_at' not in data or data.get('created_at') is None:
+                data['created_at'] = now
+            if 'updated_at' not in data or data.get('updated_at') is None:
+                data['updated_at'] = now
+
+            # Ensure boolean defaults
+            if 'is_active' not in data:
+                data['is_active'] = True
+            if 'is_deleted' not in data:
+                data['is_deleted'] = False
+
+            # Use base class create (which expects model instance or dict)
+            return await super().create(data)
+        except Exception:
+            # Fallback to superclass behavior to raise helpful errors
+            return await super().create(obj_in)
+
     async def get_all(self, db: AsyncSession) -> List[Organization]:
         """Get all active organizations"""
         try:
