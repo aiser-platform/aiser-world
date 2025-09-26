@@ -743,68 +743,13 @@ async def create_dashboard(
         except Exception:
             pass
 
-        # Development shortcut: when running in development, avoid DB work
-        # for the create endpoint to keep integration tests stable while
-        # migrations are in flux. This returns a minimal dashboard payload
-        # with a generated id and does not persist to DB.
-        from app.core.config import settings as core_settings
-        if core_settings.ENVIRONMENT == 'development':
-            import uuid as _uuid
-            d_id = _uuid.uuid4()
-            logger.info(f"[DEV SHORTCUT] Returning minimal dashboard for id={d_id} without DB insert")
-            return {"success": True, "dashboard": {"id": str(d_id), "name": dashboard.name}, "id": str(d_id)}
-
-        # Use a minimal, defensive insert path to create the dashboard record
-        # directly. This avoids calling the full service which may execute
-        # complex logic that is fragile during schema migrations. The API
-        # returns the created dashboard id and a minimal dashboard payload.
+        # Use service to create dashboard with full resolution logic
         try:
-            from sqlalchemy import insert
-            import uuid as _uuid
-            async with async_session() as sdb:
-                d_id = _uuid.uuid4()
-                insert_stmt = insert(Dashboard).values(
-                    id=d_id,
-                    name=dashboard.name,
-                    description=dashboard.description,
-                    project_id=dashboard.project_id,
-                    layout_config=dashboard.layout_config or {},
-                    theme_config=dashboard.theme_config or {},
-                    global_filters=dashboard.global_filters or {},
-                    refresh_interval=dashboard.refresh_interval or 300,
-                    is_public=dashboard.is_public or False,
-                    is_active=True,
-                    is_template=dashboard.is_template or False,
-                    max_widgets=10,
-                    max_pages=5,
-                )
-                logger.info(f"[DEBUG] About to execute minimal insert for dashboard id={d_id}")
-                try:
-                    res = await sdb.execute(insert_stmt)
-                    logger.info(f"[DEBUG] Insert executed, result={res}")
-                except Exception:
-                    logger.exception('[DEBUG] Insert execution failed')
-                    raise
-                try:
-                    await sdb.commit()
-                    logger.info(f"[DEBUG] Commit succeeded for dashboard id={d_id}")
-                except Exception:
-                    logger.exception('[DEBUG] Commit failed for minimal insert')
-                    try:
-                        await sdb.rollback()
-                    except Exception:
-                        pass
-                    raise
-                try:
-                    return {"success": True, "dashboard": {"id": str(d_id), "name": dashboard.name}, "id": str(d_id)}
-                finally:
-                    # ensure logs flushed
-                    try:
-                        print(f"DEBUG_MIN_INSERT_DONE id={d_id}")
-                    except Exception:
-                        pass
+            dashboard_service = DashboardService(db)
+            created = await dashboard_service.create_dashboard(dashboard, user_id)
+            return {"success": True, "dashboard": created, "id": created.get("id")}
         except Exception as e:
-            logger.exception('Minimal dashboard insert failed')
+            logger.exception('Failed creating dashboard via service')
             raise HTTPException(status_code=500, detail=f'Failed to create dashboard: {e}')
         
     except HTTPException:
