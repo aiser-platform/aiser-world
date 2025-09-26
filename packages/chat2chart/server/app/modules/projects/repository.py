@@ -236,7 +236,7 @@ class OrganizationRepository(
     def __init__(self):
         super().__init__(Organization)
 
-    async def create(self, obj_in: OrganizationCreate | dict, db: AsyncSession) -> Organization:
+    async def create(self, obj_in: OrganizationCreate | dict, db: AsyncSession | None = None) -> Organization:
         """Create organization with sensible defaults for slug and timestamps.
 
         This ensures CI/dev DBs that have NOT NULL constraints won't error when
@@ -273,7 +273,23 @@ class OrganizationRepository(
             if 'is_deleted' not in data:
                 data['is_deleted'] = False
 
-            # Use base class create (which expects model instance or dict)
+            # If a DB session was provided, use it to perform the INSERT so we
+            # respect the caller's transaction and avoid session mismatch.
+            if db is not None:
+                table = self.model.__table__
+                ins = table.insert().values(**data).returning(table.c.id)
+                res = await db.execute(ins)
+                await db.commit()
+                row = res.first()
+                if row:
+                    org_id = row[0]
+                    q = select(self.model).where(table.c.id == org_id)
+                    pres = await db.execute(q)
+                    return pres.scalar_one_or_none()
+                # fallback to superclass
+                return await super().create(data)
+
+            # Fallback: use base class create which uses module-global DB session
             return await super().create(data)
         except Exception:
             # Fallback to superclass behavior to raise helpful errors
