@@ -319,17 +319,18 @@ class DashboardService:
                             ou = OrganizationUser(organization_id=org.id, user_id=(int(final_created_by) if isinstance(final_created_by, int) else final_created_by), role='owner', is_active=True)
                             self.db.add(ou)
                             await self.db.flush()
-                        # create project under organization
-                        proj_payload = {
-                            'name': 'Default Project',
-                            'description': 'Auto-created default project for user',
-                            'organization_id': org.id,
-                            'created_by': final_created_by,
-                        }
-                        # use repo.create but avoid passing timestamp fields directly
-                        p = await proj_repo.create(proj_payload, self.db)
-                        if p:
-                            final_project_id = p.id
+                        # create project under organization (only if org exists)
+                        if org:
+                            proj_payload = {
+                                'name': 'Default Project',
+                                'description': 'Auto-created default project for user',
+                                'organization_id': org.id,
+                                'created_by': final_created_by,
+                            }
+                            # use repo.create but avoid passing timestamp fields directly
+                            p = await proj_repo.create(proj_payload, self.db)
+                            if p:
+                                final_project_id = p.id
 
                 # Insert dashboard row including created_by and project_id atomically
                 dash_id = uuid.uuid4()
