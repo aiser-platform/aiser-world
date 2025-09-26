@@ -267,12 +267,21 @@ class DashboardService:
                             org = None
 
                         if not org:
-                            # Avoid passing Python-side timestamps (which may be ISO strings)
-                            # into repository.create to prevent asyncpg type errors.
-                            payload = dict(org_payload)
-                            payload.pop('created_at', None)
-                            payload.pop('updated_at', None)
-                            org = await org_repo.create(payload, self.db)
+                            try:
+                                # Avoid passing Python-side timestamps (which may be ISO strings)
+                                # into repository.create to prevent asyncpg type errors.
+                                payload = dict(org_payload)
+                                payload.pop('created_at', None)
+                                payload.pop('updated_at', None)
+                                org = await org_repo.create(payload, self.db)
+                            except Exception as _e:
+                                # Non-fatal: log and continue, dashboard will be created without project/org
+                                logger.exception(f"Non-fatal: failed to create default organization: {_e}")
+                                try:
+                                    await self.db.rollback()
+                                except Exception:
+                                    pass
+                                org = None
                         # Fallback: if repository returned None due to cross-schema selection issues,
                         # perform a raw INSERT using the provided session to guarantee a row.
                         if not org:
