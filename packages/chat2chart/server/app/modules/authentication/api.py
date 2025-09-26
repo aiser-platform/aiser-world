@@ -10,6 +10,7 @@ from fastapi import Header
 import os
 from app.db.session import async_session
 from datetime import datetime
+import sqlalchemy as sa
 from sqlalchemy import select
 from app.modules.user.models import User as ChatUser
 from sqlalchemy import select
@@ -288,13 +289,14 @@ async def provision_user(payload: dict = Body(...), x_internal_auth: str | None 
 
             # Use a targeted INSERT to avoid touching missing optional columns
             now = datetime.utcnow()
+            # Use SQL function now() for timestamps to avoid Python-side timezone issues
             ins = ChatUser.__table__.insert().values(
                 id=new_uuid,
                 username=(username or email.split('@')[0]),
                 email=email,
                 password='',
-                created_at=now,
-                updated_at=now,
+                created_at=sa.func.now(),
+                updated_at=sa.func.now(),
                 is_active=True,
                 is_deleted=False,
             )
@@ -306,15 +308,31 @@ async def provision_user(payload: dict = Body(...), x_internal_auth: str | None 
                 from app.modules.projects.services import ProjectService, OrganizationService
                 # best-effort: create default organization and project and add membership
                 try:
-                    org_svc = OrganizationService()
-                    default_org = await org_svc.create_default_organization(str(new_uuid))
+                    # Use repository.create with explicit slug and server-side timestamps
+                    from app.modules.projects.repository import OrganizationRepository
+                    org_repo = OrganizationRepository()
+                    slug_val = f"default-organization-{str(new_uuid)[:8]}"
+                    org_payload = {
+                        "name": "Default Organization",
+                        "slug": slug_val,
+                        "description": "Your default organization",
+                        "plan_type": "free",
+                        "max_projects": 1,
+                        "created_at": sa.func.now(),
+                        "updated_at": sa.func.now(),
+                        "is_active": True,
+                        "is_deleted": False,
+                    }
+                    default_org = await org_repo.create(org_payload, db)
                 except Exception:
                     default_org = None
 
                 if default_org:
                     try:
                         proj_svc = ProjectService()
-                        new_proj = await proj_svc.create_project({"name":"Default Project","description":"Auto-created default project for user","organization_id": default_org.id}, str(new_uuid))
+                        from app.modules.projects.schemas import ProjectCreate
+                        new_proj_payload = ProjectCreate(name="Default Project", description="Auto-created default project for user", organization_id=default_org.id)
+                        new_proj = await proj_svc.create_project(new_proj_payload, str(new_uuid))
                     except Exception:
                         pass
             except Exception:
