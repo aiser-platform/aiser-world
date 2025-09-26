@@ -7,7 +7,7 @@ import logging
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete, and_, or_
+from sqlalchemy import select, update, delete, and_, or_, insert
 from sqlalchemy.orm import selectinload
 
 from app.modules.charts.models import Dashboard, DashboardWidget
@@ -192,7 +192,9 @@ class DashboardService:
             if not dashboard_data.project_id:
                 try:
                     proj_service = ProjectService()
-                    user_projects = await proj_service.get_user_projects(str(user_id))
+                    # pass user_id as-is (None or value). Avoid coercing to string
+                    # to prevent 'None' literal being used in queries during migration.
+                    user_projects = await proj_service.get_user_projects(user_id)
                     if user_projects and len(user_projects) > 0:
                         dashboard_data.project_id = user_projects[0].id
                     else:
@@ -201,7 +203,7 @@ class DashboardService:
                         try:
                             from app.modules.projects.services import OrganizationService
                             org_svc = OrganizationService()
-                            default_orgs = await org_svc.get_user_organizations(str(user_id))
+                            default_orgs = await org_svc.get_user_organizations(user_id)
                             if default_orgs and len(default_orgs) > 0:
                                 default_org = default_orgs[0]
                         except Exception:
@@ -287,9 +289,53 @@ class DashboardService:
             except Exception:
                 pass
 
-            self.db.add(dashboard)
-            await self.db.commit()
-            await self.db.refresh(dashboard)
+            # If we couldn't resolve a UUID for created_by, remove the attribute
+            # from the instance so SQLAlchemy won't include it in the INSERT payload.
+            try:
+                if not final_created_by and 'created_by' in getattr(dashboard, '__dict__', {}):
+                    del dashboard.__dict__['created_by']
+            except Exception:
+                pass
+
+            # If we couldn't resolve a UUID for created_by, perform an explicit
+            # INSERT that omits the created_by column to avoid datatype casting
+            # issues in mixed-schema environments. Otherwise use normal ORM add.
+            if not final_created_by:
+                # ensure dashboard has an id to insert
+                try:
+                    if not getattr(dashboard, 'id', None):
+                        dashboard.id = uuid.uuid4()
+                except Exception:
+                    dashboard.id = uuid.uuid4()
+                # make sure any previous failed transaction is cleared
+                try:
+                    await self.db.rollback()
+                except Exception:
+                    pass
+                insert_stmt = insert(Dashboard).values(
+                    id=dashboard.id,
+                    name=dashboard.name,
+                    description=dashboard.description,
+                    project_id=dashboard.project_id,
+                    layout_config=dashboard.layout_config,
+                    theme_config=dashboard.theme_config,
+                    global_filters=dashboard.global_filters,
+                    refresh_interval=dashboard.refresh_interval,
+                    is_public=dashboard.is_public,
+                    is_active=dashboard.is_active,
+                    is_template=dashboard.is_template,
+                    max_widgets=dashboard.max_widgets,
+                    max_pages=dashboard.max_pages,
+                )
+                await self.db.execute(insert_stmt)
+                await self.db.commit()
+                # Load the inserted dashboard
+                res = await self.db.execute(select(Dashboard).where(Dashboard.id == dashboard.id))
+                dashboard = res.scalar_one_or_none()
+            else:
+                self.db.add(dashboard)
+                await self.db.commit()
+                await self.db.refresh(dashboard)
 
             # If we resolved a UUID for created_by after creation, persist it with a safe UPDATE
             try:
@@ -307,12 +353,10 @@ class DashboardService:
                         should_update = False
 
                 if should_update and uuid_value is not None:
-                    # Log the value and its type to aid debugging of datatype mismatches
                     try:
                         logger.info(f"DEBUG updating created_by for dashboard {dashboard.id}: uuid_value={uuid_value} (type={type(uuid_value)}) final_created_by={final_created_by} (type={type(final_created_by)})")
                     except Exception:
                         pass
-                    # Ensure we also print to stdout so test harness captures it
                     try:
                         print(f"DEBUG_UPDATE created_by -> dashboard={dashboard.id} uuid_value={repr(uuid_value)} type={type(uuid_value)} final_created_by={repr(final_created_by)} type_final={type(final_created_by)}")
                     except Exception:
@@ -676,16 +720,56 @@ class DashboardService:
         try:
             if legacy_val is None:
                 return None
-            # If legacy_val is an integer, only compare against legacy_id to avoid UUID vs int datatype mismatch
+
+            # We may be connected to an "auth" DB where users.id is still integer
+            # and a `new_id` (UUID) column was added for migration. Try to read
+            # the canonical UUID from `new_id` when available. This avoids relying
+            # on ORM mappings that expect different column types across DBs.
             if isinstance(legacy_val, int):
-                q = select(User).where(User.legacy_id == legacy_val)
+                # Try to read new_id (UUID) from users table using raw SQL
+                try:
+                    from sqlalchemy import text
+                    q = text("SELECT new_id, email FROM users WHERE id = :lid LIMIT 1")
+                    res = await self.db.execute(q.bindparams(lid=legacy_val))
+                    row = res.first()
+                    if row:
+                        new_id_val = row[0]
+                        email_val = row[1]
+                        if new_id_val:
+                            try:
+                                return uuid.UUID(str(new_id_val))
+                            except Exception:
+                                pass
+                        # If new_id is missing, create one and persist it (dev safe, idempotent)
+                        new_uuid = uuid.uuid4()
+                        try:
+                            upd = text("UPDATE users SET new_id = :nid WHERE id = :lid")
+                            await self.db.execute(upd.bindparams(nid=str(new_uuid), lid=legacy_val))
+                            await self.db.commit()
+                            return new_uuid
+                        except Exception:
+                            try:
+                                await self.db.rollback()
+                            except Exception:
+                                pass
+                except Exception:
+                    # Fallback to ORM lookup if raw SQL fails
+                    q = select(User).where(User.id == legacy_val)
+                    res = await self.db.execute(q)
+                    user = res.scalar_one_or_none()
+                    if user:
+                        # If ORM returns a user with a UUID-like id, return it
+                        try:
+                            return uuid.UUID(str(user.id))
+                        except Exception:
+                            return None
             else:
                 # legacy_val may be a UUID string/object - compare against id
                 q = select(User).where(User.id == legacy_val)
-            res = await self.db.execute(q)
-            user = res.scalar_one_or_none()
-            if user:
-                return user.id
+                res = await self.db.execute(q)
+                user = res.scalar_one_or_none()
+                if user:
+                    return user.id
         except Exception:
             return None
         return None
