@@ -380,21 +380,62 @@ class OrganizationService(
         try:
             from app.db.session import async_session
             async with async_session() as db:
-                # Normalize user_id to int when possible to avoid SQL type-mismatch
+                # If caller passed a JWT payload dict (common in create flows),
+                # try to resolve it to the canonical user id (UUID) or legacy int
+                # before building the query. This avoids SQLAlchemy attempting to
+                # bind a Python dict or the string 'None' into a UUID parameter.
+                _uid = None
+                final_user_val = None
                 try:
-                    _uid = int(user_id)
+                    if isinstance(user_id, dict):
+                        # Try explicit id fields first
+                        maybe = user_id.get('id') or user_id.get('user_id') or user_id.get('sub')
+                        if maybe is not None:
+                            try:
+                                _uid = int(maybe)
+                                final_user_val = _uid
+                            except Exception:
+                                final_user_val = maybe
+                        else:
+                            # Try email/username lookup
+                            email = user_id.get('email')
+                            username = user_id.get('username')
+                            if email or username:
+                                q = select(User).where((User.email == email) if email else (User.username == username))
+                                pres = await db.execute(q)
+                                u = pres.scalar_one_or_none()
+                                if u:
+                                    final_user_val = u.id
+                    else:
+                        try:
+                            _uid = int(user_id)
+                            final_user_val = _uid
+                        except Exception:
+                            final_user_val = user_id
+
                 except Exception:
                     _uid = None
+                    final_user_val = user_id
 
-                # Get organizations where user is a member
-                query = (
-                    select(Organization)
-                    .join(OrganizationUser)
-                    .where(
-                        (OrganizationUser.user_id == _uid) if _uid is not None else (OrganizationUser.user_id == user_id),
-                        OrganizationUser.is_active,
+                # Build query using resolved value
+                if isinstance(final_user_val, int):
+                    query = (
+                        select(Organization)
+                        .join(OrganizationUser)
+                        .where(
+                            OrganizationUser.user_id == final_user_val,
+                            OrganizationUser.is_active,
+                        )
                     )
-                )
+                else:
+                    query = (
+                        select(Organization)
+                        .join(OrganizationUser)
+                        .where(
+                            OrganizationUser.user_id == final_user_val,
+                            OrganizationUser.is_active,
+                        )
+                    )
                 result = await db.execute(query)
                 organizations = result.scalars().all()
 
