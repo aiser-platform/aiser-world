@@ -254,7 +254,20 @@ class DashboardService:
                             'is_active': True,
                             'is_deleted': False,
                         }
-                        org = await org_repo.create(org_payload, self.db)
+                        # Avoid duplicate inserts by checking for existing org by slug or name
+                        org = None
+                        try:
+                            if org_payload.get('slug'):
+                                pres = await self.db.execute(select(Organization).where(Organization.slug == org_payload.get('slug')))
+                                org = pres.scalar_one_or_none()
+                            if not org and org_payload.get('name'):
+                                pres = await self.db.execute(select(Organization).where(Organization.name == org_payload.get('name')))
+                                org = pres.scalar_one_or_none()
+                        except Exception:
+                            org = None
+
+                        if not org:
+                            org = await org_repo.create(org_payload, self.db)
                         # Fallback: if repository returned None due to cross-schema selection issues,
                         # perform a raw INSERT using the provided session to guarantee a row.
                         if not org:
