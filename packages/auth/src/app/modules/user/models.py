@@ -5,6 +5,9 @@ from sqlalchemy.orm import relationship
 from app.modules.authentication.models import UserAuthentication
 
 from app.common.model import BaseModel
+# Import organization-related models so SQLAlchemy can resolve relationships
+# during mapper initialization and avoid import-order issues.
+from app.modules.organizations import models as organizations_models
 
 
 class User(BaseModel, UserAuthentication):
