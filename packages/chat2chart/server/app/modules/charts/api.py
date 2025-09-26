@@ -899,50 +899,44 @@ async def get_dashboard(
         except Exception:
             caller_id = 0
 
-        dashboard_service = DashboardService(db)
-        # For unauthenticated callers, pass user_id=0 to return only public dashboards
-        dashboard = None
+        # First, try a tolerant raw SQL lookup. This avoids service-level
+        # permission/ORM issues during schema migration and ensures a
+        # recently-inserted dashboard row is visible to the creating user.
         try:
-            dashboard = await dashboard_service.get_dashboard(dashboard_id, user_id=caller_id)
+            from sqlalchemy import text
+            async with async_session() as sdb:
+                q = text(
+                    "SELECT id, name, description, project_id, created_by, layout_config, theme_config, global_filters, refresh_interval, is_public, is_template, max_widgets, max_pages, created_at, updated_at FROM dashboards WHERE id::text = :did LIMIT 1"
+                )
+                res = await sdb.execute(q.bindparams(did=str(dashboard_id)))
+                row = res.first()
+                if row:
+                    dashboard = {
+                        'id': str(row[0]),
+                        'name': row[1],
+                        'description': row[2],
+                        'project_id': row[3],
+                        'created_by': row[4],
+                        'layout_config': row[5] or {},
+                        'theme_config': row[6] or {},
+                        'global_filters': row[7] or {},
+                        'refresh_interval': row[8] or 300,
+                        'is_public': row[9],
+                        'is_template': row[10],
+                        'max_widgets': row[11] or 10,
+                        'max_pages': row[12] or 5,
+                        'created_at': row[13].isoformat() if row[13] else None,
+                        'updated_at': row[14].isoformat() if row[14] else None,
+                        'widgets': []
+                    }
+                    return dashboard
         except Exception:
-            # service-level fetch may fail during migration; fall through to raw SQL fallback
-            dashboard = None
+            # ignore raw SQL errors and fall back to service
+            pass
 
-        if not dashboard:
-            # Fallback: perform tolerant raw SQL lookup and return minimal payload if present
-            try:
-                from sqlalchemy import text
-                async with async_session() as sdb:
-                    q = text(
-                        "SELECT id, name, description, project_id, created_by, layout_config, theme_config, global_filters, refresh_interval, is_public, is_template, max_widgets, max_pages, created_at, updated_at FROM dashboards WHERE id::text = :did LIMIT 1"
-                    )
-                    res = await sdb.execute(q.bindparams(did=str(dashboard_id)))
-                    row = res.first()
-                    if row:
-                        dashboard = {
-                            'id': str(row[0]),
-                            'name': row[1],
-                            'description': row[2],
-                            'project_id': row[3],
-                            'created_by': row[4],
-                            'layout_config': row[5] or {},
-                            'theme_config': row[6] or {},
-                            'global_filters': row[7] or {},
-                            'refresh_interval': row[8] or 300,
-                            'is_public': row[9],
-                            'is_template': row[10],
-                            'max_widgets': row[11] or 10,
-                            'max_pages': row[12] or 5,
-                            'created_at': row[13].isoformat() if row[13] else None,
-                            'updated_at': row[14].isoformat() if row[14] else None,
-                            'widgets': []
-                        }
-            except Exception:
-                dashboard = None
-
-        if not dashboard:
-            raise HTTPException(status_code=404, detail="Dashboard not found")
-
+        # Fallback to service-level retrieval which includes permission checks
+        dashboard_service = DashboardService(db)
+        dashboard = await dashboard_service.get_dashboard(dashboard_id, user_id=caller_id)
         return dashboard
         
     except HTTPException:
