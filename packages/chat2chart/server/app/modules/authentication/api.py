@@ -312,15 +312,13 @@ async def provision_user(payload: dict = Body(...), x_internal_auth: str | None 
                     from app.modules.projects.repository import OrganizationRepository
                     org_repo = OrganizationRepository()
                     slug_val = f"default-organization-{str(new_uuid)[:8]}"
-                    from datetime import datetime as _dt
+                    # Keep payload minimal and let repository/db set timestamp defaults
                     org_payload = {
                         "name": "Default Organization",
                         "slug": slug_val,
                         "description": "Your default organization",
                         "plan_type": "free",
                         "max_projects": 1,
-                        "created_at": _dt.utcnow(),
-                        "updated_at": _dt.utcnow(),
                         "is_active": True,
                         "is_deleted": False,
                     }
