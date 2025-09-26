@@ -851,7 +851,7 @@ async def get_dashboard(
             from sqlalchemy import text
             async with async_session() as sdb:
                 q = text(
-                    "SELECT id, name, description, project_id, created_by, layout_config, theme_config, global_filters, refresh_interval, is_public, is_template, max_widgets, max_pages, created_at, updated_at FROM dashboards WHERE id::text = :did LIMIT 1"
+                    "SELECT id, name, description, project_id, created_by, layout_config, theme_config, global_filters, refresh_interval, is_public, is_template, max_widgets, max_pages, created_at, updated_at FROM dashboards WHERE id = :did::uuid LIMIT 1"
                 )
                 res = await sdb.execute(q.bindparams(did=str(dashboard_id)))
                 row = res.first()
