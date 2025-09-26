@@ -323,8 +323,10 @@ async def provision_user(payload: dict = Body(...), x_internal_auth: str | None 
             # Read back the created user id
             return {"created": True, "id": str(new_uuid)}
     except Exception as e:
-        logger.exception('Failed to provision user')
-        raise HTTPException(status_code=500, detail=str(e))
+        # Do not propagate provisioning failures to caller; provision is
+        # best-effort. Return created=False so upstream callers can continue.
+        logger.exception('Failed to provision user (non-fatal): %s', e)
+        return {"created": False, "id": None}
 
 
 @router.post("/auth/logout")
