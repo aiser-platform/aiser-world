@@ -2,7 +2,7 @@ import logging
 from datetime import datetime
 from typing import List, Optional
 
-from sqlalchemy import select, text
+from sqlalchemy import select, text, Integer as SAInteger
 from sqlalchemy.orm import Session
 
 from app.common.repository import BaseRepository
@@ -148,14 +148,67 @@ class UserRepository(BaseRepository[User, UserCreate | UserCreateInternal, UserU
         :return: Created user instance
         """
         try:
-            db_obj = User(**user_in.model_dump())
+            create_data = user_in.model_dump()
+            table = self.model.__table__
+
+            # Build a safe insert payload using only columns present in the
+            # target table. Avoid assigning a UUID string into an integer
+            # primary key by omitting `id` when the target column is integer.
+            insert_payload = {}
+            for col in table.columns:
+                name = col.name
+                if name not in create_data:
+                    continue
+                if name == 'id' and isinstance(col.type, SAInteger):
+                    # If caller provided a UUID-like id string, skip it so DB
+                    # will assign a numeric id. If caller provided a numeric
+                    # id, allow it.
+                    val = create_data.get('id')
+                    if isinstance(val, str) and '-' in val:
+                        continue
+                insert_payload[name] = create_data[name]
+
+            # If the target table supports an `id_new`/`new_id` UUID column,
+            # persist the canonical UUID there when provided.
+            if ('id_new' in table.c or 'new_id' in table.c) and 'id' in create_data:
+                target_name = 'id_new' if 'id_new' in table.c else 'new_id'
+                if target_name not in insert_payload:
+                    insert_payload[target_name] = create_data.get('id')
+
+            ins = table.insert().values(**insert_payload)
+            # Return the primary id (and id_new if available) so we can load
+            # the created object safely regardless of underlying PK type.
+            returning_cols = [table.c.id]
+            if 'id_new' in table.c:
+                returning_cols.append(table.c.id_new)
+            elif 'new_id' in table.c:
+                returning_cols.append(table.c.new_id)
+
+            res = db.execute(ins.returning(*returning_cols))
+            db.commit()
+            row = res.first()
+            if row:
+                created_id = row[0]
+                # Load created object using text comparison of id to avoid
+                # type casting issues.
+                q = select(self.model).where(text("CAST(id AS TEXT) = :cid")).params(cid=str(created_id))
+                result = db.execute(q)
+                obj = result.scalars().first()
+                if obj:
+                    return obj
+
+            # Fallback: create via ORM without explicit id
+            fallback_data = create_data.copy()
+            if 'id' in fallback_data:
+                del fallback_data['id']
+            db_obj = User(**fallback_data)
             db.add(db_obj)
             db.commit()
             db.refresh(db_obj)
             return db_obj
         except Exception as e:
             db.rollback()
-            raise e
+            raise
 
     def update(self, user_id: int, user_update: UserUpdate, db: Session) -> User:
         """
