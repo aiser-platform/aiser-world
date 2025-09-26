@@ -184,314 +184,151 @@ class DashboardService:
         dashboard_data: DashboardCreateSchema,
         user_id: int | str,
     ) -> Dict[str, Any]:
-        """Create a new dashboard"""
+        """Create a new dashboard in a single DB transaction to avoid cross-session visibility issues."""
         try:
             logger.info(f"📊 Creating dashboard: {dashboard_data.name}")
 
-            # Try to pre-resolve or ensure a local user record so we can
-            # persist created_by reliably for newly onboarded users.
-            pre_resolved_created_by = None
-            try:
-                # Attempt to resolve via normal resolver first
-                pre_resolved_created_by = await self._resolve_user_uuid(user_id)
-            except Exception:
-                pre_resolved_created_by = None
+            # local imports to avoid circular/top-level entanglement
+            from app.modules.projects.repository import ProjectRepository, OrganizationRepository
+            from app.modules.projects.models import OrganizationUser, Project
+            from app.modules.user.models import ChatUser
+            from datetime import datetime as _dt
+            from sqlalchemy import text
 
-            # If unresolved and we have an email in the user payload, create a
-            # minimal local ChatUser so that create flows can set created_by.
+            # Begin a transaction on the provided session
             try:
-                if not pre_resolved_created_by and isinstance(user_id, dict) and user_id.get('email'):
-                    from app.modules.user.models import ChatUser
-                    import uuid as _uuid
+                await self.db.begin()
+
+                # Resolve or create minimal user for created_by
+                final_created_by = None
+                try:
+                    final_created_by = await self._resolve_user_uuid(user_id)
+                except Exception:
+                    final_created_by = None
+
+                if not final_created_by and isinstance(user_id, dict) and user_id.get('email'):
                     email = user_id.get('email')
-                    # use module-level `select` (imported at top) to avoid local shadowing
                     res = await self.db.execute(select(User).where(User.email == email))
-                    existing = res.scalar_one_or_none()
-                    if existing:
-                        pre_resolved_created_by = existing.id
+                    u = res.scalar_one_or_none()
+                    if u:
+                        final_created_by = u.id
                     else:
-                        new_uuid = _uuid.uuid4()
-                        ins = ChatUser.__table__.insert().values(
+                        new_uuid = uuid.uuid4()
+                        await self.db.execute(ChatUser.__table__.insert().values(
                             id=new_uuid,
                             username=(user_id.get('username') or email.split('@')[0]),
                             email=email,
                             password='',
-                            created_at=func.now(),
-                            updated_at=func.now(),
+                            created_at=_dt.utcnow(),
+                            updated_at=_dt.utcnow(),
                             is_active=True,
                             is_deleted=False,
-                        )
-                        try:
-                            await self.db.execute(ins)
-                            await self.db.commit()
-                            pre_resolved_created_by = new_uuid
-                        except Exception:
-                            try:
-                                await self.db.rollback()
-                            except Exception:
-                                pass
-            except Exception:
-                pre_resolved_created_by = None
-            
-            # If no project_id was provided, try to ensure the user has a default project
-            # Wrap the whole resolution/creation block so any failure here is non-fatal
-            if not dashboard_data.project_id:
-                try:
-                    proj_service = ProjectService()
-                    # Resolve a safe identifier for downstream lookups (UUID or legacy int)
+                        ))
+                        final_created_by = new_uuid
+
+                # Ensure project exists (prefer provided, then user's projects, then create defaults)
+                final_project_id = dashboard_data.project_id
+                if not final_project_id:
+                    proj_repo = ProjectRepository()
+                    # try to find any public or owned project
                     try:
-                        lookup_user_uuid = await self._resolve_user_uuid(user_id)
+                        if final_created_by:
+                            p_res = await self.db.execute(select(Project).where(Project.created_by == final_created_by))
+                            p_row = p_res.scalars().first()
+                            if p_row:
+                                final_project_id = p_row.id
                     except Exception:
-                        lookup_user_uuid = None
+                        final_project_id = None
 
-                    # Prefer UUID string for service calls, fall back to legacy int when available
-                    lookup_user_for_calls = None
-                    if lookup_user_uuid:
-                        lookup_user_for_calls = str(lookup_user_uuid)
-                    else:
-                        try:
-                            if isinstance(user_id, dict):
-                                maybe = user_id.get('user_id') or user_id.get('id') or user_id.get('sub')
-                                lookup_user_for_calls = int(maybe) if maybe and str(maybe).isdigit() else None
-                            else:
-                                lookup_user_for_calls = int(user_id) if user_id and str(user_id).isdigit() else None
-                        except Exception:
-                            lookup_user_for_calls = None
+                    if not final_project_id:
+                        org_repo = OrganizationRepository()
+                        now = _dt.utcnow()
+                        slug = f"default-organization-{str(uuid.uuid4())[:8]}"
+                        org_payload = {
+                            'name': 'Default Organization',
+                            'slug': slug,
+                            'description': 'Your default organization',
+                            'plan_type': 'free',
+                            'max_projects': 1,
+                            'created_at': now,
+                            'updated_at': now,
+                            'is_active': True,
+                            'is_deleted': False,
+                        }
+                        org = await org_repo.create(org_payload, self.db)
+                        if org and final_created_by:
+                            ou = OrganizationUser(organization_id=org.id, user_id=(int(final_created_by) if isinstance(final_created_by, int) else final_created_by), role='owner', is_active=True)
+                            self.db.add(ou)
+                            await self.db.flush()
+                        # create project under organization
+                        proj_payload = {
+                            'name': 'Default Project',
+                            'description': 'Auto-created default project for user',
+                            'organization_id': org.id,
+                            'created_by': final_created_by,
+                            'created_at': now,
+                            'updated_at': now,
+                        }
+                        p = await proj_repo.create(proj_payload, self.db)
+                        if p:
+                            final_project_id = p.id
 
-                    # Try to find existing projects for the resolved user id
-                    user_projects = await proj_service.get_user_projects(lookup_user_for_calls)
-                    if user_projects and len(user_projects) > 0:
-                        dashboard_data.project_id = user_projects[0].id
-                    else:
-                        # create a default project under user's default org
-                        default_org = None
-                        try:
-                            from app.modules.projects.services import OrganizationService
-                            org_svc = OrganizationService()
-                            default_orgs = await org_svc.get_user_organizations(lookup_user_for_calls)
-                            if default_orgs and len(default_orgs) > 0:
-                                default_org = default_orgs[0]
-                        except Exception:
-                            default_org = None
-
-                        if not default_org:
-                            # create default organization (OrganizationService ensures slug)
-                            try:
-                                org_svc = OrganizationService()
-                                default_org = await org_svc.create_default_organization(lookup_user_for_calls)
-                            except Exception:
-                                default_org = None
-
-                        if default_org:
-                            try:
-                                new_proj = ProjectCreate(name="Default Project", description="Auto-created default project for user", organization_id=default_org.id)
-                                # pass the lookup_user_for_calls as string when available
-                                created_proj = await proj_service.create_project(new_proj, str(lookup_user_for_calls) if lookup_user_for_calls is not None else None)
-                                dashboard_data.project_id = created_proj.id
-                            except Exception:
-                                # best-effort; leave project_id None if creation fails
-                                pass
-                except Exception as e:
-                    # Log and continue; dashboard creation must not fail due to org/project issues
-                    logger.exception(f"Non-fatal: project/org resolution failed during dashboard create: {e}")
-
-            # Create dashboard
-            # Resolve provided user id (could be legacy int) into UUID matching users.id
-            created_by_value = None
-            try:
-                created_by_value = await self._resolve_user_uuid(user_id)
-            except Exception:
-                created_by_value = None
-            logger.info(f"Resolved created_by_value: {created_by_value} (type={type(created_by_value)})")
-            # Also print to stdout for immediate visibility in container logs during tests
-            print(f"DEBUG: Resolved created_by_value={created_by_value!r}, type={type(created_by_value)}")
-
-            # Ensure created_by is a UUID (or None). If a legacy int slipped through, map it to UUID.
-            final_created_by = None
-            try:
-                if isinstance(created_by_value, uuid.UUID):
-                    final_created_by = created_by_value
-                elif isinstance(created_by_value, str):
-                    # try to parse as UUID
-                    try:
-                        final_created_by = uuid.UUID(created_by_value)
-                    except Exception:
-                        # maybe a numeric string representing legacy id
-                        if created_by_value.isdigit():
-                            q = select(User).where(User.legacy_id == int(created_by_value))
-                            res = await self.db.execute(q)
-                            u = res.scalar_one_or_none()
-                            if u:
-                                final_created_by = u.id
-                elif isinstance(created_by_value, int):
-                    q = select(User).where(User.legacy_id == created_by_value)
-                    res = await self.db.execute(q)
-                    u = res.scalar_one_or_none()
-                    if u:
-                        final_created_by = u.id
-            except Exception:
-                final_created_by = None
-
-            dashboard = Dashboard(
-                name=dashboard_data.name,
-                description=dashboard_data.description,
-                project_id=dashboard_data.project_id,
-                layout_config=dashboard_data.layout_config or {},
-                theme_config=dashboard_data.theme_config or {},
-                global_filters=dashboard_data.global_filters or {},
-                refresh_interval=dashboard_data.refresh_interval or 300,
-                is_public=dashboard_data.is_public or False,
-                is_template=dashboard_data.is_template or False,
-                # created_by intentionally omitted on INSERT to avoid datatype mismatch;
-                # will be set via UPDATE after insert if final_created_by is available.
-                max_widgets=10,
-                max_pages=5,
-            )
-            
-            # Dump debug info to a file in the container to inspect types at runtime
-            try:
-                with open('/tmp/dashboard_service_debug.log', 'a') as _f:
-                    _f.write(f"DEBUG_PRE_INSERT created_by_value={created_by_value!r} type={type(created_by_value)} final_created_by={final_created_by!r} type_final={type(final_created_by)}\n")
-            except Exception:
-                pass
-
-            # If we couldn't resolve a UUID for created_by, remove the attribute
-            # from the instance so SQLAlchemy won't include it in the INSERT payload.
-            try:
-                if not final_created_by and 'created_by' in getattr(dashboard, '__dict__', {}):
-                    del dashboard.__dict__['created_by']
-            except Exception:
-                pass
-
-            # If we couldn't resolve a UUID for created_by, perform an explicit
-            # INSERT that omits the created_by column to avoid datatype casting
-            # issues in mixed-schema environments. Otherwise use normal ORM add.
-            if not final_created_by:
-                # ensure dashboard has an id to insert
-                try:
-                    if not getattr(dashboard, 'id', None):
-                        dashboard.id = uuid.uuid4()
-                except Exception:
-                    dashboard.id = uuid.uuid4()
-                # make sure any previous failed transaction is cleared
-                try:
-                    await self.db.rollback()
-                except Exception:
-                    pass
-                # If we couldn't resolve created_by, make the dashboard public by default
-                # to allow immediate access for the creating user during migration.
-                is_public_val = dashboard.is_public if dashboard.is_public is not None else True
-                insert_stmt = insert(Dashboard).values(
-                    id=dashboard.id,
-                    name=dashboard.name,
-                    description=dashboard.description,
-                    project_id=dashboard.project_id,
-                    layout_config=dashboard.layout_config,
-                    theme_config=dashboard.theme_config,
-                    global_filters=dashboard.global_filters,
-                    refresh_interval=dashboard.refresh_interval,
-                    is_public=is_public_val,
-                    is_active=dashboard.is_active,
-                    is_template=dashboard.is_template,
-                    max_widgets=dashboard.max_widgets,
-                    max_pages=dashboard.max_pages,
+                # Insert dashboard row including created_by and project_id atomically
+                dash_id = uuid.uuid4()
+                ins = insert(Dashboard).values(
+                    id=dash_id,
+                    name=dashboard_data.name,
+                    description=dashboard_data.description,
+                    project_id=final_project_id,
+                    created_by=final_created_by,
+                    layout_config=dashboard_data.layout_config or {},
+                    theme_config=dashboard_data.theme_config or {},
+                    global_filters=dashboard_data.global_filters or {},
+                    refresh_interval=dashboard_data.refresh_interval or 300,
+                    is_public=dashboard_data.is_public if dashboard_data.is_public is not None else True,
+                    is_active=True,
+                    is_template=dashboard_data.is_template or False,
+                    max_widgets=10,
+                    max_pages=5,
                 )
-                await self.db.execute(insert_stmt)
+                await self.db.execute(ins)
                 await self.db.commit()
-                # Load the inserted dashboard via raw SQL to avoid ORM/selector shadowing
-                try:
-                    from sqlalchemy import text
-                    res = await self.db.execute(text("SELECT id, name, description, project_id, created_by, layout_config, theme_config, global_filters, refresh_interval, is_public, is_template, max_widgets, max_pages, created_at, updated_at FROM dashboards WHERE id = :did" ).bindparams(did=str(dashboard.id)))
-                    row = res.first()
-                    if row:
-                        from types import SimpleNamespace
-                        dashboard = SimpleNamespace(
-                            id=row[0],
-                            name=row[1],
-                            description=row[2],
-                            project_id=row[3],
-                            created_by=row[4],
-                            layout_config=row[5] or {},
-                            theme_config=row[6] or {},
-                            global_filters=row[7] or {},
-                            refresh_interval=row[8] or 300,
-                            is_public=row[9],
-                            is_template=row[10],
-                            max_widgets=row[11] or 10,
-                            max_pages=row[12] or 5,
-                            created_at=row[13],
-                            updated_at=row[14],
-                            widgets=[],
-                        )
-                    else:
-                        dashboard = None
-                except Exception:
-                    dashboard = None
-            else:
-                self.db.add(dashboard)
-                await self.db.commit()
-                await self.db.refresh(dashboard)
 
-            # If we resolved a UUID for created_by after creation, persist it with a safe UPDATE
-            try:
-                # Only persist created_by if it's a UUID or a UUID-string to avoid type mismatches
-                should_update = False
-                uuid_value = None
-                if isinstance(final_created_by, uuid.UUID):
-                    should_update = True
-                    uuid_value = final_created_by
-                elif isinstance(final_created_by, str):
-                    try:
-                        uuid_value = uuid.UUID(final_created_by)
-                        should_update = True
-                    except Exception:
-                        should_update = False
+                # Load inserted row
+                res = await self.db.execute(text("SELECT id, name, description, project_id, created_by, layout_config, theme_config, global_filters, refresh_interval, is_public, is_template, max_widgets, max_pages, created_at, updated_at FROM dashboards WHERE id = :did").bindparams(did=str(dash_id)))
+                row = res.first()
+                if not row:
+                    raise Exception('Inserted dashboard not found')
 
-                if should_update and uuid_value is not None:
-                    try:
-                        logger.info(f"DEBUG updating created_by for dashboard {dashboard.id}: uuid_value={uuid_value} (type={type(uuid_value)}) final_created_by={final_created_by} (type={type(final_created_by)})")
-                    except Exception:
-                        pass
-                    try:
-                        print(f"DEBUG_UPDATE created_by -> dashboard={dashboard.id} uuid_value={repr(uuid_value)} type={type(uuid_value)} final_created_by={repr(final_created_by)} type_final={type(final_created_by)}")
-                    except Exception:
-                        pass
-                    await self.db.execute(
-                        update(Dashboard).where(Dashboard.id == dashboard.id).values(created_by=uuid_value)
-                    )
-                    await self.db.commit()
-                    await self.db.refresh(dashboard)
+                dashboard = {
+                    'id': str(row[0]),
+                    'name': row[1],
+                    'description': row[2],
+                    'project_id': row[3],
+                    'created_by': row[4],
+                    'layout_config': row[5] or {},
+                    'theme_config': row[6] or {},
+                    'global_filters': row[7] or {},
+                    'refresh_interval': row[8] or 300,
+                    'is_public': row[9],
+                    'is_template': row[10],
+                    'max_widgets': row[11] or 10,
+                    'max_pages': row[12] or 5,
+                    'created_at': row[13].isoformat() if row[13] else None,
+                    'updated_at': row[14].isoformat() if row[14] else None,
+                    'widgets': []
+                }
+                return dashboard
+
             except Exception:
-                # Non-fatal: dashboard created without created_by set
                 try:
                     await self.db.rollback()
                 except Exception:
                     pass
-            
-            # Convert to response format
-            return {
-                "id": str(dashboard.id),
-                "name": dashboard.name,
-                "description": dashboard.description,
-                "project_id": dashboard.project_id,
-                "layout_config": dashboard.layout_config,
-                "theme_config": dashboard.theme_config,
-                "global_filters": dashboard.global_filters,
-                "refresh_interval": dashboard.refresh_interval,
-                "is_public": dashboard.is_public,
-                "is_template": dashboard.is_template,
-                "created_by": dashboard.created_by,
-                "max_widgets": dashboard.max_widgets,
-                "max_pages": dashboard.max_pages,
-                "created_at": dashboard.created_at.isoformat(),
-                "updated_at": dashboard.updated_at.isoformat() if dashboard.updated_at else None,
-                "last_viewed_at": None,
-                "widgets": []
-            }
-            
+                raise
+
         except Exception as e:
             logger.error(f"❌ Failed to create dashboard: {str(e)}")
-            await self.db.rollback()
             raise e
     
     async def update_dashboard(
