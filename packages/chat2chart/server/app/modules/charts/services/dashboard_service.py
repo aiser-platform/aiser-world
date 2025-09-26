@@ -234,6 +234,7 @@ class DashboardService:
                 pre_resolved_created_by = None
             
             # If no project_id was provided, try to ensure the user has a default project
+            # Wrap the whole resolution/creation block so any failure here is non-fatal
             if not dashboard_data.project_id:
                 try:
                     proj_service = ProjectService()
@@ -290,9 +291,9 @@ class DashboardService:
                             except Exception:
                                 # best-effort; leave project_id None if creation fails
                                 pass
-                except Exception:
-                    # best-effort only: if any error occurs trying to infer/create project/org, ignore and continue
-                    pass
+                except Exception as e:
+                    # Log and continue; dashboard creation must not fail due to org/project issues
+                    logger.exception(f"Non-fatal: project/org resolution failed during dashboard create: {e}")
 
             # Create dashboard
             # Resolve provided user id (could be legacy int) into UUID matching users.id
