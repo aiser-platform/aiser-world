@@ -69,15 +69,15 @@ class UserService(BaseService):
         # Hash the password
         hashed_password = self.auth.hash_password(user_in.password)
 
-        # Create user object with hashed password
-        user = UserCreateInternal(
-            email=user_in.email,
-            username=user_in.username,
-            password=hashed_password,
-        )
+        # Create user payload with hashed password (ensure no `id` present)
+        user_payload = {
+            "email": user_in.email,
+            "username": user_in.username,
+            "password": hashed_password,
+        }
 
-        # Save and return the created user
-        created_user = self.repository.create(user, db)
+        # Save and return the created user (pass dict to avoid pydantic defaults)
+        created_user = self.repository.create(user_payload, db)
         return created_user
 
     def authenticate(
