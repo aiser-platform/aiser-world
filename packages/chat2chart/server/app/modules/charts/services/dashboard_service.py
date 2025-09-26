@@ -188,6 +188,11 @@ class DashboardService:
         try:
             logger.info(f"📊 Creating dashboard: {dashboard_data.name}")
 
+            # Ensure local reference to sqlalchemy.select to avoid accidental
+            # UnboundLocalError if 'select' is reassigned in nested scopes.
+            import sqlalchemy as sa
+            select = sa.select
+
             # Try to pre-resolve or ensure a local user record so we can
             # persist created_by reliably for newly onboarded users.
             pre_resolved_created_by = None
