@@ -191,7 +191,8 @@ class DashboardService:
             # local imports to avoid circular/top-level entanglement
             from app.modules.projects.repository import ProjectRepository, OrganizationRepository
             from app.modules.projects.models import OrganizationUser, Project
-            from app.modules.user.models import ChatUser
+            # The chat2chart user model is exported as `User` in this service.
+            from app.modules.user.models import User as ChatUser
             from datetime import datetime as _dt
             from sqlalchemy import text
 
