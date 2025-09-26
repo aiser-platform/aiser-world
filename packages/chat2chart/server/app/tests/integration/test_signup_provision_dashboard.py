@@ -33,7 +33,8 @@ def test_signup_provision_and_dashboard_crud():
     username = f"testuser_{uuid.uuid4().hex[:6]}"
     pwd = "Test@12345"
 
-    resp = requests.post(f"{AUTH_URL}/users/signup", json={"email": email, "username": username, "password": pwd})
+    auth_url = _discover_auth_url()
+    resp = requests.post(f"{auth_url}/users/signup", json={"email": email, "username": username, "password": pwd}, timeout=5)
     assert resp.status_code in (200, 201)
     body = resp.json()
     assert 'access_token' in body or 'refresh_token' in body
