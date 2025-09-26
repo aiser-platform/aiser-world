@@ -267,7 +267,12 @@ class DashboardService:
                             org = None
 
                         if not org:
-                            org = await org_repo.create(org_payload, self.db)
+                            # Avoid passing Python-side timestamps (which may be ISO strings)
+                            # into repository.create to prevent asyncpg type errors.
+                            payload = dict(org_payload)
+                            payload.pop('created_at', None)
+                            payload.pop('updated_at', None)
+                            org = await org_repo.create(payload, self.db)
                         # Fallback: if repository returned None due to cross-schema selection issues,
                         # perform a raw INSERT using the provided session to guarantee a row.
                         if not org:
