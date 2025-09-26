@@ -9,6 +9,7 @@ from urllib.parse import unquote
 from fastapi import Header
 import os
 from app.db.session import async_session
+from datetime import datetime
 from sqlalchemy import select
 from app.modules.user.models import User as ChatUser
 from sqlalchemy import select
@@ -286,7 +287,17 @@ async def provision_user(payload: dict = Body(...), x_internal_auth: str | None 
                 new_uuid = _uuid.uuid4()
 
             # Use a targeted INSERT to avoid touching missing optional columns
-            ins = ChatUser.__table__.insert().values(id=new_uuid, username=(username or email.split('@')[0]), email=email, password='')
+            now = datetime.utcnow()
+            ins = ChatUser.__table__.insert().values(
+                id=new_uuid,
+                username=(username or email.split('@')[0]),
+                email=email,
+                password='',
+                created_at=now,
+                updated_at=now,
+                is_active=True,
+                is_deleted=False,
+            )
             await db.execute(ins)
             await db.commit()
 
