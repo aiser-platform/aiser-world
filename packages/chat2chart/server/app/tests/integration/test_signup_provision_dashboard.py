@@ -3,8 +3,28 @@ import time
 import uuid
 import requests
 
-AUTH_URL = os.getenv('AUTH_URL', 'http://localhost:5000')
+AUTH_URL = os.getenv('AUTH_URL', None)
 CHAT2_URL = os.getenv('CHAT2_URL', 'http://localhost:8000')
+
+
+def _discover_auth_url():
+    if AUTH_URL:
+        return AUTH_URL
+    candidates = [
+        'http://localhost:5000',
+        'http://127.0.0.1:5000',
+        'http://auth-service:5000',
+        'http://aiser-auth-dev:5000',
+        'http://auth:5000',
+    ]
+    for c in candidates:
+        try:
+            r = requests.get(f"{c}/health", timeout=1)
+            if r.status_code == 200:
+                return c
+        except Exception:
+            continue
+    return 'http://localhost:5000'
 
 
 def test_signup_provision_and_dashboard_crud():
