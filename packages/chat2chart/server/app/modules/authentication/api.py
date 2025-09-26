@@ -277,7 +277,7 @@ async def provision_user(payload: dict = Body(...), x_internal_auth: str | None 
                     # swallow and proceed to create new user
                     pass
 
-            # Create new user with provided UUID
+            # Create new user with provided UUID and ensure default org/project/ownership
             from sqlalchemy.dialects.postgresql import UUID as PG_UUID
             import uuid as _uuid
             try:
@@ -289,6 +289,26 @@ async def provision_user(payload: dict = Body(...), x_internal_auth: str | None 
             ins = ChatUser.__table__.insert().values(id=new_uuid, username=(username or email.split('@')[0]), email=email, password='')
             await db.execute(ins)
             await db.commit()
+
+            # Ensure default organization and project are created for this user and membership is added
+            try:
+                from app.modules.projects.services import ProjectService, OrganizationService
+                # best-effort: create default organization and project and add membership
+                try:
+                    org_svc = OrganizationService()
+                    default_org = await org_svc.create_default_organization(str(new_uuid))
+                except Exception:
+                    default_org = None
+
+                if default_org:
+                    try:
+                        proj_svc = ProjectService()
+                        new_proj = await proj_svc.create_project({"name":"Default Project","description":"Auto-created default project for user","organization_id": default_org.id}, str(new_uuid))
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
             # Read back the created user id
             return {"created": True, "id": str(new_uuid)}
     except Exception as e:
