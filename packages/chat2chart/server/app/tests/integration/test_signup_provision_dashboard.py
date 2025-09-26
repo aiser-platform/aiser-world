@@ -57,20 +57,21 @@ def test_signup_provision_and_dashboard_crud():
 
     headers = {"Authorization": f"Bearer {access}"}
 
-    # 5) Create a dashboard in chat2chart
+    # 5) Create a dashboard using the new dashboards APIs
     dash_payload = {"name": "Integration Test Dashboard", "description": "Created by integration test"}
-    create = requests.post(f"{CHAT2_URL}/charts/builder/save", json=dash_payload, headers=headers)
+    create = requests.post(f"{CHAT2_URL}/charts/dashboards/", json=dash_payload, headers=headers, timeout=5)
     assert create.status_code in (200, 201)
     created = create.json()
-    dash_id = created.get('id') or created.get('dashboard', {}).get('id')
+    # response may include id at top-level or under 'dashboard'
+    dash_id = created.get('id') or (created.get('dashboard') or {}).get('id') or (created.get('dashboard') and created['dashboard'].get('id'))
     assert dash_id
 
     # 6) Get the dashboard
-    getr = requests.get(f"{CHAT2_URL}/charts/builder/{dash_id}", headers=headers)
+    getr = requests.get(f"{CHAT2_URL}/charts/dashboards/{dash_id}", headers=headers, timeout=5)
     assert getr.status_code == 200
 
     # 7) Delete the dashboard
-    delr = requests.delete(f"{CHAT2_URL}/charts/builder/{dash_id}", headers=headers)
+    delr = requests.delete(f"{CHAT2_URL}/charts/dashboards/{dash_id}", headers=headers, timeout=5)
     assert delr.status_code in (200, 204)
 
 
