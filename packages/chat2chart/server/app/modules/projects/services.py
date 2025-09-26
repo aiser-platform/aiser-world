@@ -417,25 +417,20 @@ class OrganizationService(
                     _uid = None
                     final_user_val = user_id
 
-                # Build query using resolved value
-                if isinstance(final_user_val, int):
-                    query = (
-                        select(Organization)
-                        .join(OrganizationUser)
-                        .where(
-                            OrganizationUser.user_id == final_user_val,
-                            OrganizationUser.is_active,
-                        )
+                # If we couldn't resolve a usable user identifier, return empty
+                # list rather than passing 'None' into a UUID-typed query param.
+                if final_user_val is None:
+                    return []
+
+                # Build query using resolved value (int or UUID/string)
+                query = (
+                    select(Organization)
+                    .join(OrganizationUser)
+                    .where(
+                        OrganizationUser.user_id == final_user_val,
+                        OrganizationUser.is_active,
                     )
-                else:
-                    query = (
-                        select(Organization)
-                        .join(OrganizationUser)
-                        .where(
-                            OrganizationUser.user_id == final_user_val,
-                            OrganizationUser.is_active,
-                        )
-                    )
+                )
                 result = await db.execute(query)
                 organizations = result.scalars().all()
 
