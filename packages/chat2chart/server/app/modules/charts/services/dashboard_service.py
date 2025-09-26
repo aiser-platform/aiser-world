@@ -377,6 +377,9 @@ class DashboardService:
                     await self.db.rollback()
                 except Exception:
                     pass
+                # If we couldn't resolve created_by, make the dashboard public by default
+                # to allow immediate access for the creating user during migration.
+                is_public_val = dashboard.is_public if dashboard.is_public is not None else True
                 insert_stmt = insert(Dashboard).values(
                     id=dashboard.id,
                     name=dashboard.name,
@@ -386,7 +389,7 @@ class DashboardService:
                     theme_config=dashboard.theme_config,
                     global_filters=dashboard.global_filters,
                     refresh_interval=dashboard.refresh_interval,
-                    is_public=dashboard.is_public,
+                    is_public=is_public_val,
                     is_active=dashboard.is_active,
                     is_template=dashboard.is_template,
                     max_widgets=dashboard.max_widgets,
@@ -394,9 +397,35 @@ class DashboardService:
                 )
                 await self.db.execute(insert_stmt)
                 await self.db.commit()
-                # Load the inserted dashboard
-                res = await self.db.execute(select(Dashboard).where(Dashboard.id == dashboard.id))
-                dashboard = res.scalar_one_or_none()
+                # Load the inserted dashboard via raw SQL to avoid ORM/selector shadowing
+                try:
+                    from sqlalchemy import text
+                    res = await self.db.execute(text("SELECT id, name, description, project_id, created_by, layout_config, theme_config, global_filters, refresh_interval, is_public, is_template, max_widgets, max_pages, created_at, updated_at FROM dashboards WHERE id = :did" ).bindparams(did=str(dashboard.id)))
+                    row = res.first()
+                    if row:
+                        from types import SimpleNamespace
+                        dashboard = SimpleNamespace(
+                            id=row[0],
+                            name=row[1],
+                            description=row[2],
+                            project_id=row[3],
+                            created_by=row[4],
+                            layout_config=row[5] or {},
+                            theme_config=row[6] or {},
+                            global_filters=row[7] or {},
+                            refresh_interval=row[8] or 300,
+                            is_public=row[9],
+                            is_template=row[10],
+                            max_widgets=row[11] or 10,
+                            max_pages=row[12] or 5,
+                            created_at=row[13],
+                            updated_at=row[14],
+                            widgets=[],
+                        )
+                    else:
+                        dashboard = None
+                except Exception:
+                    dashboard = None
             else:
                 self.db.add(dashboard)
                 await self.db.commit()
