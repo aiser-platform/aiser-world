@@ -141,8 +141,25 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         """
         try:
             from app.common.utils import jsonable_encoder
+            from datetime import datetime
 
-            obj_in_data = jsonable_encoder(obj_in)
+            # Prefer pydantic model_dump when available to preserve native datetimes
+            if hasattr(obj_in, 'model_dump'):
+                obj_in_data = obj_in.model_dump()
+            elif isinstance(obj_in, dict):
+                obj_in_data = obj_in
+            else:
+                obj_in_data = jsonable_encoder(obj_in)
+
+            # Normalize ISO datetime strings back to datetime objects for common fields
+            for ts_field in ('created_at', 'updated_at', 'trial_ends_at'):
+                if ts_field in obj_in_data and isinstance(obj_in_data[ts_field], str):
+                    try:
+                        obj_in_data[ts_field] = datetime.fromisoformat(obj_in_data[ts_field])
+                    except Exception:
+                        # if parsing fails, drop the field so DB server default applies
+                        obj_in_data.pop(ts_field, None)
+
             db_obj = self.model(**obj_in_data)
 
             # If an external session is provided, use it (caller owns commit)
