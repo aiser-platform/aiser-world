@@ -148,7 +148,17 @@ class UserRepository(BaseRepository[User, UserCreate | UserCreateInternal, UserU
         :return: Created user instance
         """
         try:
-            create_data = user_in.model_dump()
+            # Accept either a Pydantic model or a plain dict
+            if hasattr(user_in, 'model_dump'):
+                create_data = user_in.model_dump()
+            elif isinstance(user_in, dict):
+                create_data = user_in
+            else:
+                # Fallback: try to coerce
+                try:
+                    create_data = dict(user_in)
+                except Exception:
+                    create_data = {}
             table = self.model.__table__
 
             # Build a safe insert payload using only columns present in the
