@@ -192,9 +192,28 @@ class DashboardService:
             if not dashboard_data.project_id:
                 try:
                     proj_service = ProjectService()
-                    # pass user_id as-is (None or value). Avoid coercing to string
-                    # to prevent 'None' literal being used in queries during migration.
-                    user_projects = await proj_service.get_user_projects(user_id)
+                    # Resolve a safe identifier for downstream lookups (UUID or legacy int)
+                    try:
+                        lookup_user_uuid = await self._resolve_user_uuid(user_id)
+                    except Exception:
+                        lookup_user_uuid = None
+
+                    # Prefer UUID string for service calls, fall back to legacy int when available
+                    lookup_user_for_calls = None
+                    if lookup_user_uuid:
+                        lookup_user_for_calls = str(lookup_user_uuid)
+                    else:
+                        try:
+                            if isinstance(user_id, dict):
+                                maybe = user_id.get('user_id') or user_id.get('id') or user_id.get('sub')
+                                lookup_user_for_calls = int(maybe) if maybe and str(maybe).isdigit() else None
+                            else:
+                                lookup_user_for_calls = int(user_id) if user_id and str(user_id).isdigit() else None
+                        except Exception:
+                            lookup_user_for_calls = None
+
+                    # Try to find existing projects for the resolved user id
+                    user_projects = await proj_service.get_user_projects(lookup_user_for_calls)
                     if user_projects and len(user_projects) > 0:
                         dashboard_data.project_id = user_projects[0].id
                     else:
@@ -203,24 +222,25 @@ class DashboardService:
                         try:
                             from app.modules.projects.services import OrganizationService
                             org_svc = OrganizationService()
-                            default_orgs = await org_svc.get_user_organizations(user_id)
+                            default_orgs = await org_svc.get_user_organizations(lookup_user_for_calls)
                             if default_orgs and len(default_orgs) > 0:
                                 default_org = default_orgs[0]
                         except Exception:
                             default_org = None
 
                         if not default_org:
-                            # create default organization
+                            # create default organization (OrganizationService ensures slug)
                             try:
                                 org_svc = OrganizationService()
-                                default_org = await org_svc.create_default_organization(str(user_id))
+                                default_org = await org_svc.create_default_organization(lookup_user_for_calls)
                             except Exception:
                                 default_org = None
 
                         if default_org:
                             try:
                                 new_proj = ProjectCreate(name="Default Project", description="Auto-created default project for user", organization_id=default_org.id)
-                                created_proj = await proj_service.create_project(new_proj, str(user_id))
+                                # pass the lookup_user_for_calls as string when available
+                                created_proj = await proj_service.create_project(new_proj, str(lookup_user_for_calls) if lookup_user_for_calls is not None else None)
                                 dashboard_data.project_id = created_proj.id
                             except Exception:
                                 # best-effort; leave project_id None if creation fails

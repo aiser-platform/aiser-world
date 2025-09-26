@@ -355,8 +355,13 @@ class OrganizationService(
             from app.db.session import async_session
             async with async_session() as db:
                 # Create default organization
+                # Ensure slug is always provided to avoid NOT NULL constraint failures
+                import uuid as _uuid
+                short = str(_uuid.uuid4()).split('-')[0]
+                slug_val = f"default-organization-{short}"
                 org_data = OrganizationCreate(
                     name="Default Organization",
+                    slug=slug_val,
                     description="Your default organization",
                     plan_type="free",
                     max_projects=1,
@@ -365,9 +370,23 @@ class OrganizationService(
                 organization = await self.repository.create(org_data.model_dump(), db)
 
                 # Add user as owner (simplified for now)
-                # await self.repository.add_user_to_organization(
-                #     organization.id, user_id, "owner"
-                # )
+                try:
+                    if user_id:
+                        from app.modules.projects.models import OrganizationUser
+                        uid_val = None
+                        try:
+                            uid_val = int(user_id)
+                        except Exception:
+                            uid_val = user_id
+                        ou = OrganizationUser(organization_id=organization.id, user_id=uid_val, role="owner", is_active=True)
+                        db.add(ou)
+                        await db.commit()
+                except Exception:
+                    # non-fatal; proceed even if membership insert fails
+                    try:
+                        await db.rollback()
+                    except Exception:
+                        pass
 
                 return OrganizationResponse.model_validate(organization.__dict__)
 
