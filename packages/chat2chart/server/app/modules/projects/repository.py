@@ -287,7 +287,14 @@ class OrganizationRepository(
             # respect the caller's transaction and avoid session mismatch.
             if db is not None:
                 table = self.model.__table__
-                ins = table.insert().values(**data).returning(table.c.id)
+                # Filter out fields that may be problematic (ISO string timestamps)
+                safe_data = {}
+                for k, v in data.items():
+                    # Only include columns that exist on the table and exclude timestamp fields
+                    if k in table.c.keys() and k not in ('created_at', 'updated_at', 'trial_ends_at'):
+                        safe_data[k] = v
+
+                ins = table.insert().values(**safe_data).returning(table.c.id)
                 try:
                     res = await db.execute(ins)
                     await db.commit()
@@ -299,14 +306,11 @@ class OrganizationRepository(
                         return pres.scalar_one_or_none()
                     # If insert returned no row, fall through to superclass
                 except Exception as e:
-                    # Attempt to handle uniqueness collisions gracefully by
-                    # returning the existing organization instead of falling
-                    # back to the BaseRepository which may JSON-encode datetimes
                     try:
                         await db.rollback()
                     except Exception:
                         pass
-                    # If the organization already exists (by slug or name), return it
+                    # If unique collision, return existing org by slug/name where possible
                     try:
                         slug = data.get('slug')
                         name = data.get('name')
@@ -323,9 +327,7 @@ class OrganizationRepository(
                             if existing:
                                 return existing
                     except Exception:
-                        # give up and re-raise original error
                         raise e
-                # fallback to superclass if nothing returned
                 return await super().create(data)
 
             # Fallback: use base class create which uses module-global DB session
