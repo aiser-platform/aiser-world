@@ -16,7 +16,12 @@ class User(BaseModel, UserAuthentication):
     # Use a flexible textual primary key in dev to tolerate mixed integer/UUID
     # during migration. We store UUID strings here; legacy integer ids remain
     # usable via repository lookup logic until full migration completes.
-    id = Column(String(64), primary_key=True, default=lambda: str(uuid.uuid4()))
+    # Do not set a Python-side default that will populate a UUID string
+    # into the INSERT payload. During migrations some DBs still have an
+    # integer `id` column; letting SQLAlchemy emit a default UUID here
+    # causes `invalid input syntax for type integer` errors. We avoid a
+    # Python default and rely on explicit provisioning or DB-side defaults.
+    id = Column(String(64), primary_key=True)
     username = Column(String(50), nullable=False)
     email = Column(String(100), nullable=False)
 
