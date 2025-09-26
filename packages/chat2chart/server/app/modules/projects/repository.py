@@ -288,15 +288,44 @@ class OrganizationRepository(
             if db is not None:
                 table = self.model.__table__
                 ins = table.insert().values(**data).returning(table.c.id)
-                res = await db.execute(ins)
-                await db.commit()
-                row = res.first()
-                if row:
-                    org_id = row[0]
-                    q = select(self.model).where(table.c.id == org_id)
-                    pres = await db.execute(q)
-                    return pres.scalar_one_or_none()
-                # fallback to superclass
+                try:
+                    res = await db.execute(ins)
+                    await db.commit()
+                    row = res.first()
+                    if row:
+                        org_id = row[0]
+                        q = select(self.model).where(table.c.id == org_id)
+                        pres = await db.execute(q)
+                        return pres.scalar_one_or_none()
+                    # If insert returned no row, fall through to superclass
+                except Exception as e:
+                    # Attempt to handle uniqueness collisions gracefully by
+                    # returning the existing organization instead of falling
+                    # back to the BaseRepository which may JSON-encode datetimes
+                    try:
+                        await db.rollback()
+                    except Exception:
+                        pass
+                    # If the organization already exists (by slug or name), return it
+                    try:
+                        slug = data.get('slug')
+                        name = data.get('name')
+                        if slug:
+                            q = select(self.model).where(table.c.slug == slug)
+                            pres = await db.execute(q)
+                            existing = pres.scalar_one_or_none()
+                            if existing:
+                                return existing
+                        if name:
+                            q = select(self.model).where(table.c.name == name)
+                            pres = await db.execute(q)
+                            existing = pres.scalar_one_or_none()
+                            if existing:
+                                return existing
+                    except Exception:
+                        # give up and re-raise original error
+                        raise e
+                # fallback to superclass if nothing returned
                 return await super().create(data)
 
             # Fallback: use base class create which uses module-global DB session
