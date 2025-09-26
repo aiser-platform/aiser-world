@@ -58,6 +58,15 @@ class ProjectService(
                     user_id  # Changed from owner_id to created_by
                 )
 
+                # Ensure created_at/updated_at present to satisfy NOT NULL
+                # constraints on some DB states during CI/dev.
+                from datetime import datetime
+                now = datetime.utcnow()
+                if 'created_at' not in project_dict:
+                    project_dict['created_at'] = now
+                if 'updated_at' not in project_dict:
+                    project_dict['updated_at'] = now
+
                 project = await self.repository.create(project_dict, db)
                 return ProjectResponse.model_validate(project.__dict__)
 
