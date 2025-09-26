@@ -256,6 +256,26 @@ class DashboardService:
                             'is_deleted': False,
                         }
                         org = await org_repo.create(org_payload, self.db)
+                        # Fallback: if repository returned None due to cross-schema selection issues,
+                        # perform a raw INSERT using the provided session to guarantee a row.
+                        if not org:
+                            try:
+                                table = Organization.__table__
+                                ins = table.insert().values(**org_payload).returning(table.c.id)
+                                res = await self.db.execute(ins)
+                                await self.db.commit()
+                                row = res.first()
+                                if row:
+                                    org_id = row[0]
+                                    pres = await self.db.execute(select(Organization).where(table.c.id == org_id))
+                                    org = pres.scalar_one_or_none()
+                            except Exception as _e:
+                                try:
+                                    await self.db.rollback()
+                                except Exception:
+                                    pass
+                                logger.exception(f"Fallback org insert failed: {_e}")
+
                         if org and final_created_by:
                             ou = OrganizationUser(organization_id=org.id, user_id=(int(final_created_by) if isinstance(final_created_by, int) else final_created_by), role='owner', is_active=True)
                             self.db.add(ou)
