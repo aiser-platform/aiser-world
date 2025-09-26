@@ -59,7 +59,8 @@ def test_signup_provision_and_dashboard_crud():
 
     # 5) Create a dashboard using the new dashboards APIs
     dash_payload = {"name": "Integration Test Dashboard", "description": "Created by integration test"}
-    create = requests.post(f"{CHAT2_URL}/charts/dashboards/", json=dash_payload, headers=headers, timeout=5)
+    # allow longer timeout for dashboard creation in CI/dev
+    create = requests.post(f"{CHAT2_URL}/charts/dashboards/", json=dash_payload, headers=headers, timeout=30)
     assert create.status_code in (200, 201)
     created = create.json()
     # response may include id at top-level or under 'dashboard'
@@ -67,11 +68,11 @@ def test_signup_provision_and_dashboard_crud():
     assert dash_id
 
     # 6) Get the dashboard
-    getr = requests.get(f"{CHAT2_URL}/charts/dashboards/{dash_id}", headers=headers, timeout=5)
+    getr = requests.get(f"{CHAT2_URL}/charts/dashboards/{dash_id}", headers=headers, timeout=30)
     assert getr.status_code == 200
 
     # 7) Delete the dashboard
-    delr = requests.delete(f"{CHAT2_URL}/charts/dashboards/{dash_id}", headers=headers, timeout=5)
+    delr = requests.delete(f"{CHAT2_URL}/charts/dashboards/{dash_id}", headers=headers, timeout=30)
     assert delr.status_code in (200, 204)
 
 
