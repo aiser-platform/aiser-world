@@ -187,6 +187,51 @@ class DashboardService:
         """Create a new dashboard"""
         try:
             logger.info(f"📊 Creating dashboard: {dashboard_data.name}")
+
+            # Try to pre-resolve or ensure a local user record so we can
+            # persist created_by reliably for newly onboarded users.
+            pre_resolved_created_by = None
+            try:
+                # Attempt to resolve via normal resolver first
+                pre_resolved_created_by = await self._resolve_user_uuid(user_id)
+            except Exception:
+                pre_resolved_created_by = None
+
+            # If unresolved and we have an email in the user payload, create a
+            # minimal local ChatUser so that create flows can set created_by.
+            try:
+                if not pre_resolved_created_by and isinstance(user_id, dict) and user_id.get('email'):
+                    from app.modules.user.models import ChatUser
+                    from sqlalchemy import select
+                    import uuid as _uuid
+                    email = user_id.get('email')
+                    res = await self.db.execute(select(User).where(User.email == email))
+                    existing = res.scalar_one_or_none()
+                    if existing:
+                        pre_resolved_created_by = existing.id
+                    else:
+                        new_uuid = _uuid.uuid4()
+                        ins = ChatUser.__table__.insert().values(
+                            id=new_uuid,
+                            username=(user_id.get('username') or email.split('@')[0]),
+                            email=email,
+                            password='',
+                            created_at=func.now(),
+                            updated_at=func.now(),
+                            is_active=True,
+                            is_deleted=False,
+                        )
+                        try:
+                            await self.db.execute(ins)
+                            await self.db.commit()
+                            pre_resolved_created_by = new_uuid
+                        except Exception:
+                            try:
+                                await self.db.rollback()
+                            except Exception:
+                                pass
+            except Exception:
+                pre_resolved_created_by = None
             
             # If no project_id was provided, try to ensure the user has a default project
             if not dashboard_data.project_id:
