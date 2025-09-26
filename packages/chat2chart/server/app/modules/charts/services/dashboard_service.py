@@ -202,9 +202,9 @@ class DashboardService:
             try:
                 if not pre_resolved_created_by and isinstance(user_id, dict) and user_id.get('email'):
                     from app.modules.user.models import ChatUser
-                    from sqlalchemy import select
                     import uuid as _uuid
                     email = user_id.get('email')
+                    # use module-level `select` (imported at top) to avoid local shadowing
                     res = await self.db.execute(select(User).where(User.email == email))
                     existing = res.scalar_one_or_none()
                     if existing:

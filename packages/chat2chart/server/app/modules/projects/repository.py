@@ -262,6 +262,16 @@ class OrganizationRepository(
             # Ensure timestamps
             from datetime import datetime
             now = datetime.utcnow()
+            # Coerce string timestamps to datetime to avoid DB type errors
+            for ts_field in ('created_at', 'updated_at'):
+                if ts_field in data and isinstance(data[ts_field], str):
+                    try:
+                        # handle ISO format strings
+                        data[ts_field] = datetime.fromisoformat(data[ts_field])
+                    except Exception:
+                        # fallback: ignore and let DB default handle it
+                        data.pop(ts_field, None)
+
             if 'created_at' not in data or data.get('created_at') is None:
                 data['created_at'] = now
             if 'updated_at' not in data or data.get('updated_at') is None:
