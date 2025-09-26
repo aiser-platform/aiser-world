@@ -850,11 +850,21 @@ async def get_dashboard(
         try:
             from sqlalchemy import text
             async with async_session() as sdb:
+                # Try exact UUID match first (fast path)
                 q = text(
                     "SELECT id, name, description, project_id, created_by, layout_config, theme_config, global_filters, refresh_interval, is_public, is_template, max_widgets, max_pages, created_at, updated_at FROM dashboards WHERE id = :did::uuid LIMIT 1"
                 )
                 res = await sdb.execute(q.bindparams(did=str(dashboard_id)))
                 row = res.first()
+
+                # If not found, try tolerant text match (handles legacy integer PKs or mixed schemas)
+                if not row:
+                    q2 = text(
+                        "SELECT id, name, description, project_id, created_by, layout_config, theme_config, global_filters, refresh_interval, is_public, is_template, max_widgets, max_pages, created_at, updated_at FROM dashboards WHERE id::text = :did LIMIT 1"
+                    )
+                    res2 = await sdb.execute(q2.bindparams(did=str(dashboard_id)))
+                    row = res2.first()
+
                 if row:
                     dashboard = {
                         'id': str(row[0]),
