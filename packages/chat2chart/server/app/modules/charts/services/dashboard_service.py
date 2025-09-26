@@ -287,7 +287,20 @@ class DashboardService:
                         if not org:
                             try:
                                 table = Organization.__table__
-                                ins = table.insert().values(**org_payload).returning(table.c.id)
+                                # Prepare safe payload: coerce timestamp strings to datetimes
+                                payload_for_insert = dict(org_payload)
+                                for ts in ('created_at', 'updated_at'):
+                                    v = payload_for_insert.get(ts)
+                                    if isinstance(v, str):
+                                        try:
+                                            from datetime import datetime as _dtparse
+                                            payload_for_insert[ts] = _dtparse.fromisoformat(v)
+                                        except Exception:
+                                            payload_for_insert.pop(ts, None)
+                                    elif v is None:
+                                        payload_for_insert.pop(ts, None)
+
+                                ins = table.insert().values(**payload_for_insert).returning(table.c.id)
                                 res = await self.db.execute(ins)
                                 await self.db.commit()
                                 row = res.first()
@@ -312,9 +325,8 @@ class DashboardService:
                             'description': 'Auto-created default project for user',
                             'organization_id': org.id,
                             'created_by': final_created_by,
-                            'created_at': now,
-                            'updated_at': now,
                         }
+                        # use repo.create but avoid passing timestamp fields directly
                         p = await proj_repo.create(proj_payload, self.db)
                         if p:
                             final_project_id = p.id
