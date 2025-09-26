@@ -191,8 +191,6 @@ class DashboardService:
             # local imports to avoid circular/top-level entanglement
             from app.modules.projects.repository import ProjectRepository, OrganizationRepository
             from app.modules.projects.models import OrganizationUser, Project
-            # The chat2chart user model is exported as `User` in this service.
-            from app.modules.user.models import User as ChatUser
             from datetime import datetime as _dt
             from sqlalchemy import text
 
@@ -215,7 +213,7 @@ class DashboardService:
                         final_created_by = u.id
                     else:
                         new_uuid = uuid.uuid4()
-                        await self.db.execute(ChatUser.__table__.insert().values(
+                        await self.db.execute(User.__table__.insert().values(
                             id=new_uuid,
                             username=(user_id.get('username') or email.split('@')[0]),
                             email=email,
