@@ -901,13 +901,13 @@ async def get_dashboard(
             q = text(
                 "SELECT id, name, description, project_id, created_by, layout_config, theme_config, global_filters, refresh_interval, is_public, is_template, max_widgets, max_pages, created_at, updated_at FROM dashboards WHERE id = (:did)::uuid LIMIT 1"
             )
-            res = await sdb.execute(q.bindparams(did=str(dashboard_id)))
+            res = await sdb.execute(q, {"did": str(dashboard_id)})
             row = res.first()
             if not row:
                 q2 = text(
                     "SELECT id, name, description, project_id, created_by, layout_config, theme_config, global_filters, refresh_interval, is_public, is_template, max_widgets, max_pages, created_at, updated_at FROM dashboards WHERE id::text = :did LIMIT 1"
                 )
-                res2 = await sdb.execute(q2.bindparams(did=str(dashboard_id)))
+                    res2 = await sdb.execute(q2, {"did": str(dashboard_id)})
                 row = res2.first()
 
             if row:
@@ -946,13 +946,13 @@ async def get_dashboard(
             q = text(
                 "SELECT id, name, description, project_id, created_by, layout_config, theme_config, global_filters, refresh_interval, is_public, is_template, max_widgets, max_pages, created_at, updated_at FROM dashboards WHERE id = :did::uuid LIMIT 1"
             )
-            res = await sdb.execute(q.bindparams(did=str(dashboard_id)))
+            res = await sdb.execute(q, {"did": str(dashboard_id)})
             row = res.first()
             if not row:
                 q2 = text(
                     "SELECT id, name, description, project_id, created_by, layout_config, theme_config, global_filters, refresh_interval, is_public, is_template, max_widgets, max_pages, created_at, updated_at FROM dashboards WHERE id::text = :did LIMIT 1"
                 )
-                res2 = await sdb.execute(q2.bindparams(did=str(dashboard_id)))
+                res2 = await sdb.execute(q2, {"did": str(dashboard_id)})
                 row = res2.first()
 
             if not row:
@@ -978,7 +978,7 @@ async def get_dashboard(
             }
 
             wq = text("SELECT id, name, widget_type, chart_type, config, data_config, style_config, x, y, width, height, z_index, created_at, updated_at FROM dashboard_widgets WHERE dashboard_id = :did AND is_deleted = false ORDER BY id")
-            wres = await sdb.execute(wq.bindparams(did=str(dashboard_id)))
+            wres = await sdb.execute(wq, {"did": str(dashboard_id)})
             for wrow in wres.fetchall():
                 dashboard_data['widgets'].append({
                     'id': str(wrow[0]),
