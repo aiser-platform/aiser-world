@@ -18,7 +18,8 @@ class DeviceSession(BaseModel):
     user_agent = Column(String(255))
     last_active = Column(DateTime, default=datetime.now)
     is_active = Column(Boolean, default=True)
-    refresh_token = Column(String(1000), nullable=False)
+    # Persist refresh token metadata to support rotation and revocation
+    refresh_token = Column(String(2048), nullable=False)
     refresh_token_revoked = Column(Boolean, default=False)
     refresh_token_expires_at = Column(DateTime, nullable=True)
 
