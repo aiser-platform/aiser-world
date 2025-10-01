@@ -210,17 +210,8 @@ async def upgrade_demo(request: Request, response: Response, payload: dict | Non
             return None
 
         try:
-            # run resolver
-            import asyncio
-            try:
-                loop = asyncio.get_event_loop()
-            except RuntimeError:
-                loop = None
-            if loop and loop.is_running():
-                # We're running inside an event loop (e.g., TestClient); create a task
-                resolved = asyncio.run(_resolve())
-            else:
-                resolved = asyncio.get_event_loop().run_until_complete(_resolve())
+            # run resolver directly since this endpoint is async
+            resolved = await _resolve()
             if resolved:
                 resolved_user_id = resolved
         except Exception:
@@ -235,12 +226,14 @@ async def upgrade_demo(request: Request, response: Response, payload: dict | Non
     token_pair = Auth().signJWT(**claims)
 
     # Persist refresh token and set as HttpOnly cookie (dev-friendly security flags)
-    try:
         try:
-            auth_service = AuthService()
-            await auth_service.persist_refresh_token(user_id, token_pair.get("refresh_token"), settings.JWT_REFRESH_EXP_TIME_MINUTES)
-        except Exception as e:
-            logger.exception(f"upgrade-demo: failed to persist refresh token: {e}")
+            try:
+                # Persist refresh token in background to avoid blocking request DB flow
+                import asyncio
+                auth_service = AuthService()
+                asyncio.create_task(auth_service.persist_refresh_token(user_id, token_pair.get("refresh_token"), settings.JWT_REFRESH_EXP_TIME_MINUTES))
+            except Exception as e:
+                logger.exception(f"upgrade-demo: failed to schedule refresh token persist: {e}")
         try:
             response.set_cookie(
                 key="refresh_token",
