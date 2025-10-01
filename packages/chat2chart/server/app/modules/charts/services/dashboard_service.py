@@ -340,18 +340,19 @@ class DashboardService:
         try:
             logger.info(f"📊 Updating dashboard: {dashboard_id}")
             
-            # Get dashboard
-            query = select(Dashboard).where(Dashboard.id == dashboard_id)
-            result = await self.db.execute(query)
-            dashboard = result.scalar_one_or_none()
-            
-            if not dashboard:
-                raise HTTPException(status_code=404, detail="Dashboard not found")
-            
-            # Check permissions: use central RBAC helper which handles UUID/legacy id
-            try:
-                from app.modules.authentication.rbac import has_dashboard_access
-                # If caller passed a raw JWT string, extract unverified claims for resolution
+            # Use an independent session for select/update to avoid concurrent
+            # operation conflicts on the caller-provided async connection.
+            from app.db.session import async_session as _async_session
+            from app.modules.authentication.rbac import has_dashboard_access
+
+            async with _async_session() as sdb:
+                # Load dashboard
+                res = await sdb.execute(select(Dashboard).where(Dashboard.id == dashboard_id))
+                db_dash = res.scalar_one_or_none()
+                if not db_dash:
+                    raise HTTPException(status_code=404, detail="Dashboard not found")
+
+                # Resolve user_id for RBAC checking (extract unverified claims from raw token if present)
                 try:
                     if isinstance(user_id, str) and "." in user_id:
                         from jose import jwt as jose_jwt
@@ -365,67 +366,54 @@ class DashboardService:
                 except Exception:
                     user_id_for_check = user_id
 
-                allowed = await has_dashboard_access(user_id_for_check, str(dashboard.id))
+                allowed = await has_dashboard_access(user_id_for_check, str(db_dash.id))
                 if not allowed:
-                    # Fallback 1: if dashboard has no created_by (race during provisioning),
-                    # allow the caller to update it if they present an email in the
-                    # JWT payload (common in upgrade-demo flows). This unblocks CI/dev
-                    # while provisioning visibility catches up.
-                    try:
-                        if dashboard.created_by is None and isinstance(user_id, dict) and user_id.get('email'):
-                            allowed = True
-                    except Exception:
-                        pass
-
-                if not allowed:
-                    # Fallback 2: if JWT contains email that maps to a users.id equal to dashboard.created_by
-                    try:
-                        if isinstance(user_id, dict) and user_id.get('email') and dashboard.created_by is not None:
+                    # Fallbacks similar to previous logic
+                    if db_dash.created_by is None and isinstance(user_id, dict) and user_id.get('email'):
+                        allowed = True
+                    if not allowed and isinstance(user_id, dict) and user_id.get('email') and db_dash.created_by is not None:
+                        try:
                             from sqlalchemy import text as _text
-                            res = await self.db.execute(_text("SELECT id FROM users WHERE email = :email LIMIT 1").bindparams(email=user_id.get('email')))
-                            row = res.first()
-                            if row and str(row[0]) == str(dashboard.created_by):
+                            pres = await sdb.execute(_text("SELECT id FROM users WHERE email = :email LIMIT 1").bindparams(email=user_id.get('email')))
+                            row = pres.first()
+                            if row and str(row[0]) == str(db_dash.created_by):
                                 allowed = True
-                    except Exception:
-                        pass
-
+                        except Exception:
+                            pass
                 if not allowed:
                     raise HTTPException(status_code=403, detail="Access denied")
-            except HTTPException:
-                raise
-            except Exception:
-                # conservative fallback: deny access if RBAC helper fails unexpectedly
-                raise HTTPException(status_code=403, detail="Access denied")
-            
-            # Update fields
-            update_data = dashboard_data.dict(exclude_unset=True)
-            for field, value in update_data.items():
-                setattr(dashboard, field, value)
-            
-            dashboard.updated_at = datetime.utcnow()
-            
-            await self.db.commit()
-            await self.db.refresh(dashboard)
-            
-            # Convert to response format
-            return {
-                "id": str(dashboard.id),
-                "name": dashboard.name,
-                "description": dashboard.description,
-                "project_id": dashboard.project_id,
-                "layout_config": dashboard.layout_config,
-                "theme_config": dashboard.theme_config,
-                "global_filters": dashboard.global_filters,
-                "refresh_interval": dashboard.refresh_interval,
-                "is_public": dashboard.is_public,
-                "is_template": dashboard.is_template,
-                "created_by": dashboard.created_by,
-                "max_widgets": dashboard.max_widgets,
-                "max_pages": dashboard.max_pages,
-                "created_at": dashboard.created_at.isoformat(),
-                "updated_at": dashboard.updated_at.isoformat(),
-                "last_viewed_at": dashboard.last_viewed_at.isoformat() if dashboard.last_viewed_at else None
-            }
+
+                # Apply updates
+                try:
+                    upd = dashboard_data.model_dump(exclude_unset=True)
+                except Exception:
+                    upd = dashboard_data.dict(exclude_unset=True)
+
+                for k, v in upd.items():
+                    setattr(db_dash, k, v)
+                db_dash.updated_at = datetime.utcnow()
+
+                await sdb.commit()
+                await sdb.refresh(db_dash)
+
+                return {
+                    "id": str(db_dash.id),
+                    "name": db_dash.name,
+                    "description": db_dash.description,
+                    "project_id": db_dash.project_id,
+                    "layout_config": db_dash.layout_config,
+                    "theme_config": db_dash.theme_config,
+                    "global_filters": db_dash.global_filters,
+                    "refresh_interval": db_dash.refresh_interval,
+                    "is_public": db_dash.is_public,
+                    "is_template": db_dash.is_template,
+                    "created_by": db_dash.created_by,
+                    "max_widgets": db_dash.max_widgets,
+                    "max_pages": db_dash.max_pages,
+                    "created_at": db_dash.created_at.isoformat() if db_dash.created_at else None,
+                    "updated_at": db_dash.updated_at.isoformat() if db_dash.updated_at else None,
+                    "last_viewed_at": db_dash.last_viewed_at.isoformat() if db_dash.last_viewed_at else None
+                }
             
         except HTTPException:
             raise
