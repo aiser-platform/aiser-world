@@ -66,7 +66,7 @@ class JWTBearer(HTTPBearer):
                 from jose import jwt as jose_jwt
                 from app.core.config import settings
                 _env = str(getattr(settings, 'ENVIRONMENT', 'development')).strip().lower()
-                allow_unverified = str(os.getenv('ALLOW_UNVERIFIED_JWT_IN_DEV', 'false')).lower() == 'true'
+                allow_unverified = bool(getattr(settings, 'ALLOW_UNVERIFIED_JWT_IN_DEV', False))
                 if _env in ('development', 'dev', 'local', 'test') and allow_unverified and isinstance(credentials.credentials, str):
                     try:
                         u = jose_jwt.get_unverified_claims(credentials.credentials)
@@ -123,13 +123,14 @@ class JWTCookieBearer(HTTPBearer):
             return {'id': 1}
 
         # In development, tolerate missing tokens for test paths by returning a
-        # minimal payload. This allows tests that patch downstream auth to run
-        # without setting headers/cookies explicitly.
+        # minimal payload only when explicitly allowed via settings.ALLOW_DEV_AUTH_BYPASS.
         if not token:
             try:
                 from app.core.config import settings
                 _env = str(getattr(settings, 'ENVIRONMENT', 'development')).strip().lower()
-                if _env in ('development', 'dev', 'local', 'test'):
+                allow_bypass = bool(getattr(settings, 'ALLOW_DEV_AUTH_BYPASS', False))
+                if _env in ('development', 'dev', 'local', 'test') and allow_bypass:
+                    logger.warning("JWTCookieBearer: returning minimal payload due to ALLOW_DEV_AUTH_BYPASS=true")
                     return {'id': 1}
             except Exception:
                 pass

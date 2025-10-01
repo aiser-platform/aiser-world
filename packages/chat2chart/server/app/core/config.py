@@ -106,6 +106,12 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
     DEBUG: bool = os.getenv("DEBUG", "true").lower() == "true"
 
+    # Development bypass flags (opt-in via env)
+    # ALLOW_UNVERIFIED_JWT_IN_DEV: if true, returns unverified JWT claims in dev when signature verification fails
+    ALLOW_UNVERIFIED_JWT_IN_DEV: bool = os.getenv("ALLOW_UNVERIFIED_JWT_IN_DEV", "false").lower() == "true"
+    # ALLOW_DEV_AUTH_BYPASS: if true, allow permissive dev auth fallbacks (e.g., missing cookie -> minimal payload)
+    ALLOW_DEV_AUTH_BYPASS: bool = os.getenv("ALLOW_DEV_AUTH_BYPASS", "true").lower() == "true"
+
     # Enterprise Settings (with defaults)
     AISER_DEPLOYMENT_MODE: str = os.getenv("AISER_DEPLOYMENT_MODE", "development")
     AISER_ORG_NAME: str = os.getenv("AISER_ORG_NAME", "Aiser Development")
