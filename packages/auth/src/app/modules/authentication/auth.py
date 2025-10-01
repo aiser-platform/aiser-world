@@ -89,7 +89,15 @@ class Auth:
         #     return refresh_jwt
 
     def signJWT(self, **kwargs) -> Dict[str, str]:
-        access_token = self.encodeJWT(**kwargs)
+        # Ensure we include a canonical UUID `id` claim when provided. If the
+        # caller supplies a legacy integer `user_id`, prefer using a string
+        # `id` claim that represents the canonical user id (UUID) when available.
+        payload = dict(kwargs)
+        # If caller passed numeric user_id but also passed id, favor id.
+        if 'user_id' in payload and 'id' not in payload:
+            payload['id'] = payload.get('user_id')
+
+        access_token = self.encodeJWT(**payload)
 
         refresh_token = self.encodeRefreshJWT(**kwargs)
 

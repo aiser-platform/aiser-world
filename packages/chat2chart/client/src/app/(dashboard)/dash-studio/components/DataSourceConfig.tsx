@@ -67,8 +67,8 @@ const DataSourceConfig: React.FC<DataSourceConfigProps> = ({ widget, onUpdate })
     setLoading(true);
     try {
                  // Get organization and project context from URL or context
-           const organizationId = 'aiser-dev-org'; // Real development organization
-           const projectId = 'development-project'; // Real development project
+           const organizationId = localStorage.getItem('currentOrganizationId') ?? 1
+           const projectId = localStorage.getItem('currentProjectId') ?? (projects && projects.length>0 ? projects[0].id : 1)
       
       // Try project-scoped data sources first
       let response;

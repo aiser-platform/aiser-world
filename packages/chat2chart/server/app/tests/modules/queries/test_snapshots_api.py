@@ -43,10 +43,60 @@ def ensure_test_user():
     try:
         conn = psycopg2.connect(db_url)
         cur = conn.cursor()
-        cur.execute("INSERT INTO users (id, email, username, password, created_at, updated_at) VALUES (1, 'test-user@example.com', 'testuser', 'temp', NOW(), NOW()) ON CONFLICT (id) DO NOTHING;")
-        # Also ensure organization/project default rows used by other code paths
+        # Ensure a user exists that maps to legacy id 1. If the users table uses
+        # UUID primary keys (migration state), attempt to find a user with
+        # legacy_id = 1 or by email; otherwise insert a UUID user with legacy_id=1.
+        cur.execute("SELECT id FROM users WHERE legacy_id = 1 LIMIT 1;")
+        row = cur.fetchone()
+        if row:
+            user_id = row[0]
+        else:
+            cur.execute("SELECT id FROM users WHERE email = %s LIMIT 1;", ('test-user@example.com',))
+            row2 = cur.fetchone()
+            if row2:
+                user_id = row2[0]
+            else:
+                # Insert a new user with legacy_id=1. Omit the `id` column so the
+                # database can assign the appropriate primary key type (integer
+                # or UUID) depending on migration state. After insert, query the
+                # assigned id so we can use it as `created_by` for projects.
+                # Insert legacy user id in a DB-agnostic way: perform a conditional
+                # insert only if no user with legacy_id=1 or the test email exists.
+                cur.execute(
+                    "INSERT INTO users (legacy_id, email, username, password, created_at, updated_at)"
+                    " SELECT %s, %s, %s, %s, NOW(), NOW()"
+                    " WHERE NOT EXISTS (SELECT 1 FROM users WHERE legacy_id = %s OR email = %s);",
+                    (1, 'test-user@example.com', 'testuser', 'temp', 1, 'test-user@example.com'),
+                )
+                # fetch the assigned id (could be int or uuid)
+                cur.execute("SELECT id FROM users WHERE legacy_id = %s OR email = %s LIMIT 1;", (1, 'test-user@example.com'))
+                row_new = cur.fetchone()
+                user_id = row_new[0] if row_new else None
+
+        # Also ensure organization/default project rows used by other code paths
         cur.execute("INSERT INTO organizations (id, name, slug, is_active, created_at, updated_at) VALUES (1, 'Aiser', 'aiser', true, NOW(), NOW()) ON CONFLICT (id) DO NOTHING;")
-        cur.execute("INSERT INTO projects (id, name, description, organization_id, created_by, is_active, created_at, updated_at) VALUES (1, 'Default', 'Default project', 1, 1, true, NOW(), NOW()) ON CONFLICT (id) DO NOTHING;")
+        # Use parameterized insert for project.created_by but resolve created_by
+        # via a subselect so we insert the canonical users.id (UUID or int) that
+        # matches our legacy_id/email. This avoids type mismatch during migration.
+        try:
+            cur.execute(
+                "INSERT INTO projects (id, name, description, organization_id, created_by, is_active, created_at, updated_at)"
+                " SELECT 1, %s, %s, 1, u.id, true, NOW(), NOW() FROM (SELECT id FROM users WHERE legacy_id = %s OR email = %s LIMIT 1) u"
+                " WHERE NOT EXISTS (SELECT 1 FROM projects WHERE id = 1);",
+                ('Default', 'Default project', 1, 'test-user@example.com'),
+            )
+        except Exception:
+            # If created_by type mismatches (migration states), insert without created_by
+            try:
+                cur.execute(
+                    "INSERT INTO projects (id, name, description, organization_id, is_active, created_at, updated_at)"
+                    " SELECT 1, %s, %s, 1, true, NOW(), NOW()"
+                    " WHERE NOT EXISTS (SELECT 1 FROM projects WHERE id = 1);",
+                    ('Default', 'Default project'),
+                )
+            except Exception:
+                # If even this fails, ignore and continue; tests may create projects as needed
+                pass
         conn.commit()
     finally:
         if conn:

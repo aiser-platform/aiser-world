@@ -26,7 +26,16 @@ class Settings(BaseSettings):
     # Database Settings
     POSTGRES_USER: str = os.getenv("POSTGRES_USER", "aiser")
     POSTGRES_PASSWORD: str = os.getenv("POSTGRES_PASSWORD", "aiser_password")
-    POSTGRES_SERVER: str = os.getenv("POSTGRES_SERVER", "localhost")
+    # Prefer the dev compose service name used in local setup. If the
+    # environment provides the generic hostname 'postgres' (common in some
+    # compose files), map it to the local test service name used in this
+    # developer environment to avoid DNS resolution failures inside the
+    # container network.
+    _env_pg = os.getenv("POSTGRES_SERVER")
+    if _env_pg:
+        POSTGRES_SERVER: str = _env_pg if _env_pg != 'postgres' else os.getenv('POSTGRES_SERVER_ALIAS', 'aiser-postgres-test')
+    else:
+        POSTGRES_SERVER: str = os.getenv("POSTGRES_SERVER", "aiser-postgres-test")
     POSTGRES_DB: str = os.getenv("POSTGRES_DB", "aiser_world")
     POSTGRES_PORT: int = int(os.getenv("POSTGRES_PORT", "5432"))
 

@@ -20,7 +20,7 @@ from google.cloud import storage as gcs
 import requests
 import pandas as pd
 
-from app.models.data import DataSource
+from app.modules.data.models import DataSource
 
 logger = logging.getLogger(__name__)
 

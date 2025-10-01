@@ -28,6 +28,7 @@ import { IFileUpload } from '../FileUpload/types';
 import { apiService } from '@/services/apiService';
 import { WorkflowNavigation, WorkflowStep } from '../WorkflowNavigation';
 import { environment, getCubeJsAuthHeader } from '@/config/environment';
+import { useOrganization } from '@/context/OrganizationContext';
 
 const { Dragger } = Upload;
 const { Title, Text, Paragraph } = Typography;
@@ -214,10 +215,12 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
     // Data sources state
     const [dataSources, setDataSources] = useState<any[]>([]);
 
+    const { currentOrganization, projects: orgProjects } = useOrganization();
+
     // Load saved data sources on component mount
     useEffect(() => {
         loadSavedDataSources();
-    }, []);
+    }, [currentOrganization, orgProjects]);
 
     // Load saved data sources from localStorage and backend
     const loadSavedDataSources = async () => {
@@ -228,9 +231,12 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
             
             // Load from backend using project-scoped API
             try {
-                               const organizationId = 'aiser-dev-org'; // Real development organization
-               const projectId = 'development-project'; // Real development project
-                
+                // Resolve organization/project context from OrganizationContext or localStorage
+                const organizationId = currentOrganization?.id ?? localStorage.getItem('currentOrganizationId') ?? 1;
+                let projectIdRaw = localStorage.getItem('currentProjectId');
+                if (!projectIdRaw && Array.isArray(orgProjects) && orgProjects.length > 0) projectIdRaw = String(orgProjects[0].id);
+                const projectId = projectIdRaw ?? (orgProjects && orgProjects.length > 0 ? String(orgProjects[0].id) : localStorage.getItem('currentProjectId') ?? 1);
+
                 const response = await fetch(`http://localhost:8000/data/api/organizations/${organizationId}/projects/${projectId}/data-sources`);
                 if (response.ok) {
                     const result = await response.json();
@@ -3003,9 +3009,13 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
     // Create a new data source based on the active tab
     const createDataSource = async () => {
         try {
-                           const organizationId = 'aiser-dev-org'; // Real development organization
-               const projectId = 'development-project'; // Real development project
-            
+            const { id: ctxOrgId } = currentOrganization || { id: undefined };
+            let projectIdRaw = localStorage.getItem('currentProjectId');
+            if (!projectIdRaw && Array.isArray(orgProjects) && orgProjects.length > 0) projectIdRaw = String(orgProjects[0].id);
+
+            const organizationId = ctxOrgId ?? localStorage.getItem('currentOrganizationId') ?? 1;
+            const projectId = projectIdRaw ?? (orgProjects && orgProjects.length > 0 ? String(orgProjects[0].id) : localStorage.getItem('currentProjectId') ?? 1);
+
             const newDataSource = {
                 id: `ds_${Date.now()}`,
                 name: dataSourceConfig.name || `New ${activeTab}`,
@@ -3027,9 +3037,9 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
                         type: newDataSource.type,
                         format: activeTab === 'file' ? 'csv' : undefined,
                         description: `Data source created via universal modal`,
+                        config: newDataSource.config || {},
                         metadata: {
-                            created_via: 'universal_modal',
-                            config: newDataSource.config
+                            created_via: 'universal_modal'
                         }
                     }),
                 });

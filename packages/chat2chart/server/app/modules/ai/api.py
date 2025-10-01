@@ -22,7 +22,7 @@ from app.modules.user.models import User
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/ai", tags=["AI Services"])
+router = APIRouter(tags=["AI Services"])
 
 
 # Request/Response Models

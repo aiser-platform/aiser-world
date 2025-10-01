@@ -1,4 +1,4 @@
-from app.common.model import BaseModel
+from app.common.model import BaseModel, Base
 from sqlalchemy import Column, String, Text, UUID, Boolean, Integer, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -41,7 +41,7 @@ class Organization(BaseModel):
     users = relationship("OrganizationUser", back_populates="organization", cascade="all, delete-orphan")
 
 
-class OrganizationUser(BaseModel):
+class OrganizationUser(Base):
     """Many-to-many relationship between organizations and users"""
     __tablename__ = "user_organizations"
 
@@ -50,7 +50,7 @@ class OrganizationUser(BaseModel):
     user_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     role = Column(String(50), default="member")  # owner, admin, member
     is_active = Column(Boolean, default=True)
-    
+
     # Relationships
     organization = relationship("Organization", back_populates="users")
     user = relationship("User", back_populates="organizations")

@@ -38,7 +38,7 @@ class ChatVisualization(BaseModel):
     is_deleted = Column(Boolean, default=False)
 
 
-class DashboardEmbed(BaseModel):
+class DashboardEmbed(Base):
     """Persisted embed tokens for dashboards"""
     __tablename__ = "dashboard_embeds"
 
@@ -51,7 +51,9 @@ class DashboardEmbed(BaseModel):
     is_active = Column(Boolean, default=True)
     access_count = Column(Integer, default=0)
     created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, onupdate=func.now())
+    updated_at = Column(DateTime, onupdate=func.now(), nullable=True)
+
+    dashboard = relationship("Dashboard", back_populates="embeds")
 
 
 
@@ -90,6 +92,7 @@ class Dashboard(BaseModel):
     last_viewed_at = Column(DateTime, nullable=True)
     # Relationship to widgets
     widgets = relationship("DashboardWidget", back_populates="dashboard", cascade="all, delete-orphan")
+    embeds = relationship("DashboardEmbed", back_populates="dashboard", cascade="all, delete-orphan")
 
 
 class DashboardWidget(Base):

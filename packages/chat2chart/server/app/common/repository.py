@@ -100,11 +100,17 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
         return query
 
-    async def get(self, id: int) -> Optional[ModelType]:
-        """Get a single record by ID"""
+    async def get(self, id: int, db: Optional[Any] = None) -> Optional[ModelType]:
+        """Get a single record by ID.
+
+        Accepts an optional AsyncSession `db` when caller manages sessions externally.
+        """
         try:
             query = self._build_base_query().where(self.model.id == id)
-            result = await self.db.execute(query)
+            if db is not None:
+                result = await db.execute(query)
+            else:
+                result = await self.db.execute(query)
             return result.scalar_one_or_none()
         except Exception as e:
             raise e

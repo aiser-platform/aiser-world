@@ -268,14 +268,15 @@ class ProjectService(
     ) -> bool:
         """Check if user can create more projects"""
         try:
-            # Get organization plan limits
-            organization = await self.__org_repository.get(organization_id, db)
+            # Get organization plan limits using the provided DB session to avoid
+            # calling repository.get() with an unexpected DB parameter.
+            from sqlalchemy import select
+            res = await db.execute(select(Organization).where(Organization.id == organization_id))
+            organization = res.scalar_one_or_none()
             if not organization:
                 return False
 
-            organization.max_projects
-
-            # For now, allow creation - in production you'd check current count
+            # TODO: enforce organization.max_projects vs current count
             return True
 
         except Exception as e:
@@ -298,10 +299,25 @@ class OrganizationService(
             from app.db.session import async_session
             async with async_session() as db:
                 organizations = await self.repository.get_all(db)
-                return [
-                    OrganizationResponse.model_validate(org.__dict__)
-                    for org in organizations
-                ]
+                coerced: List[OrganizationResponse] = []
+                from datetime import datetime
+                for org in organizations:
+                    d = dict(getattr(org, "__dict__", {}) or {})
+                    # Coerce NULL/None values to sensible defaults expected by the schema
+                    d["plan_type"] = d.get("plan_type") or "free"
+                    d["ai_credits_used"] = int(d.get("ai_credits_used") or 0)
+                    d["ai_credits_limit"] = int(d.get("ai_credits_limit") or 0)
+                    d["max_users"] = int(d.get("max_users") or 0)
+                    d["max_projects"] = int(d.get("max_projects") or 0)
+                    d["max_storage_gb"] = int(d.get("max_storage_gb") or 0)
+                    d["is_active"] = bool(d.get("is_active") if d.get("is_active") is not None else True)
+                    # trial fields may not exist on all models; default safely when missing
+                    d["is_trial_active"] = bool(d.get("is_trial_active") or False)
+                    # Ensure timestamps
+                    d["created_at"] = d.get("created_at") or datetime.utcnow()
+                    d["updated_at"] = d.get("updated_at") or datetime.utcnow()
+                    coerced.append(OrganizationResponse.model_validate(d))
+                return coerced
         except Exception as e:
             logger.error(f"Failed to get organizations: {str(e)}")
             raise e
@@ -463,15 +479,30 @@ class OrganizationService(
             raise e
 
     async def get_all(self) -> List[OrganizationResponse]:
-        """Get all active organizations"""
+        """Get all active organizations, coercing nullable fields to safe defaults"""
         try:
             from app.db.session import async_session
             async with async_session() as db:
                 organizations = await self.repository.get_all(db)
-                return [
-                    OrganizationResponse.model_validate(org.__dict__)
-                    for org in organizations
-                ]
+                coerced: List[OrganizationResponse] = []
+                from datetime import datetime
+                for org in organizations:
+                    d = dict(getattr(org, "__dict__", {}) or {})
+                    # Coerce NULL/None values to sensible defaults expected by the schema
+                    d["plan_type"] = d.get("plan_type") or "free"
+                    d["ai_credits_used"] = int(d.get("ai_credits_used") or 0)
+                    d["ai_credits_limit"] = int(d.get("ai_credits_limit") or 0)
+                    d["max_users"] = int(d.get("max_users") or 0)
+                    d["max_projects"] = int(d.get("max_projects") or 0)
+                    d["max_storage_gb"] = int(d.get("max_storage_gb") or 0)
+                    d["is_active"] = bool(d.get("is_active") if d.get("is_active") is not None else True)
+                    # Trial fields may not exist on all models; default safely when missing
+                    d["is_trial_active"] = bool(d.get("is_trial_active") or False)
+                    # Ensure timestamps
+                    d["created_at"] = d.get("created_at") or datetime.utcnow()
+                    d["updated_at"] = d.get("updated_at") or datetime.utcnow()
+                    coerced.append(OrganizationResponse.model_validate(d))
+                return coerced
         except Exception as e:
             logger.error(f"Failed to get all organizations: {str(e)}")
             raise e

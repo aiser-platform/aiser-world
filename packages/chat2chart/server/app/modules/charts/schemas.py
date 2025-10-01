@@ -447,7 +447,8 @@ class DashboardUpdateSchema(DashboardBaseSchema):
 
 class DashboardResponseSchema(DashboardBaseSchema, BaseSchema):
     id: str
-    created_by: Optional[int] = None  # Changed to int to match users table
+    # Accept either legacy integer user ids or modern UUID/string ids during migration
+    created_by: Optional[Union[int, str, UUID]] = None
     max_widgets: int = 10
     max_pages: int = 5
     created_at: str

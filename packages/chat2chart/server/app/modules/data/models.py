@@ -25,6 +25,9 @@ class DataSource(Base):
     size = Column(Integer, nullable=True)  # File size in bytes
     row_count = Column(Integer, nullable=True)
     schema = Column(JSON, nullable=True)  # Schema information
+    # Optional description and free-form metadata for data sources
+    description = Column(Text, nullable=True)
+    meta_info = Column(JSON, nullable=True)
 
     # Connection details (encrypted in production)
     connection_config = Column(JSON, nullable=True)

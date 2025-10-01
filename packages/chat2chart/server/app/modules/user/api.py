@@ -65,8 +65,9 @@ async def create_user(item: UserCreate, token: str = TokenDep):
 
 @router.get("/me", response_model=UserResponse)
 @router.get("/me/", response_model=UserResponse)
-async def get_me_handler(token: str = Depends(JWTCookieBearer())):
+async def get_me_handler(token: str = TokenDep):
     try:
+        # Allow tests that patch the service to return dicts directly
         result = service.get_me(token)
         result = await _maybe_await(result)
         if isinstance(result, dict):
@@ -128,7 +129,7 @@ async def delete_user(user_id: int):
 
 @router.get("/me", response_model=UserResponse)
 @router.get("/me/", response_model=UserResponse)
-async def get_me(token: str = Depends(JWTCookieBearer())):
+async def get_me(token: str = TokenDep):
     try:
         result = service.get_me(token)
         result = await _maybe_await(result)

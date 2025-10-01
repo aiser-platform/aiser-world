@@ -79,13 +79,18 @@ class DataSourcesCRUD:
             data_source_id = str(uuid.uuid4())
             
             # Create data source
+            # Map description into metadata to match DataSource model fields
+            metadata = {}
+            if getattr(data_source_data, 'description', None):
+                metadata['description'] = data_source_data.description
+
             data_source = DataSource(
                 id=data_source_id,
                 name=data_source_data.name,
                 type=data_source_data.type,
                 format=data_source_data.format,
-                description=data_source_data.description,
                 connection_config=data_source_data.connection_config or {},
+                metadata=json.dumps(metadata) if metadata else None,
                 user_id=user_id,
                 tenant_id=data_source_data.organization_id,
                 is_active=data_source_data.is_active,

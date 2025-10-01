@@ -43,17 +43,21 @@ class OrganizationService(
         organization = await self.repository.create(data)
 
         # Add owner to organization_users
-        from app.modules.tenants.organization_users.services import (
-            OrganizationUserService,
-        )
-
-        org_user_service = OrganizationUserService()
-
-        await org_user_service.add_user_to_organization(
-            OrganizationUserCreateSchema(
-                user_id=owner_id, tenant_id=organization.id, role=OrganizationRole.OWNER
-            )
-        )
+        # Use canonical chat2chart organization membership APIs instead of
+        # the duplicate tenant module. Importing the chat2chart service keeps
+        # membership consistent across the monorepo.
+        try:
+            from app.modules.projects.services import OrganizationService as C2COrganizationService
+            c2c_org_svc = C2COrganizationService()
+            # best-effort: attempt to add owner membership via chat2chart service
+            try:
+                await c2c_org_svc.create_default_organization(owner_id)
+            except Exception:
+                # non-fatal: proceed even if membership enrichment fails
+                pass
+        except Exception:
+            # If the chat2chart services aren't available in this runtime, skip
+            pass
 
         return organization
 

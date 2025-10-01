@@ -38,7 +38,14 @@ auth = CanonicalAuth()
 
 
 def sign_jwt_wrapper(**kwargs):
-    return auth.signJWT(**kwargs)
+    # Ensure canonical `id` claim is present and string-typed for downstream services
+    payload = dict(kwargs)
+    if 'user_id' in payload and 'id' not in payload:
+        try:
+            payload['id'] = str(payload.get('user_id'))
+        except Exception:
+            payload['id'] = payload.get('user_id')
+    return auth.signJWT(**payload)
 
 
 def decode_jwt_wrapper(token: str):

@@ -294,26 +294,59 @@ class OrganizationRepository(
                     if k in table.c.keys() and k not in ('created_at', 'updated_at', 'trial_ends_at'):
                         safe_data[k] = v
 
-                ins = table.insert().values(**safe_data).returning(table.c.id)
+                # Attempt an idempotent INSERT using PostgreSQL ON CONFLICT on slug
+                # so concurrent creates won't raise unique violations. If slug is not
+                # available, fall back to a normal insert and handle collisions by
+                # selecting an existing org by name/slug.
                 try:
-                    res = await db.execute(ins)
-                    await db.commit()
-                    row = res.first()
-                    if row:
-                        org_id = row[0]
-                        q = select(self.model).where(table.c.id == org_id)
-                        pres = await db.execute(q)
-                        return pres.scalar_one_or_none()
-                    # If insert returned no row, fall through to superclass
+                    from sqlalchemy import text as _text
+                    slug_val = safe_data.get('slug')
+                    if slug_val:
+                        ins_sql = _text(
+                            "INSERT INTO organizations (name, slug, description, is_active, is_deleted, plan_type, max_projects, created_at, updated_at) "
+                            "VALUES (:name, :slug, :desc, :is_active, :is_deleted, :plan_type, :max_projects, :created_at, :updated_at) "
+                            "ON CONFLICT (slug) DO UPDATE SET updated_at = EXCLUDED.updated_at RETURNING id"
+                        )
+                        res = await db.execute(ins_sql.bindparams(
+                            name=safe_data.get('name'),
+                            slug=safe_data.get('slug'),
+                            desc=safe_data.get('description'),
+                            is_active=safe_data.get('is_active', True),
+                            is_deleted=safe_data.get('is_deleted', False),
+                            plan_type=safe_data.get('plan_type'),
+                            max_projects=safe_data.get('max_projects'),
+                            created_at=safe_data.get('created_at'),
+                            updated_at=safe_data.get('updated_at'),
+                        ))
+                        await db.commit()
+                        row = res.first()
+                        if row and row[0]:
+                            org_id = row[0]
+                            q = select(self.model).where(table.c.id == org_id)
+                            pres = await db.execute(q)
+                            existing = pres.scalar_one_or_none()
+                            if existing:
+                                return existing
+                    else:
+                        # No slug: try basic insert then return created record
+                        ins = table.insert().values(**safe_data).returning(table.c.id)
+                        res = await db.execute(ins)
+                        await db.commit()
+                        row = res.first()
+                        if row and row[0]:
+                            org_id = row[0]
+                            q = select(self.model).where(table.c.id == org_id)
+                            pres = await db.execute(q)
+                            return pres.scalar_one_or_none()
                 except Exception as e:
+                    # On error (e.g., concurrent insert unique violation), attempt to find existing org by slug or name
                     try:
                         await db.rollback()
                     except Exception:
                         pass
-                    # If unique collision, return existing org by slug/name where possible
                     try:
-                        slug = data.get('slug')
-                        name = data.get('name')
+                        slug = safe_data.get('slug')
+                        name = safe_data.get('name')
                         if slug:
                             q = select(self.model).where(table.c.slug == slug)
                             pres = await db.execute(q)
@@ -327,7 +360,10 @@ class OrganizationRepository(
                             if existing:
                                 return existing
                     except Exception:
+                        # Re-raise original error if we couldn't recover
                         raise e
+
+                # If everything above failed to return, fall back to superclass create
                 return await super().create(data)
 
             # Fallback: use base class create which uses module-global DB session

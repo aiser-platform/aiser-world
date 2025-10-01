@@ -73,6 +73,28 @@ def get_db_conn():
     return psycopg2.connect(host=host, user=user, password=password, dbname=db, cursor_factory=RealDictCursor)
 
 
+def resolve_canonical_user_id_by_email(email: str):
+    """Try to resolve a canonical UUID users.id from the database by email.
+
+    Returns the id as string when found, otherwise None.
+    """
+    try:
+        conn = get_db_conn()
+        cur = conn.cursor()
+        cur.execute("SELECT id FROM users WHERE email = %s LIMIT 1", (email,))
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+        if not row:
+            return None
+        # row may be dict (RealDictCursor) or tuple
+        if isinstance(row, dict):
+            return str(row.get('id'))
+        return str(row[0])
+    except Exception:
+        return None
+
+
 
 
 from fastapi import Response  # type: ignore[reportMissingImports]
@@ -243,7 +265,33 @@ async def signin(payload: SignInRequest, request: Request, response: Response):
         user_email = row_email
         user_username = row_username
 
-        tokens = sign_jwt_wrapper(user_id=user_id, email=user_email)
+            # Attempt to provision canonical UUID in chat2chart and use it
+            # as the `id` claim when signing JWTs so downstream services see
+            # a stable UUID-based identity.
+            try:
+                provision_url = os.getenv('CHAT2CHART_PROVISION_URL') or os.getenv('CHAT2CHART_URL')
+                provision_secret = os.getenv('INTERNAL_PROVISION_SECRET')
+                if provision_url and provision_secret:
+                    payload = {"id": user_id, "email": user_email, "username": user_username, "create_defaults": False}
+                    headers = {"Content-Type": "application/json", "X-Internal-Auth": provision_secret}
+                    try:
+                        rprov = requests.post(provision_url + "/internal/provision-user", json=payload, headers=headers, timeout=5)
+                        if rprov.status_code == 200:
+                            j = rprov.json()
+                            prov_id = j.get('id') or j.get('user_id')
+                            if prov_id:
+                                # use canonical id in tokens
+                                tokens = sign_jwt_wrapper(user_id=user_id, id=prov_id, email=user_email)
+                            else:
+                                tokens = sign_jwt_wrapper(user_id=user_id, email=user_email)
+                        else:
+                            tokens = sign_jwt_wrapper(user_id=user_id, email=user_email)
+                    except Exception:
+                        tokens = sign_jwt_wrapper(user_id=user_id, email=user_email)
+                else:
+                    tokens = sign_jwt_wrapper(user_id=user_id, email=user_email)
+            except Exception:
+                tokens = sign_jwt_wrapper(user_id=user_id, email=user_email)
         refresh_token = tokens.get('refresh_token') if tokens.get('refresh_token') else None
         if refresh_token:
             try:
@@ -286,7 +334,41 @@ async def enterprise_login(payload: EnterpriseSignInRequest, request: Request, r
         raise HTTPException(status_code=422, detail="Missing username or identifier")
 
     signin_payload = SignInRequest(identifier=identifier, password=payload.password)
-    return await signin(signin_payload, request, response)
+    # Delegate to signin logic which returns tokens
+    result = await signin(signin_payload, request, response)
+    # Persist refresh token to device_sessions table if present
+    try:
+        refresh = None
+        if isinstance(result, dict):
+            refresh = result.get('refresh_token')
+            uid = result.get('user', {}).get('id')
+        else:
+            refresh = getattr(result, 'refresh_token', None)
+            uid = getattr(result, 'user', {}).get('id') if getattr(result, 'user', None) else None
+
+        if refresh and uid:
+            conn = get_db_conn()
+            cur = conn.cursor()
+            import secrets
+            device_id = secrets.token_urlsafe(16)
+            device_type = request.headers.get('sec-ch-ua-platform', 'browser')
+            device_name = request.headers.get('sec-ch-ua', 'web')
+            try:
+                cur.execute(
+                    "INSERT INTO device_sessions (user_id, device_id, device_type, device_name, refresh_token, refresh_token_expires_at, is_active) VALUES (%s,%s,%s,%s,%s,NOW() + INTERVAL '7 days', TRUE)",
+                    (str(uid), device_id, device_type, device_name, refresh),
+                )
+                conn.commit()
+            except Exception:
+                conn.rollback()
+            finally:
+                cur.close()
+                conn.close()
+    except Exception:
+        # Non-fatal: continue to return tokens even if persistence fails
+        pass
+
+    return result
 
 
 class SignUpRequest(BaseModel):
@@ -440,8 +522,29 @@ async def signout_user(payload: Optional[dict] = None, request: Optional[Request
                 token = payload.get('token') or payload.get('refresh_token')
             return await service.signout(token)
 
-        # Fallback: attempt to call logout handler
-        # Reuse existing logout logic by calling the logout route
+        # Fallback: mark refresh token revoked in device_sessions if provided
+        try:
+            conn = get_db_conn()
+            cur = conn.cursor()
+            token = None
+            if request:
+                # try cookie first
+                token = request.cookies.get('refresh_token')
+            if not token and payload:
+                token = payload.get('refresh_token') or payload.get('token')
+            if token:
+                cur.execute("UPDATE device_sessions SET refresh_token_revoked = TRUE, is_active = FALSE WHERE refresh_token = %s", (token,))
+                conn.commit()
+                cur.close()
+                conn.close()
+                return {"message": "Logged out", "status": "success"}
+        except Exception:
+            try:
+                cur.close()
+                conn.close()
+            except Exception:
+                pass
+        # Last fallback: call internal logout route (if present) using TestClient
         from fastapi.testclient import TestClient  # type: ignore[reportMissingImports]
         client = TestClient(app)
         body = payload or {}

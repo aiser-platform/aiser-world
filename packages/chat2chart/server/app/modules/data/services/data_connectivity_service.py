@@ -2002,15 +2002,25 @@ class DataConnectivityService:
 
             async with async_session() as db:
                 # Create the data source
+                # Build metadata and connection config safely
+                metadata = data_source_data.get('metadata', {}) or {}
+                # carry over description into metadata to avoid unknown kwargs on model
+                if data_source_data.get('description'):
+                    metadata.setdefault('description', data_source_data.get('description'))
+
+                connection_config = data_source_data.get('config') or {}
+                db_type = connection_config.get('type') or data_source_data.get('db_type')
+
                 data_source = DataSource(
                     id=f"ds_{organization_id}_{project_id}_{int(datetime.now().timestamp())}",
                     name=data_source_data['name'],
                     type=data_source_data['type'],
                     format=data_source_data.get('format'),
-                    description=data_source_data.get('description'),
-                    metadata=json.dumps(data_source_data.get('metadata', {})),
-                    user_id=organization_id,  # Using organization_id as user_id for now
-                    tenant_id=organization_id,
+                    db_type=db_type,
+                    schema=data_source_data.get('schema'),
+                    connection_config=connection_config,
+                    user_id=str(organization_id),  # Using organization_id as user_id for now
+                    tenant_id=str(organization_id),
                     is_active=True,
                     created_at=datetime.now(),
                     updated_at=datetime.now()
