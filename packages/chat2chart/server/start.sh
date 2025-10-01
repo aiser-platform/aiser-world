@@ -39,6 +39,15 @@ else
     alembic upgrade head || { echo "alembic upgrade head failed" >&2; exit 1; }
 fi
 
+# Run quick schema sanity checks to fail fast on startup if migrations incomplete
+echo "Running quick schema sanity checks..."
+if python -c "import app.scripts.check_schema as c; import sys; sys.exit(c.run_checks())"; then
+    echo "Schema sanity checks passed"
+else
+    echo "Schema sanity checks failed; exiting" >&2
+    exit 1
+fi
+
 
 echo "🚀 Starting chat2chart service..."
 # Run uvicorn without --reload in container to avoid multiple bind attempts by PID1
