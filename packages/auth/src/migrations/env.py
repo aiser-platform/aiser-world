@@ -41,10 +41,19 @@ from app.common.model import Base
 
 # Import all models to ensure they are registered with SQLAlchemy
 try:
-    pass
-
-    print("All models imported successfully")
-except ImportError as e:
+    # Import modules that declare SQLAlchemy models so mappers are configured.
+    # Add explicit imports here to avoid missing-name errors during alembic
+    # autogeneration or when running migrations in CI/dev environments.
+    import app.modules.user.models as _um
+    import app.modules.organizations.models as _om
+    import app.modules.device_session.models as _dm
+    import app.modules.temporary_token.models as _tm
+    import app.modules.authentication.models as _am
+    import app.modules.roles.models as _rm
+    print("All expected models imported successfully")
+except Exception as e:
+    # Continue even if some optional modules fail to import; alembic
+    # autogeneration may still work for available models.
     print(f"Warning: Some models could not be imported: {e}")
 
 # ------------------------------------------------------------#
