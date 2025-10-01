@@ -6,7 +6,6 @@ import time
 import pytest
 
 
-@pytest.mark.skip(reason="flaky in CI - skip while debugging asyncpg concurrency issues")
 def test_upgrade_and_dashboard_crud():
     # Use FastAPI TestClient (in-process) to avoid network/uvicorn/h11 hangs
     client = TestClient(app)
