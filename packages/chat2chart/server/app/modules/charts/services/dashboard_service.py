@@ -345,11 +345,15 @@ class DashboardService:
             # This keeps all DB work for the request on the same session/connection.
             from app.modules.authentication.rbac import has_dashboard_access
 
-            # Load dashboard via provided session
-            res = await self.db.execute(select(Dashboard).where(Dashboard.id == dashboard_id))
-            db_dash = res.scalar_one_or_none()
-            if not db_dash:
-                raise HTTPException(status_code=404, detail="Dashboard not found")
+            # Use a transaction on the request-scoped session to avoid
+            # interleaved operations on the same connection which asyncpg
+            # rejects. This ensures the select/update/flush happen atomically
+            # on the same session/connection.
+            async with self.db.begin():
+                res = await self.db.execute(select(Dashboard).where(Dashboard.id == dashboard_id))
+                db_dash = res.scalar_one_or_none()
+                if not db_dash:
+                    raise HTTPException(status_code=404, detail="Dashboard not found")
 
             # Resolve user_id for RBAC checking (extract unverified claims from raw token if present)
             try:
@@ -388,12 +392,13 @@ class DashboardService:
             except Exception:
                 upd = dashboard_data.dict(exclude_unset=True)
 
-            for k, v in upd.items():
-                setattr(db_dash, k, v)
-            db_dash.updated_at = datetime.utcnow()
+                for k, v in upd.items():
+                    setattr(db_dash, k, v)
+                db_dash.updated_at = datetime.utcnow()
 
-            await self.db.commit()
-            await self.db.refresh(db_dash)
+                # flush so returning/refresh sees updates
+                await self.db.flush()
+                await self.db.refresh(db_dash)
 
             return {
                 "id": str(db_dash.id),
