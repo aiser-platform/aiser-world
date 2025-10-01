@@ -297,25 +297,27 @@ class DashboardService:
                     if not row_obj:
                         raise Exception('Inserted dashboard not found')
 
-                dashboard = {
-                    'id': str(row_obj.id),
-                    'name': row_obj.name,
-                    'description': row_obj.description,
-                    'project_id': row_obj.project_id,
-                    'created_by': row_obj.created_by,
-                    'layout_config': row_obj.layout_config or {},
-                    'theme_config': row_obj.theme_config or {},
-                    'global_filters': row_obj.global_filters or {},
-                    'refresh_interval': row_obj.refresh_interval or 300,
-                    'is_public': row_obj.is_public,
-                    'is_template': row_obj.is_template or False,
-                    'max_widgets': row_obj.max_widgets or 10,
-                    'max_pages': row_obj.max_pages or 5,
-                    'created_at': row_obj.created_at.isoformat() if row_obj.created_at else None,
-                    'updated_at': row_obj.updated_at.isoformat() if row_obj.updated_at else None,
-                    'widgets': []
-                }
-                return dashboard
+                    # Build a plain serializable dict to avoid returning ORM objects bound
+                    # to a different session/loop which causes "different loop" errors.
+                    dashboard = {
+                        'id': str(row_obj.id),
+                        'name': row_obj.name,
+                        'description': row_obj.description,
+                        'project_id': row_obj.project_id,
+                        'created_by': str(row_obj.created_by) if row_obj.created_by is not None else None,
+                        'layout_config': row_obj.layout_config or {},
+                        'theme_config': row_obj.theme_config or {},
+                        'global_filters': row_obj.global_filters or {},
+                        'refresh_interval': row_obj.refresh_interval or 300,
+                        'is_public': bool(row_obj.is_public),
+                        'is_template': bool(row_obj.is_template) if row_obj.is_template is not None else False,
+                        'max_widgets': int(row_obj.max_widgets) if row_obj.max_widgets is not None else 10,
+                        'max_pages': int(row_obj.max_pages) if row_obj.max_pages is not None else 5,
+                        'created_at': row_obj.created_at.isoformat() if row_obj.created_at else None,
+                        'updated_at': row_obj.updated_at.isoformat() if row_obj.updated_at else None,
+                        'widgets': []
+                    }
+                    return dashboard
 
             except Exception:
                 try:
