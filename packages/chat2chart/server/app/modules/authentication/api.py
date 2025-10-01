@@ -91,7 +91,7 @@ async def auth_echo(payload: dict | None = Body(None)):
 
 
 @router.post("/auth/upgrade-demo")
-async def upgrade_demo(request: Request, response: Response, payload: dict | None = Body(None), background_tasks: BackgroundTasks | None = None):
+async def upgrade_demo(request: Request, response: Response, payload: dict | None = Body(None), background_tasks: BackgroundTasks = None):
     """Dev helper: upgrade demo_token_* / user cookie into a real c2c_access_token JWT.
 
     This endpoint is ONLY enabled when ENVIRONMENT == 'development'. It reads the
