@@ -26,8 +26,34 @@ class AuthService:
         expires_at = datetime.utcnow() + timedelta(minutes=expires_in_minutes)
         async with async_session() as db:
             try:
-                # Normalize to string for compatibility with PG UUID/text columns
+                # Normalize user id and resolve legacy numeric id -> canonical UUID
                 uid_val = str(user_id) if user_id is not None else None
+                # If value looks like a numeric legacy id, try to resolve to UUID
+                if uid_val and uid_val.isdigit():
+                    try:
+                        from sqlalchemy import text as _text
+                        res = await db.execute(_text("SELECT id FROM users WHERE legacy_id = :lid LIMIT 1").bindparams(lid=int(uid_val)))
+                        row = res.first()
+                        if row and row[0]:
+                            uid_val = str(row[0])
+                        else:
+                            # Could not resolve legacy id to UUID; skip persisting to avoid UUID cast errors
+                            logger.warning("persist_refresh_token: could not resolve legacy user id %s to UUID; skipping refresh token persist", uid_val)
+                            return None
+                    except Exception:
+                        # On any DB lookup error, avoid failing the flow; skip persisting
+                        try:
+                            await db.rollback()
+                        except Exception:
+                            pass
+                        logger.exception("persist_refresh_token: failed resolving legacy_id to UUID; skipping persist")
+                        return None
+
+                # At this point uid_val should be a UUID string or None
+                if not uid_val:
+                    logger.warning("persist_refresh_token called without resolvable user_id; skipping persist")
+                    return None
+
                 rt = RefreshToken(user_id=uid_val, token=token, expires_at=expires_at, revoked=False)
                 db.add(rt)
                 await db.flush()
