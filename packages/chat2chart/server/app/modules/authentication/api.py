@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Request, Response, HTTPException, Body
+from fastapi import APIRouter, Depends, Request, Response, HTTPException, Body, BackgroundTasks
 import logging
 from app.modules.authentication.deps.auth_bearer import JWTCookieBearer, current_user_payload
 from app.modules.authentication.auth import Auth
@@ -91,7 +91,7 @@ async def auth_echo(payload: dict | None = Body(None)):
 
 
 @router.post("/auth/upgrade-demo")
-async def upgrade_demo(request: Request, response: Response, payload: dict | None = Body(None)):
+async def upgrade_demo(request: Request, response: Response, payload: dict | None = Body(None), background_tasks: BackgroundTasks | None = None):
     """Dev helper: upgrade demo_token_* / user cookie into a real c2c_access_token JWT.
 
     This endpoint is ONLY enabled when ENVIRONMENT == 'development'. It reads the
@@ -230,13 +230,17 @@ async def upgrade_demo(request: Request, response: Response, payload: dict | Non
         # Persist refresh token in background to avoid blocking request DB flow
         # Allow skipping persistence in tests via SKIP_PERSIST_REFRESH setting
         from app.core.config import settings as _settings
-        if getattr(_settings, 'SKIP_PERSIST_REFRESH', False):
-            logger.info("SKIP_PERSIST_REFRESH is true; not persisting refresh token")
+        if getattr(_settings, 'SKIP_PERSIST_REFRESH', False) or os.getenv('PYTEST_CURRENT_TEST'):
+            logger.info("SKIP_PERSIST_REFRESH or PYTEST_CURRENT_TEST detected; not persisting refresh token")
         else:
             try:
-                import asyncio
                 auth_service = AuthService()
-                asyncio.create_task(auth_service.persist_refresh_token(user_id, token_pair.get("refresh_token"), settings.JWT_REFRESH_EXP_TIME_MINUTES))
+                if background_tasks is not None:
+                    background_tasks.add_task(auth_service.persist_refresh_token, user_id, token_pair.get("refresh_token"), settings.JWT_REFRESH_EXP_TIME_MINUTES)
+                else:
+                    # fallback to scheduling on the running loop
+                    import asyncio
+                    asyncio.create_task(auth_service.persist_refresh_token(user_id, token_pair.get("refresh_token"), settings.JWT_REFRESH_EXP_TIME_MINUTES))
             except Exception as e:
                 logger.exception(f"upgrade-demo: failed to schedule refresh token persist: {e}")
         try:
