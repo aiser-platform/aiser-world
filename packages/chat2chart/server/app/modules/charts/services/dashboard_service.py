@@ -823,16 +823,15 @@ class DashboardService:
             return None
         else:
             # Not a dict: handle str/int/uuid
-            try:
-                # If already looks like UUID, return uuid.UUID
-                if isinstance(user_id, str):
-                    try:
-                        return uuid.UUID(user_id)
-                    except Exception:
-                        # continue to check numeric legacy id
-                        pass
+            # If already looks like UUID, return uuid.UUID
+            if isinstance(user_id, str):
+                try:
+                    return uuid.UUID(user_id)
+                except Exception:
+                    # continue to final fallback
+                    pass
 
-                # We only support explicit UUID resolution here. Do not attempt
-                # fallback to legacy integer ids. If execution reaches this
-                # point without returning, there is no valid UUID to return.
-                return None
+            # We only support explicit UUID resolution here. Do not attempt
+            # fallback to legacy integer ids. If execution reaches this
+            # point without returning, there is no valid UUID to return.
+            return None
