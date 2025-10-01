@@ -212,7 +212,15 @@ async def upgrade_demo(request: Request, response: Response, payload: dict | Non
         try:
             # run resolver
             import asyncio
-            resolved = asyncio.get_event_loop().run_until_complete(_resolve())
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = None
+            if loop and loop.is_running():
+                # We're running inside an event loop (e.g., TestClient); create a task
+                resolved = asyncio.run(_resolve())
+            else:
+                resolved = asyncio.get_event_loop().run_until_complete(_resolve())
             if resolved:
                 resolved_user_id = resolved
         except Exception:

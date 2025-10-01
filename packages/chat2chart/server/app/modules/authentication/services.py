@@ -1,10 +1,13 @@
 from typing import Optional
 from datetime import datetime, timedelta
+import logging
 from app.modules.authentication.models import RefreshToken
 from app.db.session import async_session
 from app.modules.authentication.auth import Auth
 from sqlalchemy import select
 from sqlalchemy import update
+
+logger = logging.getLogger(__name__)
 from sqlalchemy.exc import ProgrammingError
 
 try:
