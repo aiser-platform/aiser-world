@@ -229,9 +229,14 @@ async def upgrade_demo(request: Request, response: Response, payload: dict | Non
         try:
             try:
                 # Persist refresh token in background to avoid blocking request DB flow
-                import asyncio
-                auth_service = AuthService()
-                asyncio.create_task(auth_service.persist_refresh_token(user_id, token_pair.get("refresh_token"), settings.JWT_REFRESH_EXP_TIME_MINUTES))
+                # Allow skipping persistence in tests via SKIP_PERSIST_REFRESH setting
+                from app.core.config import settings as _settings
+                if getattr(_settings, 'SKIP_PERSIST_REFRESH', False):
+                    logger.info("SKIP_PERSIST_REFRESH is true; not persisting refresh token")
+                else:
+                    import asyncio
+                    auth_service = AuthService()
+                    asyncio.create_task(auth_service.persist_refresh_token(user_id, token_pair.get("refresh_token"), settings.JWT_REFRESH_EXP_TIME_MINUTES))
             except Exception as e:
                 logger.exception(f"upgrade-demo: failed to schedule refresh token persist: {e}")
         try:
