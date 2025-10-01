@@ -940,6 +940,8 @@ async def get_dashboard(
         from app.modules.authentication.rbac import has_dashboard_access
 
         async with _async_session() as sdb:
+            # avoid importing selectinload at top; import locally
+            from sqlalchemy.orm import selectinload
             res = await sdb.execute(select(_Dash).options(selectinload(_Dash.widgets)).where(_Dash.id == dashboard_id))
             row_obj = res.scalar_one_or_none()
             if not row_obj:
