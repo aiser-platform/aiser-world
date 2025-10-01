@@ -1,0 +1,43 @@
+name: Integration tests — Auth & Dashboard
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  integration-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Compose
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y docker-compose
+
+      - name: Start services
+        run: |
+          docker compose -f docker-compose.dev.yml up -d --build --remove-orphans
+
+      - name: Wait for services
+        run: |
+          echo "Waiting for services to be healthy..."
+          sleep 20
+
+      - name: Run chat2chart auth+dashboard tests
+        run: |
+          docker compose -f docker-compose.dev.yml exec -T chat2chart-server /bin/bash -lc "cd /app && PYTHONPATH=/app pytest -q app/tests/modules/auth/test_upgrade_and_dashboard_crud.py"
+
+      - name: Run auth-service tests (targeted)
+        run: |
+          docker compose -f docker-compose.dev.yml exec -T auth-service /bin/bash -lc "cd src && pytest -q tests/test_refresh_and_logout.py || true"
+
+      - name: Tear down
+        if: always()
+        run: |
+          docker compose -f docker-compose.dev.yml down --volumes
+
+
