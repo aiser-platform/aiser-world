@@ -340,80 +340,79 @@ class DashboardService:
         try:
             logger.info(f"📊 Updating dashboard: {dashboard_id}")
             
-            # Use an independent session for select/update to avoid concurrent
-            # operation conflicts on the caller-provided async connection.
-            from app.db.session import async_session as _async_session
+            # Perform update using the request-scoped session (`self.db`) to
+            # avoid creating multiple concurrent operations on other connections.
+            # This keeps all DB work for the request on the same session/connection.
             from app.modules.authentication.rbac import has_dashboard_access
 
-            async with _async_session() as sdb:
-                # Load dashboard
-                res = await sdb.execute(select(Dashboard).where(Dashboard.id == dashboard_id))
-                db_dash = res.scalar_one_or_none()
-                if not db_dash:
-                    raise HTTPException(status_code=404, detail="Dashboard not found")
+            # Load dashboard via provided session
+            res = await self.db.execute(select(Dashboard).where(Dashboard.id == dashboard_id))
+            db_dash = res.scalar_one_or_none()
+            if not db_dash:
+                raise HTTPException(status_code=404, detail="Dashboard not found")
 
-                # Resolve user_id for RBAC checking (extract unverified claims from raw token if present)
-                try:
-                    if isinstance(user_id, str) and "." in user_id:
-                        from jose import jwt as jose_jwt
-                        try:
-                            _claims = jose_jwt.get_unverified_claims(user_id)
-                            user_id_for_check = _claims if isinstance(_claims, dict) else user_id
-                        except Exception:
-                            user_id_for_check = user_id
-                    else:
+            # Resolve user_id for RBAC checking (extract unverified claims from raw token if present)
+            try:
+                if isinstance(user_id, str) and "." in user_id:
+                    from jose import jwt as jose_jwt
+                    try:
+                        _claims = jose_jwt.get_unverified_claims(user_id)
+                        user_id_for_check = _claims if isinstance(_claims, dict) else user_id
+                    except Exception:
                         user_id_for_check = user_id
-                except Exception:
+                else:
                     user_id_for_check = user_id
+            except Exception:
+                user_id_for_check = user_id
 
-                allowed = await has_dashboard_access(user_id_for_check, str(db_dash.id))
-                if not allowed:
-                    # Fallbacks similar to previous logic
-                    if db_dash.created_by is None and isinstance(user_id, dict) and user_id.get('email'):
-                        allowed = True
-                    if not allowed and isinstance(user_id, dict) and user_id.get('email') and db_dash.created_by is not None:
-                        try:
-                            from sqlalchemy import text as _text
-                            pres = await sdb.execute(_text("SELECT id FROM users WHERE email = :email LIMIT 1").bindparams(email=user_id.get('email')))
-                            row = pres.first()
-                            if row and str(row[0]) == str(db_dash.created_by):
-                                allowed = True
-                        except Exception:
-                            pass
-                if not allowed:
-                    raise HTTPException(status_code=403, detail="Access denied")
+            allowed = await has_dashboard_access(user_id_for_check, str(db_dash.id))
+            if not allowed:
+                # Fallbacks similar to previous logic
+                if db_dash.created_by is None and isinstance(user_id, dict) and user_id.get('email'):
+                    allowed = True
+                if not allowed and isinstance(user_id, dict) and user_id.get('email') and db_dash.created_by is not None:
+                    try:
+                        from sqlalchemy import text as _text
+                        pres = await self.db.execute(_text("SELECT id FROM users WHERE email = :email LIMIT 1").bindparams(email=user_id.get('email')))
+                        row = pres.first()
+                        if row and str(row[0]) == str(db_dash.created_by):
+                            allowed = True
+                    except Exception:
+                        pass
+            if not allowed:
+                raise HTTPException(status_code=403, detail="Access denied")
 
-                # Apply updates
-                try:
-                    upd = dashboard_data.model_dump(exclude_unset=True)
-                except Exception:
-                    upd = dashboard_data.dict(exclude_unset=True)
+            # Apply updates using the same session
+            try:
+                upd = dashboard_data.model_dump(exclude_unset=True)
+            except Exception:
+                upd = dashboard_data.dict(exclude_unset=True)
 
-                for k, v in upd.items():
-                    setattr(db_dash, k, v)
-                db_dash.updated_at = datetime.utcnow()
+            for k, v in upd.items():
+                setattr(db_dash, k, v)
+            db_dash.updated_at = datetime.utcnow()
 
-                await sdb.commit()
-                await sdb.refresh(db_dash)
+            await self.db.commit()
+            await self.db.refresh(db_dash)
 
-                return {
-                    "id": str(db_dash.id),
-                    "name": db_dash.name,
-                    "description": db_dash.description,
-                    "project_id": db_dash.project_id,
-                    "layout_config": db_dash.layout_config,
-                    "theme_config": db_dash.theme_config,
-                    "global_filters": db_dash.global_filters,
-                    "refresh_interval": db_dash.refresh_interval,
-                    "is_public": db_dash.is_public,
-                    "is_template": db_dash.is_template,
-                    "created_by": db_dash.created_by,
-                    "max_widgets": db_dash.max_widgets,
-                    "max_pages": db_dash.max_pages,
-                    "created_at": db_dash.created_at.isoformat() if db_dash.created_at else None,
-                    "updated_at": db_dash.updated_at.isoformat() if db_dash.updated_at else None,
-                    "last_viewed_at": db_dash.last_viewed_at.isoformat() if db_dash.last_viewed_at else None
-                }
+            return {
+                "id": str(db_dash.id),
+                "name": db_dash.name,
+                "description": db_dash.description,
+                "project_id": db_dash.project_id,
+                "layout_config": db_dash.layout_config,
+                "theme_config": db_dash.theme_config,
+                "global_filters": db_dash.global_filters,
+                "refresh_interval": db_dash.refresh_interval,
+                "is_public": db_dash.is_public,
+                "is_template": db_dash.is_template,
+                "created_by": db_dash.created_by,
+                "max_widgets": db_dash.max_widgets,
+                "max_pages": db_dash.max_pages,
+                "created_at": db_dash.created_at.isoformat() if db_dash.created_at else None,
+                "updated_at": db_dash.updated_at.isoformat() if db_dash.updated_at else None,
+                "last_viewed_at": db_dash.last_viewed_at.isoformat() if db_dash.last_viewed_at else None
+            }
             
         except HTTPException:
             raise
