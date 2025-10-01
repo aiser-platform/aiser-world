@@ -262,7 +262,11 @@ class DashboardService:
                     # non-fatal, continue and allow dashboard to be created without created_by
                     pass
 
-                # Insert dashboard row including created_by and project_id atomically
+                # Insert dashboard row using a fresh session to avoid concurrent
+                # operation conflicts on the caller-provided session (asyncpg
+                # does not allow multiple concurrent operations on the same
+                # connection). This makes the operation independent and
+                # resilient to background tasks.
                 dash_id = uuid.uuid4()
                 ins = insert(Dashboard).values(
                     id=dash_id,
@@ -280,14 +284,18 @@ class DashboardService:
                     max_widgets=10,
                     max_pages=5,
                 )
-                await self.db.execute(ins)
-                await self.db.commit()
+                # Use an independent session for the insert/commit to avoid "another operation in progress"
+                from app.db.session import async_session as _async_session
+                async with _async_session() as sdb:
+                    await sdb.execute(ins)
+                    await sdb.commit()
 
-                # Load inserted row using ORM select to avoid raw-SQL typing issues
-                res = await self.db.execute(select(Dashboard).where(Dashboard.id == dash_id))
-                row_obj = res.scalar_one_or_none()
-                if not row_obj:
-                    raise Exception('Inserted dashboard not found')
+                # Load inserted row using a fresh select in a new session (avoid mixing)
+                async with _async_session() as sdb2:
+                    res = await sdb2.execute(select(Dashboard).where(Dashboard.id == dash_id))
+                    row_obj = res.scalar_one_or_none()
+                    if not row_obj:
+                        raise Exception('Inserted dashboard not found')
 
                 dashboard = {
                     'id': str(row_obj.id),
