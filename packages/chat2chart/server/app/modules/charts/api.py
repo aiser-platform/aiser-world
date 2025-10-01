@@ -884,68 +884,61 @@ async def get_dashboard(
     db: AsyncSession = Depends(get_async_session)
 ):
     """
-    Get a specific dashboard by ID
+    Get a specific dashboard by ID. Try a lightweight raw SQL read first; if not
+    found, perform a safe fresh-session ORM read and return a plain dict. This
+    avoids returning ORM objects bound to different sessions/loops which can
+    cause "future attached to a different loop" errors during tests.
     """
-    try:
-        logger.info(f"📊 Getting dashboard: {dashboard_id}")
-        
-        # Resolve optional token to determine caller payload for permission checks
-        token = await _optional_token(request)
-        caller_payload = Auth().decodeJWT(token) if token else {}
+    logger.info(f"📊 Getting dashboard: {dashboard_id}")
 
-        # First, try a tolerant raw SQL lookup. This avoids service-level
-        # permission/ORM issues during schema migration and ensures a
-        # recently-inserted dashboard row is visible to the creating user.
-        try:
-            from sqlalchemy import text
-            async with async_session() as sdb:
-                # Try exact UUID match first (fast path)
-                q = text(
-                    "SELECT id, name, description, project_id, created_by, layout_config, theme_config, global_filters, refresh_interval, is_public, is_template, max_widgets, max_pages, created_at, updated_at FROM dashboards WHERE id = :did::uuid LIMIT 1"
+    token = await _optional_token(request)
+    caller_payload = Auth().decodeJWT(token) if token else {}
+
+    # 1) Try raw SQL fast path (tolerant)
+    try:
+        from sqlalchemy import text
+        async with async_session() as sdb:
+            q = text(
+                "SELECT id, name, description, project_id, created_by, layout_config, theme_config, global_filters, refresh_interval, is_public, is_template, max_widgets, max_pages, created_at, updated_at FROM dashboards WHERE id = :did::uuid LIMIT 1"
+            )
+            res = await sdb.execute(q.bindparams(did=str(dashboard_id)))
+            row = res.first()
+            if not row:
+                q2 = text(
+                    "SELECT id, name, description, project_id, created_by, layout_config, theme_config, global_filters, refresh_interval, is_public, is_template, max_widgets, max_pages, created_at, updated_at FROM dashboards WHERE id::text = :did LIMIT 1"
                 )
-                res = await sdb.execute(q.bindparams(did=str(dashboard_id)))
-                row = res.first()
+                res2 = await sdb.execute(q2.bindparams(did=str(dashboard_id)))
+                row = res2.first()
 
-                # If not found, try tolerant text match (handles legacy integer PKs or mixed schemas)
-                if not row:
-                    q2 = text(
-                        "SELECT id, name, description, project_id, created_by, layout_config, theme_config, global_filters, refresh_interval, is_public, is_template, max_widgets, max_pages, created_at, updated_at FROM dashboards WHERE id::text = :did LIMIT 1"
-                    )
-                    res2 = await sdb.execute(q2.bindparams(did=str(dashboard_id)))
-                    row = res2.first()
+            if row:
+                return {
+                    'id': str(row[0]),
+                    'name': row[1],
+                    'description': row[2],
+                    'project_id': row[3],
+                    'created_by': str(row[4]) if row[4] else None,
+                    'layout_config': row[5] or {},
+                    'theme_config': row[6] or {},
+                    'global_filters': row[7] or {},
+                    'refresh_interval': row[8] or 300,
+                    'is_public': bool(row[9]),
+                    'is_template': bool(row[10]),
+                    'max_widgets': int(row[11]) if row[11] is not None else 10,
+                    'max_pages': int(row[12]) if row[12] is not None else 5,
+                    'created_at': row[13].isoformat() if row[13] else None,
+                    'updated_at': row[14].isoformat() if row[14] else None,
+                    'widgets': []
+                }
+    except Exception:
+        # If raw SQL path fails, fall back to safe ORM read
+        pass
 
-                if row:
-                    dashboard = {
-                        'id': str(row[0]),
-                        'name': row[1],
-                        'description': row[2],
-                        'project_id': row[3],
-                        'created_by': row[4],
-                        'layout_config': row[5] or {},
-                        'theme_config': row[6] or {},
-                        'global_filters': row[7] or {},
-                        'refresh_interval': row[8] or 300,
-                        'is_public': row[9],
-                        'is_template': row[10],
-                        'max_widgets': row[11] or 10,
-                        'max_pages': row[12] or 5,
-                        'created_at': row[13].isoformat() if row[13] else None,
-                        'updated_at': row[14].isoformat() if row[14] else None,
-                        'widgets': []
-                    }
-                    return dashboard
-        except Exception:
-            # ignore raw SQL errors and fall back to service
-            pass
-
-    # Fallback: use a fresh session and return a plain dict. In development/CI
-    # tests we prefer this path to avoid complex RBAC/service interactions that
-    # can attach futures to different loops. In production environments we
-    # still attempt permission checks via the centralized helper.
-    from app.db.session import async_session as _async_session
-    from app.modules.charts.models import Dashboard as _Dash
-    from app.modules.authentication.rbac import has_dashboard_access
+    # 2) Safe ORM read in independent session; return plain dict
     try:
+        from app.db.session import async_session as _async_session
+        from app.modules.charts.models import Dashboard as _Dash
+        from app.modules.authentication.rbac import has_dashboard_access
+
         async with _async_session() as sdb:
             res = await sdb.execute(select(_Dash).options(selectinload(_Dash.widgets)).where(_Dash.id == dashboard_id))
             row_obj = res.scalar_one_or_none()
@@ -987,7 +980,6 @@ async def get_dashboard(
             if _env in ('development', 'dev', 'local', 'test') or os.getenv('PYTEST_CURRENT_TEST'):
                 return dashboard_data
 
-            # Production path: perform central permission check
             allowed = await has_dashboard_access(caller_payload, str(row_obj.id))
             if not allowed and not dashboard_data.get('is_public'):
                 raise HTTPException(status_code=403, detail="Access denied")
