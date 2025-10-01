@@ -3,6 +3,7 @@ import typing as t
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
+import os
 
 from app.modules.authentication import Auth
 import logging
@@ -58,18 +59,20 @@ class JWTBearer(HTTPBearer):
             except Exception:
                 payload = {}
             # Development fallback: return unverified claims when signature
-            # cannot be validated (useful when auth-service uses a different
-            # secret in dev). This gives downstream code the expected payload.
+            # cannot be validated. Keep this limited and log a clear warning so
+            # it cannot be accidentally left enabled in CI/prod. We also allow
+            # explicit override via env var `ALLOW_UNVERIFIED_JWT_IN_DEV=true`.
             try:
                 from jose import jwt as jose_jwt
                 from app.core.config import settings
                 _env = str(getattr(settings, 'ENVIRONMENT', 'development')).strip().lower()
-                if _env in ('development', 'dev', 'local', 'test') and isinstance(credentials.credentials, str):
+                allow_unverified = str(os.getenv('ALLOW_UNVERIFIED_JWT_IN_DEV', 'false')).lower() == 'true'
+                if _env in ('development', 'dev', 'local', 'test') and allow_unverified and isinstance(credentials.credentials, str):
                     try:
                         u = jose_jwt.get_unverified_claims(credentials.credentials)
                         if isinstance(u, dict) and u:
                             try:
-                                logger.info(f"JWTBearer: returning unverified claims keys={list(u.keys())}")
+                                logger.warning("JWTBearer: returning unverified claims in development via ALLOW_UNVERIFIED_JWT_IN_DEV")
                             except Exception:
                                 pass
                             return u
