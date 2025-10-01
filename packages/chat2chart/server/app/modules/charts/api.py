@@ -1092,6 +1092,9 @@ async def update_dashboard(
                 except Exception:
                     # If this fast-path fails, fall back to the normal logic below
                     pass
+        except Exception:
+            # Outer fast-path guard: non-fatal, continue to next logic
+            pass
 
         # Simplified dev/test fast-path: when running in development/test mode
         # perform the update via the request-scoped `db` session to avoid
