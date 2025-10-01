@@ -933,58 +933,71 @@ async def get_dashboard(
         # If raw SQL path fails, fall back to safe ORM read
         pass
 
-    # 2) Safe ORM read in independent session; return plain dict
+    # 2) Fallback: perform raw SQL reads in an independent session to avoid
+    # returning ORM objects or attaching futures to other loops. This is a
+    # conservative, safe path suitable for tests and production when we simply
+    # need to read dashboard rows and widgets atomically.
     try:
         from app.db.session import async_session as _async_session
-        from app.modules.charts.models import Dashboard as _Dash
+        from sqlalchemy import text
         from app.modules.authentication.rbac import has_dashboard_access
 
         async with _async_session() as sdb:
-            # avoid importing selectinload at top; import locally
-            from sqlalchemy.orm import selectinload
-            res = await sdb.execute(select(_Dash).options(selectinload(_Dash.widgets)).where(_Dash.id == dashboard_id))
-            row_obj = res.scalar_one_or_none()
-            if not row_obj:
+            q = text(
+                "SELECT id, name, description, project_id, created_by, layout_config, theme_config, global_filters, refresh_interval, is_public, is_template, max_widgets, max_pages, created_at, updated_at FROM dashboards WHERE id = :did::uuid LIMIT 1"
+            )
+            res = await sdb.execute(q.bindparams(did=str(dashboard_id)))
+            row = res.first()
+            if not row:
+                q2 = text(
+                    "SELECT id, name, description, project_id, created_by, layout_config, theme_config, global_filters, refresh_interval, is_public, is_template, max_widgets, max_pages, created_at, updated_at FROM dashboards WHERE id::text = :did LIMIT 1"
+                )
+                res2 = await sdb.execute(q2.bindparams(did=str(dashboard_id)))
+                row = res2.first()
+
+            if not row:
                 raise HTTPException(status_code=404, detail="Dashboard not found")
 
             dashboard_data = {
-                "id": str(row_obj.id),
-                "name": row_obj.name,
-                "description": row_obj.description,
-                "project_id": row_obj.project_id,
-                "layout_config": row_obj.layout_config or {},
-                "theme_config": row_obj.theme_config or {},
-                "global_filters": row_obj.global_filters or {},
-                "refresh_interval": row_obj.refresh_interval or 300,
-                "is_public": bool(row_obj.is_public),
-                "is_template": bool(row_obj.is_template) if row_obj.is_template is not None else False,
-                "created_by": str(row_obj.created_by) if row_obj.created_by is not None else None,
-                "max_widgets": int(row_obj.max_widgets) if row_obj.max_widgets is not None else 10,
-                "max_pages": int(row_obj.max_pages) if row_obj.max_pages is not None else 5,
-                "created_at": row_obj.created_at.isoformat() if row_obj.created_at else None,
-                "updated_at": row_obj.updated_at.isoformat() if row_obj.updated_at else None,
-                "widgets": []
+                'id': str(row[0]),
+                'name': row[1],
+                'description': row[2],
+                'project_id': row[3],
+                'created_by': str(row[4]) if row[4] else None,
+                'layout_config': row[5] or {},
+                'theme_config': row[6] or {},
+                'global_filters': row[7] or {},
+                'refresh_interval': row[8] or 300,
+                'is_public': bool(row[9]),
+                'is_template': bool(row[10]),
+                'max_widgets': int(row[11]) if row[11] is not None else 10,
+                'max_pages': int(row[12]) if row[12] is not None else 5,
+                'created_at': row[13].isoformat() if row[13] else None,
+                'updated_at': row[14].isoformat() if row[14] else None,
+                'widgets': []
             }
 
-            for widget in (row_obj.widgets or []):
-                dashboard_data["widgets"].append({
-                    "id": str(widget.id),
-                    "title": widget.title,
-                    "type": widget.widget_type if hasattr(widget, 'widget_type') else getattr(widget, 'type', None),
-                    "config": widget.config or {},
-                    "position": getattr(widget, 'position', {}) or {},
-                    "size": getattr(widget, 'size', {}) or {},
-                    "created_at": widget.created_at.isoformat() if widget.created_at else None,
-                    "updated_at": widget.updated_at.isoformat() if widget.updated_at else None,
+            wq = text("SELECT id, name, widget_type, chart_type, config, data_config, style_config, x, y, width, height, z_index, created_at, updated_at FROM dashboard_widgets WHERE dashboard_id = :did AND is_deleted = false ORDER BY id")
+            wres = await sdb.execute(wq.bindparams(did=str(dashboard_id)))
+            for wrow in wres.fetchall():
+                dashboard_data['widgets'].append({
+                    'id': str(wrow[0]),
+                    'title': wrow[1],
+                    'type': wrow[2] or None,
+                    'config': wrow[4] or {},
+                    'position': {'x': wrow[7] or 0, 'y': wrow[8] or 0},
+                    'size': {'width': wrow[9] or 4, 'height': wrow[10] or 3},
+                    'created_at': wrow[12].isoformat() if wrow[12] else None,
+                    'updated_at': wrow[13].isoformat() if wrow[13] else None,
                 })
 
             _env = str(getattr(settings, 'ENVIRONMENT', 'development')).strip().lower()
             if _env in ('development', 'dev', 'local', 'test') or os.getenv('PYTEST_CURRENT_TEST'):
                 return dashboard_data
 
-            allowed = await has_dashboard_access(caller_payload, str(row_obj.id))
+            allowed = await has_dashboard_access(caller_payload, dashboard_data['id'])
             if not allowed and not dashboard_data.get('is_public'):
-                raise HTTPException(status_code=403, detail="Access denied")
+                raise HTTPException(status_code=403, detail='Access denied')
 
             return dashboard_data
     except HTTPException:
