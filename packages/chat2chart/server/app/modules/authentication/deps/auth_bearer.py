@@ -173,19 +173,9 @@ class JWTCookieBearer(HTTPBearer):
         try:
             payload = Auth().decodeJWT(token)
             if isinstance(payload, dict) and payload:
-                    # If token contains legacy numeric `user_id`, resolve to canonical UUID
-                    try:
-                        maybe = payload.get('user_id') or payload.get('id') or payload.get('sub')
-                        if maybe and str(maybe).isdigit():
-                            from app.db.session import async_session as _async_session
-                            from sqlalchemy import text as _text
-                            async with _async_session() as sdb:
-                                res = await sdb.execute(_text("SELECT id FROM users WHERE legacy_id = :lid LIMIT 1").bindparams(lid=int(maybe)))
-                                row = res.first()
-                                if row and row[0]:
-                                    payload['id'] = str(row[0])
-                    except Exception:
-                        pass
+                    # After migration we prefer canonical UUIDs; do not attempt
+                    # to resolve legacy integer ids here. Downstream helpers will
+                    # resolve identity via email/username when needed.
                     return payload
         except Exception:
             payload = {}

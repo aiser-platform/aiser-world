@@ -832,11 +832,7 @@ class DashboardService:
                         # continue to check numeric legacy id
                         pass
 
-                # If numeric (int or digit-string), try to find matching user by legacy_id
-                legacy_val = int(user_id) if not isinstance(user_id, uuid.UUID) else None
-            except Exception:
+                # We only support explicit UUID resolution here. Do not attempt
+                # fallback to legacy integer ids. If execution reaches this
+                # point without returning, there is no valid UUID to return.
                 return None
-
-            # We only support explicit UUID resolution here. If execution reaches
-            # this point without returning, there is no valid UUID to return.
-            return None
