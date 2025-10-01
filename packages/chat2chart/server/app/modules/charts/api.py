@@ -897,40 +897,41 @@ async def get_dashboard(
     # 1) Try raw SQL fast path (tolerant)
     try:
         from sqlalchemy import text
-        async with async_session() as sdb:
-            q = text(
-                "SELECT id, name, description, project_id, created_by, layout_config, theme_config, global_filters, refresh_interval, is_public, is_template, max_widgets, max_pages, created_at, updated_at FROM dashboards WHERE id = (:did)::uuid LIMIT 1"
+        # Use the injected session `db` synchronously within this request to
+        # avoid starting concurrent operations on other connections.
+        q = text(
+            "SELECT id, name, description, project_id, created_by, layout_config, theme_config, global_filters, refresh_interval, is_public, is_template, max_widgets, max_pages, created_at, updated_at FROM dashboards WHERE id = (:did)::uuid LIMIT 1"
+        )
+        res = await db.execute(q, {"did": str(dashboard_id)})
+        row = res.first()
+        if not row:
+            q2 = text(
+                "SELECT id, name, description, project_id, created_by, layout_config, theme_config, global_filters, refresh_interval, is_public, is_template, max_widgets, max_pages, created_at, updated_at FROM dashboards WHERE id::text = :did LIMIT 1"
             )
-            res = await sdb.execute(q, {"did": str(dashboard_id)})
-            row = res.first()
-            if not row:
-                q2 = text(
-                    "SELECT id, name, description, project_id, created_by, layout_config, theme_config, global_filters, refresh_interval, is_public, is_template, max_widgets, max_pages, created_at, updated_at FROM dashboards WHERE id::text = :did LIMIT 1"
-                )
-                res2 = await sdb.execute(q2, {"did": str(dashboard_id)})
-                row = res2.first()
+            res2 = await db.execute(q2, {"did": str(dashboard_id)})
+            row = res2.first()
 
-            if row:
-                return {
-                    'id': str(row[0]),
-                    'name': row[1],
-                    'description': row[2],
-                    'project_id': row[3],
-                    'created_by': str(row[4]) if row[4] else None,
-                    'layout_config': row[5] or {},
-                    'theme_config': row[6] or {},
-                    'global_filters': row[7] or {},
-                    'refresh_interval': row[8] or 300,
-                    'is_public': bool(row[9]),
-                    'is_template': bool(row[10]),
-                    'max_widgets': int(row[11]) if row[11] is not None else 10,
-                    'max_pages': int(row[12]) if row[12] is not None else 5,
-                    'created_at': row[13].isoformat() if row[13] else None,
-                    'updated_at': row[14].isoformat() if row[14] else None,
-                    'widgets': []
-                }
+        if row:
+            return {
+                'id': str(row[0]),
+                'name': row[1],
+                'description': row[2],
+                'project_id': row[3],
+                'created_by': str(row[4]) if row[4] else None,
+                'layout_config': row[5] or {},
+                'theme_config': row[6] or {},
+                'global_filters': row[7] or {},
+                'refresh_interval': row[8] or 300,
+                'is_public': bool(row[9]),
+                'is_template': bool(row[10]),
+                'max_widgets': int(row[11]) if row[11] is not None else 10,
+                'max_pages': int(row[12]) if row[12] is not None else 5,
+                'created_at': row[13].isoformat() if row[13] else None,
+                'updated_at': row[14].isoformat() if row[14] else None,
+                'widgets': []
+            }
     except Exception:
-        # If raw SQL path fails, fall back to safe ORM read
+        # If raw SQL path fails, fall back to safe ORM/raw reads below
         pass
 
     # 2) Fallback: perform raw SQL reads in an independent session to avoid
