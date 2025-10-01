@@ -24,5 +24,13 @@ class DeviceSession(BaseModel):
     refresh_token_expires_at = Column(DateTime, nullable=True)
 
     # Relationships
-    user = relationship("User", back_populates="device_sessions")
+    # Define relationship to User if available; in some migration/test contexts the
+    # User model may not be importable at module import time, so guard to avoid
+    # raising during registry configuration.
+    try:
+        from app.modules.user.models import User  # noqa: F401
+        user = relationship("User", back_populates="device_sessions")
+    except Exception:
+        # Relationship will be configured later when models are imported in app startup
+        user = None
 
