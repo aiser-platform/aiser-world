@@ -57,7 +57,9 @@ class AuthService:
                     logger.warning("persist_refresh_token called without resolvable user_id; skipping persist")
                     return None
 
-                rt = RefreshToken(user_id=uid_val, token=token, expires_at=expires_at, revoked=False)
+                # Ensure token is stored as text (asyncpg errors on bytes)
+                token_val = token.decode('utf-8') if isinstance(token, (bytes, bytearray)) else str(token)
+                rt = RefreshToken(user_id=uid_val, token=token_val, expires_at=expires_at, revoked=False)
                 db.add(rt)
                 await db.flush()
                 await db.refresh(rt)
