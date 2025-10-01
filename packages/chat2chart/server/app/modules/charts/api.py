@@ -998,12 +998,6 @@ async def get_dashboard(
     except Exception as e:
         logger.exception(f"get_dashboard fallback error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get dashboard: {str(e)}")
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"❌ Failed to get dashboard {dashboard_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to get dashboard: {str(e)}")
 
 
 @router.put("/dashboards/{dashboard_id}", response_model=DashboardResponseSchema)
