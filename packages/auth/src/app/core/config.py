@@ -43,6 +43,11 @@ class Settings(BaseSettings):
     def SQLALCHEMY_DATABASE_URI(self) -> str:
         return f"postgresql+psycopg2://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
 
+    @property
+    def SYNC_DATABASE_URI(self) -> str:
+        # Provide a sync URI alias used by migration helpers
+        return self.SQLALCHEMY_DATABASE_URI
+
     # Security Settings
     SECRET_KEY: str = os.getenv(
         "SECRET_KEY", "9e25a2588fcee7d21ea15fb1a63d5135"
