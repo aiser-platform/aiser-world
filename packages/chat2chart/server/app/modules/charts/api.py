@@ -907,7 +907,7 @@ async def get_dashboard(
                 q2 = text(
                     "SELECT id, name, description, project_id, created_by, layout_config, theme_config, global_filters, refresh_interval, is_public, is_template, max_widgets, max_pages, created_at, updated_at FROM dashboards WHERE id::text = :did LIMIT 1"
                 )
-                    res2 = await sdb.execute(q2, {"did": str(dashboard_id)})
+                res2 = await sdb.execute(q2, {"did": str(dashboard_id)})
                 row = res2.first()
 
             if row:
