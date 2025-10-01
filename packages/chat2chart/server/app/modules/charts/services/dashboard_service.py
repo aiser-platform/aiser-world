@@ -5,6 +5,7 @@ Replaces mock data with actual database queries
 
 import logging
 from typing import Dict, List, Any, Optional
+import asyncio
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete, and_, or_, insert
@@ -27,11 +28,15 @@ from fastapi import HTTPException
 
 logger = logging.getLogger(__name__)
 
+# Global lock to serialize some DB operations and avoid asyncpg concurrent-operation errors
+_db_op_lock = asyncio.Lock()
+
 class DashboardService:
     """Service for dashboard operations with real database queries"""
     
     def __init__(self, db_session: AsyncSession):
         self.db = db_session
+        self._op_lock = _db_op_lock
     
     async def list_dashboards(
         self,
@@ -77,8 +82,13 @@ class DashboardService:
             
             # Get paginated results
             query = query.order_by(Dashboard.updated_at.desc()).offset(offset).limit(limit)
-            result = await self.db.execute(query)
-            dashboards = result.scalars().all()
+            # Prefer using a per-session lock if available to serialize
+            # operations on the same connection; otherwise fall back to the
+            # global lock.
+            sess_lock = getattr(self.db, '_op_lock', None) or self._op_lock
+            async with sess_lock:
+                result = await self.db.execute(query)
+                dashboards = result.scalars().all()
             
             # Convert to response format
             dashboard_list = []
@@ -125,8 +135,10 @@ class DashboardService:
                 selectinload(Dashboard.widgets)
             ).where(Dashboard.id == dashboard_id)
             
-            result = await self.db.execute(query)
-            dashboard = result.scalar_one_or_none()
+            sess_lock = getattr(self.db, '_op_lock', None) or self._op_lock
+            async with sess_lock:
+                result = await self.db.execute(query)
+                dashboard = result.scalar_one_or_none()
             
             if not dashboard:
                 raise HTTPException(status_code=404, detail="Dashboard not found")
@@ -286,19 +298,19 @@ class DashboardService:
                 )
                 # Use an independent session for the insert/commit to avoid "another operation in progress"
                 from app.db.session import async_session as _async_session
-                async with _async_session() as sdb:
-                    await sdb.execute(ins)
-                    await sdb.commit()
-
-                # Load inserted row using a fresh select in a new session (avoid mixing)
-                async with _async_session() as sdb2:
-                    res = await sdb2.execute(select(Dashboard).where(Dashboard.id == dash_id))
+                # Insert using the request session inside the op lock to ensure
+                # visibility without creating a new session if possible.
+                sess_lock = getattr(self.db, '_op_lock', None) or self._op_lock
+                async with sess_lock:
+                    await self.db.execute(ins)
+                    await self.db.flush()
+                    # Load the inserted row from the same session to avoid
+                    # cross-session object sharing
+                    res = await self.db.execute(select(Dashboard).where(Dashboard.id == dash_id))
                     row_obj = res.scalar_one_or_none()
                     if not row_obj:
                         raise Exception('Inserted dashboard not found')
 
-                    # Build a plain serializable dict to avoid returning ORM objects bound
-                    # to a different session/loop which causes "different loop" errors.
                     dashboard = {
                         'id': str(row_obj.id),
                         'name': row_obj.name,
@@ -317,6 +329,7 @@ class DashboardService:
                         'updated_at': row_obj.updated_at.isoformat() if row_obj.updated_at else None,
                         'widgets': []
                     }
+                    await self.db.commit()
                     return dashboard
 
             except Exception:

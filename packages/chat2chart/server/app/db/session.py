@@ -63,6 +63,15 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
     """
     async with async_session() as session:
         try:
+            # attach a per-session lock to serialize operations on this
+            # session when needed to avoid asyncpg "another operation in
+            # progress" errors caused by overlapping awaits on the same
+            # connection.
+            try:
+                import asyncio as _asyncio
+                session._op_lock = _asyncio.Lock()
+            except Exception:
+                session._op_lock = None
             yield session
         except Exception:
             await session.rollback()

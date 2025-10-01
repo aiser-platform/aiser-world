@@ -30,6 +30,21 @@ from fastapi import APIRouter, Depends, HTTPException, Body, UploadFile, File, R
 import os
 from typing import Optional
 from app.db.session import async_session
+from contextlib import asynccontextmanager
+
+
+@asynccontextmanager
+async def use_session(db: AsyncSession | None):
+    """Yield provided AsyncSession or a new session from the factory.
+
+    This helper ensures request handlers use the request-scoped `db`
+    when available and fall back to creating a new session otherwise.
+    """
+    if db is not None:
+        yield db
+    else:
+        async with async_session() as s:
+            yield s
 from app.modules.user.models import User
 from app.modules.authentication.rbac import has_dashboard_access, is_project_owner, has_org_role
 
