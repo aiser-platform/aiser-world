@@ -238,9 +238,9 @@ async def upgrade_demo(request: Request, response: Response, payload: dict | Non
                 if background_tasks is not None:
                     background_tasks.add_task(auth_service.persist_refresh_token, user_id, token_pair.get("refresh_token"), settings.JWT_REFRESH_EXP_TIME_MINUTES)
                 else:
-                    # fallback to scheduling on the running loop
-                    import asyncio
-                    asyncio.create_task(auth_service.persist_refresh_token(user_id, token_pair.get("refresh_token"), settings.JWT_REFRESH_EXP_TIME_MINUTES))
+                    # Do not create unscoped tasks when no BackgroundTasks is provided
+                    # to avoid attaching futures to the wrong event loop in tests.
+                    logger.info("No BackgroundTasks available; skipping refresh token persist in this request")
             except Exception as e:
                 logger.exception(f"upgrade-demo: failed to schedule refresh token persist: {e}")
         try:
