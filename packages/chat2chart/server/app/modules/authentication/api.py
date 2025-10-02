@@ -379,27 +379,27 @@ def provision_user(payload: dict = Body(...), x_internal_auth: str | None = Head
                 params = {"id": new_uuid, "username": (username or email.split('@')[0]), "email": email, "password": '', "is_active": True, "is_deleted": False}
 
             try:
-                res = conn.execute(upsert_sql, params)
-                prow = res.fetchone()
-                if prow and prow[0]:
-                    created_id = prow[0]
-                else:
-                    created_id = None
+                # perform upsert and ensure legacy_id persisted atomically
+                with conn.begin():
+                    res = conn.execute(upsert_sql, params)
+                    prow = res.fetchone()
+                    if prow and prow[0]:
+                        created_id = prow[0]
+                    else:
+                        created_id = None
+
+                    # If legacy_id was provided ensure it's persisted (use UPDATE ... WHERE email)
+                    if legacy_id_val is not None:
+                        upd_legacy = sa.text(
+                            "UPDATE users SET legacy_id = :legacy WHERE email = :email AND (legacy_id IS NULL OR legacy_id = '') RETURNING id"
+                        )
+                        resu2 = conn.execute(upd_legacy, {"legacy": legacy_id_val, "email": email})
+                        r2 = resu2.fetchone()
+                        if r2 and r2[0]:
+                            created_id = r2[0]
             except Exception as e:
                 logger.exception(f"Provision upsert failed: {e}")
                 created_id = None
-
-            # If legacy_id was provided but wasn't persisted (e.g., conflict path), ensure it's updated
-            try:
-                if legacy_id_val is not None:
-                    upd_legacy = sa.text("UPDATE users SET legacy_id = :legacy WHERE email = :email AND (legacy_id IS NULL OR legacy_id = '') RETURNING id")
-                    resu2 = conn.execute(upd_legacy, {"legacy": legacy_id_val, "email": email})
-                    r2 = resu2.fetchone()
-                    if r2 and r2[0]:
-                        created_id = r2[0]
-            except Exception:
-                # best-effort
-                pass
 
             # Persist last demo user uuid in app state for test-token mapping
             try:
