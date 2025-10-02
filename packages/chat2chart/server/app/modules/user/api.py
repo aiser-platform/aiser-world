@@ -21,6 +21,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse  # type: ignore[reportMissingImports]
 import inspect
 from typing import Any
+import logging
 
 
 async def _maybe_await(value: Any):
@@ -32,6 +33,7 @@ from app.core.config import settings
 
 router = APIRouter()
 service = UserService()
+logger = logging.getLogger(__name__)
 
 
 @router.get("/", response_model=ListResponseSchema[UserResponse])
@@ -136,6 +138,12 @@ async def update_user_profile(
     user via `UserService.get_me`.
     """
     try:
+        # Log incoming auth info for debugging (helps diagnose 401 on PUT)
+        try:
+            logger.info(f"update_user_profile called with payload_type={type(payload)} payload_keys={list(payload.keys()) if isinstance(payload, dict) else None} cookies={list(request.cookies.keys()) if request else None} auth_header_present={bool(request.headers.get('Authorization')) if request else None}")
+        except Exception:
+            pass
+
         # If dependency returned a decoded payload dict, prefer that (avoids extra lookups)
         if isinstance(payload, dict):
             uid = payload.get('id') or payload.get('user_id') or payload.get('sub')
