@@ -107,14 +107,22 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         """
         try:
             query = self._build_base_query().where(self.model.id == id)
-            # Serialize DB operations to avoid asyncpg concurrent-operation conflicts
-            from app.db.session import async_operation_lock
-            if db is not None:
-                result = await db.execute(query)
-                return result.scalar_one_or_none()
-            async with async_operation_lock:
-                result = await self.db.execute(query)
-                return result.scalar_one_or_none()
+            # Retry on transient asyncpg "another operation in progress" errors
+            import asyncio
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    if db is not None:
+                        result = await db.execute(query)
+                    else:
+                        result = await self.db.execute(query)
+                    return result.scalar_one_or_none()
+                except Exception as e:
+                    msg = str(e).lower()
+                    if any(substr in msg for substr in ("another operation is in progress", "cannot perform operation", "attached to a different loop")) and attempt < max_retries - 1:
+                        await asyncio.sleep(0.05 * (2 ** attempt))
+                        continue
+                    raise
         except Exception as e:
             raise e
 
