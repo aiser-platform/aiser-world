@@ -8,7 +8,7 @@ import time
 def test_profile_update_and_create_data_source():
     client = TestClient(app)
 
-    # Use upgrade-demo helper to obtain a dev JWT (enabled in development)
+    # Ensure a user record exists in DB for this demo user (internal dev provision)
     user = {
         "user_id": "6",
         "username": "admin1",
@@ -18,6 +18,11 @@ def test_profile_update_and_create_data_source():
         "roles": ["member"],
         "provider": "internal",
     }
+    prov_payload = {"id": "6", "email": user["email"], "username": user["username"]}
+    prov = client.post('/internal/provision-user', json=prov_payload, headers={'X-Internal-Auth': 'dev-internal-secret'})
+    assert prov.status_code == 200
+
+    # Use upgrade-demo helper to obtain a dev JWT (enabled in development)
     demo_token = "demo_token_6_1758623524.282077"
     r = client.post("/auth/upgrade-demo", json={"demo_token": demo_token, "user": urllib.parse.quote(json.dumps(user))})
     assert r.status_code == 200
@@ -28,12 +33,6 @@ def test_profile_update_and_create_data_source():
 
     client.cookies.set("c2c_access_token", access, path="/")
     time.sleep(0.1)
-
-    # Get profile
-    # Ensure a user record exists in DB for this demo user (internal dev provision)
-    prov_payload = {"id": "6", "email": user["email"], "username": user["username"]}
-    prov = client.post('/internal/provision-user', json=prov_payload, headers={'X-Internal-Auth': 'dev-internal-secret'})
-    assert prov.status_code == 200
 
     # Use the real access_token returned earlier to authenticate subsequent calls
     client.cookies.set("c2c_access_token", access, path='/')
