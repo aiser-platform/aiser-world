@@ -238,8 +238,8 @@ async def get_me(token: str = TokenDep):
 # removed duplicate handler that depended on `current_user_payload` to avoid
 # conflicting route registration and unwanted duplicate DB lookups.
 
-@router.put("/profile", response_model=UserResponse)
-async def update_user_profile(user_update: UserUpdate, request: Request):
+@router.put("/profile_legacy", response_model=UserResponse)
+async def update_user_profile_legacy(user_update: UserUpdate, request: Request):
     """Update current user profile.
 
     For in-process tests (PYTEST_CURRENT_TEST) we perform the update synchronously
