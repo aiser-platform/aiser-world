@@ -105,9 +105,24 @@ class AsyncDatabaseSession:
         """Execute a query using a new session"""
         async with self._session_factory() as session:
             try:
-                result = await session.execute(query)
-                await session.commit()
-                return result
+                # attach per-session op lock if not present
+                try:
+                    if not getattr(session, '_op_lock', None):
+                        import asyncio as _asyncio
+
+                        session._op_lock = _asyncio.Lock()
+                except Exception:
+                    session._op_lock = None
+
+                if getattr(session, '_op_lock', None):
+                    async with session._op_lock:
+                        result = await session.execute(query)
+                        await session.commit()
+                        return result
+                else:
+                    result = await session.execute(query)
+                    await session.commit()
+                    return result
             except Exception:
                 await session.rollback()
                 raise
@@ -116,10 +131,25 @@ class AsyncDatabaseSession:
         """Add an object to the database"""
         async with self._session_factory() as session:
             try:
-                session.add(obj)
-                await session.commit()
-                await session.refresh(obj)
-                return obj
+                try:
+                    if not getattr(session, '_op_lock', None):
+                        import asyncio as _asyncio
+
+                        session._op_lock = _asyncio.Lock()
+                except Exception:
+                    session._op_lock = None
+
+                if getattr(session, '_op_lock', None):
+                    async with session._op_lock:
+                        session.add(obj)
+                        await session.commit()
+                        await session.refresh(obj)
+                        return obj
+                else:
+                    session.add(obj)
+                    await session.commit()
+                    await session.refresh(obj)
+                    return obj
             except Exception:
                 await session.rollback()
                 raise
@@ -128,9 +158,23 @@ class AsyncDatabaseSession:
         """Delete an object from the database"""
         async with self._session_factory() as session:
             try:
-                await session.delete(obj)
-                await session.commit()
-                return True
+                try:
+                    if not getattr(session, '_op_lock', None):
+                        import asyncio as _asyncio
+
+                        session._op_lock = _asyncio.Lock()
+                except Exception:
+                    session._op_lock = None
+
+                if getattr(session, '_op_lock', None):
+                    async with session._op_lock:
+                        await session.delete(obj)
+                        await session.commit()
+                        return True
+                else:
+                    await session.delete(obj)
+                    await session.commit()
+                    return True
             except Exception:
                 await session.rollback()
                 raise
