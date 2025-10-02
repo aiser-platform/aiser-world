@@ -79,13 +79,38 @@ class UserService(BaseService[User, UserCreate, UserUpdate, UserResponse]):
             else:
                 normalized_id = user_id
 
-            user = await self.repository.get(normalized_id)
-            # Fallback: if not found and we were given a numeric id, try legacy_id lookup
-            if not user and isinstance(normalized_id, int):
+            # If numeric id, try async repo get first; if async errors or no result, fall back to sync lookup by legacy_id
+            if isinstance(normalized_id, int):
                 try:
-                    user = await self.repository.get_by_legacy_id(normalized_id)
+                    user = await self.repository.get(normalized_id)
                 except Exception:
                     user = None
+
+                if not user:
+                    # Use sync engine to lookup legacy_id to avoid asyncpg concurrent-operation issues
+                    try:
+                        from app.db.session import get_sync_engine
+                        conn = get_sync_engine().connect()
+                        try:
+                            q = sa.text("SELECT id, legacy_id, username, email, first_name, last_name, phone, bio, avatar, website, location, timezone, onboarding_data, onboarding_completed_at, password, is_active, created_at, updated_at, deleted_at, is_deleted FROM users WHERE legacy_id = :legacy LIMIT 1")
+                            res = conn.execute(q, {"legacy": normalized_id})
+                            row = res.fetchone()
+                            if row:
+                                # Map row to a User-like dict
+                                data = dict(row._mapping) if hasattr(row, '_mapping') else dict(row)
+                                # Normalize id to string
+                                data['id'] = str(data.get('id'))
+                                return UserResponse(**data)
+                        finally:
+                            try:
+                                conn.close()
+                            except Exception:
+                                pass
+                    except Exception:
+                        pass
+                return UserResponse(**user.__dict__) if user else None
+
+            user = await self.repository.get(normalized_id)
             return UserResponse(**user.__dict__) if user else None
         except Exception as e:
             logger.exception(f"Failed to get user {user_id}: {e}")
