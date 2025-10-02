@@ -328,6 +328,32 @@ class UserService(BaseService[User, UserCreate, UserUpdate, UserResponse]):
             if not user_id:
                 raise HTTPException(status_code=401, detail="Invalid token payload: missing user id")
 
+            # If payload contains a legacy numeric id, try to resolve canonical UUID synchronously
+            try:
+                import uuid as _uuid
+                # if user_id not a UUID string, attempt legacy mapping
+                try:
+                    _uuid.UUID(str(user_id))
+                    is_uuid = True
+                except Exception:
+                    is_uuid = False
+
+                if not is_uuid:
+                    try:
+                        from app.db.session import get_sync_engine
+                        eng = get_sync_engine()
+                        with eng.connect() as conn:
+                            q = sa.text("SELECT id FROM users WHERE legacy_id = :legacy LIMIT 1")
+                            res = conn.execute(q, {"legacy": int(user_id)})
+                            r = res.fetchone()
+                            if r and r[0]:
+                                user_id = str(r[0])
+                    except Exception:
+                        # ignore and continue with original user_id
+                        pass
+            except Exception:
+                pass
+
             user = await self.get_user(user_id)
             if not user:
                 raise HTTPException(status_code=404, detail="User not found")
