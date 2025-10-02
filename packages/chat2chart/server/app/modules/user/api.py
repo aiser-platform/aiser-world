@@ -128,7 +128,7 @@ async def get_user_profile(payload: dict = Depends(JWTCookieBearer())):
 async def update_user_profile(
     user_update: UserUpdate,
     payload: dict = Depends(JWTCookieBearer()),
-    request: Request | None = None,
+    request: Optional[Request] = None,
 ):
     """Update current user profile.
 
