@@ -67,8 +67,8 @@ class JWTBearer(HTTPBearer):
             try:
                 from jose import jwt as jose_jwt
                 from app.core.config import settings
-                _env = str(getattr(settings, 'ENVIRONMENT', 'development')).strip().lower()
-                allow_unverified = bool(getattr(settings, 'ALLOW_UNVERIFIED_JWT_IN_DEV', False))
+                _env = str(getattr(settings, 'ENVIRONMENT', os.getenv('ENVIRONMENT', 'development'))).strip().lower()
+                allow_unverified = bool(getattr(settings, 'ALLOW_UNVERIFIED_JWT_IN_DEV', False)) or os.getenv('ALLOW_UNVERIFIED_JWT_IN_DEV', '').lower() == 'true'
                 if _env in ('development', 'dev', 'local', 'test') and allow_unverified and isinstance(credentials.credentials, str):
                     try:
                         u = jose_jwt.get_unverified_claims(credentials.credentials)
@@ -147,8 +147,8 @@ class JWTCookieBearer(HTTPBearer):
         if not token:
             try:
                 from app.core.config import settings
-                _env = str(getattr(settings, 'ENVIRONMENT', 'development')).strip().lower()
-                allow_bypass = bool(getattr(settings, 'ALLOW_DEV_AUTH_BYPASS', False))
+                _env = str(getattr(settings, 'ENVIRONMENT', os.getenv('ENVIRONMENT', 'development'))).strip().lower()
+                allow_bypass = bool(getattr(settings, 'ALLOW_DEV_AUTH_BYPASS', False)) or os.getenv('ALLOW_DEV_AUTH_BYPASS', '').lower() == 'true'
                 if _env in ('development', 'dev', 'local', 'test') and allow_bypass:
                     logger.warning("JWTCookieBearer: returning minimal payload due to ALLOW_DEV_AUTH_BYPASS=true")
                     return {'id': 1}
@@ -167,8 +167,9 @@ class JWTCookieBearer(HTTPBearer):
             # permissive auth path don't fail due to strict token checks.
             try:
                 from app.core.config import settings
-                _env = str(getattr(settings, 'ENVIRONMENT', 'development')).strip().lower()
-                if _env in ('development', 'dev', 'local', 'test') and isinstance(token, str):
+                _env = str(getattr(settings, 'ENVIRONMENT', os.getenv('ENVIRONMENT', 'development'))).strip().lower()
+                allow_unverified = bool(getattr(settings, 'ALLOW_UNVERIFIED_JWT_IN_DEV', False)) or os.getenv('ALLOW_UNVERIFIED_JWT_IN_DEV', '').lower() == 'true'
+                if _env in ('development', 'dev', 'local', 'test') and isinstance(token, str) and allow_unverified:
                     # Try returning unverified claims so dev tokens from auth-service
                     # are usable even when secrets differ between services.
                     try:
