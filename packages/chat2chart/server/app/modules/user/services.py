@@ -80,6 +80,12 @@ class UserService(BaseService[User, UserCreate, UserUpdate, UserResponse]):
                 normalized_id = user_id
 
             user = await self.repository.get(normalized_id)
+            # Fallback: if not found and we were given a numeric id, try legacy_id lookup
+            if not user and isinstance(normalized_id, int):
+                try:
+                    user = await self.repository.get_by_legacy_id(normalized_id)
+                except Exception:
+                    user = None
             return UserResponse(**user.__dict__) if user else None
         except Exception as e:
             logger.exception(f"Failed to get user {user_id}: {e}")
