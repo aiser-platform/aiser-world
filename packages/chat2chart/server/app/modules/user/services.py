@@ -343,9 +343,29 @@ class UserService(BaseService[User, UserCreate, UserUpdate, UserResponse]):
                 # If email present, try async email lookup
                 try:
                     if email:
-                        user = await self.repository.get_by_email(email)
-                        if user:
-                            return user
+                        # First try async repository lookup
+                        try:
+                            user = await self.repository.get_by_email(email)
+                            if user:
+                                return user
+                        except Exception:
+                            # Fall back to a synchronous lookup using sync engine to avoid asyncpg session conflicts
+                            try:
+                                from app.db.session import get_sync_engine
+                                eng = get_sync_engine()
+                                with eng.connect() as conn:
+                                    q = sa.text(
+                                        "SELECT id, legacy_id, username, email, first_name, last_name, phone, bio, avatar, website, location, timezone, onboarding_data, onboarding_completed_at, password, is_active, created_at, updated_at, deleted_at, is_deleted FROM users WHERE email = :email LIMIT 1"
+                                    )
+                                    res = conn.execute(q, {"email": email})
+                                    row = res.fetchone()
+                                    if row:
+                                        data = dict(row._mapping) if hasattr(row, '_mapping') else dict(row)
+                                        data['id'] = str(data.get('id'))
+                                        # Return a compatible response object
+                                        return UserResponse(**data)
+                            except Exception:
+                                pass
                 except Exception:
                     pass
 
