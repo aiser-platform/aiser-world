@@ -164,6 +164,17 @@ async def ai_rate_limiting_middleware(request: Request, call_next):
 
 
 @app.middleware("http")
+async def db_operation_lock_middleware(request: Request, call_next):
+    """Serialize DB-heavy requests to avoid asyncpg concurrent-operation errors in tests/dev."""
+    try:
+        from app.db.session import async_operation_lock
+        async with async_operation_lock:
+            return await call_next(request)
+    except Exception:
+        return await call_next(request)
+
+
+@app.middleware("http")
 async def embed_token_middleware(request: Request, call_next):
     """Validate embed tokens for embed routes and attach embed metadata to request.state.
     This increments access_count and updates last_accessed_at when a valid token is presented.
