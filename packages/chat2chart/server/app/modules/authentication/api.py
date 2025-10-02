@@ -390,8 +390,9 @@ def provision_user(payload: dict = Body(...), x_internal_auth: str | None = Head
 
                     # If legacy_id was provided ensure it's persisted (use UPDATE ... WHERE email)
                     if legacy_id_val is not None:
+                        # Only set legacy_id where it is NULL to avoid type comparison issues
                         upd_legacy = sa.text(
-                            "UPDATE users SET legacy_id = :legacy WHERE email = :email AND (legacy_id IS NULL OR legacy_id = '') RETURNING id"
+                            "UPDATE users SET legacy_id = :legacy WHERE email = :email AND legacy_id IS NULL RETURNING id"
                         )
                         resu2 = conn.execute(upd_legacy, {"legacy": legacy_id_val, "email": email})
                         r2 = resu2.fetchone()
