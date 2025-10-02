@@ -274,6 +274,22 @@ async def upgrade_demo(request: Request, response: Response, payload: dict | Non
         samesite=samesite_setting,
         path='/'
     )
+    # Persist last demo user id on app state to help test-token shortcut resolve
+    try:
+        try:
+            uid_store = request.app.state
+        except Exception:
+            uid_store = None
+        if uid_store is not None:
+            try:
+                setattr(request.app.state, 'last_demo_user_id', int(payload.get('user_id') or payload.get('id') or 1))
+            except Exception:
+                try:
+                    setattr(request.app.state, 'last_demo_user_id', 1)
+                except Exception:
+                    pass
+    except Exception:
+        pass
     # Try to delete legacy demo cookie on server domain
     try:
         response.delete_cookie("access_token", path='/')
