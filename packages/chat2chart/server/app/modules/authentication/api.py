@@ -290,7 +290,7 @@ async def upgrade_demo(request: Request, response: Response, payload: dict | Non
 
 
 @router.post("/internal/provision-user")
-async def provision_user(payload: dict = Body(...), x_internal_auth: str | None = Header(None)):
+def provision_user(payload: dict = Body(...), x_internal_auth: str | None = Header(None)):
     """Internal endpoint: provision or upsert a minimal user record in chat2chart DB.
 
     Expected payload: {"id": "<uuid>", "email": "...", "username": "...", "roles": [..]}
@@ -328,15 +328,15 @@ async def provision_user(payload: dict = Body(...), x_internal_auth: str | None 
             sync_engine_check = get_sync_engine()
             with sync_engine_check.connect() as conn_check:
                 try:
-                    sel = "SELECT id, username FROM users WHERE email = %s LIMIT 1"
-                    res = conn_check.execute(sel, (email,))
+                    sel = "SELECT id, username FROM users WHERE email = :email LIMIT 1"
+                    res = conn_check.execute(sa.text(sel), {"email": email})
                     row = res.fetchone()
                     if row and row[0]:
                         existing_id = row[0]
                         if username:
                             try:
-                                upd = "UPDATE users SET username = %s WHERE email = %s"
-                                conn_check.execute(upd, (username, email))
+                                upd = "UPDATE users SET username = :username WHERE email = :email"
+                                conn_check.execute(sa.text(upd), {"username": username, "email": email})
                             except Exception:
                                 pass
                         return {"created": False, "id": str(existing_id)}
@@ -409,17 +409,15 @@ async def provision_user(payload: dict = Body(...), x_internal_auth: str | None 
                         if legacy_id_val is not None and legacy_col:
                             ins_values['legacy_id'] = legacy_id_val
 
-                    # Use an upsert to avoid duplicate email insert errors when provisioning is retried
-                    # Use raw SQL upsert to avoid SQLAlchemy dialect compatibility issues
+                    # Use an upsert with named params to avoid SQLAlchemy dialect issues
                     cols = ','.join(ins_values.keys())
-                    params = ','.join(['%s'] * len(ins_values))
+                    params = ','.join([f":{k}" for k in ins_values.keys()])
                     upsert_sql = (
                         f"INSERT INTO users ({cols}) VALUES ({params}) "
                         f"ON CONFLICT (email) DO UPDATE SET username = EXCLUDED.username RETURNING id"
                     )
-                    vals = tuple(ins_values[k] for k in ins_values.keys())
                     try:
-                        resu = conn.execute(upsert_sql, vals)
+                        resu = conn.execute(sa.text(upsert_sql), ins_values)
                         rrow = resu.fetchone()
                         if rrow and rrow[0]:
                             existing_id = rrow[0]
@@ -447,7 +445,7 @@ async def provision_user(payload: dict = Body(...), x_internal_auth: str | None 
                 trans2 = conn2.begin()
                 try:
                     # Try select by slug
-                    res = conn2.execute("SELECT id FROM organizations WHERE slug = %s LIMIT 1", (slug_val,))
+                    res = conn2.execute(sa.text("SELECT id FROM organizations WHERE slug = :slug LIMIT 1"), {"slug": slug_val})
                     row = res.fetchone()
                     if row and row[0]:
                         default_org_id = row[0]
@@ -455,7 +453,7 @@ async def provision_user(payload: dict = Body(...), x_internal_auth: str | None 
                         name_base = payload.get('default_org', {}).get('name') or 'Default Organization'
                         if name_base == 'Default Organization':
                             name_base = f"Default Organization {slug_val.split('-')[-1]}"
-                        res2 = conn2.execute("SELECT id FROM organizations WHERE name = %s LIMIT 1", (name_base,))
+                        res2 = conn2.execute(sa.text("SELECT id FROM organizations WHERE name = :name LIMIT 1"), {"name": name_base})
                         rn = res2.fetchone()
                         if rn and rn[0]:
                             default_org_id = rn[0]
@@ -463,35 +461,28 @@ async def provision_user(payload: dict = Body(...), x_internal_auth: str | None 
                             ins = (
                                 "WITH ins AS ("
                                 " INSERT INTO organizations (name, slug, description, is_active, is_deleted, plan_type, max_projects, created_at, updated_at)"
-                                " VALUES (%s, %s, %s, %s, %s, %s, %s, now(), now()) RETURNING id)"
-                                " SELECT id FROM ins UNION SELECT id FROM organizations WHERE slug = %s LIMIT 1"
+                                " VALUES (:name, :slug, :desc, :is_active, :is_deleted, :plan_type, :max_projects, now(), now()) RETURNING id)"
+                                " SELECT id FROM ins UNION SELECT id FROM organizations WHERE slug = :slug LIMIT 1"
                             )
-                            pres = conn2.execute(ins, (name_base, slug_val, 'Your default organization', True, False, 'free', 1, slug_val))
+                            pres = conn2.execute(sa.text(ins), {"name": name_base, "slug": slug_val, "desc": 'Your default organization', "is_active": True, "is_deleted": False, "plan_type": 'free', "max_projects": 1})
                             prow = pres.fetchone()
                             default_org_id = prow[0] if prow and prow[0] else None
 
                     if default_org_id:
                         proj_ins = (
                             "INSERT INTO projects (name, description, organization_id, created_by, is_public, is_active, created_at, updated_at) "
-                            "VALUES (%s, %s, %s, %s, %s, %s, now(), now()) RETURNING id"
+                            "VALUES (:name, :desc, :org_id, :created_by, :is_public, :is_active, now(), now()) RETURNING id"
                         )
-                        presp = conn2.execute(proj_ins, (
-                            payload.get('default_project', {}).get('name', 'Default Project'),
-                            payload.get('default_project', {}).get('description', 'Auto-created default project for user'),
-                            default_org_id,
-                            str(new_uuid),
-                            False,
-                            True,
-                        ))
+                        presp = conn2.execute(sa.text(proj_ins), {"name": payload.get('default_project', {}).get('name', 'Default Project'), "desc": payload.get('default_project', {}).get('description', 'Auto-created default project for user'), "org_id": default_org_id, "created_by": str(new_uuid), "is_public": False, "is_active": True})
                         prow = presp.fetchone()
                         project_id = prow[0] if prow and prow[0] else None
                         # ensure membership exists
                         ou_ins = (
                             "INSERT INTO user_organizations (id, organization_id, user_id, role, is_active) "
-                            "SELECT gen_random_uuid(), %s, %s, 'owner', true "
-                            "WHERE NOT EXISTS (SELECT 1 FROM user_organizations WHERE organization_id = %s AND user_id::text = %s)"
+                            "SELECT gen_random_uuid(), :org_id, :user_id::uuid, 'owner', true "
+                            "WHERE NOT EXISTS (SELECT 1 FROM user_organizations WHERE organization_id = :org_id AND user_id::text = :user_id)"
                         )
-                        conn2.execute(ou_ins, (default_org_id, str(new_uuid), default_org_id, str(new_uuid)))
+                        conn2.execute(sa.text(ou_ins), {"org_id": default_org_id, "user_id": str(new_uuid)})
                     trans2.commit()
                 except Exception as e:
                     try:
