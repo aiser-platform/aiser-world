@@ -369,26 +369,48 @@ async def provision_user(payload: dict = Body(...), x_internal_auth: str | None 
             with sync_engine.connect() as conn:
                 trans = conn.begin()
                 try:
+                    # Detect id column type and whether legacy_id exists
+                    try:
+                        id_col = conn.execute(
+                            "SELECT data_type, udt_name FROM information_schema.columns WHERE table_name='users' AND column_name='id'"
+                        ).fetchone()
+                    except Exception:
+                        id_col = None
+                    try:
+                        legacy_col = conn.execute(
+                            "SELECT column_name FROM information_schema.columns WHERE table_name='users' AND column_name='legacy_id'"
+                        ).fetchone()
+                    except Exception:
+                        legacy_col = None
+
+                    id_is_uuid = False
+                    if id_col:
+                        # udt_name == 'uuid' or data_type contains 'uuid'
+                        udt = id_col[1] or ''
+                        dt = id_col[0] or ''
+                        if 'uuid' in udt.lower() or 'uuid' in dt.lower():
+                            id_is_uuid = True
+
+                    # Build insert values depending on id type
                     ins_values = {
-                        'id': new_uuid,
                         'username': (username or email.split('@')[0]),
                         'email': email,
                         'password': '',
                         'is_active': True,
                         'is_deleted': False,
                     }
-                    # Add legacy_id only if the column exists in current DB
-                    try:
-                        col_check = conn.execute("SELECT column_name FROM information_schema.columns WHERE table_name='users' AND column_name='legacy_id'")
-                        has_legacy = col_check.fetchall()
-                    except Exception:
-                        has_legacy = []
-                    if legacy_id_val is not None and has_legacy:
-                        ins_values['legacy_id'] = legacy_id_val
-                    # Use raw SQL insert to ensure compatibility
-                    conn.execute(
-                        ChatUser.__table__.insert().values(**ins_values)
-                    )
+
+                    if id_is_uuid:
+                        ins_values['id'] = new_uuid
+                        # include legacy_id if column exists
+                        if legacy_id_val is not None and legacy_col:
+                            ins_values['legacy_id'] = legacy_id_val
+                    else:
+                        # id is integer serial: store legacy_id if available so we can map
+                        if legacy_id_val is not None and legacy_col:
+                            ins_values['legacy_id'] = legacy_id_val
+
+                    conn.execute(ChatUser.__table__.insert().values(**ins_values))
                     trans.commit()
                 except Exception as e:
                     try:
@@ -401,79 +423,71 @@ async def provision_user(payload: dict = Body(...), x_internal_auth: str | None 
             logger.exception(f"Provision: unexpected error during sync insert: {e}")
             return {"created": False, "id": None}
 
-        # 4) Create or lookup default organization and project and membership in separate sessions
+        # 4) Create or lookup default organization and project and membership using sync SQL
         try:
-            from sqlalchemy import text as _text
+            from app.db.session import get_sync_engine
+            sync_engine2 = get_sync_engine()
             slug_val = f"default-organization-{str(new_uuid)[:8]}"
-
-            async with async_session() as sdb2:
+            with sync_engine2.connect() as conn2:
+                trans2 = conn2.begin()
                 try:
-                    # Safe org upsert: select by slug then insert via CTE returning id
-                    sel = _text("SELECT id FROM organizations WHERE slug = :slug LIMIT 1")
-                    pres = await sdb2.execute(sel.bindparams(slug=slug_val))
-                    row = pres.first()
+                    # Try select by slug
+                    res = conn2.execute("SELECT id FROM organizations WHERE slug = %s LIMIT 1", (slug_val,))
+                    row = res.fetchone()
                     if row and row[0]:
                         default_org_id = row[0]
                     else:
-                        # Also check by name to avoid name-unique violations; generate a unique default name
-                        # using the slug suffix for uniqueness
                         name_base = payload.get('default_org', {}).get('name') or 'Default Organization'
                         if name_base == 'Default Organization':
                             name_base = f"Default Organization {slug_val.split('-')[-1]}"
-                        sel_by_name = _text("SELECT id FROM organizations WHERE name = :name LIMIT 1")
-                        pres_name = await sdb2.execute(sel_by_name.bindparams(name=name_base))
-                        row_name = pres_name.first()
-                        if row_name and row_name[0]:
-                            default_org_id = row_name[0]
+                        res2 = conn2.execute("SELECT id FROM organizations WHERE name = %s LIMIT 1", (name_base,))
+                        rn = res2.fetchone()
+                        if rn and rn[0]:
+                            default_org_id = rn[0]
                         else:
-                            ins = _text(
-                            "WITH ins AS ("
-                            " INSERT INTO organizations (name, slug, description, is_active, is_deleted, plan_type, max_projects, created_at, updated_at)"
-                            " VALUES (:name, :slug, :desc, :is_active, :is_deleted, :plan_type, :max_projects, now(), now())"
-                            " RETURNING id)"
-                            " SELECT id FROM ins UNION SELECT id FROM organizations WHERE slug = :slug LIMIT 1"
-                        )
-                            pres2 = await sdb2.execute(ins.bindparams(
-                                name=name_base,
-                                slug=slug_val,
-                                desc='Your default organization',
-                                is_active=True,
-                                is_deleted=False,
-                                plan_type='free',
-                                max_projects=1,
-                            ))
-                            prow = pres2.first()
+                            ins = (
+                                "WITH ins AS ("
+                                " INSERT INTO organizations (name, slug, description, is_active, is_deleted, plan_type, max_projects, created_at, updated_at)"
+                                " VALUES (%s, %s, %s, %s, %s, %s, %s, now(), now()) RETURNING id)"
+                                " SELECT id FROM ins UNION SELECT id FROM organizations WHERE slug = %s LIMIT 1"
+                            )
+                            pres = conn2.execute(ins, (name_base, slug_val, 'Your default organization', True, False, 'free', 1, slug_val))
+                            prow = pres.fetchone()
                             default_org_id = prow[0] if prow and prow[0] else None
-                    # create project under that org
+
                     if default_org_id:
-                        proj_ins = _text(
+                        proj_ins = (
                             "INSERT INTO projects (name, description, organization_id, created_by, is_public, is_active, created_at, updated_at) "
-                            "VALUES (:name, :desc, :org_id, (:created_by)::uuid, :is_public, :is_active, now(), now()) RETURNING id"
+                            "VALUES (%s, %s, %s, %s, %s, %s, now(), now()) RETURNING id"
                         )
-                        presp = await sdb2.execute(proj_ins.bindparams(
-                            name=payload.get('default_project', {}).get('name', 'Default Project'),
-                            desc=payload.get('default_project', {}).get('description', 'Auto-created default project for user'),
-                            org_id=default_org_id,
-                            created_by=str(new_uuid),
-                            is_public=False,
-                            is_active=True,
+                        presp = conn2.execute(proj_ins, (
+                            payload.get('default_project', {}).get('name', 'Default Project'),
+                            payload.get('default_project', {}).get('description', 'Auto-created default project for user'),
+                            default_org_id,
+                            str(new_uuid),
+                            False,
+                            True,
                         ))
-                        await sdb2.commit()
+                        prow = presp.fetchone()
+                        project_id = prow[0] if prow and prow[0] else None
                         # ensure membership exists
-                        ou_ins = _text(
+                        ou_ins = (
                             "INSERT INTO user_organizations (id, organization_id, user_id, role, is_active) "
-                            "SELECT gen_random_uuid(), :org_id, (:user_id)::uuid, 'owner', true "
-                            "WHERE NOT EXISTS (SELECT 1 FROM user_organizations WHERE organization_id = :org_id AND user_id::text = :user_id)"
+                            "SELECT gen_random_uuid(), %s, %s, 'owner', true "
+                            "WHERE NOT EXISTS (SELECT 1 FROM user_organizations WHERE organization_id = %s AND user_id::text = %s)"
                         )
-                        await sdb2.execute(ou_ins.bindparams(org_id=default_org_id, user_id=str(new_uuid)))
-                        await sdb2.commit()
+                        conn2.execute(ou_ins, (default_org_id, str(new_uuid), default_org_id, str(new_uuid)))
+                    trans2.commit()
                 except Exception as e:
                     try:
-                        await sdb2.rollback()
+                        trans2.rollback()
                     except Exception:
                         pass
-                    logger.exception(f"Provision (sdb2): failed creating project/membership: {e}")
+                    logger.exception(f"Provision (sync): failed creating project/membership: {e}")
                     default_org_id = None
+        except Exception as e:
+            logger.exception(f"Provision: unexpected sync error creating defaults: {e}")
+            default_org_id = None
         except Exception as e:
             # best-effort; don't block provisioning
             logger.exception(f"Provision: failed creating defaults: {e}")
