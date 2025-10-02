@@ -174,8 +174,19 @@ async def update_user_profile(
                     else:
                         token = authh
 
-        current_user = await service.get_me(token or payload)
-        return await service.update(current_user.id, user_update)
+        # Resolve current user and perform async update
+        try:
+            current_user = await service.get_me(token or payload)
+            return await service.update(current_user.id, user_update)
+        except Exception as exc:
+            # Print exception details and full traceback to container stdout for debugging
+            try:
+                import traceback
+                print('update_user_profile: exception during get_me/update:', str(exc), flush=True)
+                traceback.print_exc()
+            except Exception:
+                pass
+            raise
     except HTTPException as e:
         raise e
     except Exception as e:
