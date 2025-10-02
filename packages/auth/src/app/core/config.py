@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings
+from pydantic import ConfigDict
 from typing import Dict
 from functools import lru_cache
 import os
@@ -70,9 +71,15 @@ class Settings(BaseSettings):
     SMTP_PORT: int = os.getenv("SMTP_PORT", 587)
     SMTP_SENDER: str = os.getenv("SMTP_SENDER", "Hello AISER")
 
-    class Config:
-        case_sensitive = True
-        env_file = ".env"
+    # Use pydantic v2 model_config to allow ignoring extra environment
+    # variables that may be present in developer machines (e.g. cloud
+    # provider secrets). This prevents `extra_forbidden` validation
+    # errors when running tests or local tools.
+    model_config = ConfigDict(
+        case_sensitive=True,
+        env_file=".env",
+        extra="ignore",
+    )
 
 
 @lru_cache

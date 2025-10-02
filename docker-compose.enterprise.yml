@@ -219,7 +219,7 @@ services:
   # Authentication Service (Enterprise Grade)
   auth-service:
     build:
-      context: ./packages/auth-service
+      context: ./packages/auth
       dockerfile: Dockerfile.enterprise
     container_name: aiser-auth-enterprise
     environment:
@@ -244,7 +244,7 @@ services:
     ports:
       - "${AUTH_PORT:-5000}:5000"
     volumes:
-      - ./packages/auth-service:/app
+      - ./packages/auth:/app
       - ./config/auth/saml:/app/config/saml
     depends_on:
       postgres:
@@ -257,14 +257,15 @@ services:
       - aiser-external
     command: >
       bash -c "
-        echo '🚀 Starting Authentication Service...' &&
-        python -m gunicorn main:app 
-        --bind 0.0.0.0:5000 
-        --workers 2 
-        --worker-class uvicorn.workers.UvicornWorker 
-        --timeout 30 
-        --access-logfile - 
-        --error-logfile -
+        echo '🚀 Starting Authentication Service (enterprise)...' &&
+        python scripts/setup_enterprise_database.py || true &&
+        gunicorn src.app.main:app \
+          --bind 0.0.0.0:5000 \
+          --workers 2 \
+          --worker-class uvicorn.workers.UvicornWorker \
+          --timeout 30 \
+          --access-logfile - \
+          --error-logfile -
       "
 
   # Nginx Reverse Proxy (Enterprise Grade)

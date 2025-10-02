@@ -816,7 +816,16 @@ async def create_dashboard(
         # Use service to create dashboard with full resolution logic
         try:
             dashboard_service = DashboardService(db)
-            created = await dashboard_service.create_dashboard(dash_model, user_id)
+            try:
+                from app.modules.charts.services.dashboard_service import _db_op_lock as _global_lock
+            except Exception:
+                _global_lock = None
+            sess_lock = getattr(db, '_op_lock', None) or _global_lock
+            if sess_lock is None:
+                created = await dashboard_service.create_dashboard(dash_model, user_id)
+            else:
+                async with sess_lock:
+                    created = await dashboard_service.create_dashboard(dash_model, user_id)
             return {"success": True, "dashboard": created, "id": created.get("id")}
         except Exception as e:
             logger.exception('Failed creating dashboard via service')

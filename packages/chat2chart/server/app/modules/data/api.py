@@ -21,6 +21,34 @@ from .services.real_cube_integration_service import RealCubeIntegrationService
 from .services.multi_engine_query_service import MultiEngineQueryService, QueryEngine
 from .services.enterprise_connectors_service import EnterpriseConnectorsService, ConnectionConfig, ConnectorType
 from .services.yaml_schema_service import YAMLSchemaService
+from app.modules.authentication import rbac as auth_rbac
+from fastapi import Request, Depends
+
+
+async def verify_project_access(request: Request, organization_id: str, project_id: str) -> bool:
+    """Dependency: verify caller has access to organization/project (owner/admin/member).
+
+    Reads Authorization header (Bearer token) and checks RBAC helpers.
+    """
+    auth_header = request.headers.get("authorization") or request.headers.get("Authorization")
+    if not auth_header:
+        raise HTTPException(status_code=401, detail="Missing authorization header")
+    token = auth_header.split(" ", 1)[1] if auth_header.lower().startswith("bearer ") else auth_header
+
+    # Allow project owners or org owners/admins
+    try:
+        if await auth_rbac.is_project_owner(token, int(project_id)):
+            return True
+
+        if await auth_rbac.has_org_role(token, int(organization_id), ["owner", "admin", "member"]):
+            return True
+
+        raise HTTPException(status_code=403, detail="Forbidden: insufficient permissions")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"RBAC check failed: {e}")
+        raise HTTPException(status_code=500, detail="RBAC verification failed")
 
 logger = logging.getLogger(__name__)
 
@@ -223,12 +251,17 @@ async def get_project_data_sources(
 async def create_project_data_source(
     organization_id: str,
     project_id: str,
-    request: DataSourceCreateRequest
+    request: DataSourceCreateRequest,
+    request_obj: Request
 ):
     """Create a new data source for a specific project"""
     try:
         logger.info(f"📊 Creating data source for project {project_id} in organization {organization_id}")
         
+        # RBAC: ensure caller has access to create data source for this project
+        # (owner/admin/member allowed). Use the incoming Request for auth header.
+        await verify_project_access(request_obj, organization_id, project_id)
+
         result = await data_service.create_project_data_source(
             organization_id=organization_id,
             project_id=project_id,

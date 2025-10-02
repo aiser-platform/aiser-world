@@ -362,31 +362,44 @@ async def provision_user(payload: dict = Body(...), x_internal_auth: str | None 
             legacy_id_val = None
             new_uuid = _uuid.uuid4()
 
-        # 3) Insert user in its own session to avoid cross-transaction side-effects
-        async with async_session() as sdb:
-            try:
-                ins_values = {
-                    'id': new_uuid,
-                    'username': (username or email.split('@')[0]),
-                    'email': email,
-                    'password': '',
-                    'created_at': sa.func.now(),
-                    'updated_at': sa.func.now(),
-                    'is_active': True,
-                    'is_deleted': False,
-                }
-                if legacy_id_val is not None:
-                    ins_values['legacy_id'] = legacy_id_val
-                ins = ChatUser.__table__.insert().values(**ins_values)
-                await sdb.execute(ins)
-                await sdb.commit()
-            except Exception as e:
+        # 3) Insert user synchronously to avoid asyncpg concurrent-operation issues
+        try:
+            from app.db.session import get_sync_engine
+            sync_engine = get_sync_engine()
+            with sync_engine.connect() as conn:
+                trans = conn.begin()
                 try:
-                    await sdb.rollback()
-                except Exception:
-                    pass
-                logger.exception(f"Provision: failed inserting user: {e}")
-                return {"created": False, "id": None}
+                    ins_values = {
+                        'id': new_uuid,
+                        'username': (username or email.split('@')[0]),
+                        'email': email,
+                        'password': '',
+                        'is_active': True,
+                        'is_deleted': False,
+                    }
+                    # Add legacy_id only if the column exists in current DB
+                    try:
+                        col_check = conn.execute("SELECT column_name FROM information_schema.columns WHERE table_name='users' AND column_name='legacy_id'")
+                        has_legacy = col_check.fetchall()
+                    except Exception:
+                        has_legacy = []
+                    if legacy_id_val is not None and has_legacy:
+                        ins_values['legacy_id'] = legacy_id_val
+                    # Use raw SQL insert to ensure compatibility
+                    conn.execute(
+                        ChatUser.__table__.insert().values(**ins_values)
+                    )
+                    trans.commit()
+                except Exception as e:
+                    try:
+                        trans.rollback()
+                    except Exception:
+                        pass
+                    logger.exception(f"Provision: failed inserting user (sync): {e}")
+                    return {"created": False, "id": None}
+        except Exception as e:
+            logger.exception(f"Provision: unexpected error during sync insert: {e}")
+            return {"created": False, "id": None}
 
         # 4) Create or lookup default organization and project and membership in separate sessions
         try:

@@ -1,6 +1,7 @@
 from typing import List, Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete
+from sqlalchemy import select, update, delete, cast
+from sqlalchemy import String
 
 from app.common.repository import BaseRepository
 from app.modules.projects.models import (
@@ -26,7 +27,8 @@ class ProjectRepository(BaseRepository[Project, ProjectCreate, ProjectUpdate]):
     async def get_user_projects(self, user_id: str, db: AsyncSession) -> List[Project]:
         """Get all projects for a specific user"""
         try:
-            # Normalize user_id to integer when possible to avoid SQL type-mismatch
+            # Normalize user_id: if it can be coerced to int we'll preserve numeric value
+            # but compare against Project.created_by as a string to avoid UUID vs int SQL errors.
             try:
                 uid = int(user_id)
             except Exception:
@@ -34,10 +36,16 @@ class ProjectRepository(BaseRepository[Project, ProjectCreate, ProjectUpdate]):
 
             # Get projects where user is owner or has access
             if uid is not None:
-                query = select(Project).where((Project.created_by == uid) | (Project.is_public))
+                # Compare created_by (UUID) as string to avoid operator mismatches
+                uid_str = str(uid)
+                query = select(Project).where((cast(Project.created_by, String) == uid_str) | (Project.is_public))
             else:
-                # fallback: only public projects if we can't coerce the id
-                query = select(Project).where(Project.is_public)
+                # If user_id isn't numeric, compare directly as string where possible
+                try:
+                    query = select(Project).where((cast(Project.created_by, String) == str(user_id)) | (Project.is_public))
+                except Exception:
+                    # fallback: only public projects if comparison is unsafe
+                    query = select(Project).where(Project.is_public)
             result = await db.execute(query)
             return result.scalars().all()
         except Exception as e:

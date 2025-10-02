@@ -20,6 +20,7 @@ from app.db.session import get_async_session
 from app.modules.data.models import DataSource, DataQuery, DataConnection
 from app.modules.projects.models import Organization, Project
 from app.core.real_data_sources import real_data_source_manager
+from app.modules.data.utils.credentials import encrypt_credentials
 
 logger = logging.getLogger(__name__)
 
@@ -84,12 +85,19 @@ class DataSourcesCRUD:
             if getattr(data_source_data, 'description', None):
                 metadata['description'] = data_source_data.description
 
+            # Encrypt sensitive fields in connection_config before storing
+            conn_cfg = data_source_data.connection_config or {}
+            try:
+                conn_cfg = encrypt_credentials(conn_cfg)
+            except Exception:
+                conn_cfg = data_source_data.connection_config or {}
+
             data_source = DataSource(
                 id=data_source_id,
                 name=data_source_data.name,
                 type=data_source_data.type,
                 format=data_source_data.format,
-                connection_config=data_source_data.connection_config or {},
+                connection_config=conn_cfg,
                 metadata=json.dumps(metadata) if metadata else None,
                 user_id=user_id,
                 tenant_id=data_source_data.organization_id,

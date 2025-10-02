@@ -111,6 +111,8 @@ class Settings(BaseSettings):
     ALLOW_UNVERIFIED_JWT_IN_DEV: bool = os.getenv("ALLOW_UNVERIFIED_JWT_IN_DEV", "false").lower() == "true"
     # ALLOW_DEV_AUTH_BYPASS: if true, allow permissive dev auth fallbacks (e.g., missing cookie -> minimal payload)
     ALLOW_DEV_AUTH_BYPASS: bool = os.getenv("ALLOW_DEV_AUTH_BYPASS", "true").lower() == "true"
+    # Skip persisting refresh tokens (useful for tests to avoid DB concurrency)
+    SKIP_PERSIST_REFRESH: bool = os.getenv("SKIP_PERSIST_REFRESH", "true").lower() == "true"
 
     # Enterprise Settings (with defaults)
     AISER_DEPLOYMENT_MODE: str = os.getenv("AISER_DEPLOYMENT_MODE", "development")

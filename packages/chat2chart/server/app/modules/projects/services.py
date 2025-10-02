@@ -249,8 +249,8 @@ class ProjectService(
 
             # Owner has access
             if (
-                str(project.created_by) == user_id
-            ):  # Changed from owner_id to created_by
+                str(project.created_by) == str(user_id)
+            ):  # Compare as strings to handle UUID vs integer ids
                 return True
 
             # Public projects are accessible to everyone
