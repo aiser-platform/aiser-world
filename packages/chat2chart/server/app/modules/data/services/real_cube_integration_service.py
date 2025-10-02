@@ -150,6 +150,10 @@ class RealCubeIntegrationService:
             if not direct_test["success"]:
                 return direct_test
 
+            # Decrypt credentials if encrypted
+            from app.modules.data.utils.credentials import decrypt_credentials
+            config = decrypt_credentials(config)
+
             # Create SQLAlchemy engine
             engine = await self._create_sqlalchemy_engine(config)
             if not engine:
@@ -532,17 +536,46 @@ class RealCubeIntegrationService:
                     database=config["database"],
                 )
 
-            # Create async engine
+            # Create async engine with connection pooling
+            # Cache engines per connection fingerprint to avoid recreating pools
+            conn_key = f"{db_type}://{config.get('host')}:{config.get('port')}@{config.get('database')}:{config.get('username')}"
+            if not hasattr(self, "_engine_cache"):
+                self._engine_cache = {}
+
+            # Reuse existing engine when possible
+            cached = self._engine_cache.get(conn_key)
+            if cached:
+                return cached
+
             engine = create_async_engine(
                 connection_string,
                 poolclass=QueuePool,
-                pool_size=5,
-                max_overflow=10,
+                pool_size=int(os.getenv("DB_POOL_SIZE", "5")),
+                max_overflow=int(os.getenv("DB_POOL_MAX_OVERFLOW", "10")),
                 pool_pre_ping=True,
                 echo=False,
             )
 
-            return engine
+            # simple retry with exponential backoff for engine connect/test
+            attempts = int(os.getenv("DB_ENGINE_CREATE_RETRIES", "3"))
+            delay = float(os.getenv("DB_ENGINE_RETRY_BASE_DELAY", "0.5"))
+            last_err = None
+            for attempt in range(1, attempts + 1):
+                try:
+                    # Test minimal connection
+                    ok = await self._test_sqlalchemy_engine(engine)
+                    if ok and ok.get("success"):
+                        # cache and return
+                        self._engine_cache[conn_key] = engine
+                        return engine
+                    last_err = ok.get("error") if isinstance(ok, dict) else "engine test failed"
+                except Exception as e:
+                    last_err = str(e)
+
+                await asyncio.sleep(delay * (2 ** (attempt - 1)))
+
+            logger.error(f"Failed to create/test engine after retries: {last_err}")
+            return None
 
         except Exception as e:
             logger.error(f"❌ SQLAlchemy engine creation failed: {str(e)}")
