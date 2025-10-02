@@ -156,8 +156,7 @@ async def update_user_profile(
         try:
             try:
                 fh = open('/tmp/update_profile_debug.log', 'a')
-                fh.write('--- REQUEST START ---
-')
+                fh.write('--- REQUEST START ---\n')
                 fh.write(f'payload_type={type(payload)}\n')
                 try:
                     fh.write(f'payload_keys={list(payload.keys()) if isinstance(payload, dict) else None}\n')
