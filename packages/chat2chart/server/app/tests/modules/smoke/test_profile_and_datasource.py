@@ -35,8 +35,8 @@ def test_profile_update_and_create_data_source():
     prov = client.post('/internal/provision-user', json=prov_payload, headers={'X-Internal-Auth': 'dev-internal-secret'})
     assert prov.status_code == 200
 
-    # For CI/dev stability use permissive test token accepted by JWTCookieBearer
-    client.cookies.set("c2c_access_token", 'test-token', path='/')
+    # Use the real access_token returned earlier to authenticate subsequent calls
+    client.cookies.set("c2c_access_token", access, path='/')
 
     getp = client.get("/users/profile")
     assert getp.status_code == 200
