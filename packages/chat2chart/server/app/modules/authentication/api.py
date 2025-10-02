@@ -274,7 +274,7 @@ async def upgrade_demo(request: Request, response: Response, payload: dict | Non
         samesite=samesite_setting,
         path='/'
     )
-    # Persist last demo user id on app state to help test-token shortcut resolve
+    # Persist last demo user identifier (string) on app state to help test-token shortcut resolve
     try:
         try:
             uid_store = request.app.state
@@ -282,10 +282,11 @@ async def upgrade_demo(request: Request, response: Response, payload: dict | Non
             uid_store = None
         if uid_store is not None:
             try:
-                setattr(request.app.state, 'last_demo_user_id', int(payload.get('user_id') or payload.get('id') or 1))
+                # user_id variable above is resolved to either numeric id or canonical UUID string
+                setattr(request.app.state, 'last_demo_user_uuid', str(user_id))
             except Exception:
                 try:
-                    setattr(request.app.state, 'last_demo_user_id', 1)
+                    setattr(request.app.state, 'last_demo_user_uuid', str(payload.get('user_id') or payload.get('id') or '1'))
                 except Exception:
                     pass
     except Exception:

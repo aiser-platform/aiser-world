@@ -120,15 +120,14 @@ class JWTCookieBearer(HTTPBearer):
         # Accept test-token shortcut used in many tests (returns permissive payload)
         if token == 'test-token':
             try:
-                # Prefer returning the last demo user id stored on the app (set by upgrade-demo)
                 app = request.app
-                last = getattr(app.state, 'last_demo_user_id', None)
-                if last:
-                    return {'id': last}
+                last_uuid = getattr(app.state, 'last_demo_user_uuid', None)
+                if last_uuid:
+                    # Return unverified payload consistent with other code paths
+                    return {'id': str(last_uuid), 'user_id': str(last_uuid), 'sub': str(last_uuid)}
             except Exception:
                 pass
-            # Fallback to id=1
-            return {'id': 1}
+            return {'id': 1, 'user_id': 1, 'sub': 1}
 
         # In development, tolerate missing tokens for test paths by returning a
         # minimal payload only when explicitly allowed via settings.ALLOW_DEV_AUTH_BYPASS.
