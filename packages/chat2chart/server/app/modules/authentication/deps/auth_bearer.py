@@ -7,6 +7,8 @@ import os
 
 from app.modules.authentication import Auth
 import logging
+import sqlalchemy as sa
+from app.db.session import get_async_session
 
 logger = logging.getLogger(__name__)
 
@@ -119,16 +121,22 @@ class JWTCookieBearer(HTTPBearer):
 
         # Accept test-token shortcut used in many tests (returns permissive payload)
         if token == 'test-token':
-            # Dev helper: resolve most-recently-created user id from DB and return as payload
+            # Dev helper: resolve most-recently-created user id from DB using async session
             try:
-                from app.db.session import get_sync_engine
-                eng = get_sync_engine()
-                with eng.connect() as conn:
-                    res = conn.execute(sa.text("SELECT id FROM users ORDER BY created_at DESC LIMIT 1"))
-                    row = res.fetchone()
-                    if row and row[0]:
-                        uid = str(row[0])
-                        return {'id': uid, 'user_id': uid, 'sub': uid}
+                async def _fetch_most_recent_user_id():
+                    async with get_async_session() as session:
+                        result = await session.execute(sa.text("SELECT id FROM users ORDER BY created_at DESC LIMIT 1"))
+                        return result.scalar_one_or_none()
+
+                uid_val = None
+                try:
+                    uid_val = await _fetch_most_recent_user_id()
+                except Exception:
+                    uid_val = None
+
+                if uid_val:
+                    uid = str(uid_val)
+                    return {'id': uid, 'user_id': uid, 'sub': uid}
             except Exception:
                 pass
             # Last-resort fallback
@@ -252,13 +260,11 @@ async def current_user_payload(request: Request) -> dict:
         # Resolve most-recent user id from DB when possible, otherwise fall back to legacy '6'.
         if token == 'test-token':
             try:
-                from app.db.session import get_sync_engine
-                eng = get_sync_engine()
-                with eng.connect() as conn:
-                    res = conn.execute(sa.text("SELECT id FROM users ORDER BY created_at DESC LIMIT 1"))
-                    row = res.fetchone()
-                    if row and row[0]:
-                        uid = str(row[0])
+                async with get_async_session() as session:
+                    result = await session.execute(sa.text("SELECT id FROM users ORDER BY created_at DESC LIMIT 1"))
+                    uid_val = result.scalar_one_or_none()
+                    if uid_val:
+                        uid = str(uid_val)
                         return {'id': uid, 'user_id': uid, 'sub': uid}
             except Exception:
                 pass
