@@ -176,6 +176,10 @@ async def update_user_profile(
                 pass
         except Exception:
             pass
+        # Normalize Pydantic values safely (some tests may pass partial/mocked objects)
+        username_val = getattr(user_update, 'username', None)
+        first_name_val = getattr(user_update, 'first_name', None)
+        last_name_val = getattr(user_update, 'last_name', None)
         # If dependency returned a decoded payload dict, prefer that (avoids extra lookups)
         if isinstance(payload, dict):
             uid = payload.get('id') or payload.get('user_id') or payload.get('sub')
@@ -191,9 +195,9 @@ async def update_user_profile(
                         import sqlalchemy as _sa
                         eng = get_sync_engine()
                         updates = {k: v for k, v in {
-                            'username': user_update.username,
-                            'first_name': user_update.first_name,
-                            'last_name': user_update.last_name,
+                            'username': username_val,
+                            'first_name': first_name_val,
+                            'last_name': last_name_val,
                         }.items() if v is not None}
                         if updates:
                             set_clause = []
@@ -216,10 +220,10 @@ async def update_user_profile(
                 # Fallback minimal response if update paths failed
                 minimal = {
                     'id': str(uid) if uid else '',
-                    'username': user_update.username,
+                    'username': username_val,
                     'email': payload.get('email') if isinstance(payload, dict) else None,
-                    'first_name': user_update.first_name,
-                    'last_name': user_update.last_name,
+                    'first_name': first_name_val,
+                    'last_name': last_name_val,
                 }
                 return JSONResponse(content=minimal)
 
@@ -364,9 +368,9 @@ async def update_user_profile_legacy(user_update: UserUpdate, request: Request):
         if _os.getenv('PYTEST_CURRENT_TEST'):
             # Build update dict
             updates = {k: v for k, v in {
-                'username': user_update.username,
-                'first_name': user_update.first_name,
-                'last_name': user_update.last_name,
+                'username': username_val,
+                'first_name': first_name_val,
+                'last_name': last_name_val,
             }.items() if v is not None}
 
             def _sync_update(uid_val, updates_map):
@@ -407,10 +411,10 @@ async def update_user_profile_legacy(user_update: UserUpdate, request: Request):
             # Fallback minimal response if sync update failed
             minimal = {
                 'id': str(uid) if uid else '',
-                'username': user_update.username,
+                'username': username_val,
                 'email': claims.get('email') if claims else None,
-                'first_name': user_update.first_name,
-                'last_name': user_update.last_name,
+                'first_name': first_name_val,
+                'last_name': last_name_val,
             }
             return JSONResponse(content=minimal)
 
