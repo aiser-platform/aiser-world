@@ -114,9 +114,14 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
                 try:
                     if db is not None:
                         result = await db.execute(query)
-                    else:
+                        return result.scalar_one_or_none()
+                    # serialize execution on the global async operation lock to avoid
+                    # asyncpg errors when multiple coroutines try to drive the same
+                    # connection pool concurrently in TestClient/in-process runs.
+                    from app.db.session import async_operation_lock
+                    async with async_operation_lock:
                         result = await self.db.execute(query)
-                    return result.scalar_one_or_none()
+                        return result.scalar_one_or_none()
                 except Exception as e:
                     msg = str(e).lower()
                     if any(substr in msg for substr in ("another operation is in progress", "cannot perform operation", "attached to a different loop")) and attempt < max_retries - 1:
