@@ -177,7 +177,8 @@ async def upgrade_demo(request: Request, response: Response, payload: dict | Non
     # Attempt to resolve the demo legacy id to the canonical UUID present in
     # this service's users table (chat2chart DB). Prefer email/username, then
     # legacy numeric id. This keeps the dev flow clean without adding new
-    # migration columns.
+    # migration columns. If a canonical UUID exists, issue the access token
+    # using that UUID so downstream services authenticate by canonical id.
     user_id = str(payload.get("user_id"))
     resolved_user_id = None
     try:
@@ -221,6 +222,21 @@ async def upgrade_demo(request: Request, response: Response, payload: dict | Non
 
     if resolved_user_id:
         user_id = resolved_user_id
+
+    # If we still only have a legacy numeric id, attempt a final sync-resolution
+    # to canonical UUID to prefer issuing tokens with canonical id.
+    if not (isinstance(user_id, str) and '-' in user_id):
+        try:
+            from app.db.session import get_sync_engine
+            eng = get_sync_engine()
+            with eng.connect() as conn:
+                q = sa.text("SELECT id FROM users WHERE email = :email OR legacy_id = :legacy LIMIT 1")
+                r = conn.execute(q, {"email": payload.get('email'), "legacy": user_id})
+                rr = r.fetchone()
+                if rr and rr[0]:
+                    user_id = str(rr[0])
+        except Exception:
+            pass
 
     claims = {"id": user_id, "user_id": user_id, "sub": user_id, "email": payload.get("email")}
     token_pair = Auth().signJWT(**claims)
