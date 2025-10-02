@@ -79,37 +79,30 @@ class UserService(BaseService[User, UserCreate, UserUpdate, UserResponse]):
             else:
                 normalized_id = user_id
 
-            # If numeric id, try async repo get first; if async errors or no result, fall back to sync lookup by legacy_id
+            # If numeric id, prefer sync legacy_id lookup first to avoid asyncpg session conflicts
             if isinstance(normalized_id, int):
                 try:
-                    user = await self.repository.get(normalized_id)
+                    from app.db.session import get_sync_engine
+                    eng = get_sync_engine()
+                    with eng.connect() as conn:
+                        q = sa.text(
+                            "SELECT id, legacy_id, username, email, first_name, last_name, phone, bio, avatar, website, location, timezone, onboarding_data, onboarding_completed_at, password, is_active, created_at, updated_at, deleted_at, is_deleted FROM users WHERE legacy_id = :legacy LIMIT 1"
+                        )
+                        res = conn.execute(q, {"legacy": normalized_id})
+                        row = res.fetchone()
+                        if row:
+                            data = dict(row._mapping) if hasattr(row, '_mapping') else dict(row)
+                            data['id'] = str(data.get('id'))
+                            return UserResponse(**data)
                 except Exception:
-                    user = None
-
-                if not user:
-                    # Use sync engine to lookup legacy_id to avoid asyncpg concurrent-operation issues
+                    # fall back to async repo get
                     try:
-                        from app.db.session import get_sync_engine
-                        conn = get_sync_engine().connect()
-                        try:
-                            q = sa.text("SELECT id, legacy_id, username, email, first_name, last_name, phone, bio, avatar, website, location, timezone, onboarding_data, onboarding_completed_at, password, is_active, created_at, updated_at, deleted_at, is_deleted FROM users WHERE legacy_id = :legacy LIMIT 1")
-                            res = conn.execute(q, {"legacy": normalized_id})
-                            row = res.fetchone()
-                            if row:
-                                # Map row to a User-like dict
-                                data = dict(row._mapping) if hasattr(row, '_mapping') else dict(row)
-                                # Normalize id to string
-                                data['id'] = str(data.get('id'))
-                                return UserResponse(**data)
-                        finally:
-                            try:
-                                conn.close()
-                            except Exception:
-                                pass
+                        user = await self.repository.get(normalized_id)
+                        return UserResponse(**user.__dict__) if user else None
                     except Exception:
-                        pass
-                return UserResponse(**user.__dict__) if user else None
+                        return None
 
+            # Non-numeric (UUID) path
             user = await self.repository.get(normalized_id)
             return UserResponse(**user.__dict__) if user else None
         except Exception as e:
