@@ -410,7 +410,10 @@ async def provision_user(payload: dict = Body(...), x_internal_auth: str | None 
                         if legacy_id_val is not None and legacy_col:
                             ins_values['legacy_id'] = legacy_id_val
 
-                    conn.execute(ChatUser.__table__.insert().values(**ins_values))
+                    # Use an upsert to avoid duplicate email insert errors when provisioning is retried
+                    insert_stmt = ChatUser.__table__.insert().values(**ins_values)
+                    upsert_stmt = insert_stmt.on_conflict_do_nothing(index_elements=['email'])
+                    conn.execute(upsert_stmt)
                     trans.commit()
                 except Exception as e:
                     try:
