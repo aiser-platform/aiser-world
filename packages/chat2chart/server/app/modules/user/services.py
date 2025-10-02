@@ -5,6 +5,7 @@ import uuid
 from app.common.service import BaseService
 from app.core.config import settings
 from app.modules.authentication.auth import Auth
+import sqlalchemy as sa
 from app.modules.authentication.schemas import (
     RefreshTokenRequest,
     RefreshTokenResponse,
