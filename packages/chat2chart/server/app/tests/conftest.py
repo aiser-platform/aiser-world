@@ -10,5 +10,8 @@ if server_root not in sys.path:
 
 # Indicate tests are running so runtime DDL helpers skip creating tables
 os.environ.setdefault('PYTEST_CURRENT_TEST', '1')
+# Allow dev bypasses/unverified JWT claims in tests
+os.environ.setdefault('ALLOW_UNVERIFIED_JWT_IN_DEV', 'true')
+os.environ.setdefault('ALLOW_DEV_AUTH_BYPASS', 'true')
 
 
