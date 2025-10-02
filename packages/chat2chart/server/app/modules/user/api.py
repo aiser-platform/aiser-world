@@ -13,6 +13,7 @@ from app.modules.authentication.deps.auth_bearer import (
     JWTCookieBearer,
     TokenDep,
     CookieDep,
+    current_user_payload,
 )
 from app.modules.user.schemas import UserCreate, UserResponse, UserUpdate
 from app.modules.user.services import UserService
@@ -145,10 +146,15 @@ async def get_me(token: str = TokenDep):
 
 # New API endpoints for settings
 @router.get("/profile", response_model=UserResponse)
-async def get_user_profile(token: str = Depends(JWTCookieBearer())):
-    """Get current user profile"""
+async def get_user_profile(payload: dict = Depends(current_user_payload)):
+    """Get current user profile. Accepts either a token string or a resolved payload dict."""
     try:
-        return await service.get_me(token)
+        # If payload is a dict with an id, fetch user by id
+        if isinstance(payload, dict) and (payload.get('id') or payload.get('user_id')):
+            uid = payload.get('id') or payload.get('user_id')
+            return await service.get_user(uid)
+        # Otherwise treat payload as token string and delegate to service.get_me
+        return await service.get_me(payload)
     except HTTPException as e:
         raise e
     except Exception as e:
@@ -159,16 +165,17 @@ async def get_user_profile(token: str = Depends(JWTCookieBearer())):
 @router.put("/profile", response_model=UserResponse)
 async def update_user_profile(
     user_update: UserUpdate,
-    token: str = Depends(JWTCookieBearer())
+    payload: dict = Depends(current_user_payload),
 ):
     """Update current user profile"""
     try:
-        # Get current user first
-        current_user = await service.get_me(token)
-
-        # Update user and ensure username is persisted when provided
-        updated_user = await service.update(current_user.id, user_update)
-        return updated_user
+        # Resolve current user id from payload dict or token
+        if isinstance(payload, dict) and (payload.get('id') or payload.get('user_id')):
+            uid = payload.get('id') or payload.get('user_id')
+            return await service.update(uid, user_update)
+        # Fallback: treat payload as token string
+        current_user = await service.get_me(payload)
+        return await service.update(current_user.id, user_update)
     except HTTPException as e:
         raise e
     except Exception as e:
