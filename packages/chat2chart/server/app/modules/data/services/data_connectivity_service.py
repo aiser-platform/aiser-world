@@ -2009,6 +2009,12 @@ class DataConnectivityService:
                     metadata.setdefault('description', data_source_data.get('description'))
 
                 connection_config = data_source_data.get('config') or {}
+                # Decrypt any encrypted credentials before using
+                try:
+                    from app.modules.data.utils.credentials import decrypt_credentials
+                    connection_config = decrypt_credentials(connection_config)
+                except Exception:
+                    pass
                 db_type = connection_config.get('type') or data_source_data.get('db_type')
 
                 data_source = DataSource(
