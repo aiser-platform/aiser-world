@@ -123,7 +123,7 @@ async def get_user_profile(payload: dict = Depends(JWTCookieBearer())):
 @router.put("/profile", response_model=UserResponse)
 async def update_user_profile(
     user_update: UserUpdate,
-    payload: dict = Depends(JWTCookieBearer()),
+    payload: dict = Depends(current_user_payload),
 ):
     """Update current user profile"""
     try:
