@@ -358,7 +358,11 @@ class UserService(BaseService[User, UserCreate, UserUpdate, UserResponse]):
                             user = await self.repository.get_by_email(email)
                             if user:
                                 return user
-                        except Exception:
+                        except Exception as e:
+                            try:
+                                print("get_me: async get_by_email raised:", e, flush=True)
+                            except Exception:
+                                pass
                             # Fall back to a synchronous lookup using sync engine to avoid asyncpg session conflicts
                             try:
                                 from app.db.session import get_sync_engine
@@ -374,8 +378,11 @@ class UserService(BaseService[User, UserCreate, UserUpdate, UserResponse]):
                                         data['id'] = str(data.get('id'))
                                         # Return a compatible response object
                                         return UserResponse(**data)
-                            except Exception:
-                                pass
+                            except Exception as e2:
+                                try:
+                                    print("get_me: sync fallback failed:", e2, flush=True)
+                                except Exception:
+                                    pass
                 except Exception:
                     pass
 
