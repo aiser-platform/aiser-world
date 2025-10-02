@@ -219,23 +219,9 @@ async def get_me(token: str = TokenDep):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
         )
 
-# New API endpoints for settings
-@router.get("/profile", response_model=UserResponse)
-async def get_user_profile(payload: dict = Depends(current_user_payload)):
-    """Get current user profile. Accepts either a token string or a resolved payload dict."""
-    try:
-        # If payload is a dict with an id, fetch user by id
-        if isinstance(payload, dict) and (payload.get('id') or payload.get('user_id')):
-            uid = payload.get('id') or payload.get('user_id')
-            return await service.get_user(uid)
-        # Otherwise treat payload as token string and delegate to service.get_me
-        return await service.get_me(payload)
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
-        )
+# NOTE: consolidated `/profile` endpoint above (depends on JWTCookieBearer) —
+# removed duplicate handler that depended on `current_user_payload` to avoid
+# conflicting route registration and unwanted duplicate DB lookups.
 
 @router.put("/profile", response_model=UserResponse)
 async def update_user_profile(
