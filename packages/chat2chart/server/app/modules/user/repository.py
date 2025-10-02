@@ -33,6 +33,17 @@ class UserRepository(BaseRepository[User, UserCreate, UserUpdate]):
         result = await self.db.execute(query)
         return result.scalars().first()
 
+    async def get_by_legacy_id(self, legacy_id: int) -> Optional[User]:
+        """
+        Get a user by legacy integer id (used during migrations/provisioning)
+
+        :param legacy_id: legacy integer id
+        :return: User instance or None
+        """
+        query = select(self.model).filter(self.model.legacy_id == legacy_id)
+        result = await self.db.execute(query)
+        return result.scalars().first()
+
     async def get_active_users(self, offset: int = 0, limit: int = 100) -> List[User]:
         """
         Get all active users with pagination
