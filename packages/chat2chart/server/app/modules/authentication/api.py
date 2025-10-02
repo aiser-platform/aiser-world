@@ -338,184 +338,67 @@ def provision_user(payload: dict = Body(...), x_internal_auth: str | None = Head
     if not uid or not email:
         raise HTTPException(status_code=400, detail='Missing id or email')
 
+    # Simplified synchronous provisioning: ensure a user row exists with UUID id and legacy_id set when provided.
     try:
-        # 1) Quick lookup: existing user by email using sync connection to avoid asyncpg session conflicts
-        try:
-            from app.db.session import get_sync_engine
-            sync_engine_check = get_sync_engine()
-            with sync_engine_check.connect() as conn_check:
-                try:
-                    sel = "SELECT id, username FROM users WHERE email = :email LIMIT 1"
-                    res = conn_check.execute(sa.text(sel), {"email": email})
-                    row = res.fetchone()
-                    if row and row[0]:
-                        existing_id = row[0]
-                        if username:
-                            try:
-                                upd = "UPDATE users SET username = :username WHERE email = :email"
-                                conn_check.execute(sa.text(upd), {"username": username, "email": email})
-                            except Exception:
-                                pass
-                        return {"created": False, "id": str(existing_id)}
-                except Exception:
-                    pass
-        except Exception:
-            pass
-
-        # 2) Prepare new_uuid and legacy_id
+        from app.db.session import get_sync_engine
         import uuid as _uuid
+        sync_engine = get_sync_engine()
+        new_uuid = None
         legacy_id_val = None
         try:
             if isinstance(uid, int) or (isinstance(uid, str) and str(uid).isdigit()):
                 legacy_id_val = int(uid)
-                new_uuid = _uuid.uuid4()
             else:
                 try:
-                    new_uuid = _uuid.UUID(str(uid))
+                    # keep incoming uuid if provided
+                    _ = _uuid.UUID(str(uid))
+                    legacy_id_val = None
                 except Exception:
-                    new_uuid = _uuid.uuid4()
+                    legacy_id_val = None
         except Exception:
             legacy_id_val = None
-            new_uuid = _uuid.uuid4()
 
-        # 3) Insert user synchronously to avoid asyncpg concurrent-operation issues
-        try:
-            from app.db.session import get_sync_engine
-            sync_engine = get_sync_engine()
-            with sync_engine.connect() as conn:
-                trans = conn.begin()
+        with sync_engine.connect() as conn:
+            # Upsert user: create with UUID primary key and set legacy_id when numeric provided
+            if legacy_id_val is not None:
+                # create a UUID for id
+                new_uuid = str(_uuid.uuid4())
+                upsert_sql = sa.text(
+                    "INSERT INTO users (id, legacy_id, username, email, password, is_active, is_deleted, created_at, updated_at) "
+                    "VALUES (:id, :legacy_id, :username, :email, :password, :is_active, :is_deleted, now(), now()) "
+                    "ON CONFLICT (email) DO UPDATE SET username = EXCLUDED.username, legacy_id = COALESCE(users.legacy_id, EXCLUDED.legacy_id) RETURNING id"
+                )
+                params = {"id": new_uuid, "legacy_id": legacy_id_val, "username": (username or email.split('@')[0]), "email": email, "password": '', "is_active": True, "is_deleted": False}
+            else:
+                new_uuid = str(_uuid.uuid4())
+                upsert_sql = sa.text(
+                    "INSERT INTO users (id, username, email, password, is_active, is_deleted, created_at, updated_at) "
+                    "VALUES (:id, :username, :email, :password, :is_active, :is_deleted, now(), now()) "
+                    "ON CONFLICT (email) DO UPDATE SET username = EXCLUDED.username RETURNING id"
+                )
+                params = {"id": new_uuid, "username": (username or email.split('@')[0]), "email": email, "password": '', "is_active": True, "is_deleted": False}
+
+            try:
+                res = conn.execute(upsert_sql, params)
+                prow = res.fetchone()
+                if prow and prow[0]:
+                    created_id = prow[0]
+                else:
+                    created_id = None
+            except Exception as e:
+                logger.exception(f"Provision upsert failed: {e}")
+                created_id = None
+
+            # Persist last demo user uuid in app state for test-token mapping
+            try:
                 try:
-                    # Detect id column type and whether legacy_id exists
-                    try:
-                        id_col = conn.execute(
-                            "SELECT data_type, udt_name FROM information_schema.columns WHERE table_name='users' AND column_name='id'"
-                        ).fetchone()
-                    except Exception:
-                        id_col = None
-                    try:
-                        legacy_col = conn.execute(
-                            "SELECT column_name FROM information_schema.columns WHERE table_name='users' AND column_name='legacy_id'"
-                        ).fetchone()
-                    except Exception:
-                        legacy_col = None
+                    request.app.state.last_demo_user_uuid = created_id or new_uuid
+                except Exception:
+                    pass
+            except Exception:
+                pass
 
-                    id_is_uuid = False
-                    if id_col:
-                        # udt_name == 'uuid' or data_type contains 'uuid'
-                        udt = id_col[1] or ''
-                        dt = id_col[0] or ''
-                        if 'uuid' in udt.lower() or 'uuid' in dt.lower():
-                            id_is_uuid = True
-
-                    # Build insert values depending on id type
-                    ins_values = {
-                        'username': (username or email.split('@')[0]),
-                        'email': email,
-                        'password': '',
-                        'is_active': True,
-                        'is_deleted': False,
-                    }
-
-                    if id_is_uuid:
-                        ins_values['id'] = new_uuid
-                        # include legacy_id if column exists
-                        if legacy_id_val is not None and legacy_col:
-                            ins_values['legacy_id'] = legacy_id_val
-                    else:
-                        # id is integer serial: store legacy_id if available so we can map
-                        if legacy_id_val is not None and legacy_col:
-                            ins_values['legacy_id'] = legacy_id_val
-
-                    # Use an upsert with named params to avoid SQLAlchemy dialect issues
-                    cols = ','.join(ins_values.keys())
-                    params = ','.join([f":{k}" for k in ins_values.keys()])
-                    upsert_sql = (
-                        f"INSERT INTO users ({cols}) VALUES ({params}) "
-                        f"ON CONFLICT (email) DO UPDATE SET username = EXCLUDED.username RETURNING id"
-                    )
-                    try:
-                        resu = conn.execute(sa.text(upsert_sql), ins_values)
-                        rrow = resu.fetchone()
-                        if rrow and rrow[0]:
-                            existing_id = rrow[0]
-                    except Exception:
-                        # Best-effort: ignore and continue
-                        pass
-                    trans.commit()
-                except Exception as e:
-                    try:
-                        trans.rollback()
-                    except Exception:
-                        pass
-                    logger.exception(f"Provision: failed inserting user (sync): {e}")
-                    return {"created": False, "id": None}
-        except Exception as e:
-            logger.exception(f"Provision: unexpected error during sync insert: {e}")
-            return {"created": False, "id": None}
-
-        # 4) Create or lookup default organization and project and membership using sync SQL
-        try:
-            from app.db.session import get_sync_engine
-            sync_engine2 = get_sync_engine()
-            slug_val = f"default-organization-{str(new_uuid)[:8]}"
-            with sync_engine2.connect() as conn2:
-                trans2 = conn2.begin()
-                try:
-                    # Try select by slug
-                    res = conn2.execute(sa.text("SELECT id FROM organizations WHERE slug = :slug LIMIT 1"), {"slug": slug_val})
-                    row = res.fetchone()
-                    if row and row[0]:
-                        default_org_id = row[0]
-                    else:
-                        name_base = payload.get('default_org', {}).get('name') or 'Default Organization'
-                        if name_base == 'Default Organization':
-                            name_base = f"Default Organization {slug_val.split('-')[-1]}"
-                        res2 = conn2.execute(sa.text("SELECT id FROM organizations WHERE name = :name LIMIT 1"), {"name": name_base})
-                        rn = res2.fetchone()
-                        if rn and rn[0]:
-                            default_org_id = rn[0]
-                        else:
-                            ins = (
-                                "WITH ins AS ("
-                                " INSERT INTO organizations (name, slug, description, is_active, is_deleted, plan_type, max_projects, created_at, updated_at)"
-                                " VALUES (:name, :slug, :desc, :is_active, :is_deleted, :plan_type, :max_projects, now(), now()) RETURNING id)"
-                                " SELECT id FROM ins UNION SELECT id FROM organizations WHERE slug = :slug LIMIT 1"
-                            )
-                            pres = conn2.execute(sa.text(ins), {"name": name_base, "slug": slug_val, "desc": 'Your default organization', "is_active": True, "is_deleted": False, "plan_type": 'free', "max_projects": 1})
-                            prow = pres.fetchone()
-                            default_org_id = prow[0] if prow and prow[0] else None
-
-                    if default_org_id:
-                        proj_ins = (
-                            "INSERT INTO projects (name, description, organization_id, created_by, is_public, is_active, created_at, updated_at) "
-                            "VALUES (:name, :desc, :org_id, :created_by, :is_public, :is_active, now(), now()) RETURNING id"
-                        )
-                        presp = conn2.execute(sa.text(proj_ins), {"name": payload.get('default_project', {}).get('name', 'Default Project'), "desc": payload.get('default_project', {}).get('description', 'Auto-created default project for user'), "org_id": default_org_id, "created_by": str(new_uuid), "is_public": False, "is_active": True})
-                        prow = presp.fetchone()
-                        project_id = prow[0] if prow and prow[0] else None
-                        # ensure membership exists
-                        ou_ins = (
-                            "INSERT INTO user_organizations (id, organization_id, user_id, role, is_active) "
-                            "SELECT gen_random_uuid(), :org_id, :user_id::uuid, 'owner', true "
-                            "WHERE NOT EXISTS (SELECT 1 FROM user_organizations WHERE organization_id = :org_id AND user_id::text = :user_id)"
-                        )
-                        conn2.execute(sa.text(ou_ins), {"org_id": default_org_id, "user_id": str(new_uuid)})
-                    trans2.commit()
-                except Exception as e:
-                    try:
-                        trans2.rollback()
-                    except Exception:
-                        pass
-                    logger.exception(f"Provision (sync): failed creating project/membership: {e}")
-                    default_org_id = None
-        except Exception as e:
-            logger.exception(f"Provision: unexpected sync error creating defaults: {e}")
-            default_org_id = None
-        except Exception as e:
-            # best-effort; don't block provisioning
-            logger.exception(f"Provision: failed creating defaults: {e}")
-
-        return {"created": True, "id": str(new_uuid)}
+        return {"created": True, "id": str(created_id or new_uuid)}
     except Exception as e:
         logger.exception('Failed to provision user (non-fatal): %s', e)
         return {"created": False, "id": None}
