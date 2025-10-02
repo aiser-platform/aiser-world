@@ -124,7 +124,14 @@ class Auth:
                         continue
 
                 # In development, allow returning unverified claims to ease local flows
-                if getattr(settings, 'ENVIRONMENT', 'development') == 'development':
+                allow_unverified_env = False
+                try:
+                    import os as _os
+                    allow_unverified_env = _os.getenv('ALLOW_UNVERIFIED_JWT_IN_DEV', '').lower() == 'true'
+                except Exception:
+                    allow_unverified_env = False
+
+                if (getattr(settings, 'ENVIRONMENT', 'development') == 'development') or allow_unverified_env:
                     try:
                         u = jwt.get_unverified_claims(token)
                         logger.info(f"Auth.decodeJWT: returning unverified claims keys={list(u.keys()) if isinstance(u, dict) else None}")
