@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Body
+from fastapi import APIRouter, Depends, HTTPException, Body, Request, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 from typing import List, Optional, Any, Dict
@@ -275,7 +275,7 @@ async def create_schedule(
 
 @router.post("/snapshots")
 async def create_snapshot(
-    request: Dict[str, Any],
+    request_body: Dict[str, Any] = Body(...),
     organization_id: Optional[str] = None,
     project_id: Optional[str] = None,
     current_token: str = Depends(JWTCookieBearer()),
@@ -298,6 +298,8 @@ async def create_snapshot(
 
     # Accept organization_id/project_id provided in request body as well as
     # query params so tests that pass them in JSON are honored.
+    # Normalize the incoming body to `request` for backward compatibility
+    request = request_body or {}
     try:
         body_org = request.get('organization_id') if isinstance(request, dict) else None
     except Exception:
@@ -367,6 +369,8 @@ async def create_snapshot(
             # Resolve data source info (uses existing service function)
             from app.modules.data.services.data_connectivity_service import DataConnectivityService
             data_service = DataConnectivityService()
+
+            # Resolve data source id as provided by the client
             # Some test monkeypatches may replace the method with functions that
             # return awaitables or async generators. Normalize here.
             ds_maybe = data_service.get_data_source_by_id(data_source_id)
@@ -600,12 +604,7 @@ async def list_snapshots(
     db: AsyncSession = Depends(get_async_session)
 ):
     # Development: allow listing without strict auth to stabilize tests
-    try:
-        from app.core.config import settings as _settings
-        if getattr(_settings, 'ENVIRONMENT', 'development') == 'development':
-            current_token = {'id': 1, 'roles': ['admin']}
-    except Exception:
-        pass
+    # No development bypass here — require valid token payload or explicit test overrides
     await ensure_tables(db)
     if isinstance(current_token, dict):
         user_payload = current_token
@@ -702,14 +701,23 @@ async def get_snapshot(snapshot_id: int,
 
 
 @router.post("/api/queries/snapshots")
-async def create_snapshot_compat(request_body: Dict[str, Any] = Body(...),
+async def create_snapshot_compat(
+    request: Optional[Dict[str, Any]] = Body(None),
+    request_query: Optional[str] = Query(None, alias="request"),
     organization_id: Optional[str] = None,
     project_id: Optional[str] = None,
     current_token: str = Depends(JWTCookieBearer()),
-    db: AsyncSession = Depends(get_async_session)
+    db: AsyncSession = Depends(get_async_session),
 ):
-    # Forward to canonical handler
-    return await create_snapshot(request_body or {}, organization_id=organization_id, project_id=project_id, current_token=current_token, db=db)
+    # Accept JSON body under either canonical shape or legacy keys.
+    # Prefer JSON body, but accept legacy `request` query param if present
+    body = request or {}
+    if not body and request_query:
+        try:
+            body = json.loads(request_query)
+        except Exception:
+            body = {}
+    return await create_snapshot(body or {}, organization_id=organization_id, project_id=project_id, current_token=current_token, db=db)
 
 
 @router.get("/api/queries/snapshots")

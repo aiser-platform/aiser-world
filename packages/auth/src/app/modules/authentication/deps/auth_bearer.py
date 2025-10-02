@@ -5,6 +5,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
 from app.modules.authentication import Auth
+from app.core.config import settings
 
 get_bearer_token = HTTPBearer(auto_error=False)
 
@@ -56,8 +57,10 @@ class JWTBearer(HTTPBearer):
             payload = Auth().decodeJWT(jwtoken)
         except:
             payload = None
-        if payload:
-            isTokenValid = True
+    # Only accept a fully valid JWT payload. Developer/test shortcuts are
+    # disabled here to avoid accidental bypass of authentication in dev.
+    if payload:
+        isTokenValid = True
         return isTokenValid
 
 
