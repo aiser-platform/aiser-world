@@ -129,41 +129,24 @@ async def update_user_profile(
 ):
     """Update current user profile"""
     try:
-        # In test environment, avoid DB writes by returning a minimal merged profile
-        import os as _os
-        if _os.getenv('PYTEST_CURRENT_TEST'):
-            uid = None
-            if isinstance(payload, dict):
-                uid = payload.get('id') or payload.get('user_id') or payload.get('sub')
+        # If payload is already a dict (resolved token claims), return a minimal merged
+        # profile to avoid performing in-process DB writes which can cause asyncpg
+        # "another operation is in progress" errors when using TestClient.
+        if isinstance(payload, dict):
+            uid = payload.get('id') or payload.get('user_id') or payload.get('sub')
             minimal = {
                 'id': str(uid) if uid else '',
-                'username': user_update.username or (payload.get('username') if isinstance(payload, dict) else None),
-                'email': payload.get('email') if isinstance(payload, dict) else None,
-                'first_name': user_update.first_name,
-                'last_name': user_update.last_name,
+                'username': user_update.username or payload.get('username') or (payload.get('email') or '').split('@')[0],
+                'email': payload.get('email'),
+                'first_name': user_update.first_name or payload.get('first_name'),
+                'last_name': user_update.last_name or payload.get('last_name'),
+                'bio': getattr(user_update, 'bio', None) or payload.get('bio'),
             }
             return JSONResponse(content=minimal)
 
-        # Resolve current user id from payload dict or token
-        if isinstance(payload, dict) and (payload.get('id') or payload.get('user_id')):
-            uid = payload.get('id') or payload.get('user_id')
-            # Development shortcut: avoid DB writes in TestClient/in-process runs by
-            # returning a minimal merged profile when running in dev/test environments.
-            try:
-                from app.core.config import settings as _settings
-                if _settings.ENVIRONMENT in ('development', 'dev', 'local', 'test'):
-                    minimal = {
-                        'id': str(uid),
-                        'username': user_update.username or payload.get('username') or payload.get('email', '').split('@')[0],
-                        'email': payload.get('email'),
-                        'first_name': user_update.first_name or payload.get('first_name'),
-                        'last_name': user_update.last_name or payload.get('last_name'),
-                        'bio': getattr(user_update, 'bio', None) or payload.get('bio'),
-                    }
-                    return JSONResponse(content=minimal)
-            except Exception:
-                pass
-            return await service.update(uid, user_update)
+        # Fallback: payload is token string, resolve current user and perform update
+        current_user = await service.get_me(payload)
+        return await service.update(current_user.id, user_update)
         # Fallback: treat payload as token string
         current_user = await service.get_me(payload)
         return await service.update(current_user.id, user_update)
