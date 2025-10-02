@@ -127,8 +127,8 @@ async def get_user_profile(payload: dict = Depends(JWTCookieBearer())):
 @router.put("/profile", response_model=UserResponse)
 async def update_user_profile(
     user_update: UserUpdate,
-    payload: dict = Depends(JWTCookieBearer()),
     request: Request,
+    payload: dict = Depends(JWTCookieBearer()),
 ):
     """Update current user profile.
 
