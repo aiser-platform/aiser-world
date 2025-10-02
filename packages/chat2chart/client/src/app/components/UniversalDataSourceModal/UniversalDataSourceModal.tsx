@@ -3027,10 +3027,13 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
             
             // Try to create in backend first
             try {
-                const response = await fetch(`http://localhost:8000/data/api/organizations/${organizationId}/projects/${projectId}/data-sources`, {
+                const backendUrl = typeof window !== 'undefined' && window.location.hostname === 'localhost' ? 'http://localhost:8000' : '';
+                const response = await fetch(`${backendUrl}/data/api/organizations/${organizationId}/projects/${projectId}/data-sources`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        // include credentials header if available
+                        'Authorization': typeof document !== 'undefined' ? `Bearer ${(document.cookie.match(/(?:^|; )c2c_access_token=([^;]+)/)||[])[1] || ''}` : ''
                     },
                     body: JSON.stringify({
                         name: newDataSource.name,

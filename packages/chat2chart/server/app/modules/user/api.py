@@ -165,9 +165,10 @@ async def update_user_profile(
     try:
         # Get current user first
         current_user = await service.get_me(token)
-        
-        # Update user
-        return await service.update(current_user.id, user_update)
+
+        # Update user and ensure username is persisted when provided
+        updated_user = await service.update(current_user.id, user_update)
+        return updated_user
     except HTTPException as e:
         raise e
     except Exception as e:

@@ -65,7 +65,7 @@ const SettingsPage: React.FC = () => {
     setLoading(true);
     try {
       // Load user profile from real API
-      const profileResponse = await fetch('/users/profile');
+      const profileResponse = await fetch('/users/profile', { headers: { 'Content-Type': 'application/json' } });
       if (profileResponse.ok) {
         const profile = await profileResponse.json();
         setUserProfile(profile);
