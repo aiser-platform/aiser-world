@@ -87,13 +87,37 @@ async def get_me_handler(token: str = TokenDep):
 async def get_user_profile(payload: dict = Depends(JWTCookieBearer())):
     """Get current user profile. Accepts either a token string or a resolved payload dict."""
     try:
-        # If payload is a dict with an id, fetch user by id
-        if isinstance(payload, dict) and (payload.get('id') or payload.get('user_id')):
+        # If payload is a dict with an id or email, in development prefer a sync DB lookup
+        from app.core.config import settings as _settings
+        if isinstance(payload, dict) and (_settings.ENVIRONMENT in ('development', 'dev', 'local', 'test')):
             uid = payload.get('id') or payload.get('user_id')
-            user = await service.get_user(uid)
-            if not user:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-            return user
+            email = payload.get('email')
+            try:
+                from app.db.session import get_sync_engine
+                eng = get_sync_engine()
+                with eng.connect() as conn:
+                    if email:
+                        q = sa.text("SELECT * FROM users WHERE email = :email LIMIT 1")
+                        r = conn.execute(q, {"email": email}).fetchone()
+                    elif uid:
+                        # try numeric legacy or uuid
+                        q = sa.text("SELECT * FROM users WHERE id::text = :uid OR legacy_id = :legacy LIMIT 1")
+                        try:
+                            legacy = int(uid)
+                        except Exception:
+                            legacy = None
+                        r = conn.execute(q, {"uid": str(uid), "legacy": legacy}).fetchone()
+                    else:
+                        r = None
+                    if r:
+                        # Map row to dict and return minimal user response without async DB call
+                        data = dict(r._mapping) if hasattr(r, '_mapping') else dict(r)
+                        data['id'] = str(data.get('id'))
+                        return JSONResponse(content=data)
+            except Exception:
+                # fallback to async service
+                pass
+
         # Otherwise treat payload as token string and delegate to service.get_me
         user = await service.get_me(payload)
         if not user:
