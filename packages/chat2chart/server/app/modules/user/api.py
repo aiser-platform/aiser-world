@@ -90,9 +90,15 @@ async def get_user_profile(payload: dict = Depends(JWTCookieBearer())):
         # If payload is a dict with an id, fetch user by id
         if isinstance(payload, dict) and (payload.get('id') or payload.get('user_id')):
             uid = payload.get('id') or payload.get('user_id')
-            return await service.get_user(uid)
+            user = await service.get_user(uid)
+            if not user:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+            return user
         # Otherwise treat payload as token string and delegate to service.get_me
-        return await service.get_me(payload)
+        user = await service.get_me(payload)
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        return user
     except HTTPException as e:
         raise e
     except Exception as e:
