@@ -84,7 +84,7 @@ async def get_me_handler(token: str = TokenDep):
 
 # New API endpoints for settings (place before param routes to avoid path collisions)
 @router.get("/profile", response_model=UserResponse)
-async def get_user_profile(payload: dict = Depends(current_user_payload)):
+async def get_user_profile(payload: dict = Depends(JWTCookieBearer())):
     """Get current user profile. Accepts either a token string or a resolved payload dict."""
     try:
         # If payload is a dict with an id, fetch user by id
@@ -104,7 +104,7 @@ async def get_user_profile(payload: dict = Depends(current_user_payload)):
 @router.put("/profile", response_model=UserResponse)
 async def update_user_profile(
     user_update: UserUpdate,
-    payload: dict = Depends(current_user_payload),
+    payload: dict = Depends(JWTCookieBearer()),
 ):
     """Update current user profile"""
     try:
