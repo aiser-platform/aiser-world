@@ -130,22 +130,26 @@ async def update_user_profile(
 ):
     """Update current user profile.
 
-    Uses `JWTCookieBearer` so GET and PUT share the same auth resolution behavior.
-    If the dependency returns a payload dict we use its id; otherwise we
-    fallback to extracting a bearer token from cookies or headers and resolve
-    the current user via the `UserService`.
+    Use `JWTCookieBearer` so GET and PUT share auth resolution. If the
+    dependency returns a payload dict we use its id; otherwise fall back to
+    extracting a bearer token from cookies or headers and resolve the current
+    user via `UserService.get_me`.
     """
     try:
-        import os as _os
-        # Test-process shortcut: prefer unverified claims from token to build a
-        # minimal profile and avoid DB writes during in-process TestClient runs.
-        if _os.getenv('PYTEST_CURRENT_TEST'):
-            token = None
+        # If dependency returned a decoded payload dict, prefer that (avoids extra lookups)
+        if isinstance(payload, dict):
+            uid = payload.get('id') or payload.get('user_id') or payload.get('sub')
+            if uid:
+                return await service.update(uid, user_update)
+
+        # Resolve token from cookies or Authorization header
+        token = None
+        if request is not None:
             try:
-                token = (request.cookies.get('c2c_access_token') or request.cookies.get('access_token')) if request else None
+                token = request.cookies.get('c2c_access_token') or request.cookies.get('access_token')
             except Exception:
                 token = None
-            if not token and request:
+            if not token:
                 authh = request.headers.get('Authorization') or request.headers.get('authorization')
                 if authh and isinstance(authh, str):
                     if authh.lower().startswith('bearer '):
@@ -153,42 +157,12 @@ async def update_user_profile(
                     else:
                         token = authh
 
-            claims = {}
-            if token:
-                try:
-                    from jose import jwt as _jose_jwt
-                    claims = _jose_jwt.get_unverified_claims(token) or {}
-                except Exception:
-                    claims = {}
-
-            # Merge claims and update payload
-            uid = None
-            if claims:
-                uid = claims.get('id') or claims.get('user_id') or claims.get('sub')
-            elif isinstance(payload, dict):
-                uid = payload.get('id') or payload.get('user_id') or payload.get('sub')
-
-            minimal = {
-                'id': str(uid) if uid else '',
-                'username': user_update.username or (claims.get('username') if claims else (payload.get('username') if isinstance(payload, dict) else None)) or (claims.get('email') if claims else (payload.get('email') if isinstance(payload, dict) else '')).split('@')[0],
-                'email': (claims.get('email') if claims else (payload.get('email') if isinstance(payload, dict) else None)),
-                'first_name': user_update.first_name or (claims.get('first_name') if claims else (payload.get('first_name') if isinstance(payload, dict) else None)),
-                'last_name': user_update.last_name or (claims.get('last_name') if claims else (payload.get('last_name') if isinstance(payload, dict) else None)),
-            }
-            return JSONResponse(content=minimal)
-
-        # Fallback: payload is token string, resolve current user and perform update
-        current_user = await service.get_me(payload)
-        return await service.update(current_user.id, user_update)
-        # Fallback: treat payload as token string
-        current_user = await service.get_me(payload)
+        current_user = await service.get_me(token or payload)
         return await service.update(current_user.id, user_update)
     except HTTPException as e:
         raise e
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 @router.get("/{user_id}", response_model=UserResponse)
 async def get_one_user(user_id: int, token: str = TokenDep):
