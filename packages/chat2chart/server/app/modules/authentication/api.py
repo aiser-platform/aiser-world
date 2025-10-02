@@ -322,29 +322,28 @@ async def provision_user(payload: dict = Body(...), x_internal_auth: str | None 
         raise HTTPException(status_code=400, detail='Missing id or email')
 
     try:
-        # 1) Quick lookup: existing user by email (short-lived session)
-        async with async_session() as sdb:
-            try:
-                q = select(ChatUser.id, ChatUser.username).where(ChatUser.email == email)
-                res = await sdb.execute(q)
-                row = res.one_or_none()
-                if row:
-                    existing_id = row[0]
-                    if username:
-                        try:
-                            await sdb.execute(ChatUser.__table__.update().where(ChatUser.__table__.c.email == email).values(username=username))
-                            await sdb.commit()
-                        except Exception:
+        # 1) Quick lookup: existing user by email using sync connection to avoid asyncpg session conflicts
+        try:
+            from app.db.session import get_sync_engine
+            sync_engine_check = get_sync_engine()
+            with sync_engine_check.connect() as conn_check:
+                try:
+                    sel = "SELECT id, username FROM users WHERE email = %s LIMIT 1"
+                    res = conn_check.execute(sel, (email,))
+                    row = res.fetchone()
+                    if row and row[0]:
+                        existing_id = row[0]
+                        if username:
                             try:
-                                await sdb.rollback()
+                                upd = "UPDATE users SET username = %s WHERE email = %s"
+                                conn_check.execute(upd, (username, email))
                             except Exception:
                                 pass
-                    return {"created": False, "id": str(existing_id)}
-            except Exception:
-                try:
-                    await sdb.rollback()
+                        return {"created": False, "id": str(existing_id)}
                 except Exception:
                     pass
+        except Exception:
+            pass
 
         # 2) Prepare new_uuid and legacy_id
         import uuid as _uuid
@@ -411,9 +410,22 @@ async def provision_user(payload: dict = Body(...), x_internal_auth: str | None 
                             ins_values['legacy_id'] = legacy_id_val
 
                     # Use an upsert to avoid duplicate email insert errors when provisioning is retried
-                    insert_stmt = ChatUser.__table__.insert().values(**ins_values)
-                    upsert_stmt = insert_stmt.on_conflict_do_nothing(index_elements=['email'])
-                    conn.execute(upsert_stmt)
+                    # Use raw SQL upsert to avoid SQLAlchemy dialect compatibility issues
+                    cols = ','.join(ins_values.keys())
+                    params = ','.join(['%s'] * len(ins_values))
+                    upsert_sql = (
+                        f"INSERT INTO users ({cols}) VALUES ({params}) "
+                        f"ON CONFLICT (email) DO UPDATE SET username = EXCLUDED.username RETURNING id"
+                    )
+                    vals = tuple(ins_values[k] for k in ins_values.keys())
+                    try:
+                        resu = conn.execute(upsert_sql, vals)
+                        rrow = resu.fetchone()
+                        if rrow and rrow[0]:
+                            existing_id = rrow[0]
+                    except Exception:
+                        # Best-effort: ignore and continue
+                        pass
                     trans.commit()
                 except Exception as e:
                     try:
