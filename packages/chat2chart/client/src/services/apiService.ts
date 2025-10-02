@@ -4,48 +4,11 @@ export async function fetchWithAuth(input: RequestInfo, init: RequestInit = {}) 
   const cfg = { ...(init || {}), credentials: 'include', headers: { ...(init.headers || {}) } } as RequestInit & { _retried?: boolean };
   let res = await fetch(input, cfg);
   if ((res.status === 401 || res.status === 403) && !cfg._retried) {
-    // dev-only upgrade attempt
+    // On unauthorized, redirect to login (no dev-only fallbacks)
     try {
-        if (process.env.NODE_ENV === 'development') {
-        // Try upgrade-demo and if it returns a token in body, set client cookie so subsequent requests include it
-        // Include demo cookie payload in body as a fallback when cookies are not sent by the browser
-        let demoToken = null;
-        let userPayload = null;
-        try {
-          const m = document.cookie.match(/(?:^|; )access_token=([^;]+)/);
-          demoToken = m ? decodeURIComponent(m[1]) : null;
-        } catch (e) {
-          demoToken = null;
-        }
-        try {
-          const mu = document.cookie.match(/(?:^|; )user=([^;]+)/);
-          userPayload = mu ? decodeURIComponent(mu[1]) : null;
-        } catch (e) {
-          userPayload = null;
-        }
-
-        const up = await fetch(`${API_URL}/auth/upgrade-demo`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ demo_token: demoToken, user: userPayload }) });
-        if (up.ok) {
-          try {
-            const body = await up.json();
-            if (body && body.access_token) {
-              // client-side fallback cookie for dev
-              try {
-                document.cookie = `c2c_access_token=${body.access_token}; path=/; samesite=lax`;
-              } catch (e) {
-                // ignore
-              }
-              // also include Authorization header on retry in case cookies are blocked
-              (cfg.headers as Record<string, string>)['Authorization'] = `Bearer ${body.access_token}`;
-            }
-          } catch (e) {
-            // ignore parse errors
-          }
-        }
-        cfg._retried = true;
-        res = await fetch(input, cfg);
-      } else {
-        // production: redirect to login
+      cfg._retried = true;
+      // In browser, redirect user to login; otherwise return the original response
+      if (typeof window !== 'undefined') {
         window.location.href = '/login';
       }
     } catch (e) {
