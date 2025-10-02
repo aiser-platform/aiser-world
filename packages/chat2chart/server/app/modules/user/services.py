@@ -287,14 +287,24 @@ class UserService(BaseService[User, UserCreate, UserUpdate, UserResponse]):
         Get current user details from token
         """
         try:
+            # Accept either a token string or an already-decoded payload dict
             if not token:
                 raise HTTPException(status_code=401, detail="Unauthorized")
 
-            decoded_token = self.auth.decodeJWT(token)
-            if not decoded_token:
+            # If caller passed a dict (resolved payload), use it directly
+            if isinstance(token, dict):
+                payload = token
+            else:
+                payload = self.auth.decodeJWT(token)
+
+            if not payload:
                 raise HTTPException(status_code=401, detail="Invalid token")
 
-            user = await self.get_user(decoded_token["user_id"])
+            user_id = payload.get("user_id") or payload.get("id") or payload.get("sub")
+            if not user_id:
+                raise HTTPException(status_code=401, detail="Invalid token payload: missing user id")
+
+            user = await self.get_user(user_id)
             if not user:
                 raise HTTPException(status_code=404, detail="User not found")
 
