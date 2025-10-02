@@ -315,7 +315,7 @@ class UserService(BaseService[User, UserCreate, UserUpdate, UserResponse]):
             if not token:
                 raise HTTPException(status_code=401, detail="Unauthorized")
 
-            # If caller passed a dict (resolved payload), use it directly
+            # If caller passed a dict (resolved payload), handle without sync DB calls
             if isinstance(token, dict):
                 payload = token
             else:
@@ -324,40 +324,50 @@ class UserService(BaseService[User, UserCreate, UserUpdate, UserResponse]):
             if not payload:
                 raise HTTPException(status_code=401, detail="Invalid token")
 
+            # Prefer explicit id fields or email
             user_id = payload.get("user_id") or payload.get("id") or payload.get("sub")
-            if not user_id:
-                raise HTTPException(status_code=401, detail="Invalid token payload: missing user id")
+            email = payload.get("email") if isinstance(payload, dict) else None
 
-            # If payload contains a legacy numeric id, try to resolve canonical UUID synchronously
-            try:
-                import uuid as _uuid
-                # if user_id not a UUID string, attempt legacy mapping
+            if isinstance(payload, dict):
+                # If numeric legacy id provided, try async legacy lookup
                 try:
-                    _uuid.UUID(str(user_id))
-                    is_uuid = True
+                    if user_id and (str(user_id).isdigit()):
+                        user = await self.repository.get_by_legacy_id(int(user_id))
+                        if user:
+                            return user
                 except Exception:
-                    is_uuid = False
+                    pass
 
-                if not is_uuid:
-                    try:
-                        from app.db.session import get_sync_engine
-                        eng = get_sync_engine()
-                        with eng.connect() as conn:
-                            q = sa.text("SELECT id FROM users WHERE legacy_id = :legacy LIMIT 1")
-                            res = conn.execute(q, {"legacy": int(user_id)})
-                            r = res.fetchone()
-                            if r and r[0]:
-                                user_id = str(r[0])
-                    except Exception:
-                        # ignore and continue with original user_id
-                        pass
-            except Exception:
-                pass
+                # If email present, try async email lookup
+                try:
+                    if email:
+                        user = await self.repository.get_by_email(email)
+                        if user:
+                            return user
+                except Exception:
+                    pass
 
+                # If id looks like UUID string, try async primary key lookup
+                try:
+                    import uuid as _uuid
+                    if user_id:
+                        try:
+                            uid = _uuid.UUID(str(user_id))
+                            user = await self.repository.get(uid)
+                            if user:
+                                return user
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+
+                # No user resolved from dict payload
+                raise HTTPException(status_code=404, detail="User not found")
+
+            # Fallback: token was a string, delegate to get_user which handles numeric UUIDs/legacy ids
             user = await self.get_user(user_id)
             if not user:
                 raise HTTPException(status_code=404, detail="User not found")
-
             return user
         except Exception as e:
             logger.error(f"Error getting user: {e}")
