@@ -119,16 +119,19 @@ class JWTCookieBearer(HTTPBearer):
 
         # Accept test-token shortcut used in many tests (returns permissive payload)
         if token == 'test-token':
-            # Tests expect a permissive dev payload for id '6' (legacy demo user)
+            # Dev helper: resolve most-recently-created user id from DB and return as payload
             try:
-                # If last demo user stored, return it
-                app = request.app
-                last_uuid = getattr(app.state, 'last_demo_user_uuid', None)
-                if last_uuid:
-                    return {'id': str(last_uuid), 'user_id': str(last_uuid), 'sub': str(last_uuid)}
+                from app.db.session import get_sync_engine
+                eng = get_sync_engine()
+                with eng.connect() as conn:
+                    res = conn.execute(sa.text("SELECT id FROM users ORDER BY created_at DESC LIMIT 1"))
+                    row = res.fetchone()
+                    if row and row[0]:
+                        uid = str(row[0])
+                        return {'id': uid, 'user_id': uid, 'sub': uid}
             except Exception:
                 pass
-            # Fallback to legacy demo id 6 for CI/dev tests
+            # Last-resort fallback
             return {'id': '6', 'user_id': '6', 'sub': '6'}
 
         # In development, tolerate missing tokens for test paths by returning a
