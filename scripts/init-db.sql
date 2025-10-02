@@ -6,7 +6,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Create users table with tenant isolation
 CREATE TABLE IF NOT EXISTS users (
-    id SERIAL PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     email VARCHAR(255) UNIQUE NOT NULL,
     username VARCHAR(100) UNIQUE,
     first_name VARCHAR(100),
@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS conversation (
     description TEXT,
     status VARCHAR(50) DEFAULT 'active',
     type VARCHAR(50) DEFAULT 'chat2chart',
-    user_id INTEGER REFERENCES users(id),
+    user_id UUID REFERENCES users(id),
     tenant_id VARCHAR(50) DEFAULT 'default',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS charts (
     status VARCHAR(50) DEFAULT 'pending',
     complexity_score INTEGER DEFAULT 5,
     data_source VARCHAR(255),
-    user_id INTEGER REFERENCES users(id),
+    user_id UUID REFERENCES users(id),
     conversation_id UUID REFERENCES conversation(id),
     tenant_id VARCHAR(50) DEFAULT 'default',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
