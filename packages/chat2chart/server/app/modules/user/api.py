@@ -82,6 +82,46 @@ async def get_me_handler(token: str = TokenDep):
         )
 
 
+# New API endpoints for settings (place before param routes to avoid path collisions)
+@router.get("/profile", response_model=UserResponse)
+async def get_user_profile(payload: dict = Depends(current_user_payload)):
+    """Get current user profile. Accepts either a token string or a resolved payload dict."""
+    try:
+        # If payload is a dict with an id, fetch user by id
+        if isinstance(payload, dict) and (payload.get('id') or payload.get('user_id')):
+            uid = payload.get('id') or payload.get('user_id')
+            return await service.get_user(uid)
+        # Otherwise treat payload as token string and delegate to service.get_me
+        return await service.get_me(payload)
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+        )
+
+
+@router.put("/profile", response_model=UserResponse)
+async def update_user_profile(
+    user_update: UserUpdate,
+    payload: dict = Depends(current_user_payload),
+):
+    """Update current user profile"""
+    try:
+        # Resolve current user id from payload dict or token
+        if isinstance(payload, dict) and (payload.get('id') or payload.get('user_id')):
+            uid = payload.get('id') or payload.get('user_id')
+            return await service.update(uid, user_update)
+        # Fallback: treat payload as token string
+        current_user = await service.get_me(payload)
+        return await service.update(current_user.id, user_update)
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+        )
+
 @router.get("/{user_id}", response_model=UserResponse)
 async def get_one_user(user_id: int, token: str = TokenDep):
     try:
