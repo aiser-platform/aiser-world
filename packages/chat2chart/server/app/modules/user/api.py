@@ -125,10 +125,16 @@ async def get_user_profile(payload: dict = Depends(JWTCookieBearer())):
 @router.put("/profile", response_model=UserResponse)
 async def update_user_profile(
     user_update: UserUpdate,
-    payload: dict = Depends(current_user_payload),
-    request: Request = None,
+    payload: dict = Depends(JWTCookieBearer()),
+    request: Request | None = None,
 ):
-    """Update current user profile"""
+    """Update current user profile.
+
+    Uses `JWTCookieBearer` so GET and PUT share the same auth resolution behavior.
+    If the dependency returns a payload dict we use its id; otherwise we
+    fallback to extracting a bearer token from cookies or headers and resolve
+    the current user via the `UserService`.
+    """
     try:
         import os as _os
         # Test-process shortcut: prefer unverified claims from token to build a
