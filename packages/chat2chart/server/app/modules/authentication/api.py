@@ -389,6 +389,18 @@ def provision_user(payload: dict = Body(...), x_internal_auth: str | None = Head
                 logger.exception(f"Provision upsert failed: {e}")
                 created_id = None
 
+            # If legacy_id was provided but wasn't persisted (e.g., conflict path), ensure it's updated
+            try:
+                if legacy_id_val is not None:
+                    upd_legacy = sa.text("UPDATE users SET legacy_id = :legacy WHERE email = :email AND (legacy_id IS NULL OR legacy_id = '') RETURNING id")
+                    resu2 = conn.execute(upd_legacy, {"legacy": legacy_id_val, "email": email})
+                    r2 = resu2.fetchone()
+                    if r2 and r2[0]:
+                        created_id = r2[0]
+            except Exception:
+                # best-effort
+                pass
+
             # Persist last demo user uuid in app state for test-token mapping
             try:
                 try:
