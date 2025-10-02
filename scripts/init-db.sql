@@ -7,13 +7,18 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- Create users table with tenant isolation
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    legacy_id INTEGER UNIQUE,
     email VARCHAR(255) UNIQUE NOT NULL,
     username VARCHAR(100) UNIQUE,
+    password VARCHAR(255) DEFAULT '',
     first_name VARCHAR(100),
     last_name VARCHAR(100),
     role VARCHAR(50) DEFAULT 'user',
     status VARCHAR(50) DEFAULT 'active',
     tenant_id VARCHAR(50) DEFAULT 'default',
+    is_active BOOLEAN DEFAULT TRUE,
+    is_deleted BOOLEAN DEFAULT FALSE,
+    deleted_at TIMESTAMP NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_login_at TIMESTAMP
