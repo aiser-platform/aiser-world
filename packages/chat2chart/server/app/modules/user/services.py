@@ -313,6 +313,16 @@ class UserService(BaseService[User, UserCreate, UserUpdate, UserResponse]):
         Get current user details from token
         """
         try:
+            # Debug: surface token/payload info to container logs for tracing
+            try:
+                tok_preview = (str(token)[:128] + '...') if token and isinstance(token, str) and len(str(token)) > 128 else str(token)
+            except Exception:
+                tok_preview = repr(token)
+            try:
+                print(f"get_me: called with token_preview={tok_preview}", flush=True)
+            except Exception:
+                pass
+            logger.info(f"get_me called; token_type={type(token)}")
             # Accept either a token string or an already-decoded payload dict
             if not token:
                 raise HTTPException(status_code=401, detail="Unauthorized")
