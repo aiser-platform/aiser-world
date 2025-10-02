@@ -140,7 +140,16 @@ async def update_user_profile(
     try:
         # Log incoming auth info for debugging (helps diagnose 401 on PUT)
         try:
-            logger.info(f"update_user_profile called with payload_type={type(payload)} payload_keys={list(payload.keys()) if isinstance(payload, dict) else None} cookies={list(request.cookies.keys()) if request else None} auth_header_present={bool(request.headers.get('Authorization')) if request else None}")
+            msg = f"update_user_profile called with payload_type={type(payload)} payload_keys={list(payload.keys()) if isinstance(payload, dict) else None} cookies={list(request.cookies.keys()) if request else None} auth_header_present={bool(request.headers.get('Authorization')) if request else None}"
+            # Print to stdout so container logs capture this reliably during debugging
+            try:
+                print(msg, flush=True)
+            except Exception:
+                pass
+            try:
+                logger.info(msg)
+            except Exception:
+                pass
         except Exception:
             pass
 
