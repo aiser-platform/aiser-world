@@ -201,3 +201,6 @@ temp-*
 .DS_Store?
 ehthumbs.db
 Icon?
+
+# Dev tokens file created by automation - should never be committed
+scripts/dev_tokens.env
