@@ -107,11 +107,14 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         """
         try:
             query = self._build_base_query().where(self.model.id == id)
+            # Serialize DB operations to avoid asyncpg concurrent-operation conflicts
+            from app.db.session import async_operation_lock
             if db is not None:
                 result = await db.execute(query)
-            else:
+                return result.scalar_one_or_none()
+            async with async_operation_lock:
                 result = await self.db.execute(query)
-            return result.scalar_one_or_none()
+                return result.scalar_one_or_none()
         except Exception as e:
             raise e
 

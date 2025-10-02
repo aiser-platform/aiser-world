@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sess
 from sqlalchemy.orm import sessionmaker
 
 from app.core.config import settings
+import asyncio
 
 # Create async engine for async operations
 # Explicitly specify asyncpg driver to prevent auto-detection of psycopg2
@@ -150,3 +151,6 @@ def get_database():
 
 # For backward compatibility
 database = get_database
+
+# Global async operation lock to serialize DB operations when needed (helps tests avoid asyncpg 'another operation in progress')
+async_operation_lock = asyncio.Lock()
