@@ -369,8 +369,9 @@ class UserService(BaseService[User, UserCreate, UserUpdate, UserResponse]):
                                 from app.db.session import get_sync_engine
                                 eng = get_sync_engine()
                                 with eng.connect() as conn:
+                                    # Query a minimal set of columns present across schemas to avoid schema drift issues
                                     q = sa.text(
-                                        "SELECT id, legacy_id, username, email, first_name, last_name, phone, bio, avatar, website, location, timezone, onboarding_data, onboarding_completed_at, password, is_active, created_at, updated_at, deleted_at, is_deleted FROM users WHERE email = :email LIMIT 1"
+                                        "SELECT id, legacy_id, username, email, first_name, last_name FROM users WHERE email = :email LIMIT 1"
                                     )
                                     res = conn.execute(q, {"email": email})
                                     row = res.fetchone()
