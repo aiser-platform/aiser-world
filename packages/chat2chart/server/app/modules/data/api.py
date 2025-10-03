@@ -109,6 +109,12 @@ async def verify_project_access(request: Request, organization_id: str, project_
             raise HTTPException(status_code=500, detail="RBAC verification failed")
 
         raise HTTPException(status_code=403, detail="Forbidden: insufficient permissions")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger = logging.getLogger(__name__)
+        logger.exception(f"RBAC top-level failure: {e}")
+        raise HTTPException(status_code=500, detail="RBAC verification failed")
 
 logger = logging.getLogger(__name__)
 
