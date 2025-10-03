@@ -30,10 +30,19 @@ async def verify_project_access(request: Request, organization_id: str, project_
 
     Reads Authorization header (Bearer token) and checks RBAC helpers.
     """
+    # Accept token from Authorization header or cookie (c2c_access_token) for browser flows
     auth_header = request.headers.get("authorization") or request.headers.get("Authorization")
-    if not auth_header:
-        raise HTTPException(status_code=401, detail="Missing authorization header")
-    token = auth_header.split(" ", 1)[1] if auth_header.lower().startswith("bearer ") else auth_header
+    token = None
+    if auth_header:
+        token = auth_header.split(" ", 1)[1] if auth_header.lower().startswith("bearer ") else auth_header
+    else:
+        # Fall back to cookie-based token used by frontend (HttpOnly cookie)
+        try:
+            token = request.cookies.get('c2c_access_token') or request.cookies.get('access_token')
+        except Exception:
+            token = None
+    if not token:
+        raise HTTPException(status_code=401, detail="Missing authorization token")
 
     # Allow project owners or org owners/admins
     try:
