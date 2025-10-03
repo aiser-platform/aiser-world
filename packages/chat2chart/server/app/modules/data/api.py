@@ -23,6 +23,11 @@ from .services.enterprise_connectors_service import EnterpriseConnectorsService,
 from .services.yaml_schema_service import YAMLSchemaService
 from app.modules.authentication import rbac as auth_rbac
 from fastapi import Request, Depends
+import sqlalchemy as sa
+import logging
+
+# logger should be available for functions defined below
+logger = logging.getLogger(__name__)
 
 
 async def verify_project_access(request: Request, organization_id: str, project_id: str) -> bool:
