@@ -44,20 +44,71 @@ async def verify_project_access(request: Request, organization_id: str, project_
     if not token:
         raise HTTPException(status_code=401, detail="Missing authorization token")
 
-    # Allow project owners or org owners/admins
+    # Perform RBAC checks using synchronous DB calls to avoid asyncpg concurrent-operation
     try:
-        if await auth_rbac.is_project_owner(token, int(project_id)):
-            return True
+        # Decode unverified claims to extract a user identifier (id/email)
+        uid = None
+        email = None
+        try:
+            from jose import jwt as _jose_jwt
+            if isinstance(token, str) and "." in token:
+                claims = _jose_jwt.get_unverified_claims(token) or {}
+                uid = claims.get('id') or claims.get('user_id') or claims.get('sub')
+                email = claims.get('email')
+        except Exception:
+            pass
 
-        if await auth_rbac.has_org_role(token, int(organization_id), ["owner", "admin", "member"]):
-            return True
+        # Resolve uid via sync DB if we only have email or legacy id
+        try:
+            from app.db.session import get_sync_engine
+            eng = get_sync_engine()
+            with eng.connect() as conn:
+                # If uid looks numeric, try legacy_id lookup
+                resolved_uid = None
+                if uid and str(uid).isdigit():
+                    q = sa.text("SELECT id::text AS id_text FROM users WHERE legacy_id = :legacy LIMIT 1")
+                    r = conn.execute(q, {"legacy": int(uid)})
+                    row = r.fetchone()
+                    if row:
+                        resolved_uid = row[0]
+
+                if not resolved_uid and email:
+                    q = sa.text("SELECT id::text AS id_text FROM users WHERE email = :email LIMIT 1")
+                    r = conn.execute(q, {"email": email})
+                    row = r.fetchone()
+                    if row:
+                        resolved_uid = row[0]
+
+                if not resolved_uid and uid:
+                    # assume uid is already a UUID text
+                    resolved_uid = str(uid)
+
+                if not resolved_uid:
+                    raise HTTPException(status_code=401, detail="Unauthorized: user not found")
+
+                # Check project ownership
+                qproj = sa.text("SELECT created_by::text AS created_by FROM projects WHERE id = :pid LIMIT 1")
+                rp = conn.execute(qproj, {"pid": int(project_id)})
+                prow = rp.fetchone()
+                if prow and prow[0] and str(prow[0]) == resolved_uid:
+                    return True
+
+                # Check org role
+                qrole = sa.text("SELECT role FROM user_organizations WHERE organization_id = :oid AND user_id::text = :uid LIMIT 1")
+                rr = conn.execute(qrole, {"oid": int(organization_id), "uid": resolved_uid})
+                rrow = rr.fetchone()
+                if rrow:
+                    role = rrow[0]
+                    if role in ("owner", "admin", "member"):
+                        return True
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.exception(f"RBAC check failed (sync fallback): {e}")
+            raise HTTPException(status_code=500, detail="RBAC verification failed")
 
         raise HTTPException(status_code=403, detail="Forbidden: insufficient permissions")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.exception(f"RBAC check failed: {e}")
-        raise HTTPException(status_code=500, detail="RBAC verification failed")
 
 logger = logging.getLogger(__name__)
 
