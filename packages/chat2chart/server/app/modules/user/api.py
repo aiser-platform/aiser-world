@@ -153,29 +153,7 @@ async def update_user_profile(
         except Exception:
             pass
 
-        try:
-            try:
-                fh = open('/tmp/update_profile_debug.log', 'a')
-                fh.write('--- REQUEST START ---\n')
-                fh.write(f'payload_type={type(payload)}\n')
-                try:
-                    fh.write(f'payload_keys={list(payload.keys()) if isinstance(payload, dict) else None}\n')
-                except Exception:
-                    fh.write('payload_keys=ERR\n')
-                try:
-                    fh.write(f'cookies={dict(request.cookies or {})}\n')
-                except Exception:
-                    fh.write('cookies=ERR\n')
-                try:
-                    fh.write(f'authorization_header_present={bool(request.headers.get("Authorization"))}\n')
-                except Exception:
-                    fh.write('auth_header=ERR\n')
-                fh.flush()
-                fh.close()
-            except Exception:
-                pass
-        except Exception:
-            pass
+        # debug logging to file removed (was used for transient investigation)
         # Normalize Pydantic values safely (some tests may pass partial/mocked objects)
         username_val = getattr(user_update, 'username', None)
         first_name_val = getattr(user_update, 'first_name', None)

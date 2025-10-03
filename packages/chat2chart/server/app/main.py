@@ -29,40 +29,7 @@ app = FastAPI(
 )
 
 
-@app.middleware("http")
-async def request_trace_middleware(request: Request, call_next):
-    """Lightweight request tracer that appends request headers and cookies to /tmp/request_trace.log.
-
-    This helps capture what the server actually receives for problematic requests
-    (cookies, authorization header, method, path) when in-container logging
-    to stdout isn't reliably captured by the environment.
-    """
-    try:
-        try:
-            with open('/tmp/request_trace.log', 'a') as fh:
-                fh.write('---- REQUEST ----\n')
-                fh.write(f'method={request.method} path={request.url.path}\n')
-                try:
-                    fh.write(f'cookies={dict(request.cookies or {})}\n')
-                except Exception:
-                    fh.write('cookies=ERR\n')
-                try:
-                    # Show if Authorization header present
-                    fh.write(f'authorization_present={bool(request.headers.get("Authorization"))}\n')
-                except Exception:
-                    fh.write('auth_header=ERR\n')
-                try:
-                    # limited headers
-                    h = {k:v for k,v in request.headers.items() if k.lower() in ('content-type','authorization','cookie')}
-                    fh.write(f'headers={h}\n')
-                except Exception:
-                    fh.write('headers=ERR\n')
-                fh.flush()
-        except Exception:
-            pass
-    except Exception:
-        pass
-    return await call_next(request)
+# Temporary request tracing middleware removed (debugging complete)
 
 
 

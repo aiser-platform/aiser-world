@@ -403,25 +403,7 @@ class UserService(BaseService[User, UserCreate, UserUpdate, UserResponse]):
                     pass
 
                 # No user resolved from dict payload - emit debug info and try a sync existence check
-                try:
-                    try:
-                        print(f"get_me: failed to resolve user from payload dict; user_id={user_id} email={email}", flush=True)
-                    except Exception:
-                        pass
-                    try:
-                        from app.db.session import get_sync_engine
-                        eng = get_sync_engine()
-                        with eng.connect() as conn:
-                            q = sa.text(
-                                "SELECT id::text AS id_text, legacy_id, email FROM users WHERE id = (:uid)::uuid OR legacy_id = :legacy OR email = :email LIMIT 3"
-                            )
-                            res = conn.execute(q, {"uid": user_id if user_id else None, "legacy": (int(user_id) if str(user_id).isdigit() else None), "email": email})
-                            rows = res.fetchall()
-                            print('get_me: sync existence check rows:', rows, flush=True)
-                    except Exception as _:
-                        pass
-                except Exception:
-                    pass
+                # No user resolved from dict payload; raise 404 so callers can handle
                 raise HTTPException(status_code=404, detail="User not found")
 
             # Fallback: token was a string, delegate to get_user which handles numeric UUIDs/legacy ids
