@@ -17,11 +17,14 @@ class CubeDataModelingService:
     """Service for Cube.js data modeling with YAML schema generation"""
 
     def __init__(self):
+        from pathlib import Path
         self.cube_api_url = os.getenv(
             "CUBE_API_URL", "http://cube-server:4000/cubejs-api/v1"
         )
         self.cube_api_secret = os.getenv("CUBE_API_SECRET", "dev-cube-secret-key")
-        self.schemas_dir = os.path.join(os.getcwd(), "cube_schemas")
+        # Centralized schema directory under server root: packages/chat2chart/server/cube_schemas
+        server_root = Path(__file__).resolve().parents[4]
+        self.schemas_dir = server_root.joinpath("cube_schemas")
         os.makedirs(self.schemas_dir, exist_ok=True)
 
         # Supported data warehouse connections
@@ -297,11 +300,20 @@ class CubeDataModelingService:
                 "type": measure["type"],
             }
 
-        # Convert to YAML
-        yaml_content = yaml.dump(cube_config, default_flow_style=False, indent=2)
+        # Add Aiser metadata and convert to YAML
+        aiser_meta = {
+            'aiser_metadata': {
+                'generated_by': 'Aiser Platform',
+                'generated_at': datetime.utcnow().isoformat() + 'Z',
+                'tool': 'CubeDataModelingService',
+                'version': os.getenv('AISER_VERSION', 'dev')
+            }
+        }
+        full_content = {**aiser_meta, **cube_config}
+        yaml_content = yaml.dump(full_content, default_flow_style=False, indent=2)
 
-        # Save to file
-        schema_file = os.path.join(self.schemas_dir, f"{cube_name}.yml")
+        # Save to central schema directory
+        schema_file = str(self.schemas_dir.joinpath(f"{cube_name}.yml"))
         with open(schema_file, "w") as f:
             f.write(yaml_content)
 
