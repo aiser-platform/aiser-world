@@ -227,6 +227,13 @@ docker-compose -f docker-compose.prod.yml up -d
    npm install
    ```
 
+## Schema management & deployment
+
+- **Centralized schemas**: Generated Cube YAML schemas are stored in `packages/chat2chart/server/cube_schemas/`. Treat this directory as the canonical source for Aiser-managed schemas; add generated schemas to PRs for review where appropriate.
+- **Generation flow**: The modeling service (`CubeDataModelingService`) produces YAML with Aiser-specific metadata and saves it to the central directory. Use the `deploy_schema_to_cube` helper to push schemas to the Cube API.
+- **Branding & overrides**: Post-process generated YAML to add Aiser annotations, naming conventions, and any UI widget metadata before merging into `cube_schemas/`.
+- **Recommended**: Run the modeling locally, review generated YAML, and open a PR to include approved schemas in `cube_schemas/` to maintain a curated set for Aiser customers.
+
 ### Logs
 
 ```bash
