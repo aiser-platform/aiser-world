@@ -717,6 +717,66 @@ class CubeIntegrationService:
             logger.error(f"❌ Cube.js query execution failed: {str(e)}")
             return {"success": False, "error": str(e)}
 
+    def convert_cube_result_to_echarts(self, rows: List[Dict[str, Any]], chart_type: str = "bar") -> Dict[str, Any]:
+        """Convert a Cube.js query result (list of dict rows) to a minimal ECharts option.
+
+        Strategy:
+        - Pick an x-axis category field (first non-numeric column)
+        - Pick a numeric measure field (first numeric column)
+        - Aggregate measure by category (sum) and emit a simple option
+        """
+        if not rows or len(rows) == 0:
+            return {"option": {}}
+
+        first = rows[0]
+        keys = list(first.keys())
+
+        def is_number(v):
+            try:
+                float(v)
+                return True
+            except Exception:
+                return False
+
+        category_field = None
+        measure_field = None
+
+        for k in keys:
+            v = first.get(k)
+            if v is None:
+                continue
+            if not is_number(v) and category_field is None:
+                category_field = k
+            if is_number(v) and measure_field is None:
+                measure_field = k
+
+        if category_field is None:
+            category_field = keys[0]
+        if measure_field is None:
+            measure_field = keys[1] if len(keys) > 1 else keys[0]
+
+        agg = {}
+        for r in rows:
+            cat = r.get(category_field)
+            try:
+                val = float(r.get(measure_field) or 0)
+            except Exception:
+                val = 0
+            agg[cat] = agg.get(cat, 0) + val
+
+        categories = list(agg.keys())
+        values = [agg[c] for c in categories]
+
+        option = {
+            "title": {"text": f"{measure_field} by {category_field}"},
+            "tooltip": {"trigger": "axis"},
+            "xAxis": {"type": "category", "data": categories},
+            "yAxis": {"type": "value"},
+            "series": [{"name": measure_field, "type": chart_type, "data": values}],
+        }
+
+        return {"option": option, "meta": {"category": category_field, "measure": measure_field}}
+
     async def get_cube_metadata(self) -> Dict[str, Any]:
         """Get metadata from Cube.js server"""
         try:
