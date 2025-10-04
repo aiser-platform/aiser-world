@@ -39,7 +39,29 @@ cd /app
 export PYTHONPATH=/app:$PYTHONPATH
 echo "Python path: $PYTHONPATH"
 echo "Testing Python import..."
-python -c "import sys; print('Python path:', sys.path); import app.core.config; print('Import successful')"
+# If core imports fail, attempt a one-time pip install of Python deps (safe, no apt-get).
+DEPS_MARKER=/tmp/.deps_installed
+if [ -f "$DEPS_MARKER" ]; then
+    echo "✅ Dependencies marker found; skipping pip install"
+else
+    # Try importing a core module; if it fails, install requirements
+    python -c "import app.core.config" 2>/dev/null || {
+        echo "⚠️ Core Python import failed; installing Python dependencies from requirements.txt..."
+        if [ -f requirements.txt ]; then
+            pip install --no-cache-dir -r requirements.txt || {
+                echo "❌ pip install failed" >&2
+                exit 1
+            }
+            touch "$DEPS_MARKER" || true
+        else
+            echo "❌ requirements.txt not found; cannot install dependencies" >&2
+            exit 1
+        fi
+    }
+    # Re-run import check to confirm
+    python -c "import app.core.config" || { echo "❌ Import still failing after install" >&2; exit 1; }
+    echo "✅ Python imports OK"
+fi
 
 # Run database migrations (fail fast if migrations fail)
 echo "Running alembic upgrade head..."
