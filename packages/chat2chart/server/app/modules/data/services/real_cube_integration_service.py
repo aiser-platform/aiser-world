@@ -18,6 +18,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.pool import QueuePool
+import sqlalchemy as sa
+from app.modules.data.utils.credentials import decrypt_credentials
 
 # Database drivers
 import psycopg2
@@ -151,10 +153,10 @@ class RealCubeIntegrationService:
                 return direct_test
 
             # Decrypt credentials if encrypted
-            from app.modules.data.utils.credentials import decrypt_credentials
             config = decrypt_credentials(config)
 
             # Create SQLAlchemy engine
+            # Create engine with pooling and retries
             engine = await self._create_sqlalchemy_engine(config)
             if not engine:
                 return {"success": False, "error": "Failed to create SQLAlchemy engine"}

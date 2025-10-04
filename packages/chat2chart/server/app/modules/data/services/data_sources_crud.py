@@ -21,6 +21,7 @@ from app.modules.data.models import DataSource, DataQuery, DataConnection
 from app.modules.projects.models import Organization, Project
 from app.core.real_data_sources import real_data_source_manager
 from app.modules.data.utils.credentials import encrypt_credentials
+from app.core.metrics import DS_CREATE_COUNTER, DS_UPDATE_COUNTER, DS_DELETE_COUNTER, CONNECTION_TEST_COUNTER
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +73,7 @@ class DataSourcesCRUD:
         self,
         data_source_data: DataSourceCreate,
         user_id: str,
-        session: AsyncSession
+        session: Optional[AsyncSession] = None
     ) -> DataSourceResponse:
         """Create a new data source"""
         try:
@@ -191,7 +192,11 @@ class DataSourcesCRUD:
                 except Exception as e:
                     logger.warning(f"Connection test failed: {e}")
                     connection_status = "failed"
-            
+            try:
+                DS_CREATE_COUNTER.inc()
+            except Exception:
+                pass
+
             return DataSourceResponse(
                 id=data_source.id,
                 name=data_source.name,
@@ -223,7 +228,7 @@ class DataSourcesCRUD:
         project_id: Optional[str] = None,
         data_source_type: Optional[str] = None,
         is_active: Optional[bool] = None,
-        session: AsyncSession
+        session: Optional[AsyncSession] = None
     ) -> List[DataSourceResponse]:
         """List data sources with filters"""
         try:
@@ -295,7 +300,7 @@ class DataSourcesCRUD:
         data_source_id: str,
         update_data: DataSourceUpdate,
         user_id: str,
-        session: AsyncSession
+        session: Optional[AsyncSession] = None
     ) -> DataSourceResponse:
         """Update a data source"""
         try:
@@ -350,7 +355,11 @@ class DataSourcesCRUD:
                     connection_status = "failed"
             
             await session.commit()
-            
+            try:
+                DS_UPDATE_COUNTER.inc()
+            except Exception:
+                pass
+
             return DataSourceResponse(
                 id=data_source.id,
                 name=data_source.name,
@@ -382,7 +391,7 @@ class DataSourcesCRUD:
         self,
         data_source_id: str,
         user_id: str,
-        session: AsyncSession
+        session: Optional[AsyncSession] = None
     ) -> bool:
         """Delete a data source"""
         try:
@@ -408,7 +417,11 @@ class DataSourcesCRUD:
             data_source.updated_at = datetime.now(timezone.utc)
             
             await session.commit()
-            
+            try:
+                DS_DELETE_COUNTER.inc()
+            except Exception:
+                pass
+
             return True
             
         except HTTPException:
@@ -425,7 +438,7 @@ class DataSourcesCRUD:
         self,
         data_source_id: str,
         user_id: str,
-        session: AsyncSession
+        session: Optional[AsyncSession] = None
     ) -> Dict[str, Any]:
         """Test data source connection"""
         try:
@@ -474,7 +487,7 @@ class DataSourcesCRUD:
         data_source_id: str,
         query: str,
         user_id: str,
-        session: AsyncSession
+        session: Optional[AsyncSession] = None
     ) -> Dict[str, Any]:
         """Execute query on data source"""
         try:
@@ -524,7 +537,7 @@ class DataSourcesCRUD:
         self,
         data_source_id: str,
         user_id: str,
-        session: AsyncSession
+        session: Optional[AsyncSession] = None
     ) -> Dict[str, Any]:
         """Get data source schema"""
         try:

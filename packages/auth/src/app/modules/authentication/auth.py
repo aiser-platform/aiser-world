@@ -1,5 +1,6 @@
 import logging
 import time
+import uuid
 from typing import Dict
 
 from jose import JWTError, jwe, jwt
@@ -52,6 +53,12 @@ class Auth:
             "iat": self.JWT_IAT,
             "scope": "access_token",
         }
+
+        # Ensure all UUID values are converted to strings for JSON serialization
+        for k, v in list(payload.items()):
+            if isinstance(v, uuid.UUID):
+                payload[k] = str(v)
+
         token = jwt.encode(payload, self.SECRET, algorithm=self.JWT_ALGORITHM)
 
         return token
@@ -65,6 +72,11 @@ class Auth:
             "iat": self.JWT_IAT,
             "scope": "refresh_token",
         }
+        # Ensure all UUID values are converted to strings for JSON serialization
+        for k, v in list(refresh_payload.items()):
+            if isinstance(v, uuid.UUID):
+                refresh_payload[k] = str(v)
+
         refresh_jwt = jwt.encode(
             refresh_payload,
             self.SECRET,

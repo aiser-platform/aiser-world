@@ -27,6 +27,8 @@ class DataSourceCreate(DataSourceBase):
 
 class DataSourceUpdate(BaseModel):
     name: Optional[str] = None
+    description: Optional[str] = None
+    connection_config: Optional[Dict[str, Any]] = None
     is_active: Optional[bool] = None
     last_accessed: Optional[datetime] = None
 

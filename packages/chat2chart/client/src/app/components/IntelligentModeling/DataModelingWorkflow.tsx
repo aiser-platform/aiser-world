@@ -38,51 +38,29 @@ const DataModelingWorkflow: React.FC<DataModelingWorkflowProps> = ({
     const [analysisResult, setAnalysisResult] = useState<any>(null);
     const [modelData, setModelData] = useState<any>(null);
 
-    // Define workflow steps
+    // Define workflow steps (static metadata). Completion state is computed dynamically below.
     const workflowSteps: WorkflowStep[] = [
-        {
-            key: 'analysis',
-            title: 'AI Analysis',
-            description: 'Analyzing data structure',
-            isRequired: true,
-            isCompleted: !!analysisResult,
-            canSkip: false
-        },
-        {
-            key: 'review',
-            title: 'Review Model',
-            description: 'Review generated model',
-            isRequired: true,
-            isCompleted: !!analysisResult?.yaml_schema,
-            canSkip: false
-        },
-        {
-            key: 'customize',
-            title: 'Customize',
-            description: 'Make adjustments',
-            isRequired: false,
-            isCompleted: false,
-            canSkip: true
-        },
-        {
-            key: 'deploy',
-            title: 'Deploy',
-            description: 'Activate the model',
-            isRequired: true,
-            isCompleted: false,
-            canSkip: false
-        }
+        { key: 'analysis', title: 'AI Analysis', description: 'Analyzing data structure', isRequired: true, canSkip: false },
+        { key: 'review', title: 'Review Model', description: 'Review generated model', isRequired: true, canSkip: false },
+        { key: 'customize', title: 'Customize', description: 'Make adjustments', isRequired: false, canSkip: true },
+        { key: 'deploy', title: 'Deploy', description: 'Activate the model', isRequired: true, canSkip: false }
     ];
 
     // Step validation
     const canProceedToNext = (): boolean => {
-        const currentStepData = workflowSteps[currentStep];
-        if (!currentStepData) return false;
-        
-        if (currentStepData.isRequired && !currentStepData.isCompleted) {
-            return false;
+        // Dynamically evaluate completion based on analysisResult and modelData
+        const step = currentStep;
+        if (step === 0) {
+            return !!analysisResult; // analysis must be present
         }
-        
+        if (step === 1) {
+            // Review requires a generated schema or fallback model
+            return !!(analysisResult?.cube_schema || analysisResult?.yaml_schema || analysisResult?.data_analysis || analysisResult?.fallback_model);
+        }
+        if (step === 2) {
+            // Customize is optional
+            return true;
+        }
         return true;
     };
 
@@ -119,33 +97,33 @@ const DataModelingWorkflow: React.FC<DataModelingWorkflowProps> = ({
         try {
             // Step 1: AI Analysis
             message.info('🧠 AI is analyzing your data structure...');
-            
+
             // Analyze with Cube.js modeling service
             const analysisResponse = await fetch('http://localhost:8000/data/cube-modeling/analyze', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    data_source_id: dataSourceId,
-                    connection_info: null // For uploaded files
-                })
+                body: JSON.stringify({ data_source_id: dataSourceId, connection_info: null })
             });
-            
-            const analysisResult = await analysisResponse.json();
-            
-            if (!analysisResult.success) {
-                throw new Error(analysisResult.error || 'Analysis failed');
+
+            const analysisJson = await analysisResponse.json();
+
+            // Accept responses that either indicate success or include a fallback model
+            if (!analysisJson.success && !analysisJson.fallback_model) {
+                throw new Error(analysisJson.error || 'Analysis failed');
             }
-            
-            setAnalysisResult(analysisResult);
+
+            // Normalize and store analysis result
+            setAnalysisResult(analysisJson);
             setCurrentStep(1);
-            
-            message.success('✅ AI analysis completed!');
-            
-            // Auto-proceed to review step
+
+            message.success('✅ AI analysis completed (or fallback applied)!');
+
+            // Auto-proceed to review/customize after a short delay
             setTimeout(() => {
+                // If a schema or fallback is available, show review; otherwise skip to customize
                 setCurrentStep(2);
                 message.info('📋 Review the generated Cube.js schema...');
-            }, 1000);
+            }, 800);
             
         } catch (error) {
             message.error('❌ Analysis failed: ' + (error as Error).message);

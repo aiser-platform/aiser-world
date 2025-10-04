@@ -361,6 +361,7 @@ def provision_user(payload: dict = Body(...), x_internal_auth: str | None = Head
         sync_engine = get_sync_engine()
         new_uuid = None
         legacy_id_val = None
+        created_id = None
         try:
             if isinstance(uid, int) or (isinstance(uid, str) and str(uid).isdigit()):
                 legacy_id_val = int(uid)
@@ -375,45 +376,66 @@ def provision_user(payload: dict = Body(...), x_internal_auth: str | None = Head
             legacy_id_val = None
 
         with sync_engine.connect() as conn:
-            # Upsert user: create with UUID primary key and set legacy_id when numeric provided
-            if legacy_id_val is not None:
-                # create a UUID for id
-                new_uuid = str(_uuid.uuid4())
-                upsert_sql = sa.text(
-                    "INSERT INTO users (id, legacy_id, username, email, password, is_active, is_deleted, created_at, updated_at) "
-                    "VALUES (:id, :legacy_id, :username, :email, :password, :is_active, :is_deleted, now(), now()) "
-                    "ON CONFLICT (email) DO UPDATE SET username = EXCLUDED.username, legacy_id = COALESCE(users.legacy_id, EXCLUDED.legacy_id) RETURNING id"
-                )
-                params = {"id": new_uuid, "legacy_id": legacy_id_val, "username": (username or email.split('@')[0]), "email": email, "password": '', "is_active": True, "is_deleted": False}
-            else:
-                new_uuid = str(_uuid.uuid4())
-                upsert_sql = sa.text(
-                    "INSERT INTO users (id, username, email, password, is_active, is_deleted, created_at, updated_at) "
-                    "VALUES (:id, :username, :email, :password, :is_active, :is_deleted, now(), now()) "
-                    "ON CONFLICT (email) DO UPDATE SET username = EXCLUDED.username RETURNING id"
-                )
-                params = {"id": new_uuid, "username": (username or email.split('@')[0]), "email": email, "password": '', "is_active": True, "is_deleted": False}
-
+            # Robust, deterministic provisioning logic:
+            # 1) Prefer existing row by legacy_id if provided.
+            # 2) Else prefer existing row by email.
+            # 3) Otherwise insert a new row (with legacy_id if provided).
             try:
-                # perform upsert and ensure legacy_id persisted atomically
                 with conn.begin():
-                    res = conn.execute(upsert_sql, params)
-                    prow = res.fetchone()
-                    if prow and prow[0]:
-                        created_id = prow[0]
-                    else:
-                        created_id = None
-
-                    # If legacy_id was provided ensure it's persisted (use UPDATE ... WHERE email)
+                    # 1) Try legacy_id lookup (deterministic mapping)
                     if legacy_id_val is not None:
-                        # Only set legacy_id where it is NULL to avoid type comparison issues
-                        upd_legacy = sa.text(
-                            "UPDATE users SET legacy_id = :legacy WHERE email = :email AND legacy_id IS NULL RETURNING id"
-                        )
-                        resu2 = conn.execute(upd_legacy, {"legacy": legacy_id_val, "email": email})
-                        r2 = resu2.fetchone()
-                        if r2 and r2[0]:
-                            created_id = r2[0]
+                        q_legacy = sa.text("SELECT id, email FROM users WHERE legacy_id = :legacy LIMIT 1")
+                        r_legacy = conn.execute(q_legacy, {"legacy": legacy_id_val})
+                        row_legacy = r_legacy.fetchone()
+                        if row_legacy and row_legacy[0]:
+                            created_id = str(row_legacy[0])
+                            # Ensure username/email are up-to-date
+                            upd = sa.text(
+                                "UPDATE users SET username = :username, email = :email, updated_at = now() WHERE id = :id"
+                            )
+                            conn.execute(upd, {"username": (username or email.split('@')[0]), "email": email, "id": created_id})
+
+                    # 2) If not resolved, try email lookup
+                    if not created_id:
+                        q_email = sa.text("SELECT id, legacy_id FROM users WHERE email = :email LIMIT 1")
+                        r_email = conn.execute(q_email, {"email": email})
+                        row_email = r_email.fetchone()
+                        if row_email and row_email[0]:
+                            created_id = str(row_email[0])
+                            existing_legacy = None
+                            try:
+                                existing_legacy = row_email[1]
+                            except Exception:
+                                existing_legacy = None
+                            # If legacy provided and currently NULL, set it
+                            if legacy_id_val is not None and (existing_legacy is None):
+                                upd_legacy = sa.text(
+                                    "UPDATE users SET legacy_id = :legacy WHERE id = :id RETURNING id"
+                                )
+                                resu2 = conn.execute(upd_legacy, {"legacy": legacy_id_val, "id": created_id})
+                                r2 = resu2.fetchone()
+                                if r2 and r2[0]:
+                                    created_id = str(r2[0])
+
+                    # 3) If still not found, insert new user deterministically
+                    if not created_id:
+                        new_uuid = str(_uuid.uuid4())
+                        if legacy_id_val is not None:
+                            ins_sql = sa.text(
+                                "INSERT INTO users (id, legacy_id, username, email, password, is_active, is_deleted, created_at, updated_at) "
+                                "VALUES (:id, :legacy_id, :username, :email, :password, :is_active, :is_deleted, now(), now()) RETURNING id"
+                            )
+                            params = {"id": new_uuid, "legacy_id": legacy_id_val, "username": (username or email.split('@')[0]), "email": email, "password": '', "is_active": True, "is_deleted": False}
+                        else:
+                            ins_sql = sa.text(
+                                "INSERT INTO users (id, username, email, password, is_active, is_deleted, created_at, updated_at) "
+                                "VALUES (:id, :username, :email, :password, :is_active, :is_deleted, now(), now()) RETURNING id"
+                            )
+                            params = {"id": new_uuid, "username": (username or email.split('@')[0]), "email": email, "password": '', "is_active": True, "is_deleted": False}
+                        res = conn.execute(ins_sql, params)
+                        prow = res.fetchone()
+                        if prow and prow[0]:
+                            created_id = str(prow[0])
             except Exception as e:
                 logger.exception(f"Provision upsert failed: {e}")
                 created_id = None
@@ -431,6 +453,51 @@ def provision_user(payload: dict = Body(...), x_internal_auth: str | None = Head
     except Exception as e:
         logger.exception('Failed to provision user (non-fatal): %s', e)
         return {"created": False, "id": None}
+
+    finally:
+        # After provisioning, attempt domain-based org auto-join (best-effort, non-fatal)
+        try:
+            # Only run auto-join when we have an email and created_id
+            if created_id and email:
+                domain = None
+                try:
+                    domain = email.split('@')[-1].lower()
+                except Exception:
+                    domain = None
+
+                personal_domains = {
+                    'gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com',
+                    'protonmail.com', 'live.com', 'aol.com'
+                }
+
+                if domain and domain not in personal_domains:
+                    # Try to find an organization that matches this domain via website hostname or slug
+                    try:
+                        with sync_engine.connect() as conn2:
+                            # Search organizations by website containing domain, or slug/name matching domain
+                            q_org = sa.text(
+                                "SELECT id FROM organizations WHERE lower(website) LIKE :w OR lower(slug) = :d OR lower(name) LIKE :n LIMIT 1"
+                            )
+                            r_org = conn2.execute(q_org, {"w": f"%{domain}%", "d": domain.split('.')[0], "n": f"%{domain.split('.')[0]}%"})
+                            row_org = r_org.fetchone()
+                            if row_org and row_org[0]:
+                                org_id = int(row_org[0])
+                                # Ensure user_organizations table exists and insert membership if not present
+                                try:
+                                    q_check = sa.text("SELECT id FROM user_organizations WHERE user_id = :uid AND organization_id = :oid LIMIT 1")
+                                    exists = conn2.execute(q_check, {"uid": created_id, "oid": org_id}).fetchone()
+                                    if not exists:
+                                        ins = sa.text("INSERT INTO user_organizations (organization_id, user_id, role, is_active) VALUES (:oid, :uid, :role, TRUE)")
+                                        conn2.execute(ins, {"oid": org_id, "uid": created_id, "role": 'member'})
+                                        conn2.commit()
+                                        logger.info(f"Auto-joined user {created_id} to organization {org_id} based on email domain {domain}")
+                                except Exception as e:
+                                    logger.debug(f"Auto-join skipped: user_organizations insert failed: {e}")
+                    except Exception as e:
+                        logger.debug(f"Auto-join org search failed for domain {domain}: {e}")
+        except Exception:
+            # swallow all errors; provisioning already completed
+            pass
 
 
 @router.post("/auth/logout")

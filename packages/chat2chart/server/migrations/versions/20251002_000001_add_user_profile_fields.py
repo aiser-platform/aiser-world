@@ -19,6 +19,19 @@ depends_on = None
 
 def upgrade() -> None:
     # Add optional profile columns to users table
+    # Ensure verification-related columns exist for auth compatibility
+    try:
+        op.add_column('users', sa.Column('is_verified', sa.Boolean(), nullable=False, server_default=sa.text('false')))
+    except Exception:
+        pass
+    try:
+        op.add_column('users', sa.Column('verification_attempts', sa.Integer(), nullable=True, server_default='0'))
+    except Exception:
+        pass
+    try:
+        op.add_column('users', sa.Column('verification_sent_at', sa.DateTime(timezone=True), nullable=True))
+    except Exception:
+        pass
     op.add_column('users', sa.Column('first_name', sa.String(length=100), nullable=True))
     op.add_column('users', sa.Column('last_name', sa.String(length=100), nullable=True))
     op.add_column('users', sa.Column('phone', sa.String(length=50), nullable=True))

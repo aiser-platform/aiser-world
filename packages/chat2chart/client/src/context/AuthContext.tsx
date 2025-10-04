@@ -141,46 +141,51 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         try {
             setLoginError(null);
 
-            // First try enterprise login (username only) using the shared fetchApi helper
-            let response = await fetchApi('api/v1/enterprise/auth/login', {
+            // Try standard /users/signin first (less likely to trigger enterprise-specific CORS/preflight issues)
+            let response = await fetch(`${AUTH_URL}/users/signin`, {
                 method: 'POST',
-                body: JSON.stringify({ username: identifier, password }),
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                // Set the access token cookie for enterprise login
-                Cookies.set('access_token', data.access_token, { expires: 7, path: '/' });
-                Cookies.set('user', JSON.stringify(data.user), { expires: 7, path: '/' });
-                setUser(data.user);
-                setLoginError(null);
-                router.push('/');
-                return;
-            }
-
-            // If enterprise login fails, try standard login (supports both email and username)
-            response = await fetchApi('users/signin', {
-                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
                 body: JSON.stringify({ identifier, password }),
             });
+
+            if (!response.ok) {
+                // If standard sign-in fails with 404/405/other, fall back to enterprise login
+                try {
+                    const txt = await response.text();
+                    console.warn('Standard signin failed:', response.status, txt);
+                } catch (e) {
+                    console.warn('Standard signin failed and response body could not be read');
+                }
+
+                // Try enterprise login (username only) using the shared fetchApi helper
+                response = await fetchApi('api/v1/enterprise/auth/login', {
+                    method: 'POST',
+                    body: JSON.stringify({ username: identifier, password }),
+                });
+            } else {
+                // standard signin succeeded, proceed to handle below
+            }
 
             if (!response.ok) {
                 // Try to extract a structured error message, fall back to generic
                 let errMsg = 'Login failed';
                 try {
-                    const errorData = await response.json();
-                    errMsg = errorData.detail || errMsg;
+                    const contentType = response.headers.get('content-type') || '';
+                    if (contentType.includes('application/json')) {
+                        const errorData = await response.json();
+                        errMsg = errorData.detail || JSON.stringify(errorData) || errMsg;
+                    } else {
+                        const txt = await response.text();
+                        errMsg = txt || errMsg;
+                    }
                 } catch (e) {
                     // ignore parse errors
                 }
-                // Log response status and body for debugging Method Not Allowed / 405 issues
-                try {
-                    const txt = await response.text();
-                    console.error('Login response not ok', response.status, txt);
-                } catch (e) {
-                    console.error('Login response read error', e);
-                }
-                throw new Error(errMsg);
+                console.error('Login response not ok', response.status, errMsg);
+                setLoginError(`${response.status}: ${errMsg}`);
+                // return early instead of throwing to avoid unhandled exception in UI
+                return;
             }
 
             const data = await response.json();
@@ -218,10 +223,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 }),
                 credentials: 'include',
             });
-
             if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.detail || 'Signup failed');
+                let errMsg = 'Signup failed';
+                try {
+                    const contentType = response.headers.get('content-type') || '';
+                    if (contentType.includes('application/json')) {
+                        const errorData = await response.json();
+                        errMsg = errorData.detail || JSON.stringify(errorData) || errMsg;
+                    } else {
+                        errMsg = await response.text();
+                    }
+                } catch (e) {
+                    // ignore parse errors
+                }
+                console.error('Signup failed', response.status, errMsg);
+                setLoginError(`${response.status}: ${errMsg}`);
+                return;
             }
 
             const data = await response.json();

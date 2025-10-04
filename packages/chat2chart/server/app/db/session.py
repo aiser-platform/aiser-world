@@ -5,6 +5,8 @@ from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import QueuePool
+import os
 
 from app.core.config import settings
 import asyncio
@@ -44,7 +46,14 @@ def get_sync_engine():
     if _sync_engine is None:
         # Use the new SYNC_DATABASE_URI property
         sync_url = settings.SYNC_DATABASE_URI
-        _sync_engine = create_engine(sync_url, echo=True)
+        _sync_engine = create_engine(
+            sync_url,
+            echo=bool(os.getenv("SQLALCHEMY_ECHO", "false").lower() in ("1", "true")),
+            poolclass=QueuePool,
+            pool_size=int(os.getenv("DB_POOL_SIZE", "5")),
+            max_overflow=int(os.getenv("DB_POOL_MAX_OVERFLOW", "10")),
+            pool_pre_ping=True,
+        )
     return _sync_engine
 
 def get_sync_session():

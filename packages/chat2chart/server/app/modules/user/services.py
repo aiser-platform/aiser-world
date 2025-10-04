@@ -144,12 +144,33 @@ class UserService(BaseService[User, UserCreate, UserUpdate, UserResponse]):
             **self.auth.signJWT(**jwt_payload)
         )
 
-        # Persist refresh token server-side for revocation and rotation
+        # Persist refresh token server-side for revocation and rotation when possible.
         try:
-            await self.auth_service.persist_refresh_token(int(user.id), sign_in.refresh_token, self.auth.JWT_REFRESH_EXP_TIME_MINUTES)
+            # Prefer legacy numeric id when available
+            session_user_id = None
+            if getattr(user, 'legacy_id', None):
+                try:
+                    session_user_id = int(user.legacy_id)
+                except Exception:
+                    session_user_id = None
+            else:
+                # If id is numeric string, use it; otherwise skip persistence (UUIDs not castable to int)
+                try:
+                    if isinstance(user.id, int):
+                        session_user_id = int(user.id)
+                    elif isinstance(user.id, str) and user.id.isdigit():
+                        session_user_id = int(user.id)
+                except Exception:
+                    session_user_id = None
+
+            if session_user_id is not None:
+                await self.auth_service.persist_refresh_token(session_user_id, sign_in.refresh_token, self.auth.JWT_REFRESH_EXP_TIME_MINUTES)
+            else:
+                # Skip persistence for UUID primary keys in some dev DB layouts
+                logger.debug('persist_refresh_token: skipping persistence for non-numeric user id')
         except Exception:
             # Non-fatal if DB persist fails; log in production
-            pass
+            logger.exception('persist_refresh_token failed')
 
         # Set cookies with HttpOnly and SameSite handling
         secure_flag = False if settings.ENVIRONMENT == 'development' else True
@@ -182,7 +203,8 @@ class UserService(BaseService[User, UserCreate, UserUpdate, UserResponse]):
         except Exception:
             pass
 
-        return user
+        # Return token object (SignInResponse) to API layer
+        return SignInResponse(**sign_in.__dict__)
 
     async def sign_up(self, user_up: UserCreate, response: Response) -> SignInResponse:
         """

@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Card, Tabs, List, Button, Modal, Radio, Space, Tag, message } from 'antd';
-import { FileOutlined, DatabaseOutlined, EyeOutlined, DeleteOutlined, PlusOutlined, ExperimentOutlined } from '@ant-design/icons';
+import { Card, Tabs, List, Button, Modal, Radio, Space, Tag, message, Form, Input } from 'antd';
+import { FileOutlined, DatabaseOutlined, EyeOutlined, DeleteOutlined, PlusOutlined, ExperimentOutlined, EditOutlined } from '@ant-design/icons';
 import UploadDragger from '../FileUpload/Dragger';
+import { enhancedDataService } from '@/services/enhancedDataService';
 import DatabaseConnector, { DatabaseConnection } from '../DatabaseConnector';
 import DataModelingWorkflow from '../IntelligentModeling/DataModelingWorkflow';
 import { IFileUpload } from '../FileUpload/types';
@@ -45,6 +46,9 @@ const DataSourceManager: React.FC<DataSourceManagerProps> = ({
     const [dataSources, setDataSources] = useState<DataSource[]>([]);
     const [previewVisible, setPreviewVisible] = useState(false);
     const [previewData, setPreviewData] = useState<any>(null);
+    const [editModalVisible, setEditModalVisible] = useState(false);
+    const [editingSource, setEditingSource] = useState<DataSource | null>(null);
+    const [form] = Form.useForm();
     const [activeTab, setActiveTab] = useState('files');
     const [loading, setLoading] = useState(false);
     const [modelingVisible, setModelingVisible] = useState(false);
@@ -53,26 +57,26 @@ const DataSourceManager: React.FC<DataSourceManagerProps> = ({
     const [modelingWorkflowVisible, setModelingWorkflowVisible] = useState(false);
     const [currentDataSourceForModeling, setCurrentDataSourceForModeling] = useState<string | null>(null);
 
-    // Mock data for demonstration
-    useEffect(() => {
-        // Load existing data sources
-        const mockSources: DataSource[] = [
-            {
-                id: '1',
-                name: 'Sales Data Q4.csv',
-                type: 'file',
-                metadata: { size: '2.5MB', rows: 1500, columns: 8 },
-                createdAt: new Date('2024-01-15')
-            },
-            {
-                id: '2',
-                name: 'Production DB',
-                type: 'database',
-                metadata: { type: 'PostgreSQL', tables: 25, status: 'connected' },
-                createdAt: new Date('2024-01-10')
+    // Load data sources from backend
+    const loadDataSources = async () => {
+        setLoading(true);
+        try {
+            const res = await enhancedDataService.listDataSources();
+            if (res.success) {
+                setDataSources(res.data_sources || []);
+            } else {
+                message.error('Failed to load data sources: ' + (res.error || 'unknown'));
             }
-        ];
-        setDataSources(mockSources);
+        } catch (err) {
+            console.error('Failed to load data sources:', err);
+            message.error('Failed to load data sources');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        void loadDataSources();
     }, []);
 
     const handleFileUpload = (fileData?: IFileUpload) => {
@@ -181,34 +185,51 @@ const DataSourceManager: React.FC<DataSourceManagerProps> = ({
         }
     };
 
-    const handlePreview = (source: DataSource) => {
-        // Mock preview data
-        const mockPreviewData = {
-            schema: [
-                { name: 'id', type: 'integer' },
-                { name: 'name', type: 'string' },
-                { name: 'value', type: 'decimal' },
-                { name: 'date', type: 'datetime' }
-            ],
-            data: [
-                { id: 1, name: 'Product A', value: 299.99, date: '2024-01-15' },
-                { id: 2, name: 'Product B', value: 199.99, date: '2024-01-16' },
-                { id: 3, name: 'Product C', value: 399.99, date: '2024-01-17' }
-            ]
-        };
-        
-        setPreviewData(mockPreviewData);
-        setPreviewVisible(true);
+    const handlePreview = async (source: DataSource) => {
+        setLoading(true);
+        try {
+            const res = await enhancedDataService.getDataSourceSchema(source.id);
+            if (res.success && res.schema) {
+                // Convert schema to previewData format
+                const schemaObj = res.schema;
+                const cols: any[] = [];
+                // If schema is a mapping of table->columns, pick first table
+                if (schemaObj && typeof schemaObj === 'object') {
+                    const firstKey = Object.keys(schemaObj)[0];
+                    const colList = Array.isArray(schemaObj[firstKey]) ? schemaObj[firstKey] : [];
+                    for (const c of colList) {
+                        cols.push({ name: c.column_name || c.name || c[0], type: c.data_type || c.type || 'string' });
+                    }
+                }
+
+                setPreviewData({ schema: cols, data: [] });
+                setPreviewVisible(true);
+            } else {
+                message.warn('Schema not available for preview');
+            }
+        } catch (err) {
+            console.error('Failed to load schema preview:', err);
+            message.error('Failed to load schema preview');
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleDelete = (sourceId: string) => {
         Modal.confirm({
             title: 'Delete Data Source',
             content: 'Are you sure you want to delete this data source?',
-            onOk: () => {
-                setDataSources(prev => prev.filter(s => s.id !== sourceId));
-                onSourceDelete(sourceId);
-                message.success('Data source deleted successfully!');
+            onOk: async () => {
+                try {
+                    const resp = await enhancedDataService.deleteDataSource(sourceId);
+                    if (!resp.success) throw new Error(resp.error || 'Delete failed');
+                    setDataSources(prev => prev.filter(s => s.id !== sourceId));
+                    try { onSourceDelete && onSourceDelete(sourceId); } catch (e) {}
+                    message.success('Data source deleted successfully!');
+                } catch (err) {
+                    console.error('Failed to delete data source:', err);
+                    message.error('Failed to delete data source: ' + (err instanceof Error ? err.message : String(err)));
+                }
             }
         });
     };
@@ -236,6 +257,7 @@ const DataSourceManager: React.FC<DataSourceManagerProps> = ({
                 >
                     AI Model
                 </Button>,
+                <Button type="text" key="edit" icon={<EditOutlined />} onClick={() => openEditModal(source)}>Edit</Button>,
                 <Button 
                     key="delete"
                     type="text" 
@@ -294,6 +316,22 @@ const DataSourceManager: React.FC<DataSourceManagerProps> = ({
     const fileSources = dataSources.filter(s => s.type === 'file');
     const dbSources = dataSources.filter(s => s.type === 'database');
 
+    const openEditModal = (source: DataSource) => {
+        setEditingSource(source);
+        const initial: any = { name: source.name, description: source.metadata?.description || '' };
+        // If database source, prefill editable connection fields (mask sensitive ones)
+        if (source.type === 'database') {
+            initial.host = (source.data && source.data.host) || source.metadata?.host || '';
+            initial.port = (source.data && source.data.port) || '';
+            initial.database = (source.data && source.data.database) || source.metadata?.database || '';
+            initial.username = (source.data && source.data.username) || '';
+            // Mask password in the UI; only send if changed
+            initial.password = (source.data && source.data.password) ? '****' : '';
+        }
+        form.setFieldsValue(initial);
+        setEditModalVisible(true);
+    };
+
     return (
         <div style={{ width: '100%' }}>
             <Card title="Data Source Manager" style={{ marginBottom: 16 }}>
@@ -315,11 +353,15 @@ const DataSourceManager: React.FC<DataSourceManagerProps> = ({
                                         <UploadDragger onUpload={handleFileUpload} />
                                     </div>
                                     
-                                    <List
-                                        dataSource={fileSources}
-                                        renderItem={renderSourceItem}
-                                        locale={{ emptyText: 'No files uploaded yet' }}
-                                    />
+                <div style={{ maxHeight: 420, overflowY: 'auto' }}>
+                <div style={{ maxHeight: 420, overflowY: 'auto' }}>
+                    <List
+                        dataSource={fileSources}
+                        renderItem={renderSourceItem}
+                        locale={{ emptyText: 'No files uploaded yet' }}
+                    />
+                </div>
+                </div>
                                 </div>
                             )
                         },
@@ -341,11 +383,13 @@ const DataSourceManager: React.FC<DataSourceManagerProps> = ({
                                         />
                                     </div>
                                     
-                                    <List
-                                        dataSource={dbSources}
-                                        renderItem={renderSourceItem}
-                                        locale={{ emptyText: 'No databases connected yet' }}
-                                    />
+                                    <div style={{ maxHeight: 420, overflowY: 'auto' }}>
+                                        <List
+                                            dataSource={dbSources}
+                                            renderItem={renderSourceItem}
+                                            locale={{ emptyText: 'No databases connected yet' }}
+                                        />
+                                    </div>
                                 </div>
                             )
                         }
@@ -378,6 +422,94 @@ const DataSourceManager: React.FC<DataSourceManagerProps> = ({
                         </div>
                     </div>
                 )}
+            </Modal>
+
+            {/* Edit Modal */}
+            <Modal
+                title="Edit Data Source"
+                open={editModalVisible}
+                onCancel={() => { setEditModalVisible(false); setEditingSource(null); form.resetFields(); }}
+                onOk={async () => {
+                    try {
+                        const values = await form.validateFields();
+                        if (!editingSource) throw new Error('No source selected');
+                        // Build optimistic update and payload
+                        const optimistic = { ...editingSource, name: values.name, metadata: { ...(editingSource.metadata || {}), description: values.description } };
+                        setDataSources(prev => prev.map(s => s.id === editingSource.id ? optimistic : s));
+
+                        const connConfig: any = editingSource.type === 'database' ? { ...(editingSource.data || {}) } : undefined;
+                        if (editingSource.type === 'database') {
+                            if (values.host !== undefined) connConfig.host = values.host;
+                            if (values.port !== undefined) connConfig.port = values.port;
+                            if (values.database !== undefined) connConfig.database = values.database;
+                            if (values.username !== undefined) connConfig.username = values.username;
+                            // Only send password if changed (not '****')
+                            if (values.password && values.password !== '****') connConfig.password = values.password;
+                        }
+
+                        const updatePayload = {
+                            name: values.name,
+                            description: values.description,
+                            connection_config: connConfig
+                        };
+
+                        const resp = await enhancedDataService.updateDataSource(editingSource.id, updatePayload);
+                        if (!resp.success) {
+                            // Rollback optimistic update if update failed
+                            setDataSources(prev => prev.map(s => s.id === editingSource.id ? editingSource : s));
+                            throw new Error(resp.error || 'Update failed');
+                        }
+
+                        // Merge returned data source metadata if provided
+                        const updated = resp.data_source || { id: editingSource.id, name: values.name };
+                        setDataSources(prev => prev.map(s => s.id === editingSource.id ? { ...s, ...updated } : s));
+                        // Refresh authoritative list from backend
+                        try { await loadDataSources(); } catch (e) { /* ignore */ }
+                        message.success('Data source updated');
+                        setEditModalVisible(false);
+                        setEditingSource(null);
+                        form.resetFields();
+                    } catch (err) {
+                        console.error('Update failed:', err);
+                        message.error('Update failed: ' + (err instanceof Error ? err.message : String(err)));
+                    }
+                }}
+                width={600}
+                destroyOnClose
+            >
+                <Form form={form} layout="vertical" initialValues={{ name: '', description: '' }}>
+                    <Form.Item name="name" label="Name" rules={[{ required: true, message: 'Name is required' }]}>
+                        <Input />
+                    </Form.Item>
+                    <Form.Item name="description" label="Description">
+                        <Input.TextArea rows={3} />
+                    </Form.Item>
+
+                    {/* Database-specific editable fields */}
+                    <Form.Item shouldUpdate={(prev, cur) => prev !== cur} noStyle>
+                        {() => (
+                            form.getFieldValue('host') !== undefined || editingSource?.type === 'database' ? (
+                                <>
+                                    <Form.Item name="host" label="Host">
+                                        <Input />
+                                    </Form.Item>
+                                    <Form.Item name="port" label="Port">
+                                        <Input />
+                                    </Form.Item>
+                                    <Form.Item name="database" label="Database">
+                                        <Input />
+                                    </Form.Item>
+                                    <Form.Item name="username" label="Username">
+                                        <Input />
+                                    </Form.Item>
+                                    <Form.Item name="password" label="Password" extra="Leave as '****' to keep existing password">
+                                        <Input.Password />
+                                    </Form.Item>
+                                </>
+                            ) : null
+                        )}
+                    </Form.Item>
+                </Form>
             </Modal>
 
             {/* AI Data Modeling Workflow Modal */}

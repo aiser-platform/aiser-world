@@ -31,6 +31,10 @@ class User(BaseModel):
     # Password hash stored for authentication
     password = Column(String(255), nullable=False)
     is_active = Column(Boolean, default=True)
+    # Verification and account state
+    is_verified = Column(Boolean, default=False, nullable=False)
+    verification_attempts = Column(Integer, default=0, nullable=True)
+    verification_sent_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     

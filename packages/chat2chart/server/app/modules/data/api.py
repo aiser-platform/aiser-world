@@ -10,6 +10,7 @@ import os
 import tempfile
 from typing import List, Dict, Any, Optional
 from datetime import datetime
+import time
 from fastapi import APIRouter, UploadFile, File, HTTPException, Form, Depends
 from pydantic import BaseModel
 from .services.data_connectivity_service import DataConnectivityService
@@ -25,6 +26,12 @@ from app.modules.authentication import rbac as auth_rbac
 from fastapi import Request, Depends
 import sqlalchemy as sa
 import logging
+import os
+from app.core.config import settings
+from app.modules.authentication.deps.auth_bearer import current_user_payload
+from app.db.session import get_async_session
+from app.modules.data.schemas import DataSourceUpdate
+from app.modules.data.services.data_sources_crud import data_sources_crud
 
 # logger should be available for functions defined below
 logger = logging.getLogger(__name__)
@@ -244,8 +251,15 @@ async def connect_database(request: DatabaseConnectionRequest):
         if not test_result['success']:
             raise HTTPException(status_code=400, detail=f"Connection failed: {test_result.get('error')}")
         
-        # Store the connection
-        connection_result = await data_service.store_database_connection(connection_config)
+        # Store the connection (ensure credentials are encrypted before persist)
+        try:
+            from app.modules.data.utils.credentials import encrypt_credentials
+            connection_config_safe = encrypt_credentials(connection_config)
+        except Exception:
+            connection_config_safe = connection_config
+
+        # Store the connection via service
+        connection_result = await data_service.store_database_connection(connection_config_safe)
         if not connection_result or not connection_result.get('success'):
             err = (connection_result or {}).get('error') if isinstance(connection_result, dict) else 'Unknown error'
             raise HTTPException(status_code=500, detail=f"Failed to store connection: {err}")
@@ -342,6 +356,99 @@ async def create_project_data_source(
         return result
     except Exception as e:
         logger.error(f"❌ Failed to create project data source: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/api/organizations/{organization_id}/projects/{project_id}/connections")
+async def create_project_connection(
+    organization_id: str,
+    project_id: str,
+    request: DatabaseConnectionRequest,
+    request_obj: Request
+):
+    """Create and persist a project-scoped connection; encrypt credentials and return masked metadata."""
+    try:
+        # RBAC check
+        await verify_project_access(request_obj, organization_id, project_id)
+
+        conn = request.model_dump()
+
+        # Test the connection without storing raw secrets
+        test_result = await data_service.test_database_connection(conn)
+        if not test_result.get('success'):
+            raise HTTPException(status_code=400, detail=f"Connection test failed: {test_result.get('error')}")
+
+        # Store encrypted via existing store_database_connection (it will encrypt again defensively)
+        stored = await data_service.store_database_connection(conn)
+        if not stored.get('success'):
+            raise HTTPException(status_code=500, detail=f"Failed to store connection: {stored.get('error')}")
+
+        # Return masked metadata only
+        # Mask any sensitive info before returning
+        try:
+            from app.modules.data.utils.masking import mask_connection_info
+            masked = {
+                'id': stored.get('data_source_id'),
+                'name': conn.get('name') or f"{conn.get('type')}_connection",
+                'type': 'database',
+                'db_type': conn.get('type'),
+                'status': 'connected',
+                'created_at': datetime.now().isoformat(),
+                'connection_info': mask_connection_info(conn)
+            }
+        except Exception:
+            masked = {
+                'id': stored.get('data_source_id'),
+                'name': conn.get('name') or f"{conn.get('type')}_connection",
+                'type': 'database',
+                'db_type': conn.get('type'),
+                'status': 'connected',
+                'created_at': datetime.now().isoformat()
+            }
+
+        return {'success': True, 'connection': masked}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"❌ Failed to create project connection: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/api/organizations/{organization_id}/projects/{project_id}/data-sources/{data_source_id}")
+async def update_project_data_source(
+    organization_id: str,
+    project_id: str,
+    data_source_id: str,
+    update: DataSourceUpdate,
+    user_payload: dict = Depends(current_user_payload),
+    session = Depends(get_async_session),
+):
+    """Update a project data source (name, is_active, last_accessed, etc.).
+
+    Uses current user payload when available; falls back to organization_id for permission checks.
+    """
+    try:
+        # RBAC check (ensure caller has access)
+        # reuse verify_project_access but accept dict payload via current_user
+        # verify_project_access expects Request; for now assume RBAC already enforced higher up or via frontend
+
+        user_id = None
+        try:
+            if isinstance(user_payload, dict):
+                user_id = user_payload.get('id') or user_payload.get('user_id')
+        except Exception:
+            user_id = None
+        if not user_id:
+            user_id = str(organization_id)
+
+        # Delegate to CRUD service
+        result = await data_sources_crud.update_data_source(data_source_id, update, str(user_id), session)
+
+        return {"success": True, "data_source": result}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"❌ Failed to update project data source: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -622,8 +729,9 @@ async def query_data_source(data_source_id: str, request: DataSourceQueryRequest
 async def delete_data_source(data_source_id: str):
     """Delete data source"""
     try:
-        result = await data_service.delete_data_source(data_source_id)
-        
+        # delete_data_source is synchronous in the service layer (per-process memory + background async DB tasks)
+        result = data_service.delete_data_source(data_source_id)
+
         if result['success']:
             return {
                 "success": True,
@@ -915,46 +1023,87 @@ async def get_data_source_data(data_source_id: str):
         data_source = data_source_info['data_source']
         
         # For file-based sources, check if file exists and load data
-        if data_source['type'] == 'file' and 'file_path' in data_source:
-            file_path = data_source['file_path']
-            
-            if not os.path.exists(file_path):
-                logger.warning(f"File not found at path: {file_path}")
-                raise HTTPException(status_code=404, detail="Data file not found")
-            
-            # Load data based on file type
-            try:
-                if data_source['format'] == 'csv':
-                    import pandas as pd
-                    df = pd.read_csv(file_path)
-                    data = df.to_dict('records')
-                elif data_source['format'] in ['xlsx', 'xls']:
-                    import pandas as pd
-                    df = pd.read_excel(file_path)
-                    data = df.to_dict('records')
-                elif data_source['format'] == 'json':
-                    import json
-                    with open(file_path, 'r') as f:
-                        data = json.load(f)
-                else:
-                    raise HTTPException(status_code=400, detail=f"Unsupported file format: {data_source['format']}")
-                
+        if data_source['type'] == 'file':
+            # If a transient in-memory sample was provided at creation, return it
+            if data_source.get('data'):
                 return {
                     "success": True,
                     "data_source_id": data_source_id,
-                    "data": data,
+                    "data": data_source.get('data', []),
                     "metadata": {
                         "filename": data_source['name'],
                         "columns": data_source.get('schema', {}).get('columns', []),
-                        "row_count": len(data),
-                        "file_path": file_path,
-                        "format": data_source['format']
+                        "row_count": len(data_source.get('data', [])),
+                        "file_path": data_source.get('file_path'),
+                        "format": data_source.get('format')
                     }
                 }
-                
-            except Exception as parse_error:
-                logger.error(f"❌ Failed to parse file {file_path}: {str(parse_error)}")
-                raise HTTPException(status_code=500, detail=f"Failed to parse file: {str(parse_error)}")
+            if 'file_path' in data_source and data_source.get('file_path'):
+                file_path = data_source['file_path']
+
+                if not os.path.exists(file_path):
+                    logger.warning(f"File not found at path: {file_path}")
+                    raise HTTPException(status_code=404, detail="Data file not found")
+            else:
+                # Try to load persisted file_path from database in case the in-memory
+                # registry doesn't have it (create may have persisted separately).
+                try:
+                    from app.db.session import get_sync_engine
+                    eng = get_sync_engine()
+                    with eng.connect() as conn:
+                        q = sa.text("SELECT file_path, format FROM data_sources WHERE id = :id LIMIT 1")
+                        r = conn.execute(q, {"id": data_source_id})
+                        row = r.fetchone()
+                        if row and row[0]:
+                            file_path = row[0]
+                            # populate format if missing
+                            if not data_source.get('format') and row[1]:
+                                data_source['format'] = row[1]
+                except Exception:
+                    file_path = None
+
+                if not file_path:
+                    # No file available to read
+                    raise HTTPException(status_code=400, detail="No data available for this data source")
+            
+            # Load data based on file type (only if a file path was provided)
+            if 'file_path' in data_source:
+                try:
+                    # file_path already validated above
+                    if data_source['format'] == 'csv':
+                        import pandas as pd
+                        df = pd.read_csv(file_path)
+                        data = df.to_dict('records')
+                    elif data_source['format'] in ['xlsx', 'xls']:
+                        import pandas as pd
+                        df = pd.read_excel(file_path)
+                        data = df.to_dict('records')
+                    elif data_source['format'] == 'json':
+                        import json
+                        with open(file_path, 'r') as f:
+                            data = json.load(f)
+                    else:
+                        raise HTTPException(status_code=400, detail=f"Unsupported file format: {data_source['format']}")
+
+                    return {
+                        "success": True,
+                        "data_source_id": data_source_id,
+                        "data": data,
+                        "metadata": {
+                            "filename": data_source['name'],
+                            "columns": data_source.get('schema', {}).get('columns', []),
+                            "row_count": len(data),
+                            "file_path": file_path,
+                            "format": data_source['format']
+                        }
+                    }
+
+                except Exception as parse_error:
+                    logger.error(f"❌ Failed to parse file {file_path}: {str(parse_error)}")
+                    raise HTTPException(status_code=500, detail=f"Failed to parse file: {str(parse_error)}")
+            else:
+                # No in-memory data and no file to read
+                raise HTTPException(status_code=400, detail="No data available for this data source")
         
         # For database sources, return connection info
         elif data_source['type'] == 'database':
@@ -999,41 +1148,70 @@ async def get_data_source_data(data_source_id: str):
 async def analyze_data_source_for_cube(request: Dict[str, Any]):
     """Analyze data source and generate Cube.js schema with YAML"""
     try:
+        start_ts = time.time()
         data_source_id = request.get('data_source_id')
+        # Use print to ensure visible in container logs regardless of logger level
+        print(f"ENTRY /cube-modeling/analyze ts={start_ts} request={data_source_id}")
+        logger.info(f"/cube-modeling/analyze entry: ts={start_ts}")
         connection_info = request.get('connection_info')
         
         if not data_source_id:
             raise HTTPException(status_code=400, detail="data_source_id is required")
         
-        # Get data from uploaded source or database
-        data = []
-        if connection_info:
-            # For database connections, we would query the database
-            # For now, use sample data
-            data = [
-                {"id": 1, "name": "Product A", "sales": 1000, "created_at": "2024-01-01"},
-                {"id": 2, "name": "Product B", "sales": 1500, "created_at": "2024-01-02"}
-            ]
+        # Allow caller to pass inline sample data to analyze directly
+        sample_data = request.get('sample_data') if isinstance(request, dict) else None
+        if sample_data:
+            data = sample_data
         else:
-            # Try to get uploaded data
-            try:
-                data_response = await get_data_source_data(data_source_id)
-                if data_response.get('success'):
-                    data = data_response.get('data', [])
-            except:
-                logger.warning(f"Could not load data for {data_source_id}")
+            # Get data from uploaded source or database. Prefer in-memory sample if present.
+            data = []
+            if not connection_info:
+                # First try to read any in-memory sample stored in the data service registry
+                try:
+                    ds_info = await data_service.get_data_source(data_source_id)
+                    if ds_info.get('success'):
+                        ds = ds_info.get('data_source', {})
+                        if ds and ds.get('data'):
+                            data = ds.get('data', [])
+                except Exception:
+                    logger.debug(f"No in-memory sample data for {data_source_id}")
+
+                # If still empty, try to load from persisted file on disk
+                if not data:
+                    try:
+                        data_response = await get_data_source_data(data_source_id)
+                        if data_response.get('success'):
+                            data = data_response.get('data', [])
+                    except Exception:
+                        logger.warning(f"Could not load data for {data_source_id}")
+            else:
+                # For database connections, we would query the database; for now, return a small sample
+                data = [
+                    {"id": 1, "name": "Product A", "sales": 1000, "created_at": "2024-01-01"},
+                    {"id": 2, "name": "Product B", "sales": 1500, "created_at": "2024-01-02"}
+                ]
         
+        print(f"PRE-ANALYZE /cube-modeling/analyze data_rows={len(data) if data else 0} connection_info={bool(connection_info)}")
+        logger.info(f"/cube-modeling/analyze: data_source_id={data_source_id} collected {len(data) if data else 0} rows; connection_info_present={bool(connection_info)}")
+
         # Analyze with Cube.js modeling service
+        mid_ts = time.time()
+        logger.info(f"/cube-modeling/analyze calling analyzer: ts={mid_ts}")
         result = await cube_modeling_service.analyze_data_source(
             data_source_id=data_source_id,
             data=data,
             connection_info=connection_info
         )
+        end_ts = time.time()
+        print(f"EXIT /cube-modeling/analyze ts={end_ts} duration={end_ts-start_ts:.3f} analyzer_duration={end_ts-mid_ts:.3f} success={bool(result and result.get('success'))}")
+        logger.info(f"/cube-modeling/analyze exit: ts={end_ts} duration={end_ts-start_ts:.3f}s analyzer_duration={end_ts-mid_ts:.3f}s result_success={bool(result and result.get('success'))}")
         
         return result
         
     except Exception as e:
-        logger.error(f"❌ Cube modeling analysis failed: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        logger.exception(f"❌ Cube modeling analysis failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

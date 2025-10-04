@@ -567,6 +567,30 @@ class EnhancedDataService {
         }
     }
 
+    /**
+     * Update a data source (name, description, connection_config, is_active)
+     */
+    async updateDataSource(dataSourceId: string, updatePayload: any): Promise<{ success: boolean; data_source?: any; error?: string }> {
+        try {
+            // Using project-scoped API; defaults to org=1,proj=1 when context unknown
+            const response = await fetchApi(`data/api/organizations/1/projects/1/data-sources/${dataSourceId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updatePayload),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || `Update failed: ${response.statusText}`);
+            }
+
+            const result = await response.json();
+            return result;
+        } catch (error) {
+            return { success: false, error: error instanceof Error ? error.message : 'Update failed' };
+        }
+    }
+
     // ===== UTILITY METHODS =====
 
     /**

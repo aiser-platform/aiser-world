@@ -1,6 +1,6 @@
 import logging
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
 from fastapi import HTTPException
@@ -28,6 +28,7 @@ from app.modules.authentication.schemas import (
 from app.modules.device_session.repository import DeviceSessionRepository
 from app.modules.device_session.schemas import (
     DeviceInfo,
+    DeviceSessionCreate,
 )
 from app.modules.email.core import send_reset_password_email, send_verification_email
 from app.modules.temporary_token.constants import TokenType
@@ -131,7 +132,7 @@ class UserService(BaseService):
         if not user.is_verified:
             # Check if verification token expired (1 hour)
             if user.verification_sent_at and (
-                datetime.utcnow() - user.verification_sent_at
+                datetime.now(timezone.utc) - user.verification_sent_at
             ) > timedelta(hours=1):
                 try:
                     # Generate new verification token
@@ -187,19 +188,51 @@ class UserService(BaseService):
                 # compute expiry (align with auth settings)
                 expires_at = datetime.utcnow() + timedelta(minutes=self.auth.JWT_REFRESH_EXP_TIME_MINUTES)
                 # Use repository to create session
-                await self.device_repo.create(
-                    DeviceSessionCreate(
-                        user_id=user.id,
-                        device_id=str(device_id),
-                        is_active=True,
-                        device_name=device_info.device_name,
-                        device_type=device_info.device_type,
-                        ip_address=device_info.ip_address,
-                        user_agent=device_info.user_agent,
-                        refresh_token=refresh,
-                        refresh_token_expires_at=expires_at,
-                    )
-                )
+                # The DeviceSessionCreate schema expects an integer user_id in some environments
+                session_user_id = None
+                try:
+                    # If user has legacy_id, prefer that as integer
+                    if hasattr(user, 'legacy_id') and user.legacy_id:
+                        session_user_id = int(user.legacy_id)
+                    else:
+                        # If id looks numeric, use it
+                        if isinstance(user.id, int):
+                            session_user_id = int(user.id)
+                        elif isinstance(user.id, str) and user.id.isdigit():
+                            session_user_id = int(user.id)
+                        else:
+                            session_user_id = None
+                except Exception:
+                    session_user_id = None
+
+                # Use repository to create session only if device_sessions table exists
+                try:
+                    has_table = False
+                    try:
+                        cur = db.execute("SELECT to_regclass('public.device_sessions')").fetchone()
+                        if cur and cur[0]:
+                            has_table = True
+                    except Exception:
+                        has_table = False
+
+                    if has_table:
+                        await self.device_repo.create(
+                            DeviceSessionCreate(
+                                user_id=session_user_id if session_user_id is not None else 0,
+                                device_id=str(device_id),
+                                is_active=True,
+                                device_name=device_info.device_name,
+                                device_type=device_info.device_type,
+                                ip_address=device_info.ip_address,
+                                user_agent=device_info.user_agent,
+                                refresh_token=refresh,
+                                refresh_token_expires_at=expires_at,
+                            )
+                        )
+                    else:
+                        logger.debug('device_sessions table missing; skipping device session persistence')
+                except Exception:
+                    logger.exception('Failed to persist device session')
         except Exception:
             # Non-fatal: continue to return tokens even if persistence fails
             logger.exception('Failed to persist device session')
@@ -409,7 +442,7 @@ class UserService(BaseService):
 
         # Rate limiting check
         if user.verification_attempts >= 3:
-            time_since_last = datetime.utcnow() - user.verification_sent_at
+            time_since_last = datetime.now(timezone.utc) - user.verification_sent_at
             if time_since_last < timedelta(hours=1):
                 retry_after = int(
                     (timedelta(hours=1) - time_since_last).total_seconds()

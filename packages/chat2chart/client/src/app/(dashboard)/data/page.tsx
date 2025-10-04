@@ -282,11 +282,13 @@ const DataSourcesPage: React.FC = () => {
 
             {/* Data Sources Table */}
             <Card>
-                <Table
+                <div style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+                    <Table
                     columns={columns}
                     dataSource={dataSources}
                     rowKey="id"
                     loading={loading}
+                    scroll={{ y: 520 }}
                     pagination={{
                         pageSize: 10,
                         showSizeChanger: true,
@@ -294,7 +296,8 @@ const DataSourcesPage: React.FC = () => {
                         showTotal: (total, range) =>
                             `${range[0]}-${range[1]} of ${total} data sources`,
                     }}
-                />
+                    />
+                </div>
             </Card>
 
             {/* Universal Data Source Modal */}

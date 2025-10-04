@@ -11,6 +11,7 @@ from datetime import datetime
 from dataclasses import dataclass
 from enum import Enum
 import aiohttp
+from app.modules.data.utils.credentials import decrypt_credentials, encrypt_credentials
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +100,39 @@ class EnterpriseConnectorsService:
         self.encrypt_credentials = True
         self.audit_connections = True
 
+    def _decrypt_connection_config(self, config: ConnectionConfig) -> ConnectionConfig:
+        """Return a copy of ConnectionConfig with decrypted sensitive fields when possible."""
+        try:
+            # Convert to dict, run decrypt, then map back
+            cfg = {
+                "password": config.password,
+                "token": config.token,
+                "api_key": config.api_key,
+                "connection_string": config.connection_string,
+            }
+            dec = decrypt_credentials(cfg)
+            # Create a shallow copy with decrypted values when present
+            new = ConnectionConfig(
+                connector_type=config.connector_type,
+                name=config.name,
+                host=config.host,
+                port=config.port,
+                database=config.database,
+                schema=config.schema,
+                username=config.username,
+                password=dec.get("password") or config.password,
+                token=dec.get("token") or config.token,
+                api_key=dec.get("api_key") or config.api_key,
+                connection_string=dec.get("connection_string") or config.connection_string,
+                ssl_enabled=config.ssl_enabled,
+                timeout=config.timeout,
+                max_connections=config.max_connections,
+                metadata=config.metadata,
+            )
+            return new
+        except Exception:
+            return config
+
     async def test_connection(self, config: ConnectionConfig) -> Dict[str, Any]:
         """Test connection to enterprise data source"""
         try:
@@ -143,6 +177,13 @@ class EnterpriseConnectorsService:
                 f"🔌 Creating {config.connector_type.value} connection: {config.name}"
             )
 
+            # Decrypt any encrypted fields in the incoming config
+            try:
+                config = self._decrypt_connection_config(config)
+            except Exception:
+                # If decryption fails, continue with original config but log
+                logger.exception("Failed to decrypt connection config; proceeding with raw values")
+
             # Test connection first
             test_result = await self.test_connection(config)
             if not test_result["success"]:
@@ -150,7 +191,19 @@ class EnterpriseConnectorsService:
 
             # Create connection
             connector_func = self.supported_connectors[config.connector_type]
-            connection_result = await connector_func(config)
+            # Execute connector creation with retries/backoff
+            attempt = 0
+            connection_result = None
+            while attempt < self.max_retries:
+                try:
+                    connection_result = await connector_func(config)
+                    # if connector returns a dict with success key, break on success
+                    if isinstance(connection_result, dict) and connection_result.get("success"):
+                        break
+                except Exception as e:
+                    logger.warning(f"Connector creation attempt {attempt+1} failed: {e}")
+                attempt += 1
+                await asyncio.sleep(self.retry_delay * (2 ** (attempt - 1)))
 
             if connection_result["success"]:
                 # Store connection
@@ -977,23 +1030,36 @@ class EnterpriseConnectorsService:
 
             async with async_session() as db:
                 # Create data source record
+                # Encrypt stored connection_config for at-rest safety
+                try:
+                    stored_cfg = {
+                        "connector_type": config.connector_type.value,
+                        "host": config.host,
+                        "port": config.port,
+                        "database": config.database,
+                        "schema": config.schema,
+                        "ssl_enabled": config.ssl_enabled,
+                        "timeout": config.timeout,
+                    }
+                    stored_cfg_enc = encrypt_credentials(stored_cfg)
+                except Exception:
+                    stored_cfg_enc = {
+                        "connector_type": config.connector_type.value,
+                        "host": config.host,
+                        "port": config.port,
+                        "database": config.database,
+                        "schema": config.schema,
+                        "ssl_enabled": config.ssl_enabled,
+                        "timeout": config.timeout,
+                    }
+
                 data_source = DataSource(
                     id=connection_id,
                     name=config.name,
                     type="enterprise_connector",
                     format=config.connector_type.value,
                     db_type=config.connector_type.value,
-                    connection_config=json.dumps(
-                        {
-                            "connector_type": config.connector_type.value,
-                            "host": config.host,
-                            "port": config.port,
-                            "database": config.database,
-                            "schema": config.schema,
-                            "ssl_enabled": config.ssl_enabled,
-                            "timeout": config.timeout,
-                        }
-                    ),
+                    connection_config=json.dumps(stored_cfg_enc),
                     metadata=json.dumps(
                         {
                             "connection_type": "enterprise",

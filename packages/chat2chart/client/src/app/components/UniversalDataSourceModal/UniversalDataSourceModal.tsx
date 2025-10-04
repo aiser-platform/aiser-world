@@ -28,6 +28,10 @@ import { IFileUpload } from '../FileUpload/types';
 import { apiService } from '@/services/apiService';
 import { WorkflowNavigation, WorkflowStep } from '../WorkflowNavigation';
 import { environment, getCubeJsAuthHeader } from '@/config/environment';
+// Resolve backend URL based on runtime hostname (localhost dev vs deployed)
+const backendUrl = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+    ? 'http://localhost:8000'
+    : (environment?.backendUrl || '');
 import { useOrganization } from '@/context/OrganizationContext';
 
 const { Dragger } = Upload;
@@ -226,7 +230,17 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
     const loadSavedDataSources = async () => {
         try {
             // Load from localStorage
-            const savedSources = JSON.parse(localStorage.getItem('aiser_data_sources') || '[]');
+            const savedSourcesRaw = JSON.parse(localStorage.getItem('aiser_data_sources') || '[]');
+            // Ensure we only load non-sensitive metadata
+            const savedSources = (savedSourcesRaw || []).map((s: any) => ({
+                id: s.id,
+                name: s.name,
+                type: s.type,
+                status: s.status,
+                createdAt: s.createdAt,
+                format: s.format || null,
+                preview: s.preview || null
+            }));
             setDataSources(savedSources);
             
             // Load from backend using project-scoped API
@@ -237,7 +251,7 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
                 if (!projectIdRaw && Array.isArray(orgProjects) && orgProjects.length > 0) projectIdRaw = String(orgProjects[0].id);
                 const projectId = projectIdRaw ?? (orgProjects && orgProjects.length > 0 ? String(orgProjects[0].id) : localStorage.getItem('currentProjectId') ?? 1);
 
-                const response = await fetch(`http://localhost:8000/data/api/organizations/${organizationId}/projects/${projectId}/data-sources`);
+                const response = await fetch(`${backendUrl}/data/api/organizations/${organizationId}/projects/${projectId}/data-sources`);
                 if (response.ok) {
                     const result = await response.json();
                     const backendSources = result.data_sources || [];
@@ -265,7 +279,7 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
             
             const connectionPayload = buildDatabaseConnectionPayload(dbConnection);
             
-            const testResponse = await fetch('http://localhost:8000/data/database/test', {
+            const testResponse = await fetch(`${backendUrl}/data/database/test`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -320,7 +334,7 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
             
             const connectionPayload = buildWarehouseConnectionPayload(warehouseConnection);
             
-            const response = await fetch('http://localhost:8000/data/warehouse/test', {
+            const response = await fetch(`${backendUrl}/data/warehouse/test`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -483,7 +497,7 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
             const connectionPayload = buildWarehouseConnectionPayload(warehouseConnection);
             
             // Call the backend API to save the connection
-            const response = await fetch('http://localhost:8000/cube-modeling/connect-warehouse', {
+            const response = await fetch(`${backendUrl}/cube-modeling/connect-warehouse`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1584,22 +1598,75 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
     // Save data source connection
     const saveDataSourceConnection = async (dataSource: any) => {
         try {
-            // Save to localStorage for persistence
-            const savedSources = JSON.parse(localStorage.getItem('aiser_data_sources') || '[]');
-            const existingIndex = savedSources.findIndex((ds: any) => ds.id === dataSource.id);
-            
-            if (existingIndex >= 0) {
-                savedSources[existingIndex] = dataSource;
-            } else {
-                savedSources.push(dataSource);
-            }
-            
-            localStorage.setItem('aiser_data_sources', JSON.stringify(savedSources));
-            
+            // Optimistically update localStorage and local state
+                const savedSourcesRaw = JSON.parse(localStorage.getItem('aiser_data_sources') || '[]');
+                const metadata = {
+                    id: dataSource.id,
+                    name: dataSource.name,
+                    type: dataSource.type,
+                    status: dataSource.status || 'pending',
+                    createdAt: dataSource.createdAt || new Date().toISOString(),
+                    format: dataSource.format || null,
+                    preview: dataSource.preview || null
+                };
+                const existingIndex = savedSourcesRaw.findIndex((ds: any) => ds.id === dataSource.id);
+                if (existingIndex >= 0) {
+                    savedSourcesRaw[existingIndex] = { ...savedSourcesRaw[existingIndex], ...metadata };
+                } else {
+                    savedSourcesRaw.push(metadata);
+                }
+                localStorage.setItem('aiser_data_sources', JSON.stringify(savedSourcesRaw));
+            setDataSources(prev => prev.map(ds => ds.id === dataSource.id ? dataSource : ds));
+
             // Also save to backend if API is available
             try {
-                // For now, just log - we'll implement this method later
-                console.log('Data source saved locally:', dataSource);
+                const organizationId = currentOrganization?.id ?? localStorage.getItem('currentOrganizationId') ?? 1;
+                let projectIdRaw = localStorage.getItem('currentProjectId');
+                if (!projectIdRaw && Array.isArray(orgProjects) && orgProjects.length > 0) projectIdRaw = String(orgProjects[0].id);
+                const projectId = projectIdRaw ?? (orgProjects && orgProjects.length > 0 ? String(orgProjects[0].id) : localStorage.getItem('currentProjectId') ?? 1);
+
+                const resp = await fetch(`${backendUrl}/data/api/organizations/${organizationId}/projects/${projectId}/data-sources`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        id: dataSource.id,
+                        name: dataSource.name,
+                        type: dataSource.type,
+                        format: dataSource.format,
+                        description: dataSource.description || dataSource.name,
+                        config: dataSource.config || {},
+                        metadata: dataSource.metadata || { created_via: 'universal_modal' }
+                    })
+                });
+
+                if (resp.ok) {
+                    const body = await resp.json();
+                    if (body.success && body.data_source) {
+                        // Merge backend-provided values (id, created_at, etc.)
+                    const merged = { ...dataSource, ...body.data_source };
+                    // update state with merged but strip secrets from local cache
+                    const mergedMetadata = {
+                        id: merged.id,
+                        name: merged.name,
+                        type: merged.type,
+                        status: merged.status || 'ready',
+                        createdAt: merged.created_at || merged.createdAt || new Date().toISOString(),
+                        format: merged.format || null,
+                        preview: merged.preview || null
+                    };
+                    setDataSources(prev => prev.map(ds => ds.id === dataSource.id ? merged : ds));
+                    const savedSourcesRaw2 = JSON.parse(localStorage.getItem('aiser_data_sources') || '[]');
+                    const idx = savedSourcesRaw2.findIndex((s: any) => s.id === dataSource.id);
+                    if (idx >= 0) savedSourcesRaw2[idx] = { ...savedSourcesRaw2[idx], ...mergedMetadata };
+                    else savedSourcesRaw2.push(mergedMetadata);
+                    localStorage.setItem('aiser_data_sources', JSON.stringify(savedSourcesRaw2));
+                    }
+                } else {
+                    console.warn('Backend save returned non-ok', resp.status);
+                }
             } catch (apiError) {
                 console.warn('Backend save failed, using local storage:', apiError);
             }
@@ -3051,7 +3118,16 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
                     const result = await response.json();
                     if (result.success && result.data_source) {
                         newDataSource.id = result.data_source.id;
+                        newDataSource.status = 'ready';
+                        newDataSource.config = result.data_source.connection_config || newDataSource.config;
                         console.log('✅ Data source created in backend:', result.data_source);
+
+                        // Notify parent component
+                        try {
+                            onDataSourceCreated && onDataSourceCreated(result.data_source);
+                        } catch (err) {
+                            console.warn('onDataSourceCreated handler failed', err);
+                        }
                     }
                 }
             } catch (backendError) {

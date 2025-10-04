@@ -232,7 +232,28 @@ async def sign_in(
         except Exception:
             payload = {}
 
-    return JSONResponse(content=payload)
+    # Sanitize payload to ensure JSON serializable (convert UUIDs, datetimes)
+    def sanitize(obj):
+        import uuid as _uuid
+        from datetime import datetime as _dt
+
+        if isinstance(obj, dict):
+            return {k: sanitize(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [sanitize(v) for v in obj]
+        if isinstance(obj, tuple):
+            return tuple(sanitize(v) for v in obj)
+        if isinstance(obj, _dt):
+            try:
+                return obj.isoformat()
+            except Exception:
+                return str(obj)
+        if isinstance(obj, _uuid.UUID):
+            return str(obj)
+        return obj
+
+    safe_payload = sanitize(payload)
+    return JSONResponse(content=safe_payload)
 
 
 @router.post("/signup")

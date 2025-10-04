@@ -14,11 +14,22 @@ import psycopg2
 import pymysql
 import pyodbc
 import redis
-import boto3
-from azure.storage.blob import BlobServiceClient
-from google.cloud import storage as gcs
+try:
+    import boto3
+except Exception:
+    boto3 = None
+try:
+    from azure.storage.blob import BlobServiceClient
+except Exception:
+    BlobServiceClient = None
+try:
+    from google.cloud import storage as gcs
+except Exception:
+    gcs = None
 import requests
 import pandas as pd
+from app.modules.data.utils.credentials import decrypt_credentials
+import time as _time
 
 from app.modules.data.models import DataSource
 
@@ -135,94 +146,85 @@ class RealDataSourceManager:
     async def _test_database_connection(
         self, data_source: DataSource
     ) -> ConnectionResult:
-        """Test database connection"""
+        """Test database connection with decryption and retry/backoff."""
         try:
-            config = data_source.connection_config
+            # Decrypt configuration if stored encrypted
+            config = data_source.connection_config or {}
+            try:
+                config = decrypt_credentials(config)
+            except Exception:
+                logger.debug("Decrypt skipped/failed for data source config")
 
-            if data_source.format == "postgresql":
-                # Test PostgreSQL connection
-                conn = psycopg2.connect(
-                    host=config["host"],
-                    port=config["port"],
-                    database=config["database"],
-                    user=config["username"],
-                    password=config["password"],
-                    sslmode=config.get("ssl_mode", "prefer"),
-                )
+            # Retry loop for flaky network/connectivity
+            attempts = int(os.getenv("DB_CONN_RETRIES", "3"))
+            base_delay = float(os.getenv("DB_CONN_RETRY_BASE_DELAY", "0.5"))
 
-                # Test query
-                cursor = conn.cursor()
-                cursor.execute("SELECT version();")
-                version = cursor.fetchone()[0]
+            last_err = None
+            for attempt in range(1, attempts + 1):
+                try:
+                    if data_source.format == "postgresql":
+                        # Test PostgreSQL connection
+                        conn = psycopg2.connect(
+                            host=config.get("host"),
+                            port=config.get("port"),
+                            database=config.get("database"),
+                            user=config.get("username"),
+                            password=config.get("password"),
+                            connect_timeout=10,
+                            sslmode=config.get("ssl_mode", "prefer"),
+                        )
+                        cursor = conn.cursor()
+                        cursor.execute("SELECT version();")
+                        version = cursor.fetchone()[0]
+                        cursor.close()
+                        conn.close()
 
-                cursor.close()
-                conn.close()
+                        return ConnectionResult(
+                            success=True,
+                            message="PostgreSQL connection successful",
+                            connection_time=0,
+                            metadata={"version": version},
+                        )
 
-                return ConnectionResult(
-                    success=True,
-                    message="PostgreSQL connection successful",
-                    connection_time=0,
-                    metadata={"version": version},
-                )
+                    elif data_source.format == "mysql":
+                        conn = pymysql.connect(
+                            host=config.get("host"),
+                            port=config.get("port"),
+                            database=config.get("database"),
+                            user=config.get("username"),
+                            password=config.get("password"),
+                            connect_timeout=10,
+                        )
+                        cursor = conn.cursor()
+                        cursor.execute("SELECT VERSION();")
+                        version = cursor.fetchone()[0]
+                        cursor.close()
+                        conn.close()
 
-            elif data_source.format == "mysql":
-                # Test MySQL connection
-                conn = pymysql.connect(
-                    host=config["host"],
-                    port=config["port"],
-                    database=config["database"],
-                    user=config["username"],
-                    password=config["password"],
-                    ssl_disabled=False,
-                )
+                        return ConnectionResult(
+                            success=True,
+                            message="MySQL connection successful",
+                            connection_time=0,
+                            metadata={"version": version},
+                        )
 
-                # Test query
-                cursor = conn.cursor()
-                cursor.execute("SELECT VERSION();")
-                version = cursor.fetchone()[0]
+                    else:
+                        return ConnectionResult(
+                            success=False,
+                            message=f"Unsupported database format: {data_source.format}",
+                            connection_time=0,
+                        )
 
-                cursor.close()
-                conn.close()
+                except Exception as e:
+                    last_err = e
+                    logger.warning(f"DB test attempt {attempt} failed: {e}")
+                    _time.sleep(base_delay * (2 ** (attempt - 1)))
 
-                return ConnectionResult(
-                    success=True,
-                    message="MySQL connection successful",
-                    connection_time=0,
-                    metadata={"version": version},
-                )
-
-            elif data_source.format == "sqlserver":
-                # Test SQL Server connection
-                conn_str = (
-                    f"DRIVER={{{config['driver']}}};"
-                    f"SERVER={config['host']},{config['port']};"
-                    f"DATABASE={config['database']};"
-                    f"UID={config['username']};"
-                    f"PWD={config['password']};"
-                    f"TrustServerCertificate=yes;"
-                )
-
-                conn = pyodbc.connect(conn_str)
-                cursor = conn.cursor()
-                cursor.execute("SELECT @@VERSION;")
-                version = cursor.fetchone()[0]
-
-                cursor.close()
-                conn.close()
-
-                return ConnectionResult(
-                    success=True,
-                    message="SQL Server connection successful",
-                    connection_time=0,
-                    metadata={"version": version},
-                )
-
-            else:
-                return ConnectionResult(
-                    success=False,
-                    message=f"Unsupported database format: {data_source.format}",
-                    connection_time=0,
-                )
+            return ConnectionResult(
+                success=False,
+                message=f"Database connection failed after {attempts} attempts: {last_err}",
+                connection_time=0,
+            )
 
         except Exception as e:
             return ConnectionResult(
@@ -457,7 +459,11 @@ class RealDataSourceManager:
     ) -> QueryResult:
         """Execute database query"""
         try:
-            config = data_source.connection_config
+            config = data_source.connection_config or {}
+            try:
+                config = decrypt_credentials(config)
+            except Exception:
+                logger.debug("Failed to decrypt connection config for query execution; proceeding with raw config")
 
             if data_source.format == "postgresql":
                 # Execute PostgreSQL query

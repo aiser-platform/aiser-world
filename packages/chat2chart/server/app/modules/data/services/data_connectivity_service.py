@@ -7,12 +7,14 @@ import logging
 import os
 import pandas as pd
 import json
+import sqlalchemy as sa
 from typing import Dict, List, Optional, Any, Union
 from datetime import datetime
 import tempfile
 from pathlib import Path
 from .cube_connector_service import CubeConnectorService
 from app.modules.data.services.ai_schema_service import AISchemaService
+from app.db.session import async_operation_lock
 
 logger = logging.getLogger(__name__)
 
@@ -136,9 +138,17 @@ class DataConnectivityService:
             try:
                 from app.modules.data.models import DataSource
                 from app.db.session import async_session
+                from app.db.session import async_operation_lock
 
                 async with async_session() as db:
                     # Create new data source record
+                    # Ensure any sensitive credentials are stored encrypted in DB
+                    try:
+                        from app.modules.data.utils.credentials import encrypt_credentials
+                        safe_config = encrypt_credentials(connection_request)
+                    except Exception:
+                        safe_config = connection_request
+
                     new_source = DataSource(
                         id=connection_id,
                         name=connection_request.get('name') or f"{connection_request.get('type')}_connection",
@@ -157,7 +167,7 @@ class DataConnectivityService:
                             'connection_string': connection_request.get('uri'),
                             'encrypt': connection_request.get('encrypt', False)
                         }),
-                        connection_config=json.dumps(connection_request),
+                        connection_config=json.dumps(safe_config),
                         metadata=json.dumps({
                             'connection_type': 'database',
                             'status': 'connected',
@@ -471,6 +481,17 @@ class DataConnectivityService:
             # generator as an async context manager, so use the sessionmaker
             # directly.
             async with async_session() as db:
+                # Ensure a per-session operation lock exists when the caller used
+                # the async_session factory directly (not via get_async_session).
+                # This prevents asyncpg 'another operation is in progress' errors
+                # by serializing DB operations within this session.
+                try:
+                    if not getattr(db, '_op_lock', None):
+                        import asyncio as _asyncio
+
+                        db._op_lock = _asyncio.Lock()
+                except Exception:
+                    db._op_lock = None
                 from sqlalchemy import select
                 query = select(DataSource).where(DataSource.id == source_id, DataSource.is_active == True)
                 result = await db.execute(query)
@@ -1237,10 +1258,11 @@ class DataConnectivityService:
             try:
                 from app.modules.data.models import DataSource
                 from app.modules.projects.models import ProjectDataSource
-                from app.db.session import get_async_session
+                # Use async_session factory directly (get_async_session is an async generator for FastAPI deps)
+                from app.db.session import async_session
                 import asyncio
                 async def _delete_from_db():
-                    async with get_async_session() as db:
+                    async with async_session() as db:
                         from sqlalchemy import delete
                         # Remove project links
                         try:
@@ -2000,64 +2022,212 @@ class DataConnectivityService:
             from app.modules.projects.models import ProjectDataSource
             from app.db.session import async_session
 
-            async with async_session() as db:
-                # Create the data source
-                # Build metadata and connection config safely
-                metadata = data_source_data.get('metadata', {}) or {}
-                # carry over description into metadata to avoid unknown kwargs on model
-                if data_source_data.get('description'):
-                    metadata.setdefault('description', data_source_data.get('description'))
+            # Generate a deterministic id for this create call so we can
+            # expose a preview entry immediately in the in-memory registry
+            generated_id = f"ds_{organization_id}_{project_id}_{int(datetime.now().timestamp())}"
 
-                connection_config = data_source_data.get('config') or {}
-                # Decrypt any encrypted credentials before using
-                try:
-                    from app.modules.data.utils.credentials import decrypt_credentials
-                    connection_config = decrypt_credentials(connection_config)
-                except Exception:
-                    pass
-                db_type = connection_config.get('type') or data_source_data.get('db_type')
-
-                data_source = DataSource(
-                    id=f"ds_{organization_id}_{project_id}_{int(datetime.now().timestamp())}",
-                    name=data_source_data['name'],
-                    type=data_source_data['type'],
-                    format=data_source_data.get('format'),
-                    db_type=db_type,
-                    schema=data_source_data.get('schema'),
-                    connection_config=connection_config,
-                    user_id=str(organization_id),  # Using organization_id as user_id for now
-                    tenant_id=str(organization_id),
-                    is_active=True,
-                    created_at=datetime.now(),
-                    updated_at=datetime.now()
-                )
-                
-                db.add(data_source)
-                await db.flush()  # Get the ID
-                
-                # Link to project
-                project_data_source = ProjectDataSource(
-                    project_id=int(project_id),
-                    data_source_id=data_source.id,
-                    data_source_type=data_source_data['type'],
-                    is_active=True,
-                    added_at=datetime.now()
-                )
-                
-                db.add(project_data_source)
-                await db.commit()
-                
-                return {
-                    'success': True,
-                    'data_source': {
-                        'id': data_source.id,
-                        'name': data_source.name,
-                        'type': data_source.type,
-                        'organization_id': organization_id,
-                        'project_id': project_id
-                    },
-                    'message': 'Data source created successfully'
+            # Store a preview entry so immediate calls (modeling) can read sample data
+            try:
+                self.data_sources[generated_id] = {
+                    'id': generated_id,
+                    'name': data_source_data.get('name'),
+                    'type': data_source_data.get('type'),
+                    'format': data_source_data.get('format'),
+                    'schema': data_source_data.get('schema'),
+                    'data': data_source_data.get('data') or data_source_data.get('sample_data') or [],
+                    'created_at': datetime.now().isoformat(),
+                    'updated_at': datetime.now().isoformat(),
+                    'organization_id': organization_id,
+                    'project_id': project_id,
+                    'is_active': True,
                 }
+            except Exception:
+                pass
+
+            async def _do_create():
+                async with async_session() as db:
+                    # Create the data source
+                    # Build metadata and connection config safely
+                    metadata = data_source_data.get('metadata', {}) or {}
+                    # carry over description into metadata to avoid unknown kwargs on model
+                    if data_source_data.get('description'):
+                        metadata.setdefault('description', data_source_data.get('description'))
+
+                    connection_config = data_source_data.get('config') or {}
+                    # Decrypt any encrypted credentials before using
+                    try:
+                        from app.modules.data.utils.credentials import decrypt_credentials
+
+                        connection_config = decrypt_credentials(connection_config)
+                    except Exception:
+                        pass
+                    db_type = connection_config.get('type') or data_source_data.get('db_type')
+
+                    # Prepare data source values so we can use them in both
+                    # async and sync (test) paths.
+                    data_source_values = {
+                        'id': generated_id,
+                        'name': data_source_data['name'],
+                        'type': data_source_data['type'],
+                        'format': data_source_data.get('format'),
+                        'db_type': db_type,
+                        'schema': data_source_data.get('schema'),
+                        'connection_config': connection_config,
+                        # Allow callers to provide inline sample rows for file sources
+                        'data': data_source_data.get('data') or data_source_data.get('sample_data') or [],
+                        'user_id': str(organization_id),  # Using organization_id as user_id for now
+                        'tenant_id': str(organization_id),
+                        'is_active': True,
+                        'created_at': datetime.now(),
+                        'updated_at': datetime.now(),
+                    }
+
+                    # create SQLAlchemy DataSource instance for async path
+                    data_source = DataSource(**data_source_values)
+
+                    # Persist using the global database helper which creates its
+                    # own session per call and serializes operations.
+                    from app.db.session import get_db
+
+                    db_helper = get_db()
+                    # Save data_source via helper (creates new session internally)
+                    await db_helper.add(data_source)
+                    # Persist sample_data to the DB if provided
+                    try:
+                        if data_source_values.get('data'):
+                            upd = sa.text("UPDATE data_sources SET sample_data = :sd WHERE id = :id")
+                            with get_sync_engine().begin() as sync_conn:
+                                sync_conn.execute(upd, {"sd": json.dumps(data_source_values.get('data')), "id": data_source.id})
+                    except Exception:
+                        # Non-fatal; sample persistence best-effort
+                        logger.debug('Failed to persist sample_data for %s', data_source.id)
+
+                    # Link to project and persist
+                    project_data_source = ProjectDataSource(
+                        project_id=int(project_id),
+                        data_source_id=data_source.id,
+                        data_source_type=data_source_data['type'],
+                        is_active=True,
+                        added_at=datetime.now(),
+                    )
+
+                    await db_helper.add(project_data_source)
+
+                    return {
+                        'success': True,
+                        'data_source': {
+                            'id': data_source.id,
+                            'name': data_source.name,
+                            'type': data_source.type,
+                            'organization_id': organization_id,
+                            'project_id': project_id,
+                        },
+                        'message': 'Data source created successfully',
+                    }
+
+            # Use global async write queue to serialize DB writes safely.
+            # Execute the create via a sync worker (thread) using the sync engine
+            # to avoid asyncpg 'another operation is in progress' errors when
+            # other async operations are running on the same event loop.
+            try:
+                from app.db.write_queue import write_queue
+
+                # Prepare a sync callable that mirrors the async create path
+                def _do_create_sync():
+                    try:
+                        # Rebuild connection/config values
+                        connection_config = data_source_data.get('config') or {}
+                        try:
+                            from app.modules.data.utils.credentials import decrypt_credentials
+
+                            connection_config = decrypt_credentials(connection_config)
+                        except Exception:
+                            pass
+
+                        db_type = connection_config.get('type') or data_source_data.get('db_type')
+                        ds_vals = {
+                            'id': generated_id,
+                            'name': data_source_data['name'],
+                            'type': data_source_data['type'],
+                            'format': data_source_data.get('format'),
+                            'db_type': db_type,
+                            'schema': data_source_data.get('schema'),
+                            'connection_config': connection_config,
+                            'data': data_source_data.get('data') or data_source_data.get('sample_data') or [],
+                            'user_id': str(organization_id),
+                            'tenant_id': str(organization_id),
+                            'is_active': True,
+                            'created_at': datetime.now(),
+                            'updated_at': datetime.now()
+                        }
+
+                        from app.db.session import get_sync_engine
+                        eng = get_sync_engine()
+                        with eng.begin() as conn:
+                            insert_ds = sa.text(
+                                "INSERT INTO data_sources (id, name, type, format, db_type, size, row_count, schema, description, connection_config, file_path, original_filename, created_at, updated_at, user_id, tenant_id, is_active, last_accessed) "
+                                "VALUES (:id, :name, :type, :format, :db_type, :size, :row_count, :schema, :description, :connection_config, :file_path, :original_filename, :created_at, :updated_at, :user_id, :tenant_id, :is_active, :last_accessed)"
+                            )
+                            params = {
+                                'id': ds_vals.get('id'),
+                                'name': ds_vals.get('name'),
+                                'type': ds_vals.get('type'),
+                                'format': ds_vals.get('format'),
+                                'db_type': ds_vals.get('db_type'),
+                                'size': ds_vals.get('size'),
+                                'row_count': ds_vals.get('row_count'),
+                                'schema': json.dumps(ds_vals.get('schema')) if ds_vals.get('schema') is not None else None,
+                                'description': ds_vals.get('description') if ds_vals.get('description') is not None else None,
+                                'connection_config': json.dumps(ds_vals.get('connection_config')) if ds_vals.get('connection_config') is not None else None,
+                                'file_path': ds_vals.get('file_path') if ds_vals.get('file_path') is not None else None,
+                                'original_filename': ds_vals.get('original_filename') if ds_vals.get('original_filename') is not None else None,
+                                'created_at': ds_vals.get('created_at'),
+                                'updated_at': ds_vals.get('updated_at'),
+                                'user_id': ds_vals.get('user_id'),
+                                'tenant_id': ds_vals.get('tenant_id'),
+                                'is_active': ds_vals.get('is_active'),
+                                'last_accessed': ds_vals.get('last_accessed')
+                            }
+                            conn.execute(insert_ds, params)
+                            insert_link = sa.text(
+                                "INSERT INTO project_data_source (id, project_id, data_source_id, data_source_type, is_active, added_at) VALUES (gen_random_uuid(), :project_id, :data_source_id, :data_source_type, :is_active, :added_at)"
+                            )
+                            conn.execute(insert_link, {"project_id": int(project_id), "data_source_id": ds_vals.get('id'), "data_source_type": data_source_data['type'], "is_active": True, "added_at": datetime.now()})
+
+                        # Update in-memory registry
+                        # Persist a copy in the in-memory registry including sample rows if provided
+                        self.data_sources[ds_vals.get('id')] = {
+                            'id': ds_vals.get('id'),
+                            'name': ds_vals.get('name'),
+                            'type': ds_vals.get('type'),
+                            'format': ds_vals.get('format'),
+                            'schema': ds_vals.get('schema'),
+                            'data': ds_vals.get('data') or [],
+                            'created_at': ds_vals.get('created_at').isoformat() if ds_vals.get('created_at') else None,
+                            'updated_at': ds_vals.get('updated_at').isoformat() if ds_vals.get('updated_at') else None,
+                            'is_active': True,
+                            'organization_id': organization_id,
+                            'project_id': project_id
+                        }
+                        return {
+                            'success': True,
+                            'data_source': {
+                                'id': ds_vals.get('id'),
+                                'name': ds_vals.get('name'),
+                                'type': ds_vals.get('type'),
+                                'organization_id': organization_id,
+                                'project_id': project_id
+                            },
+                            'message': 'Data source created (queued sync)'
+                        }
+                    except Exception as e:
+                        logger.exception("Sync queued create failed: %s", e)
+                        return {'success': False, 'error': str(e)}
+
+                return await write_queue.enqueue(_do_create_sync)
+            except Exception:
+                # If queue not available, fall back to direct async create
+                return await _do_create()
         except Exception as e:
             logger.error(f"❌ Failed to create project data source: {str(e)}")
             return {

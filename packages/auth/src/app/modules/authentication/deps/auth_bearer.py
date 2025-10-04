@@ -57,11 +57,11 @@ class JWTBearer(HTTPBearer):
             payload = Auth().decodeJWT(jwtoken)
         except:
             payload = None
-    # Only accept a fully valid JWT payload. Developer/test shortcuts are
-    # disabled here to avoid accidental bypass of authentication in dev.
-    if payload:
-        isTokenValid = True
-        return isTokenValid
+        # Only accept a fully valid JWT payload. Developer/test shortcuts are
+        # disabled here to avoid accidental bypass of authentication in dev.
+        if payload:
+            isTokenValid = True
+            return isTokenValid
 
 
 TokenDep = Depends(JWTBearer())

@@ -5,7 +5,8 @@ export const API_URL = getBackendUrl();
 
 // Default AUTH_URL to the main API URL when not explicitly set in the environment.
 // This makes dev workflows simpler (upgrade-demo and other dev helpers live on the chat2chart service).
-export const AUTH_URL = process.env.NEXT_PUBLIC_AUTH_URL || API_URL;
+// Default AUTH_URL: prefer explicit NEXT_PUBLIC_AUTH_URL, otherwise default to the auth service dev port
+export const AUTH_URL = process.env.NEXT_PUBLIC_AUTH_URL || 'http://localhost:5000';
 
 export const fetchApi = async (
     endpoint: string,

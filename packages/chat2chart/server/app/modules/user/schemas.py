@@ -28,8 +28,23 @@ class UserResponse(UserBase):
 
 
 class SignInRequest(BaseModel):
-    email: EmailStr = Field(...)
+    # Accept either `account` (legacy) or `email` from callers. Normalize so
+    # service.sign_in can read `credentials.account` reliably.
+    account: str | None = None
+    email: EmailStr | None = None
     password: str = Field(..., min_length=1)
+
+    @classmethod
+    def __get_validators__(cls):
+        yield cls._normalize_account
+
+    @classmethod
+    def _normalize_account(cls, values):
+        # Pydantic may pass a dict here; ensure 'account' is set from 'email' if missing
+        if isinstance(values, dict):
+            if not values.get('account') and values.get('email'):
+                values['account'] = values.get('email')
+        return values
 
 
 class SignInResponse(BaseModel):
