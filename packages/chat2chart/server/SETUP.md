@@ -41,6 +41,18 @@ This script will:
 - ✅ Seed demo data for development
 - ✅ Verify the setup
 
+### Developer shortcuts
+
+- **Default admin user**: `scripts/setup_database.py` will create a dev admin when no users exist. Defaults:
+  - Email: `admin@aiser.local`
+  - Username: `admin`
+  - Password: `Admin123`
+  Override via `ADMIN_EMAIL`, `ADMIN_USERNAME`, `ADMIN_PASSWORD` env vars.
+
+- **DB health-check & utilities**: the setup script now includes a `--health` flag that prints a JSON health report and a `--prune-demo N` flag to keep only `N` demo data sources.
+
+- **Cube.js**: you can replace the local Cube helper with the official Cube Docker image for a more complete modeling experience; set `CUBE_API_URL` and `CUBE_API_SECRET` in `.env`.
+
 ### 3. Verify Setup
 
 ```bash
@@ -252,3 +264,24 @@ For issues and questions:
 ---
 
 **Happy coding! 🎉**
+
+## Developer Onboarding Admin User
+
+The setup script will create a default admin user for local development to make onboarding and testing faster. By default the credentials are:
+
+- Email: `admin@aiser.local`
+- Username: `admin`
+- Password: `Admin123`
+
+You can override these values by setting environment variables before running the setup script:
+
+```bash
+export ADMIN_EMAIL=admin100@aiser.local
+export ADMIN_PASSWORD=Admin123
+export ADMIN_USERNAME=admin100
+python scripts/setup_database.py
+```
+
+The script will also provision a default organization and project for the admin user (`Aiser Organization` / `Default Project`) and add the user to `user_organizations` with the `owner` role.
+
+Please only use these defaults for local development. In production, create admin users through secure, audited processes.

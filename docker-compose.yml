@@ -65,13 +65,10 @@ services:
         poetry run uvicorn src.app.main:app --host 0.0.0.0 --port 5000 --reload
       "
 
-  # Cube.js Universal Semantic Layer
+  # Cube.js Universal Semantic Layer (official image)
   cube-server:
-    build:
-      context: ./packages/cube
-      dockerfile: Dockerfile
+    image: cubejs/cube:latest
     container_name: aiser-cube
-    working_dir: /app
     env_file:
       - .env
     ports:
@@ -85,29 +82,15 @@ services:
       - CUBE_DB_USER=${POSTGRES_USER:-aiser}
       - CUBE_DB_PASS=${POSTGRES_PASSWORD:-aiser_password}
       - CUBE_DB_SCHEMA=${CUBE_DB_SCHEMA:-public}
-      - CUBE_DB_SSL=${CUBE_DB_SSL:-false}
-      - CUBE_DB_POOL_MIN=${CUBE_DB_POOL_MIN:-2}
-      - CUBE_DB_POOL_MAX=${CUBE_DB_POOL_MAX:-10}
       - CUBE_REDIS_URL=${CUBE_REDIS_URL:-redis://redis:6379}
-      - CUBE_API_SECRET=${CUBE_API_SECRET:-dev-cube-secret-key}
-      - CUBE_DEV_MODE=${CUBE_DEV_MODE:-true}
+      - CUBEJS_API_SECRET=${CUBE_API_SECRET:-dev-cube-secret-key}
+      - CUBEJS_DEV_MODE=${CUBE_DEV_MODE:-true}
       - CUBE_LOG_LEVEL=${CUBE_LOG_LEVEL:-info}
-      - CUBEJS_EXTERNAL_DEFAULT=${CUBEJS_EXTERNAL_DEFAULT:-true}
-      - CUBEJS_SCHEDULED_REFRESH_DEFAULT=${CUBEJS_SCHEDULED_REFRESH_DEFAULT:-true}
-      - CUBEJS_SKIP_NATIVE_EXTENSIONS=${CUBEJS_SKIP_NATIVE_EXTENSIONS:-true}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    volumes:
-      - ./packages/cube:/app
-      - cube_node_modules:/app/node_modules
-    command: >
-      sh -c "
-        npm ci --no-audit --no-fund &&
-        npm run dev
-      "
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:4000/cubejs-api/v1/load"]
       interval: 30s
@@ -153,7 +136,7 @@ services:
       bash -c "
         apt-get update && apt-get install -y build-essential libpq-dev libjpeg-dev libpng-dev libfreetype6-dev libtiff5-dev libwebp-dev libopenjp2-7-dev zlib1g-dev curl unixodbc-dev &&
         pip install -r requirements.txt &&
-        uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+        uvicorn app.main:app --host 0.0.0.0 --port 8000
       "
 
   # Frontend Client
