@@ -7,19 +7,29 @@ echo "🔧 Setting up chat2chart service..."
 export DEBIAN_FRONTEND=noninteractive
 export DEBCONF_NONINTERACTIVE_SEEN=true
 
-# Fix any interrupted dpkg operations
-echo "🔧 Fixing interrupted package installations..."
-dpkg --configure -a || true
+# Avoid re-running heavy runtime package installs on container restarts.
+# Use SKIP_RUNTIME_SETUP=1 to force-skip, or the presence of marker file
+# /tmp/.start_sh_done will also skip the install step.
+if [ -n "$SKIP_RUNTIME_SETUP" ] || [ -f /tmp/.start_sh_done ]; then
+    echo "⚠️ Skipping runtime system setup (SKIP_RUNTIME_SETUP or marker present)"
+else
+    # Fix any interrupted dpkg operations
+    echo "🔧 Fixing interrupted package installations..."
+    dpkg --configure -a || true
 
-# Install system dependencies
-echo "📦 Installing system dependencies..."
-apt-get update -qq && apt-get install -y -qq --no-install-recommends \
-    build-essential \
-    libpq-dev \
-    curl \
-    gnupg \
-    lsb-release \
-    wget
+    # Install system dependencies (kept short; prefer building these into the image)
+    echo "📦 Installing system dependencies..."
+    apt-get update -qq && apt-get install -y -qq --no-install-recommends \
+        build-essential \
+        libpq-dev \
+        curl \
+        gnupg \
+        lsb-release \
+        wget
+
+    # Mark that runtime setup ran to avoid repeated installs on restart
+    touch /tmp/.start_sh_done || true
+fi
 
 echo "🚀 Running database migrations..."
 cd /app
