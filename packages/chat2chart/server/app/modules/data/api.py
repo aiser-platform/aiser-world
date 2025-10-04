@@ -1366,6 +1366,54 @@ async def deploy_cube_schema(request: dict):
         logger.error(f"❌ Cube.js deployment failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@router.post("/dash-studio/query-editor/generate-chart")
+async def generate_chart_from_cube(request: Dict[str, Any]):
+    """Run a Cube.js query and return a simple ECharts option for preview.
+
+    Expected payload: { "query": {...}, "chart_type": "bar" }
+    """
+    try:
+        query = request.get("query") if isinstance(request, dict) else None
+        chart_type = request.get("chart_type", "bar") if isinstance(request, dict) else "bar"
+        if not query:
+            raise HTTPException(status_code=400, detail="query is required")
+
+        # Execute Cube query via integration service
+        from .services.cube_integration_service import CubeIntegrationService
+
+        ci = CubeIntegrationService()
+        result = await ci.execute_cube_query(query)
+        if not result.get("success"):
+            raise HTTPException(status_code=400, detail=result.get("error", "Query failed"))
+
+        # Cube returns nested structure; try to extract rows
+        data = result.get("data", {})
+        # typical Cube load returns {data: [...]} or nested payloads; try to find rows
+        rows = []
+        if isinstance(data, dict) and "data" in data:
+            rows = data.get("data") or []
+        elif isinstance(data, list):
+            rows = data
+        else:
+            # fallback: try to extract first list field
+            if isinstance(data, dict):
+                for v in data.values():
+                    if isinstance(v, list):
+                        rows = v
+                        break
+
+        # Convert to ECharts option
+        option_payload = ci.convert_cube_result_to_echarts(rows, chart_type=chart_type)
+
+        return {"success": True, "echarts_option": option_payload.get("option"), "meta": option_payload.get("meta")}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Failed to generate chart from Cube: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/cube-cubes")
 async def get_deployed_cubes():
     """Get list of deployed cubes from real Cube.js server"""
