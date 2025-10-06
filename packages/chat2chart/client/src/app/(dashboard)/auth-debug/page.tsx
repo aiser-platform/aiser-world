@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import ClientLogger from './ClientLogger';
 
 const AuthDebugPage: React.FC = () => {
   const [status, setStatus] = useState<string>("Idle");
@@ -91,6 +92,7 @@ const AuthDebugPage: React.FC = () => {
         <strong>Last response:</strong>
         <pre style={{ background: '#f5f5f5', padding: 8 }}>{result ? JSON.stringify(result, null, 2) : '<none>'}</pre>
       </div>
+      <ClientLogger />
     </div>
   );
 };
