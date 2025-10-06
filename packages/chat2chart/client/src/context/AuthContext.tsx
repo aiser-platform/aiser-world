@@ -327,6 +327,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const verifyAuth = async (): Promise<void> => {
         setAuthError(null);
+        setLoading(true);
         try {
             const controller = new AbortController();
             const t = setTimeout(() => controller.abort(), 4000);
@@ -334,17 +335,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             try {
                 res = await fetch('/api/auth/users/me', { method: 'GET', credentials: 'include', signal: controller.signal });
             } finally { clearTimeout(t); }
-            if (res.ok) {
+            if (res && res.ok) {
                 const u = await res.json();
                 setUser(u);
                 try { localStorage.setItem('aiser_user', JSON.stringify(u)); } catch {}
                 setAuthError(null);
                 return;
             }
-            setAuthError(`Server returned ${res.status}`);
+            if (res) setAuthError(`Server returned ${res.status}`);
             setUser(null);
         } catch (e: any) {
             setAuthError(String(e?.message || e));
+        } finally {
+            setLoading(false);
+            setInitialized(true);
         }
     };
 
