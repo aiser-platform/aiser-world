@@ -49,12 +49,36 @@ export default function ClientLogger() {
   const sendLogs = async () => {
     try {
       const payload = { logs: bufferRef.current, url: window.location.href, userAgent: navigator.userAgent };
-      await fetch('/debug/client-error', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      alert('Logs sent');
+      // Try same-origin proxy first
+      let res = await fetch('/api/debug/client-error', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      if (!res.ok) {
+        // Fallback: post directly to backend debug endpoint
+        try {
+          const backend = (window as any).__NEXT_DATA__?.props?.pageProps?.publicRuntimeConfig?.NEXT_PUBLIC_API_URL || `${window.location.protocol}//${window.location.hostname}:8000`;
+          await fetch(`${backend.replace(/\/$/, '')}/debug/client-error`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        } catch (e2) {
+          console.error('Direct backend post failed', e2);
+          throw e2;
+        }
+      }
+      console.log('ClientLogger: logs sent', payload.logs?.length || 0);
     } catch (e) {
-      alert('Failed to send logs: ' + String(e));
+      console.warn('ClientLogger: Failed to send logs', e);
     }
   };
+
+  // Periodically flush logs to server in background (dev only)
+  useEffect(() => {
+    const id = setInterval(() => {
+      try {
+        if (bufferRef.current && bufferRef.current.length > 0) {
+          // fire-and-forget
+          fetch('/api/debug/client-error', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ logs: bufferRef.current, url: window.location.href, userAgent: navigator.userAgent }) }).catch(() => {});
+        }
+      } catch (e) {}
+    }, 5000);
+    return () => clearInterval(id);
+  }, []);
 
   return (
     <div style={{ marginTop: 12 }}>
