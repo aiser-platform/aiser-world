@@ -279,42 +279,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
 
             // Immediately mark authenticated so UI renders without waiting.
-            // Persist a minimal optimistic `aiser_user` and perform a background
-            // verification using cookie-based check only.
+            // Persist a minimal optimistic `aiser_user` and perform an immediate
+            // verification (with short timeout/retries) so ProtectRoute doesn't block.
             setLoginError(null);
             setUser(data.user);
             try { localStorage.setItem('aiser_user', JSON.stringify(data.user)); } catch {}
+            // Attempt verification and wait up to ~3s total before navigating
+            try {
+                const verifyPromise = (async () => {
+                    await verifyAuth();
+                })();
+                const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('verify timeout')), 3000));
+                await Promise.race([verifyPromise, timeout]);
+            } catch (e) {
+                // verification timed out or failed; keep optimistic state but log
+                console.warn('Auth verification during login timed out or failed:', e);
+            }
+
             setInitialized(true);
             setLoading(false);
+            // Navigate to chat (client will re-run verifyAuth if needed)
             router.push('/chat');
-
-            // Background verification (non-blocking) — prefer cookie-based check.
-            (async () => {
-                try {
-                    const controllerBg = new AbortController();
-                    const tBg = setTimeout(() => controllerBg.abort(), 4000);
-                    let verifyRes;
-                    try {
-                        const verifyUrlBg = typeof window !== 'undefined' ? `${AUTH_URL}/users/me` : `/api/auth/users/me`;
-                        verifyRes = await fetch(verifyUrlBg, { method: 'GET', credentials: 'include', signal: controllerBg.signal });
-                    } finally { clearTimeout(tBg); }
-
-                    if (verifyRes && verifyRes.ok) {
-                        const verified = await verifyRes.json();
-                        setUser(verified);
-                        try { localStorage.setItem('aiser_user', JSON.stringify(verified)); } catch {}
-                        return;
-                    }
-
-                    // If verification fails, clear optimistic state and redirect to login
-                    setUser(null);
-                    setInitialized(true);
-                    setLoading(false);
-                    router.push('/login');
-                } catch (err) {
-                    console.warn('Background verification error', err);
-                }
-            })();
         } catch (error) {
             console.error('❌ AuthContext: Login error:', error);
             const message = error instanceof Error ? error.message : 'Network error';
