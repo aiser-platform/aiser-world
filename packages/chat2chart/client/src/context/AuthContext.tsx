@@ -1,3 +1,5 @@
+"use client";
+
 import LoadingScreen from '@/components/LoadingScreen/LoadingScreen';
 import Cookies from 'js-cookie';
 import { createContext, useContext, useEffect, useState } from 'react';
@@ -9,23 +11,29 @@ import { ReactNode } from 'react';
 
 interface AuthContextType {
     isAuthenticated: boolean;
-    user: { email: string; password: string } | null;
+    user: any | null;
     loading: boolean;
+    authError: string | null;
     loginError: string | null;
+    initialized: boolean;
     login: (account: string, password: string) => void;
     signup: (email: string, username: string, password: string) => void;
     logout: () => void;
+    verifyAuth: () => Promise<void>;
     setLoginError: (error: string | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
     isAuthenticated: false,
     user: null,
-    loading: true,
+    loading: false,
+    authError: null,
     loginError: null,
-    login: () => null,
-    signup: () => null,
+    initialized: false,
+    login: () => Promise.resolve(),
+    signup: () => Promise.resolve(),
     logout: () => null,
+    verifyAuth: async () => Promise.resolve(),
     setLoginError: () => null,
 });
 
@@ -35,140 +43,207 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const router = useRouter();
 
     const [user, setUser] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(true); // Start with true during initial auth check
     const [loginError, setLoginError] = useState<string | null>(null);
+    const [initialized, setInitialized] = useState(false); // Start as false until auth check completes
+    const [authError, setAuthError] = useState<string | null>(null);
 
+    // Initialize authentication state on mount
     useEffect(() => {
-        async function loadUserFromCookies() {
-            console.log('Loading user from cookies...');
-            // Prefer namespaced server-set JWT, fall back to legacy access_token
-            let accessToken = Cookies.get('c2c_access_token') || Cookies.get('access_token');
-            const userInfo = Cookies.get(AUTH_COOKIE_KEYS[2]);
-            
-            console.log('Access token from cookies:', accessToken);
-            console.log('User info from cookies:', userInfo);
-            
-            // If we have a demo token from frontend, attempt to upgrade it to a real JWT
-            if (accessToken && accessToken.startsWith('demo_token_')) {
+        let isMounted = true;
+        
+        const initializeAuth = async () => {
+            console.log('🔄 AuthContext: Initializing authentication...');
+            setLoading(true);
+            setAuthError(null);
+            try {
+                // First try token-based verification using localStorage (fast, avoids proxy issues)
+                console.log('🔍 AuthContext: Attempting token-based auth check (localStorage)');
+                const fallbackToken = typeof window !== 'undefined' ? localStorage.getItem('aiser_access_token') : null;
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 4000);
+                let response;
                 try {
-                    console.log('Found demo token, attempting upgrade...');
-                    const upgradeRes = await fetch(`${AUTH_URL}/auth/upgrade-demo`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        credentials: 'include',
-                        body: JSON.stringify({ demo_token: accessToken, user: userInfo }),
-                    });
-                    if (upgradeRes.ok) {
-                        const up = await upgradeRes.json();
-                        if (up.access_token) {
-                            // persist namespaced cookie for client-side and server-side
-                            Cookies.set('c2c_access_token', up.access_token, { expires: 7, path: '/' });
-                            Cookies.set('access_token', up.access_token, { expires: 7, path: '/' });
-                            Cookies.remove('user', { path: '/' });
-                            accessToken = up.access_token;
-                            console.log('Demo token upgraded to real JWT');
+                    if (fallbackToken) {
+                        try {
+                            // Use same-origin proxy so cookies and CORS are handled consistently
+                            response = await fetch(`/api/auth/users/me`, {
+                                method: 'GET',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Bearer ${fallbackToken}`,
+                                },
+                                credentials: 'include',
+                                signal: controller.signal,
+                            });
+                        } catch (e) {
+                            // token-based check failed or timed out, fallthrough to cookie-based check
+                            console.warn('🔍 AuthContext: token-based /users/me failed, will try cookie-proxy', e);
+                            response = undefined as any;
                         }
-                    } else {
-                        console.warn('Upgrade demo failed', await upgradeRes.text());
                     }
-                } catch (e) {
-                    console.error('Upgrade-demo error', e);
+
+                    // If token check didn't run or failed, fall back to cookie-based proxy
+                    if (!response || !response.ok) {
+                        console.log('🔍 AuthContext: Falling back to cookie-based proxy /api/auth/users/me');
+                        try {
+                            // Always use the same-origin proxy endpoint from the client
+                            response = await fetch(`/api/auth/users/me`, {
+                                method: 'GET',
+                                headers: { 'Content-Type': 'application/json' },
+                                credentials: 'include',
+                                signal: controller.signal,
+                            });
+                        } catch (e) {
+                            console.warn('🔍 AuthContext: cookie-proxy /users/me failed', e);
+                            response = undefined as any;
+                        }
+                    }
+                } finally {
+                    clearTimeout(timeout);
+                }
+
+                console.log('🔍 AuthContext: Auth check (proxy) response status:', response.status);
+
+                if (response.ok) {
+                    const userData = await response.json();
+                    console.log('✅ AuthContext: User authenticated (proxy):', userData);
+                    if (isMounted) {
+                        setUser(userData);
+                        try { localStorage.setItem('aiser_user', JSON.stringify(userData)); } catch {}
+                    }
+                } else {
+                // Try fallback: if a dev fallback token exists in localStorage, use it
+                console.log('⚠️ AuthContext: proxy check failed, trying Authorization header fallback');
+                const fallbackToken = typeof window !== 'undefined' ? localStorage.getItem('aiser_access_token') : null;
+                if (fallbackToken) {
+                    try {
+                        const controller2 = new AbortController();
+                        const timeout2 = setTimeout(() => controller2.abort(), 3000);
+                        try {
+                            // Use same-origin proxy and include Authorization header as fallback
+                            response = await fetch(`/api/auth/users/me`, {
+                                method: 'GET',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Bearer ${fallbackToken}`,
+                                },
+                                credentials: 'include',
+                                signal: controller2.signal,
+                            });
+                        } finally {
+                            clearTimeout(timeout2);
+                        }
+
+                        console.log('🔍 AuthContext: Auth check (bearer proxy) response status:', response.status);
+                        if (response.ok) {
+                            const userData = await response.json();
+                            console.log('✅ AuthContext: User authenticated (bearer proxy):', userData);
+                            if (isMounted) {
+                                setUser(userData);
+                                try { localStorage.setItem('aiser_user', JSON.stringify(userData)); } catch {}
+                            }
+                        } else {
+                            console.log('❌ AuthContext: Bearer fallback (proxy) failed, status:', response.status);
+                            if (isMounted) setUser(null);
+                        }
+                    } catch (e) {
+                        console.error('❌ AuthContext: Bearer fallback (proxy) error:', e);
+                        if (isMounted) setUser(null);
+                    }
+                } else {
+                    if (isMounted) setUser(null);
+                }
+                }
+            } catch (error: any) {
+                console.error('❌ AuthContext: Auth initialization error:', error);
+                if (isMounted) {
+                    setUser(null);
+                    setAuthError(String(error?.message || error));
+                }
+            } finally {
+                // Ensure initialized is set regardless of result so ProtectRoute can act
+                if (isMounted) {
+                    setInitialized(true);
+                    setLoading(false);
                 }
             }
-
-            if (accessToken) {
+        };
+        
+        // If we have a persisted user from a recent login, use it immediately
+        try {
+            const persisted = typeof window !== 'undefined' ? localStorage.getItem('aiser_user') : null;
+            if (persisted) {
                 try {
-                    // Try enterprise endpoint first
-                    let response = await fetch(`${AUTH_URL}/api/v1/enterprise/auth/me`, {
-                        headers: {
-                            'Authorization': `Bearer ${accessToken}`,
-                            'Content-Type': 'application/json',
-                        },
-                        credentials: 'include',
-                    });
-                    
-                    if (!response.ok) {
-                        // Try standard endpoint
-                        response = await fetch(`${AUTH_URL}/users/me`, {
-                            headers: {
-                                'Authorization': `Bearer ${accessToken}`,
-                                'Content-Type': 'application/json',
-                            },
-                            credentials: 'include',
-                        });
+                    const parsed = JSON.parse(persisted);
+                    if (isMounted) {
+                        setUser(parsed);
+                        setInitialized(true);
+                        setLoading(false);
                     }
-                    
-                    if (response.ok) {
-                        const userData = await response.json();
-                        setUser(userData);
-                        console.log('User authenticated successfully');
-                    } else {
-                        // Token is invalid, clear cookies
-                        console.log('Token validation failed, clearing cookies');
-                        for (const key of AUTH_COOKIE_KEYS) {
-                            Cookies.remove(key, { path: '/' });
-                        }
-                        Cookies.remove('access_token', { path: '/' });
-                        Cookies.remove('c2c_access_token', { path: '/' });
-                        setUser(null);
-                    }
-                } catch (error) {
-                    console.error('Token validation error:', error);
-                    // For now, if we have a token, assume it's valid to avoid constant relogin
-                    // This is a temporary fix until backend is properly configured
-                    if (userInfo) {
-                        try {
-                            setUser(JSON.parse(userInfo));
-                            console.log('Using cached user info');
-                        } catch (parseError) {
-                            console.error('Error parsing user info:', parseError);
-                            setUser(null);
-                        }
-                    } else {
-                        setUser(null);
-                    }
+                    // still run background verification
+                    initializeAuth();
+                } catch (e) {
+                    // fallback to normal flow
+                    initializeAuth();
                 }
             } else {
-                setUser(null);
+                // Run auth check immediately
+                initializeAuth();
             }
-            setLoading(false);
-            console.log('Auth loading complete');
+        } catch (e) {
+            initializeAuth();
         }
-        loadUserFromCookies();
-    }, []);
+        
+        // Add fallback timeout to ensure initialization completes
+        const fallbackTimer = setTimeout(() => {
+            if (isMounted && !initialized) {
+                console.warn('⚠️ AuthContext: Fallback timeout reached, forcing initialization');
+                setUser(null);
+                setInitialized(true);
+                setLoading(false);
+            }
+        }, 6000);
+        
+        return () => {
+            isMounted = false;
+            clearTimeout(fallbackTimer);
+        };
+    }, []); // Empty dependency array - run only once on mount
 
     const login = async (identifier: string, password: string): Promise<void> => {
         try {
+            console.log('🔄 AuthContext: Starting login process...');
             setLoginError(null);
+            setLoading(true);
 
-            // Try standard /users/signin first (less likely to trigger enterprise-specific CORS/preflight issues)
-            let response = await fetch(`${AUTH_URL}/users/signin`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ identifier, password }),
-            });
-
-            if (!response.ok) {
-                // If standard sign-in fails with 404/405/other, fall back to enterprise login
+            // Send login request to auth service via same-origin proxy with retries
+            let response: Response | null = null;
+            const maxAttempts = 3;
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
                 try {
-                    const txt = await response.text();
-                    console.warn('Standard signin failed:', response.status, txt);
-                } catch (e) {
-                    console.warn('Standard signin failed and response body could not be read');
+                    const signinUrl = typeof window !== 'undefined' ? `${AUTH_URL}/users/signin` : `/api/auth/users/signin`;
+                    response = await fetch(signinUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include', // Essential for receiving HttpOnly cookies
+                        body: JSON.stringify({ identifier, password }),
+                    });
+                    break; // success or valid response
+                } catch (err) {
+                    console.warn(`AuthContext: signin attempt ${attempt} failed`, err);
+                    if (attempt < maxAttempts) await new Promise((r) => setTimeout(r, attempt * 300));
                 }
+            }
 
-                // Try enterprise login (username only) using the shared fetchApi helper
-                response = await fetchApi('api/v1/enterprise/auth/login', {
-                    method: 'POST',
-                    body: JSON.stringify({ username: identifier, password }),
-                });
-            } else {
-                // standard signin succeeded, proceed to handle below
+            if (!response) {
+                setLoginError('Network error during signin');
+                setLoading(false);
+                setAuthError('Network error during signin');
+                return;
             }
 
             if (!response.ok) {
-                // Try to extract a structured error message, fall back to generic
                 let errMsg = 'Login failed';
                 try {
                     const contentType = response.headers.get('content-type') || '';
@@ -182,47 +257,110 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 } catch (e) {
                     // ignore parse errors
                 }
-                console.error('Login response not ok', response.status, errMsg);
+                console.error('❌ AuthContext: Login failed:', response.status, errMsg);
                 setLoginError(`${response.status}: ${errMsg}`);
-                // return early instead of throwing to avoid unhandled exception in UI
+                setLoading(false);
                 return;
             }
 
             const data = await response.json();
-            // Set the access token cookie for standard login
-            if (data.access_token) {
-                Cookies.set('access_token', data.access_token, { expires: 7, path: '/' });
-                Cookies.set('user', JSON.stringify(data.user), { expires: 7, path: '/' });
-            }
-            setUser(data.user);
+            console.log('✅ AuthContext: Login successful, auth service set HttpOnly cookies');
+            
+            // The auth service may set HttpOnly cookies. Persist fallback token and
+            // immediately consider user signed-in (so UI loads). Perform a
+            // background verification that will not block rendering.
             setLoginError(null);
-            router.push('/');
+            try {
+                if (data.access_token) {
+                    localStorage.setItem('aiser_access_token', data.access_token);
+                }
+            } catch (e) {
+                console.warn('Could not persist access token to localStorage', e);
+            }
+
+            // Immediately mark authenticated so UI renders without waiting.
+            // Persist a minimal optimistic `aiser_user` and perform a background
+            // verification using cookie-based check only.
+            setLoginError(null);
+            setUser(data.user);
+            try { localStorage.setItem('aiser_user', JSON.stringify(data.user)); } catch {}
+            setInitialized(true);
+            setLoading(false);
+            router.push('/chat');
+
+            // Background verification (non-blocking) — prefer cookie-based check.
+            (async () => {
+                try {
+                    const controllerBg = new AbortController();
+                    const tBg = setTimeout(() => controllerBg.abort(), 4000);
+                    let verifyRes;
+                    try {
+                        const verifyUrlBg = typeof window !== 'undefined' ? `${AUTH_URL}/users/me` : `/api/auth/users/me`;
+                        verifyRes = await fetch(verifyUrlBg, { method: 'GET', credentials: 'include', signal: controllerBg.signal });
+                    } finally { clearTimeout(tBg); }
+
+                    if (verifyRes && verifyRes.ok) {
+                        const verified = await verifyRes.json();
+                        setUser(verified);
+                        try { localStorage.setItem('aiser_user', JSON.stringify(verified)); } catch {}
+                        return;
+                    }
+
+                    // If verification fails, clear optimistic state and redirect to login
+                    setUser(null);
+                    setInitialized(true);
+                    setLoading(false);
+                    router.push('/login');
+                } catch (err) {
+                    console.warn('Background verification error', err);
+                }
+            })();
         } catch (error) {
-            // Surface network errors more clearly
-            const message =
-                error instanceof Error
-                    ? error.message
-                    : 'Network error: failed to reach authentication service';
+            console.error('❌ AuthContext: Login error:', error);
+            const message = error instanceof Error ? error.message : 'Network error';
             setLoginError(message);
+            setAuthError(message);
+            setLoading(false);
             return Promise.reject(error);
+        }
+    };
+
+    const verifyAuth = async (): Promise<void> => {
+        setAuthError(null);
+        try {
+            const controller = new AbortController();
+            const t = setTimeout(() => controller.abort(), 4000);
+            let res;
+            try {
+                res = await fetch('/api/auth/users/me', { method: 'GET', credentials: 'include', signal: controller.signal });
+            } finally { clearTimeout(t); }
+            if (res.ok) {
+                const u = await res.json();
+                setUser(u);
+                try { localStorage.setItem('aiser_user', JSON.stringify(u)); } catch {}
+                setAuthError(null);
+                return;
+            }
+            setAuthError(`Server returned ${res.status}`);
+            setUser(null);
+        } catch (e: any) {
+            setAuthError(String(e?.message || e));
         }
     };
 
     const signup = async (email: string, username: string, password: string): Promise<void> => {
         try {
+            console.log('🔄 AuthContext: Starting signup process...');
             setLoginError(null);
-            const response = await fetch(`${AUTH_URL}/users/signup`, {
+            setLoading(true);
+            
+            const response = await fetch(`/api/auth/users/signup`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    email,
-                    username,
-                    password,
-                }),
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, username, password }),
                 credentials: 'include',
             });
+            
             if (!response.ok) {
                 let errMsg = 'Signup failed';
                 try {
@@ -236,48 +374,58 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 } catch (e) {
                     // ignore parse errors
                 }
-                console.error('Signup failed', response.status, errMsg);
+                console.error('❌ AuthContext: Signup failed:', response.status, errMsg);
                 setLoginError(`${response.status}: ${errMsg}`);
+                setLoading(false);
                 return;
             }
 
             const data = await response.json();
+            console.log('✅ AuthContext: Signup successful, setting user data...');
+            
             setUser(data.user);
             setLoginError(null);
-            router.push('/');
+            setLoading(false);
+            setInitialized(true);
+            
+            console.log('✅ AuthContext: Signup complete, redirecting to /chat');
+            router.push('/chat');
         } catch (error) {
-            setLoginError(
-                error instanceof Error
-                    ? error.message
-                    : 'An unexpected error occurred'
-            );
+            console.error('❌ AuthContext: Signup error:', error);
+            setLoginError(error instanceof Error ? error.message : 'An unexpected error occurred');
+            setLoading(false);
             return Promise.reject(error);
         }
     };
 
     const logout = () => {
         try {
+            console.log('🔄 AuthContext: Logging out...');
             // Clear user state
             setUser(null);
+            setLoginError(null);
+            setLoading(false);
+            setInitialized(false);
+
+            // Clear any client-side cookies that might exist
+            const cookieOptions = { 
+                path: '/',
+                domain: window.location.hostname === 'localhost' ? 'localhost' : undefined,
+                secure: window.location.protocol === 'https:',
+                sameSite: 'lax' as const
+            };
             
-            // Remove all auth cookies
             for (const key of AUTH_COOKIE_KEYS) {
-                Cookies.remove(key, { path: '/' });
-                Cookies.remove(key, { path: '/', domain: 'localhost' });
-                Cookies.remove(key, { path: '/', domain: '.localhost' });
+                Cookies.remove(key, cookieOptions);
             }
-            
-            // Clear any other cookies that might exist
-            Cookies.remove('access_token', { path: '/' });
-            Cookies.remove('refresh_token', { path: '/' });
-            Cookies.remove('user_id', { path: '/' });
-            
-            // Navigate to login
+            Cookies.remove('access_token', cookieOptions);
+            Cookies.remove('c2c_access_token', cookieOptions);
+
+            console.log('✅ AuthContext: Logout complete, redirecting to login');
+            // Redirect to login page
             router.push('/login');
         } catch (error) {
-            console.error('Error during logout:', error);
-            // Force navigation even if cookie removal fails
-            router.push('/login');
+            console.error('❌ AuthContext: Logout error:', error);
         }
     };
 
@@ -287,10 +435,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 isAuthenticated: !!user,
                 user,
                 loading,
+                authError,
                 loginError,
+                initialized,
                 login,
                 signup,
                 logout,
+                verifyAuth,
                 setLoginError,
             }}
         >
@@ -304,18 +455,62 @@ export const useAuth = () => useContext(AuthContext);
 export const ProtectRoute = ({ children }: { children: ReactNode }) => {
     const router = useRouter();
     const pathname = usePathname();
+    const { isAuthenticated, loading, initialized } = useAuth();
 
-    const { isAuthenticated, loading } = useAuth();
-
-    useEffect(() => {
-        if (!loading && !isAuthenticated && pathname !== '/login') {
-            router.push('/login');
-        }
-    }, [loading, isAuthenticated, router, pathname]);
-
-    if (loading || (!isAuthenticated && pathname !== '/login')) {
-        return <LoadingScreen />;
+    // Don't block login/signup pages
+    if (pathname === '/login' || pathname === '/signup' || pathname === '/logout') {
+        return children;
     }
+
+    // If we already have an authenticated user, render immediately to avoid
+    // showing the loading spinner after login (client-side state is authoritative).
+    if (isAuthenticated) {
+        console.debug('ProtectRoute: early pass-through, user authenticated');
+        return children;
+    }
+    // Perform redirect as a side-effect (hooks must be called unconditionally)
+    useEffect(() => {
+        console.debug('ProtectRoute: state', { initialized, loading, isAuthenticated, pathname });
+        if (initialized && !loading && !isAuthenticated) {
+            // avoid redirecting when already on auth pages
+            if (pathname !== '/login' && pathname !== '/signup' && pathname !== '/logout') {
+                router.replace('/login');
+            }
+        }
+    }, [initialized, loading, isAuthenticated, pathname, router]);
+
+    // Show loading only if auth is not initialized yet
+    if (!initialized || loading) {
+        return (
+            <div style={{ 
+                display: 'flex', 
+                justifyContent: 'center', 
+                alignItems: 'center', 
+                height: '100vh',
+                fontSize: '16px',
+                color: '#666'
+            }}>
+                Loading...
+            </div>
+        );
+    }
+
+    // If initialized but not authenticated, show redirecting UI while effect navigates
+    if (!isAuthenticated) {
+        return (
+            <div style={{ 
+                display: 'flex', 
+                justifyContent: 'center', 
+                alignItems: 'center', 
+                height: '100vh',
+                fontSize: '16px',
+                color: '#666'
+            }}>
+                Redirecting to login...
+            </div>
+        );
+    }
+
     return children;
 };
 
@@ -336,11 +531,15 @@ export const RedirectAuthenticated = ({
         }
     }, [isAuthenticated, router, pathname]);
 
+    // Never block login/signup behind a loading screen
+    // Render the form immediately; redirect will happen if already authenticated
+    if (pathname === '/login' || pathname === '/signup') {
+        return children;
+    }
+    // For other auth pages (if any), keep prior behavior
     if (loading) {
         return <LoadingScreen />;
     }
-    
-    // Only redirect if on login/signup pages and authenticated
     if (isAuthenticated && (pathname === '/login' || pathname === '/signup')) {
         return <LoadingScreen />;
     }
@@ -352,30 +551,45 @@ export const DefaultRoute = ({ children }: { children: ReactNode }) => {
     const router = useRouter();
     const pathname = usePathname();
 
-    const { isAuthenticated, loading } = useAuth();
-    const [timeoutReached, setTimeoutReached] = useState(false);
+    const { isAuthenticated, loading, initialized } = useAuth();
 
     useEffect(() => {
-        if (!loading && pathname === '/') {
-            router.push(isAuthenticated ? '/chat' : '/login');
+        if (pathname !== '/') return;
+        
+        // Only redirect when auth is initialized
+        if (initialized && !loading) {
+            router.replace(isAuthenticated ? '/chat' : '/login');
         }
-    }, [loading, isAuthenticated, router, pathname]);
+    }, [initialized, loading, isAuthenticated, router, pathname]);
 
-    // Add timeout fallback
+    // Add timeout fallback for root path
     useEffect(() => {
+        if (pathname !== '/') return;
+        
         const timer = setTimeout(() => {
-            if (loading && pathname === '/') {
+            if (!initialized) {
                 console.log('Auth timeout reached, redirecting to login');
-                setTimeoutReached(true);
-                router.push('/login');
+                router.replace('/login');
             }
-        }, 5000); // 5 second timeout
+        }, 5000); // Increased timeout to 5 seconds
 
         return () => clearTimeout(timer);
-    }, [loading, pathname, router]);
+    }, [initialized, router, pathname]);
 
-    if ((loading && !timeoutReached) || pathname === '/') {
-        return <LoadingScreen />;
+    if (pathname === '/') {
+        // Show simple loading instead of LoadingScreen to avoid conflicts
+        return (
+            <div style={{ 
+                display: 'flex', 
+                justifyContent: 'center', 
+                alignItems: 'center', 
+                height: '100vh',
+                fontSize: '16px',
+                color: '#666'
+            }}>
+                Loading...
+            </div>
+        );
     }
     return children;
 };
