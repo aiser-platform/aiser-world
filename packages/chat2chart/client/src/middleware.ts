@@ -14,16 +14,9 @@ export function middleware(request: NextRequest) {
 }
 
 // Apply to all routes
+// Disable middleware matcher to avoid accidental interception of static asset
+// requests during local development. If middleware is needed later, re-enable
+// and scope it explicitly to API routes only.
 export const config = {
-  matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - api (API routes)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     */
-    // Exclude API and Next.js static asset paths explicitly (with trailing slashes)
-    '/((?!api/|_next/static/|_next/image/|favicon.ico).*)',
-  ],
+  matcher: [],
 };
