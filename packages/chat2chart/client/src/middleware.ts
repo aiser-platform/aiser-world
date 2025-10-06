@@ -23,6 +23,7 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      */
-    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+    // Exclude API and Next.js static asset paths explicitly (with trailing slashes)
+    '/((?!api/|_next/static/|_next/image/|favicon.ico).*)',
   ],
 };
