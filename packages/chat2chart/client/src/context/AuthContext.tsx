@@ -314,20 +314,42 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setAuthError(null);
         setLoading(true);
         try {
-            const controller = new AbortController();
-            const t = setTimeout(() => controller.abort(), 4000);
-            let res;
-            try {
-                res = await fetch('/api/auth/users/me', { method: 'GET', credentials: 'include', signal: controller.signal });
-            } finally { clearTimeout(t); }
-            if (res && res.ok) {
-                const u = await res.json();
-                setUser(u);
-                try { localStorage.setItem('aiser_user', JSON.stringify(u)); } catch {}
-                setAuthError(null);
-                return;
+            // Retry attempt for transient failures (e.g., cookie forwarding race)
+            const attempts = 3;
+            let lastErr: any = null;
+            for (let attempt = 1; attempt <= attempts; attempt++) {
+                try {
+                    const controller = new AbortController();
+                    const t = setTimeout(() => controller.abort(), 3000);
+                    let res: Response | undefined = undefined;
+                    try {
+                        res = await fetch('/api/auth/users/me', { method: 'GET', credentials: 'include', signal: controller.signal });
+                    } finally { clearTimeout(t); }
+
+                    if (res && res.ok) {
+                        const u = await res.json();
+                        setUser(u);
+                        try { localStorage.setItem('aiser_user', JSON.stringify(u)); } catch {}
+                        setAuthError(null);
+                        return;
+                    }
+
+                    if (res) {
+                        lastErr = new Error(`Server returned ${res.status}`);
+                        // If 403/401, retry once after a short delay (cookie may not be set yet)
+                        if (res.status === 401 || res.status === 403) {
+                            await new Promise((r) => setTimeout(r, attempt * 300));
+                            continue;
+                        }
+                        break; // non-retryable status
+                    }
+                } catch (err) {
+                    lastErr = err;
+                    await new Promise((r) => setTimeout(r, attempt * 300));
+                    continue;
+                }
             }
-            if (res) setAuthError(`Server returned ${res.status}`);
+            if (lastErr) setAuthError(String(lastErr?.message || lastErr));
             setUser(null);
         } catch (e: any) {
             setAuthError(String(e?.message || e));
