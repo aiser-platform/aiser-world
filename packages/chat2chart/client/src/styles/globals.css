@@ -188,6 +188,14 @@ body {
     background: var(--background) !important;
 }
 
+/* Header layout tweaks for consistent alignment */
+.ant-layout-header {
+    height: 64px !important;
+    padding: 0 24px !important;
+    display: flex !important;
+    align-items: center !important;
+}
+
 .ant-layout-content {
     background: var(--background) !important;
     color: var(--foreground) !important;
