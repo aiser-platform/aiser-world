@@ -1489,6 +1489,19 @@
     overflow: hidden;
 }
 
+/* Ensure chat content uses available width and input stays visible */
+.chat-main {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.chat-content {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+}
+
 .chat-messages {
     flex: 1;
     overflow-y: auto;
