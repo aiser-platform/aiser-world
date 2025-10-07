@@ -13,8 +13,8 @@ class DeviceInfo(BaseModel):
 
 
 class DeviceSessionBase(BaseModel):
-    user_id: int = Field(...)
-    device_id: UUID = Field(...)
+    user_id: str | int = Field(...)  # Support both UUID (str) and integer
+    device_id: str = Field(...)  # Changed from UUID to str for flexibility
     device_type: str = Field(None)
     device_name: str = Field(None)
     ip_address: str = Field(None)

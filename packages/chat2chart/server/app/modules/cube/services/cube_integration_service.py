@@ -21,6 +21,7 @@ class CubeIntegrationService:
         self.cube_api_url = settings.CUBE_API_URL
         self.cube_api_secret = settings.CUBE_API_SECRET
         self.ai_service = LiteLLMService()
+        self._server_health_cache = {"ts": 0, "status": None}
 
     async def generate_cube_schema(
         self,
@@ -40,6 +41,23 @@ class CubeIntegrationService:
             if cached_schema:
                 logger.info("📋 Using cached Cube.js schema")
                 return cached_schema
+
+            # Optional: lightweight server health check to skip Cube-dependent flows early
+            try:
+                now = asyncio.get_event_loop().time()
+                # cache health check for 10 seconds
+                if not self._server_health_cache.get('status') or (now - self._server_health_cache.get('ts', 0)) > 10:
+                    async with aiohttp.ClientSession() as session:
+                        try:
+                            resp = await session.get(f"{self.cube_api_url}/health", timeout=5)
+                            self._server_health_cache = {"ts": now, "status": (resp.status == 200)}
+                        except Exception:
+                            self._server_health_cache = {"ts": now, "status": False}
+                if not self._server_health_cache.get('status'):
+                    logger.warning("Cube.js server appears unavailable; skipping direct validation steps")
+            except Exception:
+                # Non-fatal: continue, AI schema generation does not strictly require Cube server
+                pass
 
             # Analyze data structure with AI
             data_analysis = await self._analyze_data_structure(sample_data)

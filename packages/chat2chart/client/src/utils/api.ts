@@ -3,10 +3,19 @@ import { getBackendUrl } from './backendUrl';
 
 export const API_URL = getBackendUrl();
 
-// Default AUTH_URL to the main API URL when not explicitly set in the environment.
+// Default AUTH_URL to the auth service port when not explicitly set in the environment.
 // This makes dev workflows simpler (upgrade-demo and other dev helpers live on the chat2chart service).
 // Default AUTH_URL: prefer explicit NEXT_PUBLIC_AUTH_URL, otherwise default to the auth service dev port
-export const AUTH_URL = process.env.NEXT_PUBLIC_AUTH_URL || 'http://localhost:5000';
+export const AUTH_URL = (() => {
+    if (typeof window !== 'undefined') {
+        // derive auth host from current hostname to ensure cookies match
+        const host = window.location.hostname === '127.0.0.1' ? 'localhost' : window.location.hostname;
+        const protocol = window.location.protocol;
+        const authPort = process.env.NEXT_PUBLIC_AUTH_PORT || '5000';
+        return `${protocol}//${host}:${authPort}`;
+    }
+    return process.env.NEXT_PUBLIC_AUTH_URL || 'http://auth-service:5000';
+})();
 
 export const fetchApi = async (
     endpoint: string,
@@ -27,13 +36,23 @@ export const fetchApi = async (
                           endpoint.startsWith('api/v1/pricing') ||
                           endpoint.startsWith('api/v1/ai-usage/');
     
-    const baseUrl = isAuthEndpoint ? AUTH_URL : API_URL;
+    const baseUrl = isAuthEndpoint ? (typeof window !== 'undefined' ? '' : AUTH_URL) : API_URL;
 
-    const response = await fetch(`${baseUrl}/${endpoint}`, {
+    // When calling auth endpoints from the browser, use the same-origin proxy
+    // at `/api/auth/...` to ensure cookies are attached by the browser.
+    const url = isAuthEndpoint && typeof window !== 'undefined' ? `/api/auth/${endpoint.replace(/^\/+/, '')}` : `${baseUrl}/${endpoint}`;
+
+    const response = await fetch(url, {
         ...options,
         credentials: 'include',
         headers: {
             ...defaultHeaders,
+            // If an access token was stored as a fallback in localStorage (dev only),
+            // use it as a Bearer Authorization header for requests where cookies
+            // may not be reliably sent by the browser.
+            ...(typeof window !== 'undefined' && !((options.headers || {}) as any).Authorization
+                ? { Authorization: `Bearer ${localStorage.getItem('aiser_access_token') || ''}` }
+                : {}),
             ...options.headers,
         },
     });

@@ -66,22 +66,9 @@ async def create_user(item: UserCreate, token: str = TokenDep):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
-@router.get("/me", response_model=UserResponse)
-@router.get("/me/", response_model=UserResponse)
-async def get_me_handler(token: str = TokenDep):
-    try:
-        # Allow tests that patch the service to return dicts directly
-        result = service.get_me(token)
-        result = await _maybe_await(result)
-        if isinstance(result, dict):
-            return JSONResponse(content=result)
-        return result
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
-        )
+# Deprecated duplicate handler removed. See the consolidated `get_me` handler
+# defined further down in this module which handles cookie and token
+# extraction robustly and supports both TokenDep and CookieTokenDep flows.
 
 
 # New API endpoints for settings (place before param routes to avoid path collisions)

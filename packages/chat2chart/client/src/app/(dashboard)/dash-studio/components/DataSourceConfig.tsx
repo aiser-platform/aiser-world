@@ -39,6 +39,7 @@ import {
   ThunderboltOutlined
 } from '@ant-design/icons';
 import { dashboardDataService } from '../services/DashboardDataService';
+import { getBackendUrlForApi } from '@/utils/backendUrl';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -67,20 +68,30 @@ const DataSourceConfig: React.FC<DataSourceConfigProps> = ({ widget, onUpdate })
     setLoading(true);
     try {
                  // Get organization and project context from URL or context
-           const organizationId = localStorage.getItem('currentOrganizationId') ?? 1
-           const projectId = localStorage.getItem('currentProjectId') ?? (projects && projects.length>0 ? projects[0].id : 1)
+          const organizationId = localStorage.getItem('currentOrganizationId') ?? 1;
+          const projectIdRaw = localStorage.getItem('currentProjectId');
+          // If a projects list is available in localStorage, prefer its first id
+          let projectId = projectIdRaw ?? 1;
+          try {
+            const projList = JSON.parse(localStorage.getItem('projects') || 'null');
+            if (Array.isArray(projList) && projList.length > 0 && projList[0].id) {
+              projectId = projectIdRaw ?? projList[0].id;
+            }
+          } catch (e) {
+            // ignore parse errors and keep fallback
+          }
       
       // Try project-scoped data sources first
       let response;
       try {
-        response = await fetch(`http://localhost:8000/data/api/organizations/${organizationId}/projects/${projectId}/data-sources?user_id=current_user`);
+        response = await fetch(`${getBackendUrlForApi()}/data/api/organizations/${organizationId}/projects/${projectId}/data-sources?user_id=current_user`);
         if (!response.ok) {
           throw new Error(`Project-scoped API failed: ${response.status}`);
         }
       } catch (projectError) {
         console.log('Project-scoped API not available, falling back to global API');
         // Fallback to global data sources API
-        response = await fetch('http://localhost:8000/data/sources');
+        response = await fetch(`${getBackendUrlForApi()}/data/sources`);
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -94,7 +105,7 @@ const DataSourceConfig: React.FC<DataSourceConfigProps> = ({ widget, onUpdate })
       
       // Check enterprise connections
       try {
-        const enterpriseResponse = await fetch(`http://localhost:8000/data/enterprise/connections`);
+        const enterpriseResponse = await fetch(`${getBackendUrlForApi()}/data/enterprise/connections`);
         if (enterpriseResponse.ok) {
           const enterpriseResult = await enterpriseResponse.json();
           if (enterpriseResult.connections && enterpriseResult.connections.length > 0) {

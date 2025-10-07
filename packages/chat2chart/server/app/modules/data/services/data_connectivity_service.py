@@ -503,6 +503,9 @@ class DataConnectivityService:
                         'name': source.name,
                         'type': source.type,
                         'format': source.format,
+                        # expose persisted inline/sample data and file path if present
+                        'sample_data': getattr(source, 'sample_data', None),
+                        'file_path': getattr(source, 'file_path', None),
                         'db_type': source.db_type,
                         'size': source.size,
                         'row_count': source.row_count,
@@ -2022,9 +2025,10 @@ class DataConnectivityService:
             from app.modules.projects.models import ProjectDataSource
             from app.db.session import async_session
 
-            # Generate a deterministic id for this create call so we can
+            # Generate a stable unique id for this create call so we can
             # expose a preview entry immediately in the in-memory registry
-            generated_id = f"ds_{organization_id}_{project_id}_{int(datetime.now().timestamp())}"
+            import uuid
+            generated_id = f"ds_{uuid.uuid4().hex}"
 
             # Store a preview entry so immediate calls (modeling) can read sample data
             try:
@@ -2073,31 +2077,76 @@ class DataConnectivityService:
                         'db_type': db_type,
                         'schema': data_source_data.get('schema'),
                         'connection_config': connection_config,
-                        # Allow callers to provide inline sample rows for file sources
-                        'data': data_source_data.get('data') or data_source_data.get('sample_data') or [],
-                        'user_id': str(organization_id),  # Using organization_id as user_id for now
-                        'tenant_id': str(organization_id),
+                    # Allow callers to provide inline sample rows for file sources
+                        'sample_data': data_source_data.get('data') or data_source_data.get('sample_data') or [],
+                        # Ensure ids are strings to avoid asyncpg type errors
+                        'user_id': str(organization_id) if organization_id is not None else None,
+                        'tenant_id': str(organization_id) if organization_id is not None else None,
                         'is_active': True,
                         'created_at': datetime.now(),
                         'updated_at': datetime.now(),
                     }
 
                     # create SQLAlchemy DataSource instance for async path
+                    # If the generated id already exists due to previous attempts, reuse it
+                    try:
+                        from app.db.session import get_sync_engine
+                        eng_check = get_sync_engine()
+                        import sqlalchemy as sa
+                        with eng_check.connect() as conn:
+                            row = conn.execute(sa.text("SELECT id FROM data_sources WHERE id = :id"), {"id": generated_id}).fetchone()
+                            if row and row[0]:
+                                # already exists; return early using existing id
+                                return {
+                                    'success': True,
+                                    'data_source': {
+                                        'id': str(row[0]),
+                                        'name': data_source_values.get('name'),
+                                        'type': data_source_values.get('type'),
+                                        'organization_id': organization_id,
+                                        'project_id': project_id,
+                                    },
+                                    'data_source_id': str(row[0]),
+                                    'id': str(row[0]),
+                                    'message': 'Data source already exists'
+                                }
+                    except Exception:
+                        # non-fatal; continue to create
+                        pass
+
                     data_source = DataSource(**data_source_values)
 
                     # Persist using the global database helper which creates its
                     # own session per call and serializes operations.
                     from app.db.session import get_db
+                    from sqlalchemy.exc import IntegrityError as SAIntegrityError
 
                     db_helper = get_db()
                     # Save data_source via helper (creates new session internally)
-                    await db_helper.add(data_source)
+                    # Retry on unique key collisions by regenerating id
+                    max_attempts = 3
+                    attempt = 0
+                    while True:
+                        try:
+                            attempt += 1
+                            await db_helper.add(data_source)
+                            break
+                        except SAIntegrityError as sie:
+                            if attempt >= max_attempts:
+                                raise
+                            # regenerate id and retry
+                            import uuid as _uuid
+                            new_id = f"ds_{_uuid.uuid4().hex}"
+                            data_source_values['id'] = new_id
+                            # recreate SQLAlchemy instance with new id
+                            data_source = DataSource(**data_source_values)
+                            continue
                     # Persist sample_data to the DB if provided
                     try:
-                        if data_source_values.get('data'):
+                        if data_source_values.get('sample_data'):
                             upd = sa.text("UPDATE data_sources SET sample_data = :sd WHERE id = :id")
                             with get_sync_engine().begin() as sync_conn:
-                                sync_conn.execute(upd, {"sd": json.dumps(data_source_values.get('data')), "id": data_source.id})
+                                sync_conn.execute(upd, {"sd": json.dumps(data_source_values.get('sample_data')), "id": data_source.id})
                     except Exception:
                         # Non-fatal; sample persistence best-effort
                         logger.debug('Failed to persist sample_data for %s', data_source.id)
@@ -2122,6 +2171,8 @@ class DataConnectivityService:
                             'organization_id': organization_id,
                             'project_id': project_id,
                         },
+                        'data_source_id': data_source.id,
+                        'id': data_source.id,
                         'message': 'Data source created successfully',
                     }
 
@@ -2153,7 +2204,7 @@ class DataConnectivityService:
                             'db_type': db_type,
                             'schema': data_source_data.get('schema'),
                             'connection_config': connection_config,
-                            'data': data_source_data.get('data') or data_source_data.get('sample_data') or [],
+                            'sample_data': data_source_data.get('data') or data_source_data.get('sample_data') or [],
                             'user_id': str(organization_id),
                             'tenant_id': str(organization_id),
                             'is_active': True,
@@ -2166,7 +2217,8 @@ class DataConnectivityService:
                         with eng.begin() as conn:
                             insert_ds = sa.text(
                                 "INSERT INTO data_sources (id, name, type, format, db_type, size, row_count, schema, description, connection_config, file_path, original_filename, created_at, updated_at, user_id, tenant_id, is_active, last_accessed) "
-                                "VALUES (:id, :name, :type, :format, :db_type, :size, :row_count, :schema, :description, :connection_config, :file_path, :original_filename, :created_at, :updated_at, :user_id, :tenant_id, :is_active, :last_accessed)"
+                                "VALUES (:id, :name, :type, :format, :db_type, :size, :row_count, :schema, :description, :connection_config, :file_path, :original_filename, :created_at, :updated_at, :user_id, :tenant_id, :is_active, :last_accessed) "
+                                "ON CONFLICT (id) DO NOTHING"
                             )
                             params = {
                                 'id': ds_vals.get('id'),
@@ -2183,12 +2235,57 @@ class DataConnectivityService:
                                 'original_filename': ds_vals.get('original_filename') if ds_vals.get('original_filename') is not None else None,
                                 'created_at': ds_vals.get('created_at'),
                                 'updated_at': ds_vals.get('updated_at'),
-                                'user_id': ds_vals.get('user_id'),
-                                'tenant_id': ds_vals.get('tenant_id'),
+                                'user_id': str(ds_vals.get('user_id')) if ds_vals.get('user_id') is not None else None,
+                                'tenant_id': str(ds_vals.get('tenant_id')) if ds_vals.get('tenant_id') is not None else None,
                                 'is_active': ds_vals.get('is_active'),
                                 'last_accessed': ds_vals.get('last_accessed')
                             }
-                            conn.execute(insert_ds, params)
+                            # Retry insert on unique violation
+                            max_sync_attempts = 3
+                            sync_attempt = 0
+                            while True:
+                                try:
+                                    conn.execute(insert_ds, params)
+
+                                    # ensure id exists (select back)
+                                    sel = sa.text("SELECT id FROM data_sources WHERE id = :id LIMIT 1")
+                                    rsel = conn.execute(sel, {"id": params['id']})
+                                    row = rsel.fetchone()
+                                    if not row:
+                                        # nothing inserted (conflict); try to find by name+project
+                                        sel2 = sa.text(
+                                            "SELECT ds.id FROM data_sources ds JOIN project_data_source pds ON pds.data_source_id = ds.id "
+                                            "WHERE ds.name = :name AND pds.project_id = :pid LIMIT 1"
+                                        )
+                                        r2 = conn.execute(sel2, {"name": ds_vals.get('name'), "pid": int(project_id)})
+                                        rr = r2.fetchone()
+                                        if rr and rr[0]:
+                                            params['id'] = rr[0]
+                                            break
+                                    else:
+                                        # inserted successfully
+                                        break
+                                except Exception as e:
+                                    # detect unique violation (asyncpg / psycopg2 messages vary)
+                                    msg = str(e).lower()
+                                    if 'unique' in msg or 'duplicate' in msg:
+                                        sync_attempt += 1
+                                        if sync_attempt >= max_sync_attempts:
+                                            raise
+                                        import uuid as _uuid
+                                        new_id = f"ds_{_uuid.uuid4().hex}"
+                                        params['id'] = new_id
+                                        ds_vals['id'] = new_id
+                                        # loop and retry with new id
+                                        continue
+                                    raise
+                            # Persist sample_data if present
+                            if ds_vals.get('sample_data'):
+                                try:
+                                    upd = sa.text("UPDATE data_sources SET sample_data = :sd WHERE id = :id")
+                                    conn.execute(upd, {"sd": json.dumps(ds_vals.get('sample_data')), "id": ds_vals.get('id')})
+                                except Exception:
+                                    logger.debug('Failed to persist sample_data in sync path for %s', ds_vals.get('id'))
                             insert_link = sa.text(
                                 "INSERT INTO project_data_source (id, project_id, data_source_id, data_source_type, is_active, added_at) VALUES (gen_random_uuid(), :project_id, :data_source_id, :data_source_type, :is_active, :added_at)"
                             )
@@ -2218,21 +2315,37 @@ class DataConnectivityService:
                                 'organization_id': organization_id,
                                 'project_id': project_id
                             },
+                            'data_source_id': ds_vals.get('id'),
+                            'id': ds_vals.get('id'),
                             'message': 'Data source created (queued sync)'
                         }
                     except Exception as e:
                         logger.exception("Sync queued create failed: %s", e)
                         return {'success': False, 'error': str(e)}
 
-                return await write_queue.enqueue(_do_create_sync)
+                # Serialize DB writes via the write queue to avoid asyncpg "another operation is in progress" errors
+                # Use the sync callable so all DB writes run via the sync engine in a worker thread.
+                # Retry enqueue a few times in case of transient connection/loop issues, then fall back to async path.
+                import asyncio
+                max_enqueue_attempts = 3
+                for attempt in range(1, max_enqueue_attempts + 1):
+                    try:
+                        return await write_queue.enqueue(_do_create_sync)
+                    except Exception as enqueue_exc:
+                        logger.warning("write_queue.enqueue attempt %d/%d failed: %s", attempt, max_enqueue_attempts, enqueue_exc)
+                        if attempt == max_enqueue_attempts:
+                            logger.exception("write_queue.enqueue failed after %d attempts, falling back to direct async create", max_enqueue_attempts)
+                            return await _do_create()
+                        await asyncio.sleep(0.4 * attempt)
             except Exception:
                 # If queue not available, fall back to direct async create
                 return await _do_create()
         except Exception as e:
-            logger.error(f"❌ Failed to create project data source: {str(e)}")
+            # Log full exception with traceback to help debugging in tests
+            logger.exception("❌ Failed to create project data source")
             return {
                 'success': False,
-                'error': str(e)
+                'error': repr(e) or str(e) or 'Unknown error'
             }
 
     async def get_project_data_source(

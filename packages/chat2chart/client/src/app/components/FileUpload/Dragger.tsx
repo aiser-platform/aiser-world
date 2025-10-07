@@ -10,7 +10,7 @@ export interface UploadDraggerProps {
 }
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB - Enhanced limit
-const UPLOAD_API_URL = 'http://localhost:8000/data/upload'; // Correct endpoint
+const UPLOAD_API_URL = '/api/data/upload'; // Use same-origin proxy for uploads
 
 const UploadDragger: React.FC<UploadDraggerProps> = ({
     onUpload,

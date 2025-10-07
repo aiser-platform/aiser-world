@@ -99,7 +99,7 @@ const DataModelingWorkflow: React.FC<DataModelingWorkflowProps> = ({
             message.info('🧠 AI is analyzing your data structure...');
 
             // Analyze with Cube.js modeling service
-            const analysisResponse = await fetch('http://localhost:8000/data/cube-modeling/analyze', {
+            const analysisResponse = await fetch('/api/data/cube-modeling/analyze', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ data_source_id: dataSourceId, connection_info: null })

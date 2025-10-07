@@ -1,7 +1,7 @@
+@import 'antd/dist/reset.css';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-@import 'antd/dist/reset.css';
 
 /* Theme Variables */
 :root {
@@ -77,15 +77,10 @@ body {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     position: relative;
-    overflow: hidden;
 }
 
 /* Responsive Styles */
-@media screen and (min-width: 1024px) {
-    :root {
-        --base-font-size: 32px;
-    }
-}
+/* Removed aggressive root font scaling on large screens */
 
 /* Tailwind Utilities */
 @layer utilities {

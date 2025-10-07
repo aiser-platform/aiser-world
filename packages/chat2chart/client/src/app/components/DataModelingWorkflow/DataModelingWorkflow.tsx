@@ -154,7 +154,7 @@ const DataModelingWorkflow: React.FC<DataModelingWorkflowProps> = ({
         try {
             setLoading(true);
             
-            const response = await fetch('http://localhost:8000/charts/ai-data-modeling', {
+            const response = await fetch('/api/charts/ai-data-modeling', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -199,7 +199,7 @@ const DataModelingWorkflow: React.FC<DataModelingWorkflowProps> = ({
                 modifications: approvalType === 'customize' ? { yaml_config: yamlContent } : {}
             };
 
-            const response = await fetch('http://localhost:8000/charts/approve-schema', {
+            const response = await fetch('/api/charts/approve-schema', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

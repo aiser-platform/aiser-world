@@ -96,7 +96,12 @@ class UserService(BaseService):
     def get_user(self, user_id: int, db: Session) -> Optional[User]:
         """Get user by ID"""
         user = self.repository.get_by_id(user_id, db)
-        return UserResponse(**user.__dict__) if user else None
+        if user:
+            # Convert UUID to string for UserResponse
+            user_dict = user.__dict__.copy()
+            user_dict['id'] = str(user_dict['id'])
+            return UserResponse(**user_dict)
+        return None
 
     def update_user(self, user_id: int, user_in: UserUpdate, db: Session) -> User:
         """Update user profile"""
@@ -369,7 +374,7 @@ class UserService(BaseService):
             logger.error(f"Error refreshing token: {e}")
             raise HTTPException(status_code=401, detail=str(e))
 
-    def get_me(self, token: str) -> User:
+    def get_me(self, token: str, db: Session) -> User:
         """
         Get current user details from token
         """
@@ -378,7 +383,7 @@ class UserService(BaseService):
             if not decoded_token:
                 raise HTTPException(status_code=401, detail="Invalid token")
 
-            user = self.get_user(decoded_token["user_id"])
+            user = self.get_user(decoded_token["user_id"], db)
             if not user:
                 raise HTTPException(status_code=404, detail="User not found")
 

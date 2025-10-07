@@ -3,8 +3,8 @@ import { fetchWithAuth } from '@/services/apiService';
 export class DashboardAPIService {
   private baseURL: string;
 
-  constructor(baseURL: string = 'http://localhost:8000') {
-    this.baseURL = baseURL;
+  constructor(baseURL: string = '/api') {
+    this.baseURL = baseURL.replace(/\/$/, '');
   }
 
   private withCreds(init?: RequestInit): RequestInit {

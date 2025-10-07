@@ -73,23 +73,37 @@ class JWTCookie(HTTPBearer):
         self.payload = None
 
     async def __call__(self, request: Request):
+        print(f"DEBUG: JWTCookie called, checking cookies...")
         token = request.cookies.get("access_token")
+        print(f"DEBUG: access_token from cookies: {token[:20] if token else 'None'}...")
+        
+        # Also check for c2c_access_token
+        if not token:
+            token = request.cookies.get("c2c_access_token")
+            print(f"DEBUG: c2c_access_token from cookies: {token[:20] if token else 'None'}...")
+        
         try:
             auth_header = await super(JWTCookie, self).__call__(request)
             if auth_header and auth_header.credentials:
                 token = auth_header.credentials
+                print(f"DEBUG: token from auth header: {token[:20] if token else 'None'}...")
         except HTTPException:
+            print(f"DEBUG: No auth header found")
             if not token:
+                print(f"DEBUG: No token found in cookies or header, raising 403")
                 raise HTTPException(
                     status_code=403,
                     detail="Unauthorized.",
                 )
 
+        print(f"DEBUG: Final token to verify: {token[:20] if token else 'None'}...")
         if not self.verify_jwt(token):
+            print(f"DEBUG: Token verification failed")
             raise HTTPException(
                 status_code=403, detail="Invalid token or expired token."
             )
 
+        print(f"DEBUG: Token verification successful")
         request.state.jwt_payload = token
         return token
 

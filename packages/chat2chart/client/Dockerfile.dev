@@ -11,6 +11,6 @@ RUN if [ -f package.json ]; then npm install --no-audit --no-fund; fi
 COPY . .
 
 # Default dev command
-CMD ["npm run dev"]
+CMD ["npm","run","dev"]
 
 

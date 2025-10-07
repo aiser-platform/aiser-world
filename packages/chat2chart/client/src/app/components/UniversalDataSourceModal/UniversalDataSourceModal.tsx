@@ -29,9 +29,10 @@ import { apiService } from '@/services/apiService';
 import { WorkflowNavigation, WorkflowStep } from '../WorkflowNavigation';
 import { environment, getCubeJsAuthHeader } from '@/config/environment';
 // Resolve backend URL based on runtime hostname (localhost dev vs deployed)
+import { getBackendUrlForApi } from '@/utils/backendUrl';
 const backendUrl = typeof window !== 'undefined' && window.location.hostname === 'localhost'
     ? 'http://localhost:8000'
-    : (environment?.backendUrl || '');
+: (environment?.api?.baseUrl || getBackendUrlForApi());
 import { useOrganization } from '@/context/OrganizationContext';
 
 const { Dragger } = Upload;
@@ -1652,7 +1653,8 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
                         id: merged.id,
                         name: merged.name,
                         type: merged.type,
-                        status: merged.status || 'ready',
+                        // normalize status to known UI values
+                        status: merged.status || 'connected',
                         createdAt: merged.created_at || merged.createdAt || new Date().toISOString(),
                         format: merged.format || null,
                         preview: merged.preview || null
@@ -3118,7 +3120,8 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
                     const result = await response.json();
                     if (result.success && result.data_source) {
                         newDataSource.id = result.data_source.id;
-                        newDataSource.status = 'ready';
+                        // normalize backend 'ready' to frontend 'connected'
+                        newDataSource.status = result.data_source.status || 'connected';
                         newDataSource.config = result.data_source.connection_config || newDataSource.config;
                         console.log('✅ Data source created in backend:', result.data_source);
 

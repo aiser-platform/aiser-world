@@ -83,7 +83,8 @@ const { TextArea } = Input;
 const { Option } = Select;
 const { Panel } = Collapse;
 
-interface DashboardStudioProps {}
+// Explicitly avoid empty interface which ESLint flags; use a generic record for now.
+type DashboardStudioProps = Record<string, unknown>;
 
 
 
@@ -252,7 +253,7 @@ const DashboardStudio: React.FC<DashboardStudioProps> = () => {
   // URL parameter handling for deep linking (react to changes)
   const searchParams = useSearchParams();
   useEffect(() => {
-    const tabParam = searchParams.get('tab') || 'dashboard';
+    const tabParam = searchParams?.get ? searchParams.get('tab') || 'dashboard' : 'dashboard';
     const validTabs = ['dashboard', 'query-editor', 'chart', 'filter'];
     const key = validTabs.includes(tabParam) ? tabParam : 'dashboard';
     setActiveTab(key);

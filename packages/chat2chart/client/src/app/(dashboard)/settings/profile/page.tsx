@@ -13,6 +13,7 @@ import {
     SaveOutlined
 } from '@ant-design/icons';
 import { useAuth } from '@/context/AuthContext';
+import { getBackendUrl } from '@/utils/backendUrl';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -26,11 +27,35 @@ export default function ProfileSettingsPage() {
     const onFinish = async (values: any) => {
         setLoading(true);
         try {
-            // Add your profile update logic here
-            console.log('Profile update values:', values);
+            // Map frontend form fields to backend UserUpdate schema
+            const payload: any = {
+                username: values.username,
+                first_name: values.firstName,
+                last_name: values.lastName,
+                email: values.email,
+                phone: values.phone,
+                bio: values.bio,
+                website: values.website,
+                location: values.location,
+                timezone: values.timezone
+            };
+
+            const res = await fetch(`${getBackendUrl()}/users/profile`, {
+                method: 'PUT',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!res.ok) {
+                const txt = await res.text();
+                throw new Error(`Failed to update profile: ${res.status} ${txt}`);
+            }
+
             message.success('Profile updated successfully!');
         } catch (error) {
             message.error('Failed to update profile. Please try again.');
+            console.error(error);
         } finally {
             setLoading(false);
         }
@@ -71,8 +96,9 @@ export default function ProfileSettingsPage() {
                             form={form}
                             layout="vertical"
                             initialValues={{
-                                firstName: '',
-                                lastName: '',
+                                username: user?.username || '',
+                                firstName: user?.first_name || user?.firstName || '',
+                                lastName: user?.last_name || user?.lastName || '',
                                 email: user?.email || '',
                                 phone: '',
                                 bio: '',

@@ -15,7 +15,7 @@ from app.modules.authentication import (
     SignUpResponse,
 )
 from app.modules.authentication.decoractors.auth_cookies import handle_auth_cookies
-from app.modules.authentication.deps.auth_bearer import TokenDep, JWTCookie
+from app.modules.authentication.deps.auth_bearer import TokenDep, JWTCookie, CookieTokenDep
 from app.modules.authentication.schemas import (
     ForgotPasswordRequest,
     ForgotPasswordResponse,
@@ -33,6 +33,7 @@ from unittest.mock import Mock
 import inspect
 from app.modules.user.schemas import UserCreate, UserResponse, UserUpdate
 from app.modules.user.services import UserService
+from app.modules.authentication.utils.cookie_manager import manage_auth_cookies
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +69,7 @@ async def create_user(item: UserCreate, token: str = TokenDep):
 
 @router.get("/me")
 @router.get("/me/")
-async def get_me(token: str = TokenDep):
+async def get_me(token: str = CookieTokenDep, db: Session = Depends(get_db)):
     """Get current user profile"""
     try:
         # If tests patched the module-level service and set a return_value
@@ -78,7 +79,7 @@ async def get_me(token: str = TokenDep):
             if rv is not None:
                 return JSONResponse(content=rv)
 
-        result = service.get_me(token)
+        result = service.get_me(token, db)
         if inspect.isawaitable(result):
             result = await result
 
@@ -147,35 +148,6 @@ async def delete_user(user_id: str):
         )
 
 
-@router.get("/me")
-@router.get("/me/")
-async def get_me(token: str = TokenDep):
-    """Get current user profile"""
-    try:
-        print("ENTER get_me: service.get_me=", service.get_me, "return_value=", getattr(service.get_me, 'return_value', None))
-        # If tests patched the module-level service and set a return_value
-        # on `service.get_me`, prefer returning it directly (helps test mocks).
-        if hasattr(service, "get_me") and hasattr(service.get_me, "return_value"):
-            rv = getattr(service.get_me, "return_value")
-            print("get_me: found return_value rv=", rv)
-            if rv is not None:
-                print("get_me: returning JSONResponse(rv)")
-                return JSONResponse(content=rv)
-
-        result = service.get_me(token)
-        if inspect.isawaitable(result):
-            result = await result
-
-        if isinstance(result, dict):
-            return JSONResponse(content=result)
-
-        return result
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
-        )
 
 
 @router.post("/sign-in")
@@ -253,7 +225,22 @@ async def sign_in(
         return obj
 
     safe_payload = sanitize(payload)
-    return JSONResponse(content=safe_payload)
+    # Ensure cookies are set directly on the response as a fallback in case
+    # decorator cookie extraction misses a JSONResponse wrapper.
+    try:
+        tokens = None
+        if isinstance(safe_payload, dict) and safe_payload.get('access_token'):
+            tokens = {
+                'access_token': safe_payload.get('access_token'),
+                'refresh_token': safe_payload.get('refresh_token'),
+            }
+        if tokens:
+            manage_auth_cookies(response=response, tokens=tokens)
+    except Exception:
+        # Non-fatal: continue returning payload even if cookie setting fails
+        pass
+
+    return safe_payload
 
 
 @router.post("/signup")

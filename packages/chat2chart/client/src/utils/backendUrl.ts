@@ -9,21 +9,32 @@
  */
 
 export const getBackendUrl = (): string => {
-  // Priority 1: Explicit environment variable (production, staging, on-premise)
+  // If running in the browser, derive from current origin to avoid unreachable container DNS
+  if (typeof window !== 'undefined') {
+    const { protocol, hostname } = window.location;
+    // Allow runtime override decided by connectivity checks
+    try {
+      const override = window.localStorage.getItem('aiser_api_base');
+      if (override) return override;
+    } catch {}
+    // Normalize 127.0.0.1 to localhost to avoid mixed cookie/host quirks
+    const host = hostname === '127.0.0.1' ? 'localhost' : hostname;
+    const apiPort = '8000';
+    return `${protocol}//${host}:${apiPort}`;
+  }
+  // On the server (SSR), prefer explicit env
   if (process.env.NEXT_PUBLIC_BACKEND_URL) {
     return process.env.NEXT_PUBLIC_BACKEND_URL;
   }
-  // Priority 2: Local development (browser needs localhost), fall back to Docker host for server-only environments
-  if (process.env.NODE_ENV === 'development') {
-    // Use localhost so browser and container-origin cookie host match (localhost vs 127.0.0.1 mismatch)
-    return 'http://localhost:8000';
-  }
-
-  // Production / containerized default
-  return 'http://aiser-chat2chart-dev:8000';
+  // Fallback for SSR inside docker network
+  return 'http://chat2chart-server:8000';
 };
 
 export const getBackendUrlForApi = (): string => {
-  // API routes always use localhost since they run on the same host
-  return 'http://127.0.0.1:8000';
+  // Use browser-derived URL on client
+  if (typeof window !== 'undefined') {
+    return getBackendUrl();
+  }
+  // Use service DNS on server (SSR)
+  return process.env.NEXT_PUBLIC_BACKEND_URL || 'http://chat2chart-server:8000';
 };

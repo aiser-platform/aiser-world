@@ -1,10 +1,10 @@
 'use client';
 
-import dynamic from 'next/dynamic';
+import nextDynamic from 'next/dynamic';
 
 // Force dynamic rendering to avoid React context issues
 
-const DashboardStudioWrapper = dynamic(() => import('./components/DashboardStudioWrapper'), {
+const DashboardStudioWrapper = nextDynamic(() => import('./components/DashboardStudioWrapper'), {
   ssr: false,
   loading: () => (
     <div style={{
@@ -18,6 +18,8 @@ const DashboardStudioWrapper = dynamic(() => import('./components/DashboardStudi
     </div>
   )
 });
+
+export const dynamic = 'force-dynamic';
 
 export default function DashStudioPage() {
   return <DashboardStudioWrapper />;

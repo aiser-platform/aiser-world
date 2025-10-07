@@ -1,5 +1,5 @@
 'use client';
-
+export const dynamic = 'force-dynamic';
 // Simple dynamic configuration that actually works
 
 import { Tabs, Card, Row, Col, Button, Space, Tag, Typography, message, Tooltip } from 'antd';
@@ -194,8 +194,8 @@ const ChatToChart = () => {
 
     // Handle URL parameters for data source integration
     React.useEffect(() => {
-        const dataSourceId = searchParams.get('dataSource');
-        const modelingComplete = searchParams.get('modeling');
+        const dataSourceId = searchParams?.get ? searchParams.get('dataSource') : null;
+        const modelingComplete = searchParams?.get ? searchParams.get('modeling') : null;
         
         if (dataSourceId) {
             // For now, we'll set a placeholder and let the EnhancedDataPanel handle the actual data source

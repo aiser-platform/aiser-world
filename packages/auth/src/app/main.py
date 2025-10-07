@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.api import api_router
@@ -71,3 +71,18 @@ app.add_middleware(
 )
 
 app.include_router(api_router)
+
+
+# Middleware: log cookies for /users/me to help debug browser cookie delivery
+@app.middleware("http")
+async def log_cookie_debug(request: Request, call_next):
+    try:
+        if request.url.path.startswith("/users/me"):
+            # Log cookie keys only (avoid logging sensitive values)
+            cookie_keys = list(request.cookies.keys())
+            logger.debug(f"COOKIE DEBUG - Path: {request.url.path} CookieKeys: {cookie_keys}")
+    except Exception:
+        logger.exception("Failed to log cookies")
+    response = await call_next(request)
+    return response
+

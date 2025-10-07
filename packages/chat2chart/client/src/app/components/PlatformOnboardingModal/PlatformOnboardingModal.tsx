@@ -99,18 +99,54 @@ const PlatformOnboardingModal: React.FC = () => {
             layout="vertical"
             preserve={false}
             onFinish={(values) => {
+              // Backwards compatibility: accept `fullName` or `name` and split to first/last
+              try {
+                if (values.fullName && (!values.firstName || !values.lastName)) {
+                  const parts = String(values.fullName || '').trim().split(/\s+/);
+                  values.firstName = values.firstName || parts.shift() || '';
+                  values.lastName = values.lastName || parts.join(' ') || '';
+                  delete values.fullName;
+                }
+                if (values.name && (!values.firstName || !values.lastName)) {
+                  const parts = String(values.name || '').trim().split(/\s+/);
+                  values.firstName = values.firstName || parts.shift() || '';
+                  values.lastName = values.lastName || parts.join(' ') || '';
+                  delete values.name;
+                }
+              } catch (e) {
+                // ignore splitting errors and proceed with whatever was provided
+              }
+
               updateOnboardingData(values);
               markStepCompleted('welcome');
             }}
           >
             <Row gutter={[16, 16]}>
-              <Col span={12}>
+              <Col span={8}>
                 <Form.Item
-                  name="fullName"
-                  label="Full Name"
-                  rules={[{ required: true, message: 'Please enter your full name' }]}
+                  name="firstName"
+                  label="First Name"
+                  rules={[{ required: true, message: 'Please enter your first name' }]}
                 >
-                  <Input placeholder="Enter your full name" />
+                  <Input placeholder="First name" />
+                </Form.Item>
+              </Col>
+              <Col span={8}>
+                <Form.Item
+                  name="lastName"
+                  label="Last Name"
+                  rules={[{ required: true, message: 'Please enter your last name' }]}
+                >
+                  <Input placeholder="Last name" />
+                </Form.Item>
+              </Col>
+              <Col span={8}>
+                <Form.Item
+                  name="username"
+                  label="Username"
+                  rules={[{ required: true, message: 'Please choose a username' }]}
+                >
+                  <Input placeholder="Username" />
                 </Form.Item>
               </Col>
               <Col span={12}>

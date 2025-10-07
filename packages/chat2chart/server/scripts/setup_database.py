@@ -72,6 +72,11 @@ async def setup_database():
             await ensure_user_columns(engine)
         except Exception as e:
             print(f"⚠️ Failed to ensure user columns: {e}")
+        # Ensure organization/project schema columns expected by code are present
+        try:
+            await ensure_org_project_columns(engine)
+        except Exception as e:
+            print(f"⚠️ Failed to ensure org/project columns: {e}")
         
         # Check if demo data exists
         print("🔍 Checking demo data...")
@@ -147,6 +152,7 @@ async def create_missing_tables(engine, missing_tables):
                 name VARCHAR NOT NULL,
                 type VARCHAR NOT NULL,
                 format VARCHAR,
+                description TEXT,
                 db_type VARCHAR,
                 size INTEGER,
                 row_count INTEGER,
@@ -275,10 +281,10 @@ async def seed_demo_data(engine):
                 ON CONFLICT (id) DO NOTHING
             """))
 
-        # Insert demo project
+        # Insert demo project (do not set created_by here to avoid UUID/integer mismatches)
         conn.execute(text("""
-            INSERT INTO projects (id, name, description, organization_id, created_by, is_active, created_at, updated_at)
-            VALUES (1, 'Demo Project', 'Demo project for testing and development', 1, 1, true, NOW(), NOW())
+            INSERT INTO projects (id, name, description, organization_id, is_active, created_at, updated_at)
+            VALUES (1, 'Demo Project', 'Demo project for testing and development', 1, true, NOW(), NOW())
             ON CONFLICT (id) DO NOTHING
         """))
         
@@ -300,14 +306,13 @@ async def seed_demo_data(engine):
             ON CONFLICT DO NOTHING
         """))
         
-        # Insert demo dashboard
+        # Insert demo dashboard (omit created_by to avoid UUID/integer mismatches)
         conn.execute(text("""
-            INSERT INTO dashboards (id, name, description, project_id, created_by, layout_config, theme_config, is_active, created_at, updated_at)
+            INSERT INTO dashboards (id, name, description, project_id, layout_config, theme_config, is_active, created_at, updated_at)
             VALUES (
                 gen_random_uuid(),
                 'Demo Dashboard',
                 'Demo dashboard for testing and development',
-                1,
                 1,
                 '{"grid_size": 12, "widgets": []}',
                 '{"primary_color": "#1890ff"}',
@@ -401,6 +406,35 @@ def health_check(engine):
     except Exception as e:
         out["error"] = str(e)
     return out
+
+
+async def ensure_org_project_columns(engine):
+    """Add missing organization/project columns that older DBs may lack.
+
+    This ensures runtime queries that select these columns don't fail with
+    UndefinedColumnError.
+    """
+    with engine.connect() as conn:
+        # organizations.is_deleted
+        try:
+            conn.execute(text("ALTER TABLE organizations ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE;"))
+        except Exception:
+            print("Warning: failed to add organizations.is_deleted")
+
+        # projects.deleted_at
+        try:
+            conn.execute(text("ALTER TABLE projects ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;"))
+        except Exception:
+            print("Warning: failed to add projects.deleted_at")
+
+        # dashboards.deleted_at/is_deleted may also be referenced elsewhere
+        try:
+            conn.execute(text("ALTER TABLE dashboards ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;"))
+            conn.execute(text("ALTER TABLE dashboards ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE;"))
+        except Exception:
+            print("Warning: failed to add dashboards deleted flags")
+
+        conn.commit()
 
 
 def ensure_admin(engine):

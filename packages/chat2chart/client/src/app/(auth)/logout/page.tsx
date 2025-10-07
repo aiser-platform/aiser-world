@@ -1,5 +1,5 @@
-'use client';
-
+ 'use client';
+export const dynamic = 'force-dynamic';
 // Simple dynamic configuration that actually works
 
 import LoadingScreen from '@/components/LoadingScreen/LoadingScreen';

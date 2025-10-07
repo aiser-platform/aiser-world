@@ -1,5 +1,6 @@
 from typing import Optional
 from pydantic import BaseModel, EmailStr, Field
+import uuid
 
 
 class UserBase(BaseModel):
@@ -22,7 +23,7 @@ class UserUpdate(BaseModel):
 
 
 class UserResponse(UserBase):
-    id: int
+    id: str  # Changed from int to str to handle UUID
 
     def __init__(self, **user):
         super().__init__(**user)

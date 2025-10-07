@@ -57,7 +57,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
     const loadAvailableModels = async () => {
         setLoading(true);
         try {
-            const response = await fetch('http://localhost:8000/ai/models');
+            const response = await fetch('/api/ai/models');
             const data = await response.json();
             
             if (data.success) {

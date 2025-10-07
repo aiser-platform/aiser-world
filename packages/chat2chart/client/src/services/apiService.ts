@@ -2,7 +2,7 @@ import { API_URL } from '@/utils/api';
 
 export async function fetchWithAuth(input: RequestInfo, init: RequestInit = {}) {
   const cfg = { ...(init || {}), credentials: 'include', headers: { ...(init.headers || {}) } } as RequestInit & { _retried?: boolean };
-  let res = await fetch(input, cfg);
+  const res = await fetch(input, cfg);
   if ((res.status === 401 || res.status === 403) && !cfg._retried) {
     // On unauthorized, redirect to login (no dev-only fallbacks)
     try {

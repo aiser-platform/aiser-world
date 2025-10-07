@@ -104,16 +104,14 @@ class ErrorBoundary extends Component<Props, State> {
         const errorText = JSON.stringify(errorDetails, null, 2);
         const newWindow = window.open('', '_blank');
         if (newWindow) {
-          newWindow.document.write(`
-            <html>
-              <head><title>Error Report</title></head>
-              <body>
-                <h1>Error Report</h1>
-                <pre>${errorText}</pre>
-                <p>Please copy this information and send it to our support team.</p>
-              </body>
-            </html>
-          `);
+          // Avoid writing raw <html> tags which can confuse Next.js prerender.
+          newWindow.document.body.innerHTML = `
+            <div>
+              <h1>Error Report</h1>
+              <pre>${errorText}</pre>
+              <p>Please copy this information and send it to our support team.</p>
+            </div>
+          `;
         }
       });
   };
@@ -127,7 +125,7 @@ class ErrorBoundary extends Component<Props, State> {
 
       // Default error UI
       return (
-        <div style={{ 
+        <div style={{
           minHeight: '100vh', 
           display: 'flex', 
           alignItems: 'center', 
@@ -135,7 +133,7 @@ class ErrorBoundary extends Component<Props, State> {
           padding: '20px',
           background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
         }}>
-          <Card 
+        <Card 
             style={{ 
               maxWidth: '600px', 
               width: '100%',

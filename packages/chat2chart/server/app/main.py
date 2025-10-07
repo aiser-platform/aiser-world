@@ -1,4 +1,5 @@
 import logging
+import os
 
 from app.core import g
 from app.core.api import api_router
@@ -35,6 +36,11 @@ app = FastAPI(
 
 # Configure CORS from settings for stricter control
 allowed_origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
+# Ensure local dev frontend ports commonly used in this repo are allowed (3000 and 3001)
+# This protects against local port remapping where the frontend is served on 3001.
+for extra_origin in ("http://localhost:3001", "http://127.0.0.1:3001"):
+    if extra_origin not in allowed_origins:
+        allowed_origins.append(extra_origin)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
@@ -212,12 +218,25 @@ async def embed_token_middleware(request: Request, call_next):
     return response
 
 
-# @app.exception_handler(Exception)
-# async def exception_handler(request: Request, exc: Exception):
-#     return JSONResponse(
-#         status_code=500,
-#         content={"error": "An internal error occurred"},
-#     )
+@app.exception_handler(Exception)
+async def exception_handler(request: Request, exc: Exception):
+    """Global exception handler to catch unexpected errors, log full traceback
+    and return structured JSON instead of allowing the server process to crash.
+    This helps E2E tests and dev environments by making failures visible
+    and avoiding process exit on unhandled exceptions.
+    """
+    import traceback
+
+    tb = "\n".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+    logger.error(f"Unhandled exception for path={request.url.path}: {tb}")
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "internal_server_error",
+            "message": str(exc),
+            "trace": tb if bool(os.getenv("EXPOSE_TRACES", "false").lower() in ("1", "true")) else "<hidden>",
+        },
+    )
 
 
 # @app.middleware("http")

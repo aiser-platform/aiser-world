@@ -87,6 +87,7 @@ export interface SchemaInfo {
 
 class EnhancedDataService {
     private baseURL: string;
+    private _enterpriseCache: { ts: number; connections: EnterpriseConnection[] } | null = null;
 
     constructor() {
         this.baseURL = getBackendUrl();
@@ -155,6 +156,12 @@ class EnhancedDataService {
      */
     async listEnterpriseConnections(): Promise<{ success: boolean; connections?: EnterpriseConnection[]; error?: string }> {
         try {
+            // Simple in-memory cache valid for 30 seconds to reduce repeated calls
+            const now = Date.now();
+            if (this._enterpriseCache && (now - this._enterpriseCache.ts) < 30000) {
+                return { success: true, connections: this._enterpriseCache.connections };
+            }
+
             const response = await fetchApi('data/enterprise/connections');
 
             if (!response.ok) {
@@ -163,6 +170,10 @@ class EnhancedDataService {
             }
 
             const result = await response.json();
+            // store into cache
+            if (result && Array.isArray(result.connections)) {
+                this._enterpriseCache = { ts: Date.now(), connections: result.connections };
+            }
             return result;
         } catch (error) {
             return {
@@ -265,19 +276,29 @@ class EnhancedDataService {
                 }),
             });
 
+            const result = await response.json();
             if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.detail || `Query execution failed: ${response.statusText}`);
+                // Return structured failure including engine if backend provided it
+                return {
+                    success: false,
+                    data: result.data || [],
+                    columns: result.columns || [],
+                    row_count: result.row_count || 0,
+                    execution_time: result.execution_time || 0,
+                    engine: result.engine || engine || 'unknown',
+                    query_id: result.query_id,
+                    error: result.error || result.detail || `Query execution failed: ${response.statusText}`,
+                    metadata: result.metadata,
+                };
             }
 
-            const result = await response.json();
             return {
                 success: result.success,
                 data: result.data || [],
                 columns: result.columns || [],
                 row_count: result.row_count || 0,
                 execution_time: result.execution_time || 0,
-                engine: result.engine || 'unknown',
+                engine: result.engine || engine || 'unknown',
                 query_id: result.query_id,
                 error: result.error,
                 metadata: result.metadata,

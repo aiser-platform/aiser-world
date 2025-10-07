@@ -63,7 +63,16 @@ const DataSourceManager: React.FC<DataSourceManagerProps> = ({
         try {
             const res = await enhancedDataService.listDataSources();
             if (res.success) {
-                setDataSources(res.data_sources || []);
+                // Backend shape may differ; normalize entries minimally to satisfy DataSource[]
+                const normalized = (res.data_sources || []).map((ds: any) => ({
+                    id: ds.id || ds.data_source_id || ds.name,
+                    name: ds.name || ds.title || ds.id,
+                    type: ds.type === 'database' || ds.db_type ? 'database' : 'file',
+                    data: ds,
+                    metadata: ds.connection_config || ds.metadata || {},
+                    createdAt: ds.created_at ? new Date(ds.created_at) : new Date()
+                }));
+                setDataSources(normalized as DataSource[]);
             } else {
                 message.error('Failed to load data sources: ' + (res.error || 'unknown'));
             }
@@ -113,7 +122,7 @@ const DataSourceManager: React.FC<DataSourceManagerProps> = ({
             setLoading(true);
             
             // Call the backend to create database connection
-            const response = await fetch('http://localhost:8000/data/connect-database', {
+            const response = await fetch('/api/data/connect-database', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -162,7 +171,7 @@ const DataSourceManager: React.FC<DataSourceManagerProps> = ({
 
     const handleDatabaseTest = async (connection: DatabaseConnection): Promise<boolean> => {
         try {
-            const response = await fetch('http://localhost:8000/data/connect-database', {
+            const response = await fetch('/api/data/connect-database', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -205,7 +214,7 @@ const DataSourceManager: React.FC<DataSourceManagerProps> = ({
                 setPreviewData({ schema: cols, data: [] });
                 setPreviewVisible(true);
             } else {
-                message.warn('Schema not available for preview');
+                message.warning('Schema not available for preview');
             }
         } catch (err) {
             console.error('Failed to load schema preview:', err);

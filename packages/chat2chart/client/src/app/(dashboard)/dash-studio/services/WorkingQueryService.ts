@@ -114,14 +114,14 @@ class WorkingQueryService {
       let response;
       try {
         // Try project-scoped API first
-        response = await fetch(`http://localhost:8000/data/api/organizations/${organizationId}/projects/${projectId}/data-sources/${dataSourceId}/data`);
+        response = await fetch(`/api/data/api/organizations/${organizationId}/projects/${projectId}/data-sources/${dataSourceId}/data`);
         if (!response.ok) {
           throw new Error(`Project-scoped API failed: ${response.status}`);
         }
       } catch (projectError) {
         console.log('Project-scoped API not available, falling back to global API');
         // Fallback to global API
-        response = await fetch(`http://localhost:8000/data/sources/${dataSourceId}/data`);
+        response = await fetch(`/api/data/sources/${dataSourceId}/data`);
         if (!response.ok) {
           throw new Error(`Failed to fetch data: ${response.status}`);
         }

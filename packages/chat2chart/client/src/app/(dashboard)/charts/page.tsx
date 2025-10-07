@@ -88,7 +88,7 @@ const ChartsPage: React.FC = () => {
         setLoading(true);
         try {
             // Using the charts API endpoint
-            const response = await fetch('http://localhost:8000/charts/');
+            const response = await fetch('/api/charts/');
             const result = await response.json();
             
             if (result.success) {
@@ -118,7 +118,7 @@ const ChartsPage: React.FC = () => {
 
     const handleDeleteChart = async (chartId: string) => {
         try {
-            const response = await fetch(`http://localhost:8000/charts/${chartId}`, {
+            const response = await fetch(`/api/charts/${chartId}`, {
                 method: 'DELETE',
             });
             
@@ -136,7 +136,7 @@ const ChartsPage: React.FC = () => {
 
     const handleShareChart = async (chart: Chart) => {
         try {
-            const response = await fetch(`http://localhost:8000/charts/${chart.id}/share`, {
+            const response = await fetch(`/api/charts/${chart.id}/share`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -160,7 +160,7 @@ const ChartsPage: React.FC = () => {
 
     const handleExportChart = async (chart: Chart) => {
         try {
-            const response = await fetch(`http://localhost:8000/charts/${chart.id}/export`);
+            const response = await fetch(`/api/charts/${chart.id}/export`);
             const result = await response.json();
             
             if (result.success) {
@@ -183,7 +183,7 @@ const ChartsPage: React.FC = () => {
 
     const handleDuplicateChart = async (chart: Chart) => {
         try {
-            const response = await fetch(`http://localhost:8000/charts/${chart.id}/duplicate`, {
+            const response = await fetch(`/api/charts/${chart.id}/duplicate`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

@@ -600,14 +600,14 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
         );
     };
 
-    // Collapsible section rendering
-    const renderCollapsibleSection = (title: string, content: string, isCollapsed: boolean = false) => {
-        const [collapsed, setCollapsed] = useState(isCollapsed);
+    // Collapsible section component (hooks must be called in React components)
+    const CollapsibleSection: React.FC<{ title: string; content: string; isCollapsed?: boolean }> = ({ title, content, isCollapsed = false }) => {
+        const [collapsed, setCollapsed] = useState<boolean>(isCollapsed);
 
         return (
             <div className="collapsible-section">
-                <div 
-                    className="section-header" 
+                <div
+                    className="section-header"
                     onClick={() => setCollapsed(!collapsed)}
                 >
                     <span className="section-title">{title}</span>
@@ -642,7 +642,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
     // Build comprehensive data source context for AI analysis
     const buildDataSourceContext = async (dataSourceId: string, dataSourceType: string) => {
         try {
-            let context: any = {
+            const context: any = {
                 id: dataSourceId,
                 type: dataSourceType,
                 timestamp: new Date().toISOString(),
@@ -826,7 +826,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
     // Build comprehensive context from multiple selected data sources
     const buildMultiDataSourceContext = async (selectedSources: any[]): Promise<any> => {
         try {
-            let context: any = {
+            const context: any = {
                 total_sources: selectedSources.length,
                 timestamp: new Date().toISOString(),
                 analysis_capabilities: {
@@ -2738,7 +2738,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
             
             let accumulatedResponse = '';
             let chartData: any = null;
-            let sqlQueries: string[] = [];
+            const sqlQueries: string[] = [];
             let executionMetadata: any = {};
             
             try {

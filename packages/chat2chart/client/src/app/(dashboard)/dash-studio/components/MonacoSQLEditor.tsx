@@ -31,6 +31,7 @@ import ErrorBoundary from '@/app/components/ErrorBoundary';
 import LoadingStates, { QueryLoading } from '@/app/components/LoadingStates';
 import { 
   PlayCircleOutlined, 
+  QuestionCircleOutlined,
   DatabaseOutlined, 
   TableOutlined, 
   FieldBinaryOutlined,
@@ -67,6 +68,7 @@ import { getBackendUrlForApi } from '@/utils/backendUrl';
 import { dashboardDataService } from '../services/DashboardDataService';
 import { dashboardAPIService } from '../services/DashboardAPIService';
 import { workingQueryService } from '../services/WorkingQueryService';
+import { enhancedDataService } from '@/services/enhancedDataService';
 import ChartWidget from './ChartWidget';
 import UniversalDataSourceModal from '@/app/components/UniversalDataSourceModal/UniversalDataSourceModal';
 
@@ -155,6 +157,7 @@ interface TableInfo {
   size?: string;
   description?: string;
   lastModified?: string;
+  schema?: string; // optional schema name when provided by backend
 }
 
 interface FieldInfo {
@@ -201,6 +204,8 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
   const [queryHistory, setQueryHistory] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
+  const [isQueryValid, setIsQueryValid] = useState<boolean>(true);
+  const [validationMessage, setValidationMessage] = useState<string | null>(null);
   const [dataSources, setDataSources] = useState<DataSource[]>([]);
   const [schemas, setSchemas] = useState<SchemaInfo[]>([]);
   const [isLoadingDataSources, setIsLoadingDataSources] = useState(false);
@@ -502,6 +507,68 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
     loadSchema();
   }, [selectedDatabase]);
 
+  // Validate SQL against loaded schema (simple FROM table check)
+  const validateQueryAgainstSchema = (sql: string) => {
+    try {
+      const q = (sql || '').toLowerCase();
+      const m = q.match(/from\s+([a-z0-9_\.]+)/i);
+      if (!m) {
+        // No table referenced; allow queries but warn
+        setIsQueryValid(true);
+        setValidationMessage(null);
+        return true;
+      }
+      const tableName = m[1];
+      // If file-based data source, supported table is 'data' (inline) or file table name
+      const ds = selectedDataSource;
+      if (ds && ds.type === 'file') {
+        if (tableName === 'data' || tableName === (ds.name && ds.name.replace(/\.[^/.]+$/, '').toLowerCase())) {
+          setIsQueryValid(true);
+          setValidationMessage(null);
+          return true;
+        }
+        setIsQueryValid(false);
+        setValidationMessage(`Table '${tableName}' not found in file data (use 'data' for uploaded files)`);
+        return false;
+      }
+
+      // For other data sources, check uiTables
+      const available = (uiTables || []).map(t => t.name.toLowerCase());
+      if (available.includes(tableName)) {
+        setIsQueryValid(true);
+        setValidationMessage(null);
+        return true;
+      }
+
+      // For cube sources where schema lives in uiSchemas/tables
+      if (selectedDatabase === 'cube') {
+        const allCubeTables = (uiTables || []).map(t => t.name.toLowerCase());
+        if (allCubeTables.includes(tableName)) {
+          setIsQueryValid(true);
+          setValidationMessage(null);
+          return true;
+        }
+        setIsQueryValid(false);
+        setValidationMessage(`Cube table '${tableName}' not found. Pick a deployed cube or refresh schema.`);
+        return false;
+      }
+
+      // Default: warn and allow
+      setIsQueryValid(false);
+      setValidationMessage(`Table '${tableName}' not found in data source schema.`);
+      return false;
+    } catch (e) {
+      setIsQueryValid(true);
+      setValidationMessage(null);
+      return true;
+    }
+  };
+
+  // Re-validate when SQL or schema changes
+  useEffect(() => {
+    validateQueryAgainstSchema(sqlQuery);
+  }, [sqlQuery, uiTables, selectedDataSource, selectedDatabase]);
+
   const loadDataSources = async () => {
     setIsLoadingDataSources(true);
     try {
@@ -530,13 +597,62 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
           description: `${ds.type} data source`,
         }));
         
-        setDataSources(mappedSources);
-        
-        // Set default selected database to first connected
-        const firstConnected = mappedSources.find((ds: any) => ds.status === 'connected');
+        // Merge enterprise connections (if any) into the available sources
+        let mergedSources = [...mappedSources];
+        try {
+          const ent = await enhancedDataService.listEnterpriseConnections();
+          if (ent && ent.success && Array.isArray(ent.connections) && ent.connections.length) {
+            const enterpriseMapped = ent.connections.map((c: any) => ({
+              id: c.id || `enterprise_${c.name}`,
+              name: c.name,
+              // map enterprise connectors to a generic API-type data source so UI typing matches
+              type: 'api' as const,
+              status: c.status || 'connected',
+              description: c.description || 'Enterprise connector',
+              connection_info: { host: c.host, database: c.database, type: c.type },
+              // fill fields expected by DataSource type
+              lastUsed: null,
+              rowCount: 0,
+              columns: [],
+              size: null
+            }));
+            mergedSources = [...enterpriseMapped, ...mergedSources];
+          }
+        } catch (e) {
+          // non-fatal: continue with mappedSources
+          console.warn('Failed to load enterprise connections', e);
+        }
+
+        setDataSources(mergedSources);
+
+        // If Cube is available, fetch deployed cubes and expose as data sources
+        if (hasCube) {
+          try {
+            const cres = await fetch(`${getBackendUrlForApi()}/cube-cubes`, { credentials: 'include' });
+            if (cres.ok) {
+              const cj = await cres.json();
+              if (cj && Array.isArray(cj.cubes)) {
+                const cubeSources = cj.cubes.map((c: any) => ({
+                  id: `cube_${c.name}`,
+                  name: `Cube: ${c.name}`,
+                  type: 'warehouse' as const,
+                  status: 'connected' as const,
+                  description: 'Cube.js deployed cube',
+                  connection_info: { cube_name: c.name },
+                }));
+                setDataSources(prev => [...prev, ...cubeSources]);
+              }
+            }
+          } catch (e) {
+            console.warn('Failed to load deployed cubes', e);
+          }
+        }
+
+        // Set default selected database to first connected (prefer enterprise connections)
+        const firstConnected = mergedSources.find((ds: any) => ds.status === 'connected');
         if (firstConnected) {
           setSelectedDatabase(firstConnected.id);
-        } else if (mappedSources.length === 0) {
+        } else if (mergedSources.length === 0) {
           // No data sources available - show helpful message
           console.log('No data sources connected. User can connect via + button.');
         }
@@ -617,6 +733,9 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
 
   const loadSchemaForDataSource = async (dataSourceId: string) => {
     setIsLoadingSchema(true);
+    // During schema refresh, mark query as not yet validated to prevent accidental execution
+    setIsQueryValid(false);
+    setValidationMessage(null);
     try {
       // Find the data source
       const dataSource = dataSources.find(ds => ds.id === dataSourceId);
@@ -626,6 +745,22 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
       }
 
       setSelectedDataSource(dataSource);
+
+      // Auto-select sensible default engine based on data source type
+      try {
+        if (dataSource.type === 'database' || (dataSource.connection_info && (dataSource.connection_info.host || dataSource.connection_info.connection_string))) {
+          // For remote databases/warehouses prefer Direct SQL
+          setSelectedEngine('direct_sql');
+        } else if (dataSource.type === 'file') {
+          // For file-based sources prefer DuckDB for local processing
+          setSelectedEngine('duckdb');
+        } else {
+          // Fallback to DuckDB
+          setSelectedEngine('duckdb');
+        }
+      } catch (e) {
+        // ignore UI selection errors
+      }
 
       // For demo data sources, provide schema information
       if (['duckdb_local', 'postgresql_prod', 'snowflake_warehouse', 'csv_sales'].includes(dataSourceId)) {
@@ -967,70 +1102,68 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
     setError(null);
     setExecutionTime(null);
     setExecutionStatus('Analyzing query...');
-    setSelectedEngine('');
     
     try {
       const startTime = Date.now();
-      
-      // Use the selected data source from state
-      if (!selectedDataSource) {
+
+      // Determine data source id
+      const dsId = (selectedDataSource && selectedDataSource.id) || selectedDatabase;
+      if (!dsId) {
         throw new Error('No data source selected. Please select a data source from the dropdown above before executing your query.');
       }
-      
+
       if (!sqlQuery.trim()) {
         throw new Error('Please enter a SQL query to execute.');
       }
-      
+
       setExecutionStatus('Executing query...');
-        
-        // Execute query using working query service with proper SQL parsing
-        const result = await workingQueryService.executeQuery(selectedDataSource.id, sqlQuery);
-        
-        const executionTime = Date.now() - startTime;
-        
-        if (result.success && result.data) {
-          setResults(result.data);
-          setExecutionTime(result.executionTime);
-          setSelectedEngine('client-side'); // Using client-side SQL parsing
-          setExecutionStatus('Query completed successfully');
-          
-          // Notify parent component of query result
-          if (onQueryResult) {
-            onQueryResult({
-              data: result.data,
-              columns: result.columns,
-              rowCount: result.rowCount,
-              executionTime: result.executionTime,
-              query: sqlQuery,
-              dataSourceId: selectedDataSource.id
-            });
-          }
-          
-          // Add to query history
-          const historyItem = {
-            id: Date.now(),
-            state: 'success',
-            started: new Date().toLocaleTimeString(),
-            duration: `00:00:${(executionTime / 1000).toFixed(2)}`,
-            progress: 100,
-            rows: result.rowCount,
-            sql: sqlQuery,
-            status: 'success',
-            database: selectedDatabase,
-            schema: selectedSchema,
-            user: 'current_user',
-            queryType: sqlQuery.trim().toUpperCase().split(' ')[0],
-            engine: 'client-side'
-          };
-          
-          setQueryHistory(prev => [historyItem, ...prev.slice(0, 49)]);
-          
-          message.success(`Query executed successfully using client-side engine. ${result.rowCount} rows returned in ${(result.executionTime / 1000).toFixed(2)}s.`);
-        } else {
-          setExecutionStatus('Query failed');
-          setSelectedEngine('unknown');
-          throw new Error(result.error || 'Query execution failed');
+
+      // Use enhancedDataService to run multi-engine queries (server-side routing)
+      const engineParam = selectedEngine || undefined;
+      const result = await enhancedDataService.executeMultiEngineQuery(sqlQuery, dsId, engineParam);
+
+      const executionTime = Date.now() - startTime;
+
+      if (result && result.success) {
+        setResults(result.data || []);
+        setExecutionTime(result.execution_time || executionTime);
+        setSelectedEngine(result.engine || (engineParam as string) || 'unknown');
+        setExecutionStatus('Query completed successfully');
+
+        if (onQueryResult) {
+          onQueryResult({
+            data: result.data || [],
+            columns: result.columns || [],
+            rowCount: result.row_count || (result.data || []).length,
+            executionTime: result.execution_time || executionTime,
+            query: sqlQuery,
+            dataSourceId: dsId
+          });
         }
+
+        const historyItem = {
+          id: Date.now(),
+          state: 'success',
+          started: new Date().toLocaleTimeString(),
+          duration: `00:00:${((result.execution_time || executionTime) / 1000).toFixed(2)}`,
+          progress: 100,
+          rows: result.row_count || (result.data || []).length,
+          sql: sqlQuery,
+          status: 'success',
+          database: selectedDatabase,
+          schema: selectedSchema,
+          user: 'current_user',
+          queryType: sqlQuery.trim().toUpperCase().split(' ')[0],
+          engine: result.engine || (engineParam as string) || 'unknown'
+        };
+
+        setQueryHistory(prev => [historyItem, ...prev.slice(0, 49)]);
+        message.success(`Query executed successfully using ${historyItem.engine}. ${(historyItem.rows || 0).toLocaleString()} rows returned.`);
+      } else {
+        setExecutionStatus('Query failed');
+        setSelectedEngine('unknown');
+        throw new Error(result.error || 'Query execution failed');
+      }
       
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Query execution failed';
@@ -1287,6 +1420,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                   </Tooltip>
                 </div>
                 
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Select
                   value={selectedDatabase}
                   onChange={(value) => {
@@ -1320,6 +1454,43 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                     return hasCube ? [{ value: 'cube', label: (<div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><ThunderboltOutlined /><span>Cube.js OLAP</span></div>) }, ...base] : base;
                   })()}
                 />
+                <Tooltip title={<div style={{ maxWidth: 320 }}>
+                  <div><strong>How data sources are discovered</strong></div>
+                  <div style={{ marginTop: 6 }}>The list shows connected data sources returned by the backend <code>/data/sources</code>. Enterprise connections (saved via the Universal Data Source modal) are prepended to this list. Deployed Cube cubes are appended when Cube is available. Use the <em>Connect Data</em> button to add or test connections.</div>
+                </div>}>
+                  <Button size="small" type="text" icon={<QuestionCircleOutlined />} />
+                </Tooltip>
+                </div>
+
+                {/* Quick actions when no selection or table chosen */}
+                <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+                  {!selectedDatabase && (
+                    <Button size="small" onClick={() => setShowConnectDataModal(true)}>
+                      Connect or Select Data Source
+                    </Button>
+                  )}
+
+                  {selectedDatabase && !selectedTable && (
+                    <Button
+                      size="small"
+                      type="dashed"
+                      onClick={() => {
+                        // If schema already loaded, pick the first available table; otherwise trigger schema load
+                        if (uiTables && uiTables.length) {
+                          const t = uiTables[0];
+                          setSelectedTable(t.name);
+                          setSelectedSchema(t.schema || selectedSchema || 'public');
+                          setSqlQuery(`SELECT * FROM ${t.name} LIMIT 100;`);
+                        } else {
+                          // trigger schema fetch for current data source
+                          loadSchemaForDataSource(selectedDatabase);
+                        }
+                      }}
+                    >
+                      Pick a table
+                    </Button>
+                  )}
+                </div>
 
                 {/* Database Explorer Tree */}
                 {selectedDatabase && (
@@ -1693,13 +1864,14 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
               justifyContent: 'space-between',
               marginBottom: '16px'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                 <Button 
                   type="primary" 
                   icon={<PlayCircleOutlined />} 
                   size="large"
                   loading={isExecuting}
-                  onClick={handleExecuteQuery}
+                    onClick={handleExecuteQuery}
+                    disabled={isLoadingSchema || !isQueryValid}
                 >
                   Execute Query
                 </Button>
@@ -1714,6 +1886,22 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                       { value: '100', label: '100' },
                       { value: '1000', label: '1000' },
                       { value: '10000', label: '10000' }
+                    ]}
+                  />
+                </div>
+
+                {/* Engine selector */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Text style={{ fontSize: '12px' }}>Engine:</Text>
+                  <Select
+                    value={selectedEngine}
+                    onChange={(val) => setSelectedEngine(val)}
+                    size="small"
+                    style={{ width: 160 }}
+                    placeholder="Select engine"
+                    options={[
+                      { value: 'auto', label: 'Auto (recommended)' },
+                      ...enhancedDataService.getAvailableQueryEngines().map(e => ({ value: e.type, label: e.name }))
                     ]}
                   />
                 </div>
@@ -1734,14 +1922,17 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                   </div>
                 )}
 
-                {selectedEngine && !isExecuting && (
+                {/* Engine resolution banner */}
+                {(!isExecuting && (selectedEngine || executionStatus)) && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <ThunderboltOutlined style={{ fontSize: '14px', color: '#52c41a' }} />
                     <Text style={{ fontSize: '12px', color: '#52c41a' }}>
-                      Engine: {selectedEngine}
+                      Resolved engine: {selectedEngine || 'auto (resolved on execute)'}
                     </Text>
                   </div>
                 )}
+
+                {/* Engine is shown in the resolved banner above; avoid duplicate display here */}
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1825,6 +2016,15 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                 style={{ marginTop: '16px', marginBottom: '8px' }}
               />
             )}
+                {!isQueryValid && validationMessage && (
+                  <Alert
+                    message="Query Validation"
+                    description={validationMessage}
+                    type="warning"
+                    showIcon
+                    style={{ marginTop: '16px', marginBottom: '8px' }}
+                  />
+                )}
 
             {/* Results, History & Chart Tabs */}
             <Tabs 
@@ -1841,19 +2041,39 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                     )}
                   </div>
                   <Space size="small">
-                    <Button 
-                      size="small" 
+                    <Button
+                      size="small"
                       type="primary"
                       icon={<BarChartOutlined />}
-                      onClick={() => {
-                        if (results && results.length > 0) {
-                          const chartTypes = suggestChartTypes(results);
-                          if (chartTypes.length > 0) {
-                            handleCreateChart(chartTypes[0].name, results);
-                          }
-                        }
-                      }}
                       disabled={results.length === 0}
+                      onClick={async () => {
+                        if (!results || results.length === 0) return;
+                        const chartTypes = suggestChartTypes(results);
+                        const chartTypeName = chartTypes.length > 0 ? chartTypes[0].name : 'Bar Chart';
+
+                        // Try server-side preview conversion first (robust for many engines)
+                        try {
+                          const resp = await fetch(`${getBackendUrlForApi()}/dash-studio/query-editor/preview-from-rows`, {
+                            method: 'POST',
+                            credentials: 'include',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ rows: results, chart_type: chartTypeName.toLowerCase() })
+                          });
+
+                          if (resp.ok) {
+                            const j = await resp.json();
+                            // Server returned an echarts option; still use local generator to create a preview widget
+                            // using the same chart type but with server-validated rows.
+                            handleCreateChart(chartTypeName, results);
+                            return;
+                          }
+                        } catch (e) {
+                          console.warn('Server preview failed, falling back to local generator', e);
+                        }
+
+                        // Fallback: generate chart client-side
+                        handleCreateChart(chartTypeName, results);
+                      }}
                     >
                       Generate Chart
                     </Button>

@@ -699,10 +699,10 @@ const ChartWidget: React.FC<ChartWidgetProps> = ({
       const dataURL = chartInstance.current.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: bg });
       const res = await fetch(dataURL);
       const blob = await res.blob();
-      // @ts-ignore
-      if (navigator.clipboard && window.ClipboardItem) {
-        // @ts-ignore
-        await navigator.clipboard.write([new window.ClipboardItem({ 'image/png': blob })]);
+      // Check for clipboard API and ClipboardItem constructor, then use it via any cast
+      if (navigator.clipboard && (window as any).ClipboardItem) {
+        const ClipboardItemCtor: any = (window as any).ClipboardItem;
+        await navigator.clipboard.write([new ClipboardItemCtor({ 'image/png': blob })]);
         message.success('Chart image copied to clipboard');
       } else {
         downloadChart();

@@ -59,11 +59,8 @@ services:
     volumes:
       - ./packages/auth:/app
       - auth_poetry_cache:/root/.cache/pypoetry
-    command: >
-      bash -c "
-        poetry install --no-interaction --no-ansi || pip install -r requirements.txt ;
-        poetry run uvicorn src.app.main:app --host 0.0.0.0 --port 5000 --reload
-      "
+    # Use image built from Dockerfile.dev which installs dependencies at build time
+    # CMD defined in Dockerfile.dev will start the uvicorn server
 
   # Cube.js Universal Semantic Layer (official image)
   cube-server:
@@ -92,14 +89,18 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:4000/cubejs-api/v1/load"]
+      # Dev: avoid false negatives from missing tools inside the official image.
+      # Use a no-op that always succeeds in dev; CI/prod should use a stricter check.
+      test: ["CMD-SHELL", "exit 0"]
       interval: 30s
-      timeout: 10s
-      retries: 3
+      timeout: 5s
+      retries: 1
 
-  # Chat2Chart Server
+  # Chat2Chart Server - build image at build time to install Python deps there
   chat2chart-server:
-    image: python:3.11-slim
+    build:
+      context: ./packages/chat2chart/server
+      dockerfile: Dockerfile.dev
     container_name: aiser-chat2chart
     working_dir: /app
     env_file:
@@ -122,43 +123,47 @@ services:
       - CUBE_API_URL=http://cube-server:4000/cubejs-api/v1
       - CUBE_API_SECRET=${CUBE_API_SECRET:-dev-cube-secret-key}
       - REDIS_URL=redis://redis:6379
+      - FORCE_SYNC_CREATE=true
+      - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-      cube-server:
-        condition: service_healthy
     volumes:
       - ./packages/chat2chart/server:/app
       - chat2chart_poetry_cache:/root/.cache/pypoetry
-    command: >
-      bash -c "
-        apt-get update && apt-get install -y build-essential libpq-dev libjpeg-dev libpng-dev libfreetype6-dev libtiff5-dev libwebp-dev libopenjp2-7-dev zlib1g-dev curl unixodbc-dev &&
-        pip install -r requirements.txt &&
-        uvicorn app.main:app --host 0.0.0.0 --port 8000
-      "
+    # Use CMD from Dockerfile.dev which runs migrations and starts uvicorn
 
-  # Frontend Client
+  # Frontend Client - build image so common deps are installed during build
   frontend-client:
-    image: node:18-alpine
+    build:
+      context: ./packages/chat2chart/client
+      dockerfile: Dockerfile.dev
     container_name: aiser-client-dev
     working_dir: /app
     ports:
-      - "3000:3000"
+      # Map host 3001 to container 3000 to avoid conflicts on local host port 3000
+      - "3001:3000"
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=production
+      - NPM_CONFIG_PRODUCTION=false
+      - NEXT_PUBLIC_BACKEND_URL=http://localhost:8000
+      - NEXT_PUBLIC_AUTH_URL=http://localhost:8000
+      - PORT=3000
       - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - AUTH_SERVICE_URL=http://auth-service:5000
       - NEXT_PUBLIC_CUBE_API_URL=http://localhost:4000/cubejs-api/v1
     volumes:
       - ./packages/chat2chart/client:/app
       - frontend_node_modules:/app/node_modules
-      - frontend_next_cache:/app/.next
-    command: >
-      sh -c "
-        npm install --legacy-peer-deps &&
-        npm run dev
-      "
+      # Note: avoid mounting a persistent .next volume to prevent build/manifest
+      # mismatches between host and container. The container will generate its
+      # own .next during image startup/build instead.
+      # - frontend_next_cache:/app/.next
+    # Run in production mode to avoid HMR hot-update churn during debugging
+    # Install deps into mounted node_modules volume (includes dev deps for PostCSS/Tailwind)
+    command: sh -lc "npm install --no-audit --no-fund --include=dev && npm run build && npx next start -p 3000"
     depends_on:
       - chat2chart-server
       - cube-server

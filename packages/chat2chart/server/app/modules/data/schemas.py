@@ -31,6 +31,9 @@ class DataSourceUpdate(BaseModel):
     connection_config: Optional[Dict[str, Any]] = None
     is_active: Optional[bool] = None
     last_accessed: Optional[datetime] = None
+    # Allow callers to include inline sample rows when updating a data source
+    sample_data: Optional[List[Dict[str, Any]]] = None
+    data: Optional[List[Dict[str, Any]]] = None
 
 
 class DataSource(DataSourceBase):

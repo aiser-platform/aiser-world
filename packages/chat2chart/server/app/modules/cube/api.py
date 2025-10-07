@@ -10,6 +10,8 @@ from app.core.cache import cache
 from app.modules.data.services.data_connectivity_service import DataConnectivityService
 from app.modules.data.services.yaml_schema_service import YAMLSchemaService
 import yaml
+import httpx
+from app.core.config import settings
 
 router = APIRouter()
 
@@ -595,3 +597,31 @@ async def cube_service_health():
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
         )
+
+
+@router.get("/server/health")
+async def cube_server_health():
+    """Lightweight check of the upstream Cube.js server availability."""
+    try:
+        cube_url = getattr(settings, 'CUBE_API_URL', 'http://localhost:4000')
+        async with httpx.AsyncClient() as client:
+            # Prefer health endpoint if available
+            try:
+                resp = await client.get(f"{cube_url}/health", timeout=5.0)
+                if resp.status_code == 200:
+                    return {"success": True, "status": "connected", "server_url": cube_url}
+            except Exception:
+                # ignore and try metadata endpoint
+                pass
+
+            try:
+                resp = await client.get(f"{cube_url}/cubejs-api/v1/meta", timeout=5.0)
+                if resp.status_code == 200:
+                    meta = resp.json()
+                    return {"success": True, "status": "connected", "server_url": cube_url, "meta": meta}
+                else:
+                    return {"success": False, "status": "error", "http_status": resp.status_code}
+            except Exception as e:
+                return {"success": False, "status": "disconnected", "error": str(e)}
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))

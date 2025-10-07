@@ -20,6 +20,7 @@ class ConnectorType(Enum):
     """Supported enterprise connector types"""
 
     SNOWFLAKE = "snowflake"
+    POSTGRESQL = "postgresql"
     BIGQUERY = "bigquery"
     REDSHIFT = "redshift"
     DATABRICKS = "databricks"
@@ -77,6 +78,7 @@ class EnterpriseConnectorsService:
         self.connection_pools = {}
         self.supported_connectors = {
             ConnectorType.SNOWFLAKE: self._connect_snowflake,
+            ConnectorType.POSTGRESQL: self._connect_postgresql,
             ConnectorType.BIGQUERY: self._connect_bigquery,
             ConnectorType.REDSHIFT: self._connect_redshift,
             ConnectorType.DATABRICKS: self._connect_databricks,
@@ -146,9 +148,13 @@ class EnterpriseConnectorsService:
                     "error": f"Unsupported connector type: {config.connector_type.value}",
                 }
 
-            # Test connection
+            # Test connection: call connector function defensively to support older signatures
             connector_func = self.supported_connectors[config.connector_type]
-            result = await connector_func(config, test_only=True)
+            try:
+                result = await connector_func(config, test_only=True)
+            except TypeError:
+                # Fallback for legacy connector functions that accept only (config)
+                result = await connector_func(config)
 
             if result["success"]:
                 logger.info(f"✅ Connection test successful: {config.name}")
@@ -267,6 +273,8 @@ class EnterpriseConnectorsService:
                 result = await self._execute_redshift_query(connection, query, params)
             elif config.connector_type == ConnectorType.DATABRICKS:
                 result = await self._execute_databricks_query(connection, query, params)
+            elif config.connector_type == ConnectorType.POSTGRESQL:
+                result = await self._execute_postgresql_query(connection, query, params)
             elif config.connector_type == ConnectorType.REST_API:
                 result = await self._execute_rest_api_query(connection, query, params)
             else:
@@ -665,6 +673,37 @@ class EnterpriseConnectorsService:
 
         except Exception as e:
             logger.error(f"❌ Redshift query execution failed: {str(e)}")
+            return {"success": False, "error": str(e)}
+
+    async def _execute_postgresql_query(self, connection: Dict, query: str, params: Optional[Dict]) -> Dict[str, Any]:
+        """Execute a real query against PostgreSQL using psycopg2 in a thread."""
+        try:
+            cfg = connection.get('config')
+
+            def run():
+                import psycopg2
+                import psycopg2.extras
+
+                conn = psycopg2.connect(
+                    host=cfg.host,
+                    port=cfg.port or 5432,
+                    dbname=cfg.database,
+                    user=cfg.username,
+                    password=cfg.password,
+                    connect_timeout=10,
+                )
+                cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+                cur.execute(query)
+                rows = cur.fetchall()
+                cols = list(rows[0].keys()) if rows else []
+                cur.close()
+                conn.close()
+                return {"success": True, "data": rows, "columns": cols, "row_count": len(rows)}
+
+            res = await asyncio.to_thread(run)
+            return res
+        except Exception as e:
+            logger.error(f"❌ Postgres query execution failed: {e}")
             return {"success": False, "error": str(e)}
 
     async def _get_redshift_schema(
@@ -1081,6 +1120,55 @@ class EnterpriseConnectorsService:
 
         except Exception as e:
             logger.error(f"❌ Failed to save connection to database: {str(e)}")
+
+    async def _connect_postgresql(
+        self, config: ConnectionConfig, test_only: bool = False
+    ) -> Dict[str, Any]:
+        """Simple PostgreSQL connector test using psycopg2 via thread to avoid blocking.
+
+        Accepts `test_only` flag to match other connector signatures.
+        """
+        try:
+            import psycopg2
+            import psycopg2.extras
+
+            def _test():
+                conn = psycopg2.connect(
+                    host=config.host,
+                    port=config.port or 5432,
+                    dbname=config.database,
+                    user=config.username,
+                    password=config.password,
+                    connect_timeout=5,
+                )
+                cur = conn.cursor()
+                cur.execute("SELECT 1")
+                r = cur.fetchone()
+                cur.close()
+                conn.close()
+                return r
+
+            res = await asyncio.to_thread(_test)
+
+            if test_only:
+                return {"success": True, "connection": None, "message": "Postgres connection test successful"}
+
+            # For non-test (create) flows, return a minimal connection info object
+            connection_info = {
+                "host": config.host,
+                "port": config.port or 5432,
+                "database": config.database,
+                "user": config.username,
+            }
+
+            return {
+                "success": True,
+                "connection": connection_info,
+                "message": "Postgres connection established",
+            }
+        except Exception as e:
+            logger.error(f"❌ Postgres connection test failed: {e}")
+            return {"success": False, "error": str(e)}
 
     async def list_connections(self) -> List[Dict[str, Any]]:
         """List all enterprise connections"""

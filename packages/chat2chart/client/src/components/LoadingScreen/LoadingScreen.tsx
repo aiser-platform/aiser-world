@@ -2,7 +2,15 @@ import { Spin } from 'antd';
 
 const LoadingScreen = () => {
     return (
-        <div className="flex justify-center items-center h-screen w-screen absolute top-0 left-0 bg-opacity-80 z-50">
+        <div style={{
+            position: 'fixed',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: '#ffffff',
+            zIndex: 9999,
+        }}>
             <Spin size="large" />
         </div>
     );

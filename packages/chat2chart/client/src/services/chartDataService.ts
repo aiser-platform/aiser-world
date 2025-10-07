@@ -51,7 +51,7 @@ export class ChartDataService {
 
     async loadDataSources(): Promise<ChartDataSource[]> {
         try {
-            const response = await fetch('http://localhost:8000/data/sources');
+            const response = await fetch('/api/data/sources');
             if (response.ok) {
                 const result = await response.json();
                 this.dataSources = result.data_sources || [];

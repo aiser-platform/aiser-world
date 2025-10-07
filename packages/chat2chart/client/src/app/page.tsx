@@ -1,12 +1,28 @@
 'use client';
 
-import { DefaultRoute } from '@/context/AuthContext';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+
+export const dynamic = 'force-dynamic';
 
 export default function HomePage() {
+    const router = useRouter();
+
+    useEffect(() => {
+        // Immediately redirect to login page
+        router.replace('/login');
+    }, [router]);
+
     return (
-        <DefaultRoute>
-            {/* This content won't be shown since DefaultRoute will redirect */}
-            <div />
-        </DefaultRoute>
+        <div style={{ 
+            display: 'flex', 
+            justifyContent: 'center', 
+            alignItems: 'center', 
+            height: '100vh',
+            fontSize: '16px',
+            color: '#666'
+        }}>
+            Redirecting to login...
+        </div>
     );
 }

@@ -70,7 +70,7 @@ const SQLEditor: React.FC<SQLEditorProps> = ({
         
         try {
             // Execute query through Cube.js
-            const response = await fetch('http://localhost:8000/data/cube/query', {
+            const response = await fetch('/api/data/cube/query', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -176,7 +176,7 @@ const SQLEditor: React.FC<SQLEditorProps> = ({
 
         setAiLoading(true);
         try {
-            const response = await fetch('http://localhost:8000/ai/analyze-query', {
+            const response = await fetch('/api/ai/analyze-query', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

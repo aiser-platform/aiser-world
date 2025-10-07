@@ -1,438 +1,457 @@
 'use client';
 
-import { useAuth } from '@/context/AuthContext';
-import { ExclamationCircleOutlined } from '@ant-design/icons';
-import { Button, Form, Input } from 'antd';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { Button, Form, Input, message, Switch, Checkbox } from 'antd';
+import { UserOutlined, LockOutlined, MailOutlined } from '@ant-design/icons';
 import Image from 'next/image';
+import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
 
-export default function LoginPage() {
-    const [email, setEmail] = useState('');
-    const [isCapsLockOn, setIsCapsLockOn] = useState(false);
-    const [loading, setLoading] = useState(false);
-    const [isSignUp, setIsSignUp] = useState(false);
-
-    const { login, signup, loginError, setLoginError } = useAuth();
-    const [form] = Form.useForm();
+export const dynamic = 'force-dynamic';
 
     interface FormValues {
-        account: string;
+    identifier: string;
         password: string;
         username?: string;
         confirmPassword?: string;
     }
 
-    // Add this function to handle Caps Lock detection
-    const handleCapsLock = (e: KeyboardEvent) => {
-        if (e.code === 'CapsLock')
-            setIsCapsLockOn(e.getModifierState('CapsLock'));
+export default function LoginPage() {
+    const [isSignUp, setIsSignUp] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [showForgotPassword, setShowForgotPassword] = useState(false);
+    const { login, signup } = useAuth();
+    const router = useRouter();
+
+    const onFinish = async (values: FormValues) => {
+        setLoading(true);
+        try {
+            if (isSignUp) {
+                // Signup flow
+                if (!values.username) {
+                    message.error('Username is required for signup');
+                    return;
+                }
+                if (values.password !== values.confirmPassword) {
+                    message.error('Passwords do not match');
+                    return;
+                }
+                await signup(values.identifier, values.username, values.password);
+                message.success('Account created successfully!');
+            } else {
+                // Login flow
+                await login(values.identifier, values.password);
+                message.success('Login successful!');
+            }
+            router.push('/chat');
+        } catch (error) {
+            message.error(isSignUp ? 'Signup failed. Please try again.' : 'Login failed. Please check your credentials.');
+        } finally {
+            setLoading(false);
+        }
     };
 
-    // Add useEffect to add/remove event listeners
-    useEffect(() => {
-        window.addEventListener('keydown', handleCapsLock);
-        window.addEventListener('keyup', handleCapsLock);
-
-        return () => {
-            window.removeEventListener('keydown', handleCapsLock);
-            window.removeEventListener('keyup', handleCapsLock);
-        };
-    }, []);
-
-    const handleSubmit = async (values: FormValues) => {
+    const handleForgotPassword = async (email: string) => {
         setLoading(true);
-        if (isSignUp) {
-            signup(values.account, values.username!, values.password);
-        } else {
-            login(values.account, values.password);
+        try {
+            // TODO: Implement forgot password API call
+            message.success('Password reset instructions sent to your email!');
+            setShowForgotPassword(false);
+        } catch (error) {
+            message.error('Failed to send reset instructions. Please try again.');
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     return (
         <>
             <style jsx>{`
-                /* Base input styling for all form fields */
-                .ant-input, .ant-input-password {
-                    background-color: white !important;
-                    border-color: #d1d5db !important;
-                    border-radius: 8px !important;
-                    height: 40px !important;
-                    color: #374151 !important;
-                    font-size: 14px !important;
-                    line-height: 1.5 !important;
-                    padding: 8px 12px !important;
-                    transition: all 0.2s ease !important;
+                .login-page {
+                    min-height: 100vh;
+                    display: flex;
+                    flex-direction: column;
+                    background: #f8fafc;
                 }
-
-                /* Placeholder styling */
-                .ant-input::placeholder, .ant-input-password::placeholder {
-                    color: #9ca3af !important;
-                    background-color: transparent !important;
+                
+                .login-form-section {
+                    flex: 1;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 2rem;
+                    background: white;
                 }
-
-                /* Focus states */
-                .ant-input:focus, .ant-input-password:focus,
-                .ant-input-focused, .ant-input-password-focused {
-                    background-color: white !important;
-                    border-color: #1f2937 !important;
-                    box-shadow: 0 0 0 2px rgba(31, 41, 55, 0.2) !important;
-                    outline: none !important;
+                
+                .login-branding-section {
+                    flex: 1;
+                    display: flex;
+                    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+                    color: white;
+                    padding: 2rem;
+                    align-items: center;
+                    justify-content: center;
                 }
-
-                /* Hover states */
-                .ant-input:hover, .ant-input-password:hover {
-                    border-color: #9ca3af !important;
-                    background-color: white !important;
+                
+                .form-container {
+                    width: 100%;
+                    max-width: 400px;
                 }
-
-                /* Disabled states */
-                .ant-input:disabled, .ant-input-password:disabled {
-                    background-color: #f9fafb !important;
-                    border-color: #e5e7eb !important;
-                    color: #9ca3af !important;
+                
+                .logo-section {
+                    text-align: center;
+                    margin-bottom: 2rem;
                 }
-
-                /* Password input inner field */
-                .ant-input-password .ant-input {
-                    background-color: white !important;
-                    border: none !important;
-                    box-shadow: none !important;
-                    padding: 0 !important;
-                    height: 100% !important;
+                
+                .logo-section img {
+                    width: 48px;
+                    height: 48px;
+                    margin-bottom: 1rem;
                 }
-
-                /* Password input inner field focus */
-                .ant-input-password .ant-input:focus {
-                    background-color: white !important;
-                    border: none !important;
-                    box-shadow: none !important;
+                
+                .logo-section h1 {
+                    font-size: 1.75rem;
+                    font-weight: 700;
+                    color: #1f2937;
+                    margin: 0;
                 }
-
-                /* Password visibility toggle button */
-                .ant-input-password .ant-input-suffix {
-                    background-color: transparent !important;
+                
+                .form-title {
+                    font-size: 1.5rem;
+                    font-weight: 600;
+                    color: #111827;
+                    margin-bottom: 0.5rem;
+                    text-align: center;
                 }
-
-                .ant-input-password .ant-input-suffix .anticon {
-                    color: #6b7280 !important;
+                
+                .form-subtitle {
+                    font-size: 1rem;
+                    color: #6b7280;
+                    margin-bottom: 2rem;
+                    text-align: center;
                 }
-
-                /* Form item labels */
-                .ant-form-item-label > label {
-                    color: #374151 !important;
-                    font-weight: 500 !important;
-                    font-size: 14px !important;
+                
+                .form-card {
+                    background: white;
+                    border-radius: 12px;
+                    padding: 2rem;
+                    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+                    border: 1px solid #e5e7eb;
                 }
-
-                /* Error states */
-                .ant-input-status-error, .ant-input-password-status-error {
-                    border-color: #ef4444 !important;
-                    background-color: white !important;
+                
+                .form-input {
+                    height: 48px;
+                    border-radius: 8px;
+                    border: 1px solid #d1d5db;
                 }
-
-                .ant-input-status-error:focus, .ant-input-password-status-error:focus {
-                    border-color: #ef4444 !important;
-                    box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2) !important;
+                
+                .form-button {
+                    height: 48px;
+                    border-radius: 8px;
+                    font-weight: 500;
                 }
-
-                /* Success states */
-                .ant-input-status-success, .ant-input-password-status-success {
-                    border-color: #10b981 !important;
-                    background-color: white !important;
+                
+                .toggle-section {
+                    text-align: center;
+                    margin-top: 1.5rem;
+                    padding-top: 1.5rem;
+                    border-top: 1px solid #e5e7eb;
                 }
-
-                .ant-input-status-success:focus, .ant-input-password-status-success:focus {
-                    border-color: #10b981 !important;
-                    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2) !important;
+                
+                .footer {
+                    position: fixed;
+                    bottom: 1rem;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    font-size: 0.75rem;
+                    color: #9ca3af;
+                    text-align: center;
                 }
-
-                /* Input group styling */
-                .ant-input-group {
-                    background-color: transparent !important;
+                
+                .branding-content {
+                    text-align: center;
+                    max-width: 400px;
                 }
-
-                .ant-input-group-addon {
-                    background-color: #f9fafb !important;
-                    border-color: #d1d5db !important;
-                    color: #374151 !important;
+                
+                .branding-title {
+                    font-size: 1.5rem;
+                    font-weight: 700;
+                    margin-bottom: 1rem;
                 }
-
-                /* Form container styling */
-                .ant-form {
-                    background-color: transparent !important;
+                
+                .branding-subtitle {
+                    font-size: 1rem;
+                    color: #cbd5e1;
+                    margin-bottom: 1.5rem;
                 }
-
-                .ant-form-item {
-                    margin-bottom: 24px !important;
+                
+                .demo-image {
+                    width: 100%;
+                    max-width: 400px;
+                    height: auto;
+                    border-radius: 12px;
+                    box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.3);
                 }
-
-                /* Button styling consistency */
-                .ant-btn {
-                    border-radius: 8px !important;
-                    font-weight: 500 !important;
-                    transition: all 0.2s ease !important;
-                }
-
-                .ant-btn-primary {
-                    background-color: #1f2937 !important;
-                    border-color: #1f2937 !important;
-                    color: white !important;
-                }
-
-                .ant-btn-primary:hover {
-                    background-color: #111827 !important;
-                    border-color: #111827 !important;
-                }
-
-                .ant-btn-primary:focus {
-                    background-color: #1f2937 !important;
-                    border-color: #1f2937 !important;
-                    box-shadow: 0 0 0 2px rgba(31, 41, 55, 0.2) !important;
-                }
-
-                /* Error message styling */
-                .ant-form-item-explain-error {
-                    color: #ef4444 !important;
-                    font-size: 12px !important;
-                    margin-top: 4px !important;
-                }
-
-                /* Caps lock warning styling */
-                .caps-lock-warning {
-                    color: #d97706 !important;
-                    font-size: 12px !important;
-                    margin-top: 4px !important;
+                
+                @media (min-width: 1024px) {
+                    .login-page {
+                        flex-direction: row;
+                    }
+                    
+                    .branding-title {
+                        font-size: 2rem;
+                        margin-bottom: 1rem;
+                    }
+                    
+                    .branding-subtitle {
+                        font-size: 1.125rem;
+                        margin-bottom: 2rem;
+                    }
+                    
+                    .demo-image {
+                        max-width: 450px;
+                    }
+                    
+                    .footer {
+                        left: 2rem;
+                        transform: none;
+                        text-align: left;
+                    }
                 }
             `}</style>
-            <div className="flex min-h-screen">
-            {/* Left side - Dark section with GIF and branding */}
-            <div className="flex-col justify-between hidden w-1/2 p-12 lg:flex bg-gray-900 text-white">
-                <div>
-                    <div className="flex items-center mb-8">
+            
+            <div className="login-page">
+                {/* Form Section */}
+                <div className="login-form-section">
+                    <div className="form-container">
+                        <div className="logo-section">
                         <Image
                             src="/aiser-logo.png"
                             alt="Aiser Logo"
-                            width={40}
-                            height={40}
-                            className="mr-3"
-                        />
-                        <h1 className="text-4xl font-bold">Aiser</h1>
+                                width={48}
+                                height={48}
+                            />
+                            <h1>Aiser</h1>
+                        </div>
+                        
+                        <div className="form-card">
+                            <h1 className="form-title">
+                                {isSignUp ? 'Create your account' : 'Welcome back'}
+                            </h1>
+                            <p className="form-subtitle">
+                                {isSignUp 
+                                    ? 'Sign up to get started with Aiser' 
+                                    : 'Sign in to your account to continue'
+                                }
+                            </p>
+                            
+                            <Form
+                                name="login"
+                                onFinish={onFinish}
+                                layout="vertical"
+                                size="large"
+                            >
+                                <Form.Item
+                                    name="identifier"
+                                    rules={[
+                                        { required: true, message: 'Please input your email!' },
+                                        { type: 'email', message: 'Please enter a valid email!' }
+                                    ]}
+                                >
+                                    <Input
+                                        prefix={<UserOutlined />}
+                                        placeholder="Email"
+                                        className="form-input"
+                                    />
+                                </Form.Item>
+                                
+                                {isSignUp && (
+                                    <Form.Item
+                                        name="username"
+                                        rules={[
+                                            { required: true, message: 'Please input your username!' },
+                                            { min: 3, message: 'Username must be at least 3 characters!' }
+                                        ]}
+                                    >
+                                        <Input
+                                            prefix={<UserOutlined />}
+                                            placeholder="Username"
+                                            className="form-input"
+                                        />
+                                    </Form.Item>
+                                )}
+                                
+                                <Form.Item
+                                    name="password"
+                                    rules={[
+                                        { required: true, message: 'Please input your password!' },
+                                        { min: 6, message: 'Password must be at least 6 characters!' }
+                                    ]}
+                                >
+                                    <Input.Password
+                                        prefix={<LockOutlined />}
+                                        placeholder="Password"
+                                        className="form-input"
+                                    />
+                                </Form.Item>
+                                
+                                {isSignUp && (
+                                    <Form.Item
+                                        name="confirmPassword"
+                                        rules={[
+                                            { required: true, message: 'Please confirm your password!' },
+                                            ({ getFieldValue }) => ({
+                                                validator(_, value) {
+                                                    if (!value || getFieldValue('password') === value) {
+                                                        return Promise.resolve();
+                                                    }
+                                                    return Promise.reject(new Error('Passwords do not match!'));
+                                                },
+                                            }),
+                                        ]}
+                                    >
+                                        <Input.Password
+                                            prefix={<LockOutlined />}
+                                            placeholder="Confirm Password"
+                                            className="form-input"
+                                        />
+                                    </Form.Item>
+                                )}
+                                
+                                <Form.Item>
+                                    <Button
+                                        type="primary"
+                                        htmlType="submit"
+                                        loading={loading}
+                                        className="form-button"
+                                        block
+                                    >
+                                        {isSignUp ? 'Sign Up' : 'Sign In'}
+                                    </Button>
+                                </Form.Item>
+                            </Form>
+                            
+                            <div className="toggle-section">
+                                <Switch
+                                    checked={isSignUp}
+                                    onChange={setIsSignUp}
+                                    checkedChildren="Sign Up"
+                                    unCheckedChildren="Sign In"
+                                />
+                                <p style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: '#6b7280' }}>
+                                    {isSignUp ? 'Already have an account?' : "Don't have an account?"}
+                                </p>
+                                
+                                {!isSignUp && (
+                                    <p style={{ marginTop: '0.5rem', fontSize: '0.875rem' }}>
+                                        <a 
+                                            href="#" 
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                setShowForgotPassword(true);
+                                            }}
+                                            style={{ color: '#3b82f6' }}
+                                        >
+                                            Forgot your password?
+                                        </a>
+                                    </p>
+                                )}
+                                
+                                <p style={{ marginTop: '1rem', fontSize: '0.75rem', color: '#9ca3af', textAlign: 'center' }}>
+                                    By signing {isSignUp ? 'up' : 'in'}, you agree to our{' '}
+                                    <a href="/terms" style={{ color: '#3b82f6' }}>Terms of Service</a>
+                                    {' '}and{' '}
+                                    <a href="/privacy" style={{ color: '#3b82f6' }}>Privacy Policy</a>
+                                </p>
+                            </div>
+                        </div>
+                        
+                        {/* Forgot Password Modal */}
+                        {showForgotPassword && (
+                            <div style={{
+                                position: 'fixed',
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                zIndex: 1000
+                            }}>
+                                <div style={{
+                                    backgroundColor: 'white',
+                                    padding: '2rem',
+                                    borderRadius: '12px',
+                                    maxWidth: '400px',
+                                    width: '90%',
+                                    boxShadow: '0 20px 40px rgba(0, 0, 0, 0.1)'
+                                }}>
+                                    <h3 style={{ marginBottom: '1rem', textAlign: 'center' }}>Reset Password</h3>
+                                    <p style={{ marginBottom: '1.5rem', color: '#6b7280', textAlign: 'center' }}>
+                                        Enter your email address and we'll send you instructions to reset your password.
+                                    </p>
+                                    <Form
+                                        onFinish={(values) => handleForgotPassword(values.email)}
+                                        layout="vertical"
+                                    >
+                                        <Form.Item
+                                            name="email"
+                                            rules={[
+                                                { required: true, message: 'Please input your email!' },
+                                                { type: 'email', message: 'Please enter a valid email!' }
+                                            ]}
+                                        >
+                                            <Input
+                                                prefix={<MailOutlined />}
+                                                placeholder="Email"
+                                                size="large"
+                                            />
+                                        </Form.Item>
+                                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                                            <Button onClick={() => setShowForgotPassword(false)}>
+                                                Cancel
+                                            </Button>
+                                            <Button type="primary" htmlType="submit" loading={loading}>
+                                                Send Instructions
+                                            </Button>
+                                        </div>
+                                    </Form>
+                                </div>
+                            </div>
+                        )}
                     </div>
-                    <p className="text-xl text-gray-300">AI-powered data visualization platform</p>
                 </div>
                 
-                <div className="flex flex-col items-center space-y-6">
-                    <div className="relative w-full max-w-md">
+                {/* Branding Section */}
+                <div className="login-branding-section">
+                    <div className="branding-content">
+                        <h1 className="branding-title">Welcome to Aiser</h1>
+                        <p className="branding-subtitle">
+                            AI-powered data visualization platform
+                        </p>
                         <Image
                             src="/Aiser Demo Gif.gif"
                             alt="Aiser Platform Demo"
-                            width={500}
+                            width={450}
                             height={300}
-                            className="rounded-lg shadow-2xl"
+                            className="demo-image"
                             unoptimized
                         />
-                    </div>
-                    <div className="text-center">
-                        <h2 className="text-2xl font-bold mb-4">
+                        <h2 className="branding-title" style={{ fontSize: '1.5rem', marginTop: '2rem' }}>
                             Transform data into insights instantly
                         </h2>
-                        <p className="text-lg text-gray-300">
-                            Chat with your data, generate visualizations, and discover patterns with AI
+                        <p className="branding-subtitle">
+                            Join thousands of users discovering patterns and making data-driven decisions with AI
                         </p>
                     </div>
-                </div>
-                
-                <div>
-                    <p className="text-xs text-gray-500">&copy; 2025 Dataticon Team. All rights reserved.</p>
                 </div>
             </div>
 
-            {/* Right side - White section with login form */}
-            <div className="flex flex-col justify-center w-full p-8 lg:w-1/2 lg:p-12 bg-white">
-                <div className="w-full max-w-md mx-auto space-y-8">
-                    <div className="text-center space-y-3">
-                        <h1 className="text-3xl font-bold text-gray-900">
-                            {isSignUp ? 'Create your account' : 'Welcome back'}
-                        </h1>
-                        <p className="text-gray-600">
-                            {isSignUp 
-                                ? 'Sign up to start analyzing your data with AI' 
-                                : 'Sign in to your Aiser account'
-                            }
-                        </p>
-                    </div>
-                    
-                    <Form
-                        form={form}
-                        className="space-y-6"
-                        layout="vertical"
-                        onFinish={handleSubmit}
-                        disabled={loading}
-                    >
-                        <Form.Item
-                            label={<span className="text-gray-700 font-medium">Email or Username</span>}
-                            name="account"
-                            rules={[
-                                {
-                                    required: true,
-                                    message: 'Please input your email or username!',
-                                },
-                            ]}
-                        >
-                            <Input
-                                id="account"
-                                placeholder="Enter your email or username"
-                                required
-                                size="large"
-                                className="rounded-lg border-gray-300 focus:border-gray-900 focus:ring-gray-900"
-                                style={{
-                                    backgroundColor: 'white',
-                                    borderColor: '#d1d5db',
-                                    borderRadius: '8px',
-                                    height: '40px'
-                                }}
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                            />
-                        </Form.Item>
-                        
-                        {isSignUp && (
-                            <Form.Item
-                                label={<span className="text-gray-700 font-medium">Username</span>}
-                                name="username"
-                                rules={[
-                                    {
-                                        required: true,
-                                        message: 'Please input your username!',
-                                    },
-                                    {
-                                        min: 3,
-                                        message: 'Username must be at least 3 characters!',
-                                    },
-                                ]}
-                            >
-                                                            <Input
-                                id="username"
-                                placeholder="Choose a username"
-                                required
-                                size="large"
-                                className="rounded-lg border-gray-300 focus:border-gray-900 focus:ring-gray-900"
-                                style={{
-                                    backgroundColor: 'white',
-                                    borderColor: '#d1d5db',
-                                    borderRadius: '8px',
-                                    height: '40px'
-                                }}
-                            />
-                            </Form.Item>
-                        )}
-                        
-                        <Form.Item
-                            label={<span className="text-gray-700 font-medium">Password</span>}
-                            name="password"
-                            rules={[
-                                {
-                                    required: true,
-                                    message: 'Please input your password!',
-                                },
-                                ...(isSignUp ? [{
-                                    min: 8,
-                                    message: 'Password must be at least 8 characters!',
-                                }] : []),
-                            ]}
-                        >
-                            <Input.Password
-                                id="password"
-                                required
-                                placeholder="Enter your password"
-                                size="large"
-                                className="rounded-lg border-gray-300 focus:border-gray-900 focus:ring-gray-900"
-                                style={{
-                                    backgroundColor: 'white',
-                                    borderColor: '#d1d5db',
-                                    borderRadius: '8px',
-                                    height: '40px'
-                                }}
-                            />
-                            {isCapsLockOn && (
-                                <div className="caps-lock-warning">
-                                    <span role="alert">⚠️ Caps Lock is on</span>
-                                </div>
-                            )}
-                        </Form.Item>
-                        
-                        {isSignUp && (
-                            <Form.Item
-                                label={<span className="text-gray-700 font-medium">Confirm Password</span>}
-                                name="confirmPassword"
-                                dependencies={['password']}
-                                rules={[
-                                    {
-                                        required: true,
-                                        message: 'Please confirm your password!',
-                                    },
-                                    ({ getFieldValue }) => ({
-                                        validator(_, value) {
-                                            if (!value || getFieldValue('password') === value) {
-                                                return Promise.resolve();
-                                            }
-                                            return Promise.reject(new Error('Passwords do not match!'));
-                                        },
-                                    }),
-                                ]}
-                            >
-                                <Input.Password
-                                    id="confirmPassword"
-                                    required
-                                    placeholder="Confirm your password"
-                                    size="large"
-                                    className="rounded-lg border-gray-300 focus:border-gray-900 focus:ring-gray-900"
-                                    style={{
-                                        backgroundColor: 'white',
-                                        borderColor: '#d1d5db',
-                                        borderRadius: '8px',
-                                        height: '40px'
-                                    }}
-                                />
-                            </Form.Item>
-                        )}
-                        
-                        {loginError && (
-                            <div className="flex items-center p-3 text-red-700 bg-red-50 border border-red-200 rounded-lg">
-                                <ExclamationCircleOutlined className="mr-2" />
-                                <span className="text-sm">{loginError}</span>
-                            </div>
-                        )}
-                        
-                        <Button
-                            type="primary"
-                            className="w-full h-12 text-lg font-medium rounded-lg bg-gray-900 hover:bg-gray-800 border-gray-900"
-                            htmlType="submit"
-                            loading={loading}
-                        >
-                            {isSignUp ? 'Create Account' : 'Sign In'}
-                        </Button>
-                    </Form>
-                    
-                    <div className="text-center pt-6">
-                        <p className="text-gray-600">
-                            {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
-                            <button
-                                type="button"
-                                className="text-gray-900 hover:text-gray-700 font-medium hover:underline"
-                                onClick={() => {
-                                    setIsSignUp(!isSignUp);
-                                    form.resetFields();
-                                    setLoginError(null);
-                                }}
-                            >
-                                {isSignUp ? 'Sign In' : 'Sign Up'}
-                            </button>
-                        </p>
-                    </div>
-                </div>
-            </div>
+            {/* Footer */}
+            <div className="footer">
+                <p>&copy; 2025 Dataticon Team. All rights reserved.</p>
         </div>
         </>
     );

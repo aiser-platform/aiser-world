@@ -1,10 +1,34 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 const BACKEND = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// When running inside the frontend container, `localhost:8000` refers to the
+// frontend container itself. Prefer the internal service DNS name when the
+// configured BACKEND points at localhost so server-side proxying can reach the
+// chat2chart backend container on the Docker network.
+const INTERNAL_BACKEND = BACKEND.match(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/) ? 'http://chat2chart-server:8000' : BACKEND;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    const target = `${BACKEND.replace(/\/$/, '')}/debug/client-error`;
+    // Basic CORS handling for browser clients using same-origin proxy
+    const origin = req.headers.origin || '';
+    const allowed = [
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      'http://localhost:3001',
+      'http://127.0.0.1:3001',
+    ];
+    if (allowed.includes(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    }
+
+    if (req.method === 'OPTIONS') {
+      return res.status(204).end();
+    }
+    const targetBase = INTERNAL_BACKEND.replace(/\/$/, '');
+    const target = `${targetBase}/debug/client-error`;
 
     const fetchOptions: any = {
       method: req.method,
@@ -33,5 +57,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.status(502).json({ error: 'Debug proxy failed', detail: String(err) });
   }
 }
+
+
 
 

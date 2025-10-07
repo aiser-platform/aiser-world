@@ -88,12 +88,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                         console.log('🔍 AuthContext: Falling back to cookie-based proxy /api/auth/users/me');
                         try {
                             // Always use the same-origin proxy endpoint from the client
+                            // Log current cookie visibility for debugging (HttpOnly cookies won't appear here)
+                            try { console.debug('🔍 AuthContext: document.cookie (client-visible):', typeof document !== 'undefined' ? document.cookie : '<no-doc>'); } catch (e) {}
                             response = await fetch(`/api/auth/users/me`, {
                                 method: 'GET',
                                 headers: { 'Content-Type': 'application/json' },
                                 credentials: 'include',
                                 signal: controller.signal,
                             });
+                            console.debug('🔍 AuthContext: cookie-proxy response status (proxy):', response.status, 'ok=', response.ok);
                         } catch (e) {
                             console.warn('🔍 AuthContext: cookie-proxy /users/me failed', e);
                             response = undefined as any;
@@ -103,7 +106,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     clearTimeout(timeout);
                 }
 
-                console.log('🔍 AuthContext: Auth check (proxy) response status:', response.status);
+                console.log('🔍 AuthContext: Auth check (proxy) response status:', response ? response.status : '<no response>');
 
                 if (response.ok) {
                     const userData = await response.json();
@@ -135,7 +138,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                             clearTimeout(timeout2);
                         }
 
-                        console.log('🔍 AuthContext: Auth check (bearer proxy) response status:', response.status);
+                        console.log('🔍 AuthContext: Auth check (bearer proxy) response status:', response ? response.status : '<no response>');
                         if (response.ok) {
                             const userData = await response.json();
                             console.log('✅ AuthContext: User authenticated (bearer proxy):', userData);
@@ -144,7 +147,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                                 try { localStorage.setItem('aiser_user', JSON.stringify(userData)); } catch {}
                             }
                         } else {
-                            console.log('❌ AuthContext: Bearer fallback (proxy) failed, status:', response.status);
+                            console.log('❌ AuthContext: Bearer fallback (proxy) failed, status:', response ? response.status : '<no response>');
                             if (isMounted) setUser(null);
                         }
                     } catch (e) {
@@ -166,6 +169,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 if (isMounted) {
                     setInitialized(true);
                     setLoading(false);
+                    console.debug('🔁 AuthContext: initialization complete', { user: !!user, initialized: true, loading: false });
                 }
             }
         };
@@ -265,6 +269,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
             const data = await response.json();
             console.log('✅ AuthContext: Login successful, auth service set HttpOnly cookies');
+            // Log cookie visibility and navigator state for debugging
+            try { console.debug('🔐 After signin: document.cookie (client-visible):', typeof document !== 'undefined' ? document.cookie : '<no-doc>'); } catch (e) {}
+            try { console.debug('🔐 After signin: navigator.cookieEnabled=', typeof navigator !== 'undefined' ? navigator.cookieEnabled : '<no-navigator>'); } catch (e) {}
             
             // The auth service may set HttpOnly cookies. Persist fallback token and
             // immediately consider user signed-in (so UI loads). Perform a
@@ -287,6 +294,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             // Attempt verification and wait up to ~3s total before navigating
             try {
                 const verifyPromise = (async () => {
+                    console.debug('🔁 AuthContext: Performing immediate verifyAuth after login');
                     await verifyAuth();
                 })();
                 const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('verify timeout')), 3000));
@@ -318,6 +326,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const attempts = 3;
             let lastErr: any = null;
             for (let attempt = 1; attempt <= attempts; attempt++) {
+                console.debug('🔁 AuthContext: verifyAuth attempt', attempt);
                 try {
                     const controller = new AbortController();
                     const t = setTimeout(() => controller.abort(), 3000);
@@ -326,6 +335,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                         res = await fetch('/api/auth/users/me', { method: 'GET', credentials: 'include', signal: controller.signal });
                     } finally { clearTimeout(t); }
 
+                    console.debug('🔁 AuthContext: verifyAuth response status', res ? res.status : '<no response>');
                     if (res && res.ok) {
                         const u = await res.json();
                         setUser(u);
