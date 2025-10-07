@@ -177,7 +177,8 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
                 value={selectedModel}
                 onChange={handleModelChange}
                 loading={loading}
-                style={{ minWidth: 200 }}
+                className="model-selector-compact"
+                style={{ minWidth: 220 }}
                 placeholder="Select AI Model"
             >
                 {models.map(renderModelOption)}

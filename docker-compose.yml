@@ -151,7 +151,7 @@ services:
       - NPM_CONFIG_PRODUCTION=false
       - NEXT_PUBLIC_BACKEND_URL=http://chat2chart-server:8000
       - NEXT_PUBLIC_AUTH_URL=http://auth-service:5000
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_API_URL=http://chat2chart-server:8000
       - NEXT_PUBLIC_BACKEND_INTERNAL=http://chat2chart-server:8000
       - PORT=3000
       - AUTH_SERVICE_URL=http://auth-service:5000

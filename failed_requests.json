@@ -1,17 +1,1 @@
-[
-  {
-    "url": "http://localhost:3000/_next/static/chunks/webpack-a3c90ac924351e8f.js",
-    "failure": "net::ERR_ABORTED",
-    "method": "GET"
-  },
-  {
-    "url": "http://localhost:3000/_next/static/chunks/4235-1d3cabf98e022fc0.js",
-    "failure": "net::ERR_ABORTED",
-    "method": "GET"
-  },
-  {
-    "url": "http://localhost:3000/_next/static/chunks/app/(dashboard)/chat/page-7ceb7c5b5fc524a8.js",
-    "failure": "net::ERR_ABORTED",
-    "method": "GET"
-  }
-]
+[]

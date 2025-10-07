@@ -436,6 +436,17 @@ body {
     border-radius: 6px !important;
 }
 
+/* Header tweaks */
+.sidebar-toggle:focus {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+/* ModelSelector compact sizing */
+.model-selector-compact .ant-select-selector {
+    min-width: 220px !important;
+}
+
 .ant-btn-default {
     background: var(--card-background) !important;
     border-color: var(--border-color-base) !important;

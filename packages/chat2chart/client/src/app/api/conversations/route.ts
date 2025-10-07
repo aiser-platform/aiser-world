@@ -41,7 +41,9 @@ export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
         const backendUrl = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://chat2chart-server:8000';
-        const response = await fetch(`${backendUrl}/conversations/`, {
+    // Ensure server-side resolves localhost/env to internal docker service
+    const targetBase = /localhost|127\.0\.0\.1/.test(String(backendUrl)) ? 'http://chat2chart-server:8000' : backendUrl;
+    const response = await fetch(`${targetBase.replace(/\/$/, '')}/conversations`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

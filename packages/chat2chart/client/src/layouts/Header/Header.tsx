@@ -56,6 +56,8 @@ export const LayoutHeader: React.FC<Props> = ({
                         )
                     }
                     onClick={() => setCollapsed(!collapsed)}
+                    aria-label={collapsed ? 'Open sidebar' : 'Close sidebar'}
+                    className="sidebar-toggle"
                     style={{
                         fontSize: '16px',
                         width: 48,
@@ -72,14 +74,16 @@ export const LayoutHeader: React.FC<Props> = ({
             <div className="flex items-center space-x-2">
                 {/* Mode selector and AI Model selector in header for quick access */}
                 <div style={{ marginRight: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <ModeSelector
-                        value={typeof window !== 'undefined' ? (localStorage.getItem('chat_mode') || 'standard') : 'standard'}
-                        onChange={(v: string) => {
-                            try { localStorage.setItem('chat_mode', v); } catch (e) {}
-                            try { window.dispatchEvent(new CustomEvent('chat_mode_changed', { detail: v })); } catch (e) {}
-                        }}
-                        disabled={false}
-                    />
+                    <div style={{ width: 160 }}>
+                        <ModeSelector
+                            value={typeof window !== 'undefined' ? (localStorage.getItem('chat_mode') || 'standard') : 'standard'}
+                            onChange={(v: string) => {
+                                try { localStorage.setItem('chat_mode', v); } catch (e) {}
+                                try { window.dispatchEvent(new CustomEvent('chat_mode_changed', { detail: v })); } catch (e) {}
+                            }}
+                            disabled={false}
+                        />
+                    </div>
                     <div>
                         <ModelSelector onModelChange={() => {}} showCostInfo={false} compact={true} />
                     </div>
