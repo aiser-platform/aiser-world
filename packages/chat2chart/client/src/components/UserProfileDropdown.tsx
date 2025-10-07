@@ -19,9 +19,10 @@ import PricingModal from './PricingModal';
 
 interface UserProfileDropdownProps {
   className?: string;
+  showText?: boolean;
 }
 
-const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({ className }) => {
+const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({ className, showText = true }) => {
   const { user, logout } = useAuth();
   const { currentOrganization, usageStats } = useOrganization();
   const [pricingModalVisible, setPricingModalVisible] = useState(false);
@@ -201,14 +202,16 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({ className }) 
             )}
           </div>
           {/* always show username on desktop and tablet, collapse only on very small screens */}
-          <div className="ml-2 block" style={{ minWidth: 140 }}>
-            <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-              {user?.email?.split('@')[0] || 'User'}
+          {showText && (
+            <div className="ml-2 block" style={{ minWidth: 140 }}>
+              <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                {user?.email?.split('@')[0] || 'User'}
+              </div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">
+                {getPlanDisplayName(organizationData.plan)} Plan
+              </div>
             </div>
-            <div className="text-xs text-gray-500 dark:text-gray-400">
-              {getPlanDisplayName(organizationData.plan)} Plan
-            </div>
-          </div>
+          )}
         </div>
       </Dropdown>
 

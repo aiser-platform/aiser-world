@@ -126,7 +126,8 @@ export const LayoutHeader: React.FC<Props> = ({
                         style={{ fontSize: '16px', width: 40, height: 40 }}
                     />
                 </Tooltip>
-                <UserProfileDropdown />
+                {/* hide text in profile when in header to avoid duplicate admin text */}
+                <UserProfileDropdown showText={false} />
             </div>
         </Layout.Header>
     );
