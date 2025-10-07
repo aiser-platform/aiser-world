@@ -190,8 +190,8 @@ body {
 
 /* Header layout tweaks for consistent alignment */
 .ant-layout-header {
-    height: 64px !important;
-    padding: 0 16px !important;
+    height: 56px !important;
+    padding: 0 12px !important;
     display: flex !important;
     align-items: center !important;
 }

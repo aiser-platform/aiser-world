@@ -66,7 +66,6 @@ export const LayoutHeader: React.FC<Props> = ({
                         <ProjectSelector isHeader={true} />
                     </div>
                 </div>
-                <div className="header-title">Aiser</div>
             </div>
             
             {/* spacer pushes header-right group to the far right */}
