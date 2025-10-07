@@ -43,7 +43,7 @@ export const LayoutHeader: React.FC<Props> = ({
                 borderBottom: `1px solid ${isDarkMode ? '#303030' : '#f0f0f0'}`,
             }}
         >
-            <div className="flex items-center space-x-4" style={{ alignItems: 'center' }}>
+            <div className="header-left flex items-center space-x-4" style={{ alignItems: 'center' }}>
                 <Button
                     type="text"
                     icon={
@@ -69,9 +69,13 @@ export const LayoutHeader: React.FC<Props> = ({
                 <div style={{ marginLeft: 8 }}>
                     <ProjectSelector isHeader={true} />
                 </div>
+                <div className="header-title">Aiser</div>
             </div>
             
-            <div className="flex items-center space-x-2">
+            {/* spacer pushes header-right group to the far right */}
+            <div style={{ flex: 1 }} />
+
+            <div className="header-right flex items-center space-x-2">
                 {/* Mode selector and AI Model selector in header for quick access */}
                 <div style={{ marginRight: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
                     <div style={{ width: 160 }}>

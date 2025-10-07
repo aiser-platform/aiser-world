@@ -196,6 +196,11 @@ body {
     align-items: center !important;
 }
 
+.header-left { display: flex; align-items: center; gap: 12px; }
+.header-right { display: flex; align-items: center; gap: 8px; }
+.header-title { font-size: 18px; font-weight: 600; color: var(--heading-color); margin-left: 12px; }
+.logo-compact { width: 34px; height: 34px; }
+
 .ant-layout-content {
     background: var(--background) !important;
     color: var(--foreground) !important;
