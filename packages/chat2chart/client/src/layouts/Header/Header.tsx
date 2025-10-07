@@ -11,6 +11,7 @@ import { Button, Layout, theme, Tooltip } from 'antd';
 import UserProfileDropdown from '@/components/UserProfileDropdown';
 import { useThemeMode } from '@/components/Providers/ThemeModeContext';
 import ProjectSelector from '@/app/(dashboard)/chat/components/ProjectSelector/ProjectSelector';
+import AiserLogo from '@/app/components/Logo/AiserLogo';
 import ModelSelector from '@/app/components/ModelSelector/ModelSelector';
 import ModeSelector from '@/app/components/ModeSelector/ModeSelector';
 
@@ -59,8 +60,7 @@ export const LayoutHeader: React.FC<Props> = ({
                 {/* Logo / Project selector grouping */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <div className="logo-compact">
-                        {/* lightweight text logo for visibility */}
-                        <img src="/logo192.png" alt="Aiser" style={{ width: 34, height: 34, borderRadius: 6 }} />
+                        <AiserLogo size={34} showText={false} />
                     </div>
                     <div style={{ marginLeft: 0 }}>
                         <ProjectSelector isHeader={true} />
