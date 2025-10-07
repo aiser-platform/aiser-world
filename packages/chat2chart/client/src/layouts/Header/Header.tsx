@@ -44,30 +44,27 @@ export const LayoutHeader: React.FC<Props> = ({
             }}
         >
             <div className="header-left flex items-center space-x-4" style={{ alignItems: 'center' }}>
-                <Button
-                    type="text"
-                    icon={
-                        isBreakpoint ? (
-                            <MenuOutlined />
-                        ) : collapsed ? (
-                            <MenuUnfoldOutlined />
-                        ) : (
-                            <MenuFoldOutlined />
-                        )
-                    }
-                    onClick={() => setCollapsed(!collapsed)}
-                    aria-label={collapsed ? 'Open sidebar' : 'Close sidebar'}
-                    className="sidebar-toggle"
-                    style={{
-                        fontSize: '16px',
-                        width: 48,
-                        height: 48,
-                        padding: 8
-                    }}
-                />
-                {/* Project Selector - Left side near sidebar */}
-                <div style={{ marginLeft: 8 }}>
-                    <ProjectSelector isHeader={true} />
+                {/* Sidebar toggle (left of project selector) */}
+                <Tooltip title={collapsed ? 'Open sidebar' : 'Collapse sidebar'}>
+                    <Button
+                        type="text"
+                        icon={isBreakpoint ? <MenuOutlined /> : collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+                        onClick={() => setCollapsed(!collapsed)}
+                        aria-label={collapsed ? 'Open sidebar' : 'Close sidebar'}
+                        className="sidebar-toggle"
+                        style={{ fontSize: '16px', width: 44, height: 44, padding: 6 }}
+                    />
+                </Tooltip>
+
+                {/* Logo / Project selector grouping */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div className="logo-compact">
+                        {/* lightweight text logo for visibility */}
+                        <img src="/logo192.png" alt="Aiser" style={{ width: 34, height: 34, borderRadius: 6 }} />
+                    </div>
+                    <div style={{ marginLeft: 0 }}>
+                        <ProjectSelector isHeader={true} />
+                    </div>
                 </div>
                 <div className="header-title">Aiser</div>
             </div>
@@ -126,12 +123,8 @@ export const LayoutHeader: React.FC<Props> = ({
                         type="text"
                         icon={isDarkMode ? <SunOutlined /> : <MoonOutlined />}
                         onClick={() => setIsDarkMode(!isDarkMode)}
-                        style={{
-                            fontSize: '16px',
-                            width: 40,
-                            height: 40,
-                        }}
-                        
+                        aria-label={isDarkMode ? 'Light mode' : 'Dark mode'}
+                        style={{ fontSize: '16px', width: 40, height: 40 }}
                     />
                 </Tooltip>
                 <UserProfileDropdown />
