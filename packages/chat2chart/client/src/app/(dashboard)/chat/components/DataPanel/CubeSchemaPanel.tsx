@@ -59,7 +59,8 @@ const CubeSchemaPanel: React.FC<CubeSchemaPanelProps> = ({ dataSourceId, onSchem
         
         try {
             // Fetch real Cube.js schema from the container
-            const response = await fetch('http://localhost:4000/cubejs-api/v1/meta');
+            const { environment } = await import('@/config/environment');
+            const response = await fetch(`${environment.cubejs.url.replace(/\/$/, '')}/cubejs-api/v1/meta`);
             
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);

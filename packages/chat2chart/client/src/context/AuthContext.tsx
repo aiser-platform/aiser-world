@@ -48,6 +48,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [initialized, setInitialized] = useState(false); // Start as false until auth check completes
     const [authError, setAuthError] = useState<string | null>(null);
 
+    // Robust fetch helper available to the provider
+    const robustFetch = async (input: RequestInfo, init?: RequestInit, attempts = 3, delayMs = 300) => {
+        for (let i = 1; i <= attempts; i++) {
+            try {
+                const r = await fetch(input, init);
+                return r;
+            } catch (err) {
+                console.warn(`robustFetch attempt ${i} failed for ${String(input)}:`, err);
+                if (i === attempts) throw err;
+                await new Promise((res) => setTimeout(res, delayMs * i));
+            }
+        }
+        throw new Error('robustFetch exhausted');
+    };
+
     // Initialize authentication state on mount
     useEffect(() => {
         let isMounted = true;
@@ -57,6 +72,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             setLoading(true);
             setAuthError(null);
             try {
+                // Helper to send client-side debug logs to the backend
+                const sendClientLog = async (event: string, details: any) => {
+                    try {
+                        await fetch('/api/debug/client-error', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            body: JSON.stringify({ event, details, timestamp: Date.now(), clientCookies: typeof document !== 'undefined' ? document.cookie : '' }),
+                        });
+                    } catch (e) {
+                        // swallow errors - debug endpoint should not break auth flow
+                    }
+                };
+
+                // Small helper: robust fetch with retries for network/transient failures
+                const robustFetch = async (input: RequestInfo, init?: RequestInit, attempts = 4, delayMs = 300) => {
+                    for (let i = 1; i <= attempts; i++) {
+                        try {
+                            const r = await fetch(input, init);
+                            return r;
+                        } catch (err) {
+                            console.warn(`robustFetch attempt ${i} failed for ${String(input)}:`, err);
+                            if (i === attempts) throw err;
+                            await new Promise((res) => setTimeout(res, delayMs * i));
+                        }
+                    }
+                    throw new Error('robustFetch exhausted');
+                };
+
                 // First try token-based verification using localStorage (fast, avoids proxy issues)
                 console.log('🔍 AuthContext: Attempting token-based auth check (localStorage)');
                 const fallbackToken = typeof window !== 'undefined' ? localStorage.getItem('aiser_access_token') : null;
@@ -67,7 +111,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     if (fallbackToken) {
                         try {
                             // Use same-origin proxy so cookies and CORS are handled consistently
-                            response = await fetch(`/api/auth/users/me`, {
+                            response = await robustFetch(`/api/auth/users/me`, {
                                 method: 'GET',
                                 headers: {
                                     'Content-Type': 'application/json',
@@ -310,6 +354,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             setLoading(false);
             // Navigate to chat (client will re-run verifyAuth if needed)
             router.push('/chat');
+
+            // Instrumentation: mark login time for logout investigation
+            try { localStorage.setItem('last_login_at', String(Date.now())); } catch {}
         } catch (error) {
             console.error('❌ AuthContext: Login error:', error);
             const message = error instanceof Error ? error.message : 'Network error';
@@ -445,6 +492,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             Cookies.remove('c2c_access_token', cookieOptions);
 
             console.log('✅ AuthContext: Logout complete, redirecting to login');
+            // Log client-side logout event for debugging
+            try {
+                fetch('/api/debug/client-error', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ event: 'client_logout', timestamp: Date.now(), cookies: typeof document !== 'undefined' ? document.cookie : '' }),
+                });
+            } catch (e) {}
             // Redirect to login page
             router.push('/login');
         } catch (error) {

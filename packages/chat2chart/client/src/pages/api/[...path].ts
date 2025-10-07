@@ -57,11 +57,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     upstream.headers.forEach((value, key) => {
       const lk = key.toLowerCase();
       if (lk === 'transfer-encoding' || lk === 'connection') return;
-      if (lk === 'set-cookie') { setCookieValues.push(value as string); return; }
+      if (lk === 'set-cookie') {
+        // Sanitize Set-Cookie headers so cookies are applicable to the frontend host.
+        // Remove Domain attribute (upstream may set Domain=auth-service) so browser will accept cookie for same-origin.
+        const raw = Array.isArray(value) ? value : [value as string];
+        for (const v of raw) {
+          const parts = (v as string).split(';').map((p: string) => p.trim()).filter(Boolean);
+          const filtered = parts.filter((p: string) => !/^domain=/i.test(p));
+          const rebuilt = filtered.join('; ');
+          setCookieValues.push(rebuilt);
+        }
+        return;
+      }
       if (lk === 'content-encoding') return;
       res.setHeader(key, value as string);
     });
-    if (setCookieValues.length) res.setHeader('set-cookie', setCookieValues);
+    if (setCookieValues.length) {
+      // Forward sanitized Set-Cookie values to the browser
+      res.setHeader('set-cookie', setCookieValues);
+      console.log('Proxy: forwarded sanitized set-cookie headers:', setCookieValues);
+    }
 
     const buf = await upstream.arrayBuffer();
     if (buf && buf.byteLength > 0) res.send(Buffer.from(buf)); else res.end();

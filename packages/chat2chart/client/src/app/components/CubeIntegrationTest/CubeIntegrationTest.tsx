@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { environment } from '@/config/environment';
 import { Card, Button, Space, Typography, Alert, Spin, Tag, Divider, List, message } from 'antd';
 import { 
     DatabaseOutlined, 
@@ -92,7 +93,7 @@ const CubeIntegrationTest: React.FC = () => {
                 timezone: "UTC"
             };
 
-            const response = await fetch('http://localhost:4000/cubejs-api/v1/load', {
+            const response = await fetch(`${environment.cubejs.url.replace(/\/$/, '')}/cubejs-api/v1/load`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

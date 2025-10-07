@@ -35,6 +35,7 @@ import {
     CompressOutlined
 } from '@ant-design/icons';
 import UniversalDataSourceModal from '@/app/components/UniversalDataSourceModal/UniversalDataSourceModal';
+import { environment } from '@/config/environment';
 import CubeSchemaPanel from './CubeSchemaPanel';
 import './styles.css';
 import '../HistoryPanel/styles.css';
@@ -223,13 +224,13 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
                 });
                 
                 // Add real Cube.js data source from actual running instance
-                const realCubeSource = {
+                    const realCubeSource = {
                     id: 'cube_real_001',
                     name: 'Cube.js Analytics',
                     type: 'cube' as const,
                     status: 'connected' as const,
                     config: {
-                        endpoint: 'http://localhost:4000',
+                        endpoint: environment.cubejs.url,
                         apiVersion: 'v1'
                     },
                     metadata: {

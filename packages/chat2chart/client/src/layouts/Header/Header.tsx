@@ -11,6 +11,8 @@ import { Button, Layout, theme, Tooltip } from 'antd';
 import UserProfileDropdown from '@/components/UserProfileDropdown';
 import { useThemeMode } from '@/components/Providers/ThemeModeContext';
 import ProjectSelector from '@/app/(dashboard)/chat/components/ProjectSelector/ProjectSelector';
+import ModelSelector from '@/app/components/ModelSelector/ModelSelector';
+import ModeSelector from '@/app/components/ModeSelector/ModeSelector';
 
 type Props = {
     isBreakpoint: boolean;
@@ -41,7 +43,7 @@ export const LayoutHeader: React.FC<Props> = ({
                 borderBottom: `1px solid ${isDarkMode ? '#303030' : '#f0f0f0'}`,
             }}
         >
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-4" style={{ alignItems: 'center' }}>
                 <Button
                     type="text"
                     icon={
@@ -56,16 +58,32 @@ export const LayoutHeader: React.FC<Props> = ({
                     onClick={() => setCollapsed(!collapsed)}
                     style={{
                         fontSize: '16px',
-                        width: 64,
-                        height: 64,
+                        width: 48,
+                        height: 48,
+                        padding: 8
                     }}
                 />
-                
                 {/* Project Selector - Left side near sidebar */}
-                <ProjectSelector isHeader={true} />
+                <div style={{ marginLeft: 8 }}>
+                    <ProjectSelector isHeader={true} />
+                </div>
             </div>
             
             <div className="flex items-center space-x-2">
+                {/* Mode selector and AI Model selector in header for quick access */}
+                <div style={{ marginRight: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <ModeSelector
+                        value={typeof window !== 'undefined' ? (localStorage.getItem('chat_mode') || 'standard') : 'standard'}
+                        onChange={(v: string) => {
+                            try { localStorage.setItem('chat_mode', v); } catch (e) {}
+                            try { window.dispatchEvent(new CustomEvent('chat_mode_changed', { detail: v })); } catch (e) {}
+                        }}
+                        disabled={false}
+                    />
+                    <div>
+                        <ModelSelector onModelChange={() => {}} showCostInfo={false} compact={true} />
+                    </div>
+                </div>
                 {/* GitHub Issue Buttons */}
                 <Tooltip title="🐛 Report Bug - Opens GitHub issue">
                     <Button

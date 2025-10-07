@@ -113,6 +113,23 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
         setQuickActions(actions);
     }, [props.selectedDataSource]);
     const [isListening, setIsListening] = React.useState<boolean>(false);
+    const [mode, setMode] = React.useState<string>(() => {
+        try { return typeof window !== 'undefined' ? (localStorage.getItem('chat_mode') || 'standard') : 'standard'; } catch { return 'standard'; }
+    });
+
+    // Sync mode with header ModeSelector changes via a custom window event
+    React.useEffect(() => {
+        const handler = (e: any) => {
+            try {
+                const v = e?.detail || (typeof window !== 'undefined' ? localStorage.getItem('chat_mode') : null) || 'standard';
+                setMode(v);
+            } catch (err) {
+                // ignore
+            }
+        };
+        try { window.addEventListener('chat_mode_changed', handler as EventListener); } catch (e) {}
+        return () => { try { window.removeEventListener('chat_mode_changed', handler as EventListener); } catch (e) {} };
+    }, []);
     const [dataSourceModalVisible, setDataSourceModalVisible] = React.useState<boolean>(false);
     const [analysisMode, setAnalysisMode] = React.useState<string>('main');
     const [openAIModel, setOpenAIModel] = React.useState<string | undefined>(undefined);
@@ -978,7 +995,8 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                     // Enhanced data source context for better AI analysis
                     const dataSourceContext = await buildDataSourceContext(dataSourceId, dataSourceType);
                     
-                    const response = await fetch(`${getBackendUrlForApi()}/ai/chat/analyze`, {
+                    // Use same-origin proxy so browser sends HttpOnly cookies and avoids CORS
+                    const response = await fetch(`/api/ai/chat/analyze`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -1073,7 +1091,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                 try {
                     console.log('🔍 Calling AI chat analysis without data source...');
                     
-                    const response = await fetch(`${getBackendUrlForApi()}/ai/chat/analyze`, {
+                    const response = await fetch(`/api/ai/chat/analyze`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1248,7 +1266,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                 conversation_id: props.conversationId || 'new-conversation'
             };
 
-                            const response = await fetch(`${getBackendUrlForApi()}/ai/chat/analyze`, {
+                            const response = await fetch(`/api/ai/chat/analyze`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -2079,7 +2097,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                         console.warn('No active data source to execute SQL');
                         return;
                     }
-                    const res = await fetch(`${getBackendUrlForApi()}/data/query/execute`, {
+                    const res = await fetch(`/api/data/query/execute`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ query: sql, data_source_id: active.id, engine: 'direct_sql', optimization: true })
@@ -2142,7 +2160,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
             try {
                 if (autoExecStatus) autoExecStatus.style.display = 'inline-block';
                 const sql = suggestions[0];
-                const res = await fetch(`${getBackendUrlForApi()}/data/query/execute`, {
+                const res = await fetch(`/api/data/query/execute`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ query: sql, data_source_id: active.id, engine: 'direct_sql', optimization: true })
@@ -2888,16 +2906,14 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                         <MessageOutlined /> AI-Native Chat
                     </Title>
                     <div className="header-actions">
-                        <Select
-                            defaultValue="gpt-4.1-mini"
-                            style={{ width: 180 }}
-                            onChange={(value) => setSelectedAIModel(value)}
-                            options={[
-                                { value: 'gpt-4.1-mini', label: '🤖 GPT-4.1 Mini' },
-                                { value: 'gpt-5-mini', label: '🚀 GPT-5 Mini' },
-                                { value: 'gpt-4-mini', label: '🧠 GPT-4 Mini' }
-                            ]}
-                        />
+                        {/* Prefer centralized ModelSelector in header; keep compact model select here as fallback */}
+                        <div style={{ minWidth: 180 }}>
+                            <select value={selectedAIModel} onChange={(e) => setSelectedAIModel(e.target.value)} style={{ width: 180, padding: '6px 8px', borderRadius: 6 }}>
+                                <option value="gpt-4.1-mini">🤖 GPT-4.1 Mini</option>
+                                <option value="gpt-5-mini">🚀 GPT-5 Mini</option>
+                                <option value="gpt-4-mini">🧠 GPT-4 Mini</option>
+                            </select>
+                        </div>
                         <Select
                             placeholder="Navigate"
                             style={{ width: 200 }}
@@ -3063,15 +3079,8 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                     {/* Quick Actions - Full Width Modern Design */}
                     <div className="quick-actions-modern">
                         <div className="action-group" style={{ width: 240 }}>
-                            <Select
-                                defaultValue="standard"
-                                style={{ width: 220 }}
-                                size="middle"
-                                className="mode-selector"
-                            >
-                                <Select.Option value="standard">Standard Mode</Select.Option>
-                                <Select.Option value="deep" disabled>Deep Analysis (Coming Soon)</Select.Option>
-                            </Select>
+                            {/* ModeSelector moved to header for global access; keep placeholder for spacing */}
+                            <div style={{ width: 240 }} />
                         </div>
                         
 
@@ -3084,7 +3093,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
             </div>
 
             {/* Universal Data Source Modal */}
-            <UniversalDataSourceModal
+                    <UniversalDataSourceModal
                 isOpen={dataSourceModalVisible}
                 onClose={() => setDataSourceModalVisible(false)}
                 onDataSourceCreated={(dataSource) => {
@@ -3094,6 +3103,8 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                 initialDataSourceType="file"
                 isChatIntegration={true}
             />
+                    {/* Debug: expose last login timestamp to help investigate intermittent logout */}
+                    <div style={{ display: 'none' }} id="__debug_last_login">{typeof window !== 'undefined' ? localStorage.getItem('last_login_at') : ''}</div>
         </div>
     );
 };

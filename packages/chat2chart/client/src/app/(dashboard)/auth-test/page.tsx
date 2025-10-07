@@ -13,7 +13,7 @@ const AuthTestPage: React.FC = () => {
                 console.log('🔍 Testing authentication...');
                 
                 // Test the exact same request that AuthContext makes
-                const response = await fetch('http://localhost:5000/users/me', {
+                const response = await fetch('/api/auth/users/me', {
                     method: 'GET',
                     headers: {
                         'Content-Type': 'application/json',
@@ -49,7 +49,7 @@ const AuthTestPage: React.FC = () => {
         try {
             console.log('🔍 Testing login...');
             
-            const response = await fetch('http://localhost:5000/users/signin', {
+            const response = await fetch('/api/auth/users/signin', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

@@ -32,7 +32,7 @@ import { environment, getCubeJsAuthHeader } from '@/config/environment';
 import { getBackendUrlForApi } from '@/utils/backendUrl';
 const backendUrl = typeof window !== 'undefined' && window.location.hostname === 'localhost'
     ? '/api'
-: (environment?.api?.baseUrl || getBackendUrlForApi());
+    : (environment?.api?.baseUrl || getBackendUrlForApi());
 import { useOrganization } from '@/context/OrganizationContext';
 
 const { Dragger } = Upload;
