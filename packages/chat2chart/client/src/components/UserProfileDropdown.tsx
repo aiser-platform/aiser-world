@@ -189,7 +189,7 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({ className }) 
         overlayClassName="user-profile-dropdown"
         overlayStyle={{ minWidth: 280 }}
       >
-        <div className={`flex items-center cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg p-2 transition-colors ${className}`}>
+        <div className={`flex items-center cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg p-2 transition-colors ${className}`} style={{ gap: 8 }}>
           <div className="relative">
             <Avatar 
               size="default" 
@@ -200,7 +200,8 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({ className }) 
               <div className="absolute -top-1 -right-1 w-3 h-3 bg-orange-500 rounded-full border-2 border-white"></div>
             )}
           </div>
-          <div className="ml-2 hidden sm:block">
+          {/* always show username on desktop and tablet, collapse only on very small screens */}
+          <div className="ml-2 block" style={{ minWidth: 140 }}>
             <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
               {user?.email?.split('@')[0] || 'User'}
             </div>

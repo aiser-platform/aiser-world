@@ -3020,7 +3020,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                 
                 <div className="input-container">
                     <div className="input-wrapper">
-                        <Input.TextArea
+                    <Input.TextArea
                             ref={textAreaRef}
                             value={inputValue}
                             onChange={(e) => setInputValue(e.target.value)}
@@ -3033,6 +3033,8 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                                 }
                             }}
                             className="chat-textarea"
+                        aria-label="Chat input"
+                        data-test-id="chat-input"
                         />
                         
                         {/* Input Actions - Full Width */}
@@ -3062,6 +3064,8 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                                 disabled={!inputValue.trim() || chatLoading}
                                 className="send-button"
                                 title="Send Message"
+                                aria-label="Send message"
+                                data-test-id="send-button"
                             />
                         </div>
                     </div>

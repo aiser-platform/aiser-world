@@ -239,7 +239,8 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({
                         value={currentProject ? { value: currentProject.id.toString(), label: currentProject.name } : undefined}
                         onChange={handleProjectChange}
                         loading={loading}
-                        style={{ minWidth: 200 }}
+                        style={{ minWidth: isHeader ? 260 : 200 }}
+                        dropdownMatchSelectWidth={false}
                         placeholder={projects.length === 0 ? "No Projects" : (currentProject ? currentProject.name : "Select Project")}
                         suffixIcon={<FolderOutlined />}
                         disabled={projects.length === 0}
