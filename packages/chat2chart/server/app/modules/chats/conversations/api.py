@@ -63,6 +63,9 @@ async def create_conversation(conversation: ConversationSchema):
         result = await service.create(conversation)
         return result
     except Exception as e:
+        # Log full exception with traceback for easier debugging in dev
+        import logging, traceback
+        logging.getLogger(__name__).exception(f"Failed to create conversation: {e}\n{traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
         )

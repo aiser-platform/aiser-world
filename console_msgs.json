@@ -1,0 +1,272 @@
+[
+  {
+    "type": "debug",
+    "text": "ProtectRoute: state {initialized: false, loading: true, isAuthenticated: false, pathname: /chat}",
+    "location": {
+      "url": "http://localhost:3000/_next/static/chunks/app/(dashboard)/layout-667ad745e1698d24.js",
+      "lineNumber": 0,
+      "columnNumber": 32249
+    }
+  },
+  {
+    "type": "log",
+    "text": "🔄 AuthContext: Initializing authentication...",
+    "location": {
+      "url": "http://localhost:3000/_next/static/chunks/app/(dashboard)/layout-667ad745e1698d24.js",
+      "lineNumber": 0,
+      "columnNumber": 24474
+    }
+  },
+  {
+    "type": "log",
+    "text": "🔍 AuthContext: Attempting token-based auth check (localStorage)",
+    "location": {
+      "url": "http://localhost:3000/_next/static/chunks/app/(dashboard)/layout-667ad745e1698d24.js",
+      "lineNumber": 0,
+      "columnNumber": 24570
+    }
+  },
+  {
+    "type": "log",
+    "text": "🔍 AuthContext: Falling back to cookie-based proxy /api/auth/users/me",
+    "location": {
+      "url": "http://localhost:3000/_next/static/chunks/app/(dashboard)/layout-667ad745e1698d24.js",
+      "lineNumber": 0,
+      "columnNumber": 25071
+    }
+  },
+  {
+    "type": "debug",
+    "text": "🔍 AuthContext: document.cookie (client-visible): ",
+    "location": {
+      "url": "http://localhost:3000/_next/static/chunks/app/(dashboard)/layout-667ad745e1698d24.js",
+      "lineNumber": 0,
+      "columnNumber": 25174
+    }
+  },
+  {
+    "type": "debug",
+    "text": "🔍 AuthContext: cookie-proxy response status (proxy): 200 ok= true",
+    "location": {
+      "url": "http://localhost:3000/_next/static/chunks/app/(dashboard)/layout-667ad745e1698d24.js",
+      "lineNumber": 0,
+      "columnNumber": 25450
+    }
+  },
+  {
+    "type": "log",
+    "text": "🔍 AuthContext: Auth check (proxy) response status: 200",
+    "location": {
+      "url": "http://localhost:3000/_next/static/chunks/app/(dashboard)/layout-667ad745e1698d24.js",
+      "lineNumber": 0,
+      "columnNumber": 25672
+    }
+  },
+  {
+    "type": "log",
+    "text": "✅ AuthContext: User authenticated (proxy): {username: admin, email: admin@aiser.app, id: 81d6c774-af74-43b4-a6c1-559ae47de048}",
+    "location": {
+      "url": "http://localhost:3000/_next/static/chunks/app/(dashboard)/layout-667ad745e1698d24.js",
+      "lineNumber": 0,
+      "columnNumber": 25806
+    }
+  },
+  {
+    "type": "debug",
+    "text": "🔁 AuthContext: initialization complete {user: false, initialized: true, loading: false}",
+    "location": {
+      "url": "http://localhost:3000/_next/static/chunks/app/(dashboard)/layout-667ad745e1698d24.js",
+      "lineNumber": 0,
+      "columnNumber": 26998
+    }
+  },
+  {
+    "type": "debug",
+    "text": "ProtectRoute: early pass-through, user authenticated",
+    "location": {
+      "url": "http://localhost:3000/_next/static/chunks/app/(dashboard)/layout-667ad745e1698d24.js",
+      "lineNumber": 0,
+      "columnNumber": 32154
+    }
+  },
+  {
+    "type": "error",
+    "text": "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+    "location": {
+      "url": "http://localhost:3000/api/conversations",
+      "lineNumber": 0,
+      "columnNumber": 0
+    }
+  },
+  {
+    "type": "warning",
+    "text": "Failed to persist conversation to database: Internal Server Error",
+    "location": {
+      "url": "http://localhost:3000/_next/static/chunks/app/(dashboard)/chat/page-d52ba27c8a8cde91.js",
+      "lineNumber": 0,
+      "columnNumber": 1860
+    }
+  },
+  {
+    "type": "log",
+    "text": "Loaded data sources from backend: [Object, Object]",
+    "location": {
+      "url": "http://localhost:3000/_next/static/chunks/4235-65ce0698a5b7cf83.js",
+      "lineNumber": 0,
+      "columnNumber": 6768
+    }
+  },
+  {
+    "type": "log",
+    "text": "Loaded saved data sources: []",
+    "location": {
+      "url": "http://localhost:3000/_next/static/chunks/4235-65ce0698a5b7cf83.js",
+      "lineNumber": 0,
+      "columnNumber": 6904
+    }
+  },
+  {
+    "type": "log",
+    "text": "Loaded data sources from backend: [Object, Object]",
+    "location": {
+      "url": "http://localhost:3000/_next/static/chunks/4235-65ce0698a5b7cf83.js",
+      "lineNumber": 0,
+      "columnNumber": 6768
+    }
+  },
+  {
+    "type": "log",
+    "text": "Loaded saved data sources: []",
+    "location": {
+      "url": "http://localhost:3000/_next/static/chunks/4235-65ce0698a5b7cf83.js",
+      "lineNumber": 0,
+      "columnNumber": 6904
+    }
+  },
+  {
+    "type": "log",
+    "text": "Loaded data sources from backend: [Object, Object]",
+    "location": {
+      "url": "http://localhost:3000/_next/static/chunks/4235-65ce0698a5b7cf83.js",
+      "lineNumber": 0,
+      "columnNumber": 6768
+    }
+  },
+  {
+    "type": "log",
+    "text": "Loaded saved data sources: []",
+    "location": {
+      "url": "http://localhost:3000/_next/static/chunks/4235-65ce0698a5b7cf83.js",
+      "lineNumber": 0,
+      "columnNumber": 6904
+    }
+  },
+  {
+    "type": "log",
+    "text": "Loaded data sources from backend: [Object, Object]",
+    "location": {
+      "url": "http://localhost:3000/_next/static/chunks/4235-65ce0698a5b7cf83.js",
+      "lineNumber": 0,
+      "columnNumber": 6768
+    }
+  },
+  {
+    "type": "log",
+    "text": "Loaded saved data sources: []",
+    "location": {
+      "url": "http://localhost:3000/_next/static/chunks/4235-65ce0698a5b7cf83.js",
+      "lineNumber": 0,
+      "columnNumber": 6904
+    }
+  },
+  {
+    "type": "log",
+    "text": "Loaded data sources from backend: [Object, Object]",
+    "location": {
+      "url": "http://localhost:3000/_next/static/chunks/4235-65ce0698a5b7cf83.js",
+      "lineNumber": 0,
+      "columnNumber": 6768
+    }
+  },
+  {
+    "type": "log",
+    "text": "Loaded saved data sources: []",
+    "location": {
+      "url": "http://localhost:3000/_next/static/chunks/4235-65ce0698a5b7cf83.js",
+      "lineNumber": 0,
+      "columnNumber": 6904
+    }
+  },
+  {
+    "type": "log",
+    "text": "Loaded data sources from backend: [Object, Object]",
+    "location": {
+      "url": "http://localhost:3000/_next/static/chunks/4235-65ce0698a5b7cf83.js",
+      "lineNumber": 0,
+      "columnNumber": 6768
+    }
+  },
+  {
+    "type": "log",
+    "text": "Loaded saved data sources: []",
+    "location": {
+      "url": "http://localhost:3000/_next/static/chunks/4235-65ce0698a5b7cf83.js",
+      "lineNumber": 0,
+      "columnNumber": 6904
+    }
+  },
+  {
+    "type": "log",
+    "text": "Loaded data sources from backend: [Object, Object]",
+    "location": {
+      "url": "http://localhost:3000/_next/static/chunks/4235-65ce0698a5b7cf83.js",
+      "lineNumber": 0,
+      "columnNumber": 6768
+    }
+  },
+  {
+    "type": "log",
+    "text": "Loaded saved data sources: []",
+    "location": {
+      "url": "http://localhost:3000/_next/static/chunks/4235-65ce0698a5b7cf83.js",
+      "lineNumber": 0,
+      "columnNumber": 6904
+    }
+  },
+  {
+    "type": "log",
+    "text": "Loaded data sources from backend: [Object, Object]",
+    "location": {
+      "url": "http://localhost:3000/_next/static/chunks/4235-65ce0698a5b7cf83.js",
+      "lineNumber": 0,
+      "columnNumber": 6768
+    }
+  },
+  {
+    "type": "log",
+    "text": "Loaded saved data sources: []",
+    "location": {
+      "url": "http://localhost:3000/_next/static/chunks/4235-65ce0698a5b7cf83.js",
+      "lineNumber": 0,
+      "columnNumber": 6904
+    }
+  },
+  {
+    "type": "log",
+    "text": "Loaded data sources from backend: [Object, Object]",
+    "location": {
+      "url": "http://localhost:3000/_next/static/chunks/4235-65ce0698a5b7cf83.js",
+      "lineNumber": 0,
+      "columnNumber": 6768
+    }
+  },
+  {
+    "type": "log",
+    "text": "Loaded saved data sources: []",
+    "location": {
+      "url": "http://localhost:3000/_next/static/chunks/4235-65ce0698a5b7cf83.js",
+      "lineNumber": 0,
+      "columnNumber": 6904
+    }
+  }
+]

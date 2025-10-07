@@ -1,7 +1,12 @@
 import Cookies from 'js-cookie';
 import { getBackendUrl } from './backendUrl';
 
-export const API_URL = getBackendUrl();
+// When running in the browser prefer same-origin proxy so all frontend calls
+// go through `/api/...` and benefit from cookie forwarding and CORS handling.
+export const API_URL = ((): string => {
+    if (typeof window !== 'undefined') return '';
+    return getBackendUrl();
+})();
 
 // Default AUTH_URL to the auth service port when not explicitly set in the environment.
 // This makes dev workflows simpler (upgrade-demo and other dev helpers live on the chat2chart service).

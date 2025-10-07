@@ -10,7 +10,8 @@ export default function ConnectivityBanner() {
   const [target, setTarget] = useState<string>('');
 
   useEffect(() => {
-    const url = `${getBackendUrl()}/health`;
+    // Prefer same-origin proxy endpoint to check backend connectivity from the browser
+    const url = `/api/health`;
     setTarget(url);
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 2500);

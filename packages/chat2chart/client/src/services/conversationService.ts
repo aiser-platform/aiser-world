@@ -42,7 +42,13 @@ class ConversationService {
   private backendUrl: string;
 
   constructor() {
-    this.backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8000';
+    // In browser contexts prefer same-origin proxy so that HttpOnly cookies and CORS
+    // issues are avoided. For server-side or build-time use NEXT_PUBLIC_BACKEND_URL.
+    if (typeof window !== 'undefined') {
+      this.backendUrl = '/api';
+    } else {
+      this.backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8000';
+    }
   }
 
   // ===== Memory-First Operations =====

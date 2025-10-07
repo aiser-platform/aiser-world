@@ -45,14 +45,54 @@ const { chromium, request: playwrightRequest } = require('playwright');
     const page = await context.newPage();
     const consoleMsgs = [];
     const failed = [];
+    const badResponses = [];
     page.on('console', msg => consoleMsgs.push({type: msg.type(), text: msg.text()}));
     page.on('requestfailed', req => failed.push({url: req.url(), failure: req.failure() && req.failure().errorText}));
     page.on('pageerror', e => consoleMsgs.push({type:'pageerror', text: String(e)}));
+    page.on('response', async (res) => {
+      try {
+        const status = res.status();
+        if (status >= 400) {
+          badResponses.push({ url: res.url(), status, headers: Object.fromEntries(res.headers()) });
+        }
+      } catch (e) {}
+    });
 
     console.log('Opening debug page', debugPage);
+    // Instrument client page to capture fetch failures
+    await page.evaluateOnNewDocument(() => {
+      try {
+        window.__failedFetches = [];
+        const _fetch = window.fetch;
+        window.fetch = async (...args) => {
+          try {
+            const res = await _fetch.apply(window, args);
+            try {
+              if (!res.ok) {
+                window.__failedFetches.push({ url: args[0], status: res.status, ok: res.ok });
+              }
+            } catch (e) {}
+            return res;
+          } catch (e) {
+            try { window.__failedFetches.push({ url: args[0], error: String(e) }); } catch (ee) {}
+            throw e;
+          }
+        };
+      } catch (e) {}
+    });
     const resp = await page.goto(debugPage, { waitUntil: 'load', timeout: 20000 }).catch(e=>{console.log('goto error',e);return null});
     console.log('debug page status', resp && resp.status());
     await page.waitForTimeout(800);
+
+    // Also navigate to the protected /chat route to replicate the "Loading..." hang
+    try {
+      console.log('Navigating to /chat to reproduce protected route rendering');
+      const chatResp = await page.goto(`${base}/chat`, { waitUntil: 'load', timeout: 20000 }).catch(e=>{console.log('chat goto error',e);return null});
+      console.log('/chat page status', chatResp && chatResp.status());
+      await page.waitForTimeout(1200);
+    } catch (e) {
+      console.log('Navigate /chat failed', e);
+    }
 
     // Directly probe the client-side /api/auth/users/me from the page context to capture
     // cookie-forwarding / session visibility as seen by the app.
@@ -97,6 +137,7 @@ const { chromium, request: playwrightRequest } = require('playwright');
     console.log('SCREENSHOT: auth_debug_after.png');
     console.log('---CONSOLE---'); consoleMsgs.forEach(m=>console.log(m.type + ': ' + m.text));
     console.log('---FAILED REQUESTS---'); failed.forEach(r=>console.log(r.url + ' -> ' + r.failure));
+    console.log('---BAD RESPONSES (>=400)---'); badResponses.forEach(r=>console.log(r.status + ' ' + r.url));
 
     await browser.close();
   } finally {

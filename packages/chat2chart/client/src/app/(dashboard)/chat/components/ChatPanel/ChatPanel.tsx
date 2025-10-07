@@ -19,7 +19,7 @@ import {
 } from '../../types';
 import ChatMessageBox from './MessageBox';
 import './styles.css';
-import { getBackendUrlForApi } from '@/utils/backendUrl';
+// Use same-origin proxy for browser requests
 
 const { TextArea } = Input;
 const { Title, Text, Paragraph } = Typography;

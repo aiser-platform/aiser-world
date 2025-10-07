@@ -24,7 +24,15 @@ export const getBackendUrl = (): string => {
   }
   // On the server (SSR), prefer explicit env
   if (process.env.NEXT_PUBLIC_BACKEND_URL) {
-    return process.env.NEXT_PUBLIC_BACKEND_URL;
+    const envUrl = String(process.env.NEXT_PUBLIC_BACKEND_URL).trim();
+    // If env was set to localhost/127.0.0.1 (common on dev host), map to the
+    // internal docker service hostname so server-side requests reach the
+    // chat2chart backend container instead of trying to connect to localhost
+    // inside the Next.js container (which would be the Next server itself).
+    if (/localhost|127\.0\.0\.1/.test(envUrl)) {
+      return 'http://chat2chart-server:8000';
+    }
+    return envUrl;
   }
   // Fallback for SSR inside docker network
   return 'http://chat2chart-server:8000';
@@ -36,5 +44,7 @@ export const getBackendUrlForApi = (): string => {
     return getBackendUrl();
   }
   // Use service DNS on server (SSR)
-  return process.env.NEXT_PUBLIC_BACKEND_URL || 'http://chat2chart-server:8000';
+  const env = process.env.NEXT_PUBLIC_BACKEND_URL;
+  if (env && /localhost|127\.0\.0\.1/.test(env)) return 'http://chat2chart-server:8000';
+  return env || 'http://chat2chart-server:8000';
 };

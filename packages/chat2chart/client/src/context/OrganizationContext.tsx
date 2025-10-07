@@ -119,7 +119,7 @@ export const OrganizationProvider: React.FC<OrganizationProviderProps> = ({ chil
   const getOrganizations = async () => {
     try {
       // Call the real API to get organizations
-      const response = await fetch(`${getBackendUrlForApi()}/api/organizations`);
+      const response = await fetch(`/api/organizations`);
       if (response.ok) {
         const orgs = await response.json();
         setOrganizations(orgs);
@@ -155,7 +155,7 @@ export const OrganizationProvider: React.FC<OrganizationProviderProps> = ({ chil
   const getProjects = async (orgId?: number) => {
     try {
       // Call the real API to get projects
-      const response = await fetch(`${getBackendUrlForApi()}/api/projects?user_id=default`);
+      const response = await fetch(`/api/projects?user_id=default`);
       if (response.ok) {
         const data = await response.json();
         setProjects(data.items || []);
@@ -181,7 +181,7 @@ export const OrganizationProvider: React.FC<OrganizationProviderProps> = ({ chil
   const getOrganizationUsage = async (orgId: number) => {
     try {
       // Call the real API to get usage stats
-      const response = await fetch(`${getBackendUrlForApi()}/api/organizations/${orgId}/usage`);
+      const response = await fetch(`/api/organizations/${orgId}/usage`);
       if (response.ok) {
         const usage = await response.json();
         // Transform the API response to match our UsageStats interface

@@ -14,9 +14,13 @@ const getBackendUrl = () => {
 
 export async function GET(request: NextRequest) {
     try {
-        const { searchParams } = new URL(request.url);
-        const backendUrl = getBackendUrl();
-        const response = await fetch(`${backendUrl}/conversations/?${searchParams.toString()}`);
+    const { searchParams } = new URL(request.url);
+    // When running on the Next server (inside the container), prefer the internal
+    // docker service hostname so requests reach the chat2chart backend.
+    // Use server-side backend resolution helper: prefer env, map localhost to internal service
+    const backendUrl = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://chat2chart-server:8000';
+    const targetBase = /localhost|127\.0\.0\.1/.test(String(backendUrl)) ? 'http://chat2chart-server:8000' : backendUrl;
+    const response = await fetch(`${targetBase.replace(/\/$/, '')}/conversations/?${searchParams.toString()}`);
         
         if (!response.ok) {
             throw new Error(`Backend responded with ${response.status}`);
@@ -36,7 +40,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const backendUrl = getBackendUrl();
+        const backendUrl = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://chat2chart-server:8000';
         const response = await fetch(`${backendUrl}/conversations/`, {
             method: 'POST',
             headers: {

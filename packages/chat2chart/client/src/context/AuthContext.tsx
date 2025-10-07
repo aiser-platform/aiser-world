@@ -108,7 +108,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
                 console.log('🔍 AuthContext: Auth check (proxy) response status:', response ? response.status : '<no response>');
 
-                if (response.ok) {
+                if (response && response.ok) {
                     const userData = await response.json();
                     console.log('✅ AuthContext: User authenticated (proxy):', userData);
                     if (isMounted) {
@@ -223,10 +223,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
             // Send login request to auth service via same-origin proxy with retries
             let response: Response | null = null;
-            const maxAttempts = 3;
+            const maxAttempts = 5;
             for (let attempt = 1; attempt <= maxAttempts; attempt++) {
                 try {
-                    const signinUrl = typeof window !== 'undefined' ? `${AUTH_URL}/users/signin` : `/api/auth/users/signin`;
+                    // In-browser use same-origin proxy so cookies and CORS are handled consistently.
+                    const signinUrl = typeof window !== 'undefined' ? `/api/auth/users/signin` : `${AUTH_URL}/users/signin`;
+                    console.debug(`AuthContext: signin attempt ${attempt}, url=${signinUrl}`);
                     response = await fetch(signinUrl, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -235,8 +237,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     });
                     break; // success or valid response
                 } catch (err) {
-                    console.warn(`AuthContext: signin attempt ${attempt} failed`, err);
-                    if (attempt < maxAttempts) await new Promise((r) => setTimeout(r, attempt * 300));
+                    console.warn(`AuthContext: signin attempt ${attempt} failed for url ${typeof window !== 'undefined' ? '/api/auth/users/signin' : AUTH_URL}`, err);
+                    if (attempt < maxAttempts) await new Promise((r) => setTimeout(r, Math.min(2000, attempt * 500)));
                 }
             }
 

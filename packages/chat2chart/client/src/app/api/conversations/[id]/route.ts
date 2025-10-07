@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getBackendUrlForApi } from '@/utils/backendUrl';
-
-const BACKEND_URL = getBackendUrlForApi();
+// Use server-safe backend resolution: map localhost->internal service when SSR
+const BACKEND_URL = ((): string => {
+    const env = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL;
+    if (env && /localhost|127\.0\.0\.1/.test(env)) return 'http://chat2chart-server:8000';
+    return env || 'http://chat2chart-server:8000';
+})();
 
 export async function GET(
     request: NextRequest,

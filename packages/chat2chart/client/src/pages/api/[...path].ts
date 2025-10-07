@@ -1,7 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
-const BACKEND = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-const INTERNAL_BACKEND = BACKEND.match(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/) ? 'http://chat2chart-server:8000' : BACKEND;
+const BACKEND = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+// Map localhost/127.0.0.1 to internal docker hostname when running inside container
+const INTERNAL_BACKEND = BACKEND && (/localhost|127\.0\.0\.1/.test(BACKEND)) ? 'http://chat2chart-server:8000' : BACKEND;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -20,7 +21,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // strip the /api/ prefix
     const path = rawUrl.replace(/^\/api\/?/, '').replace(/^\//, '');
     const targetBase = INTERNAL_BACKEND.replace(/\/$/, '');
-    const target = `${targetBase}/${path}`;
+    // Heuristic routing to match backend route prefixes:
+    // - data/* -> backend /data/*
+    // - conversations/* -> backend /conversations/* (top-level)
+    // - chats/* -> backend /chats/* (top-level)
+    // - otherwise -> backend /api/*
+    let target: string;
+    if (!path) {
+      target = `${targetBase}/api`;
+    } else if (path.startsWith('data/')) {
+      target = `${targetBase}/${path}`;
+    } else if (path.startsWith('conversations') || path.startsWith('chats')) {
+      target = `${targetBase}/${path}`;
+    } else {
+      target = `${targetBase}/api/${path}`;
+    }
 
     // Build fetch options
     const headers: Record<string, string> = {};
@@ -29,7 +44,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (req.headers.authorization) headers.authorization = String(req.headers.authorization);
     if (req.headers['content-type']) headers['content-type'] = String(req.headers['content-type']);
 
-    const fetchOptions: any = { method: req.method, headers, redirect: 'manual' };
+    const fetchOptions: any = { method: req.method, headers, redirect: 'follow' };
     if (req.method && req.method !== 'GET') {
       fetchOptions.body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
     }

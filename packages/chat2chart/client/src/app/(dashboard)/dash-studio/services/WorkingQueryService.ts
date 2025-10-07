@@ -114,7 +114,8 @@ class WorkingQueryService {
       let response;
       try {
         // Try project-scoped API first
-        response = await fetch(`/api/data/api/organizations/${organizationId}/projects/${projectId}/data-sources/${dataSourceId}/data`);
+        // backend expects /data/api/..., so proxy should forward /data/... directly
+        response = await fetch(`/api/data/organizations/${organizationId}/projects/${projectId}/data-sources/${dataSourceId}/data`);
         if (!response.ok) {
           throw new Error(`Project-scoped API failed: ${response.status}`);
         }
