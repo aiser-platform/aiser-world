@@ -41,7 +41,7 @@ const CubeIntegrationTest: React.FC = () => {
     const checkCubeStatus = async () => {
         setLoading(true);
         try {
-            const response = await fetch('http://localhost:8000/data/cube-status');
+            const response = await fetch('/api/data/cube-status');
             if (response.ok) {
                 const result = await response.json();
                 setCubeStatus(result.cube_status);
@@ -70,7 +70,7 @@ const CubeIntegrationTest: React.FC = () => {
 
     const getDeployedCubes = async () => {
         try {
-            const response = await fetch('http://localhost:8000/data/cube-cubes');
+            const response = await fetch('/api/data/cube-cubes');
             if (response.ok) {
                 const result = await response.json();
                 setDeployedCubes(result.cubes || []);

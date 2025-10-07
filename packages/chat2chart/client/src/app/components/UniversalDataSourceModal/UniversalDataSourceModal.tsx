@@ -31,7 +31,7 @@ import { environment, getCubeJsAuthHeader } from '@/config/environment';
 // Resolve backend URL based on runtime hostname (localhost dev vs deployed)
 import { getBackendUrlForApi } from '@/utils/backendUrl';
 const backendUrl = typeof window !== 'undefined' && window.location.hostname === 'localhost'
-    ? 'http://localhost:8000'
+    ? '/api'
 : (environment?.api?.baseUrl || getBackendUrlForApi());
 import { useOrganization } from '@/context/OrganizationContext';
 
@@ -3096,7 +3096,7 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
             
             // Try to create in backend first
             try {
-                const backendUrl = typeof window !== 'undefined' && window.location.hostname === 'localhost' ? 'http://localhost:8000' : '';
+                const backendUrl = typeof window !== 'undefined' && window.location.hostname === 'localhost' ? '/api' : '';
                 const response = await fetch(`${backendUrl}/data/api/organizations/${organizationId}/projects/${projectId}/data-sources`, {
                     method: 'POST',
                     headers: {

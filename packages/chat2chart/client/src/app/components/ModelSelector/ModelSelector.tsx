@@ -82,7 +82,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
     const testModelConnection = async (modelId: string) => {
         setTestingModel(modelId);
         try {
-            const response = await fetch(`http://localhost:8000/ai/model-status?model_id=${modelId}`);
+            const response = await fetch(`/api/ai/model-status?model_id=${modelId}`);
             const data = await response.json();
             
             setModelStatus(prev => ({
@@ -102,7 +102,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
 
     const handleModelChange = async (modelId: string) => {
         try {
-            const response = await fetch('http://localhost:8000/ai/set-default-model', {
+            const response = await fetch('/api/ai/set-default-model', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ model_id: modelId })
