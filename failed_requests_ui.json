@@ -1,0 +1,7 @@
+[
+  {
+    "url": "http://localhost:3000/login?_rsc=1iwkq",
+    "method": "GET",
+    "failure": "net::ERR_ABORTED"
+  }
+]

@@ -1,0 +1,162 @@
+[
+  {
+    "type": "log",
+    "text": "🔄 AuthContext: Initializing authentication..."
+  },
+  {
+    "type": "log",
+    "text": "🔍 AuthContext: Attempting token-based auth check (localStorage)"
+  },
+  {
+    "type": "log",
+    "text": "🔍 AuthContext: Falling back to cookie-based proxy /api/auth/users/me"
+  },
+  {
+    "type": "debug",
+    "text": "🔍 AuthContext: document.cookie (client-visible): "
+  },
+  {
+    "type": "error",
+    "text": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+  },
+  {
+    "type": "debug",
+    "text": "🔍 AuthContext: cookie-proxy response status (proxy): 403 ok= false"
+  },
+  {
+    "type": "log",
+    "text": "🔍 AuthContext: Auth check (proxy) response status: 403"
+  },
+  {
+    "type": "log",
+    "text": "⚠️ AuthContext: proxy check failed, trying Authorization header fallback"
+  },
+  {
+    "type": "debug",
+    "text": "🔁 AuthContext: initialization complete {user: false, initialized: true, loading: false}"
+  },
+  {
+    "type": "debug",
+    "text": "ProtectRoute: state {initialized: false, loading: true, isAuthenticated: false, pathname: /chat}"
+  },
+  {
+    "type": "log",
+    "text": "🔄 AuthContext: Initializing authentication..."
+  },
+  {
+    "type": "log",
+    "text": "🔍 AuthContext: Attempting token-based auth check (localStorage)"
+  },
+  {
+    "type": "log",
+    "text": "🔍 AuthContext: Falling back to cookie-based proxy /api/auth/users/me"
+  },
+  {
+    "type": "debug",
+    "text": "🔍 AuthContext: document.cookie (client-visible): "
+  },
+  {
+    "type": "debug",
+    "text": "🔍 AuthContext: cookie-proxy response status (proxy): 200 ok= true"
+  },
+  {
+    "type": "log",
+    "text": "🔍 AuthContext: Auth check (proxy) response status: 200"
+  },
+  {
+    "type": "log",
+    "text": "✅ AuthContext: User authenticated (proxy): {username: admin, email: admin@aiser.app, id: 81d6c774-af74-43b4-a6c1-559ae47de048}"
+  },
+  {
+    "type": "debug",
+    "text": "🔁 AuthContext: initialization complete {user: false, initialized: true, loading: false}"
+  },
+  {
+    "type": "debug",
+    "text": "ProtectRoute: early pass-through, user authenticated"
+  },
+  {
+    "type": "error",
+    "text": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+  },
+  {
+    "type": "log",
+    "text": "Loaded data sources from backend: [Object, Object]"
+  },
+  {
+    "type": "log",
+    "text": "Loaded saved data sources: []"
+  },
+  {
+    "type": "log",
+    "text": "Loaded data sources from backend: [Object, Object]"
+  },
+  {
+    "type": "log",
+    "text": "Loaded saved data sources: []"
+  },
+  {
+    "type": "log",
+    "text": "Loaded data sources from backend: [Object, Object]"
+  },
+  {
+    "type": "log",
+    "text": "Loaded saved data sources: []"
+  },
+  {
+    "type": "error",
+    "text": "Failed to load resource: the server responded with a status of 500 (Internal Server Error)"
+  },
+  {
+    "type": "error",
+    "text": "Error fetching projects: Error: Failed to fetch projects\n    at k (http://localhost:3000/_next/static/chunks/app/(dashboard)/layout-6f53c3e6418a5e32.js:1:39838)\n    at async w (http://localhost:3000/_next/static/chunks/app/(dashboard)/layout-6f53c3e6418a5e32.js:1:39357)\n    at async Promise.all (index 0)\n    at async _ (http://localhost:3000/_next/static/chunks/app/(dashboard)/layout-6f53c3e6418a5e32.js:1:39129)"
+  },
+  {
+    "type": "log",
+    "text": "Loaded data sources from backend: [Object, Object]"
+  },
+  {
+    "type": "log",
+    "text": "Loaded saved data sources: []"
+  },
+  {
+    "type": "log",
+    "text": "Loaded data sources from backend: [Object, Object]"
+  },
+  {
+    "type": "log",
+    "text": "Loaded saved data sources: []"
+  },
+  {
+    "type": "log",
+    "text": "Loaded data sources from backend: [Object, Object]"
+  },
+  {
+    "type": "log",
+    "text": "Loaded saved data sources: []"
+  },
+  {
+    "type": "log",
+    "text": "Loaded data sources from backend: [Object, Object]"
+  },
+  {
+    "type": "log",
+    "text": "Loaded saved data sources: []"
+  },
+  {
+    "type": "log",
+    "text": "Loaded data sources from backend: [Object, Object]"
+  },
+  {
+    "type": "log",
+    "text": "Loaded saved data sources: []"
+  },
+  {
+    "type": "log",
+    "text": "Loaded data sources from backend: [Object, Object]"
+  },
+  {
+    "type": "log",
+    "text": "Loaded saved data sources: []"
+  }
+]

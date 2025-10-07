@@ -31,6 +31,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       target = `${targetBase}/api`;
     } else if (path.startsWith('data/')) {
       target = `${targetBase}/${path}`;
+    } else if (path.startsWith('ai/')) {
+      // AI endpoints are top-level on the backend (e.g. /ai/models)
+      target = `${targetBase}/${path}`;
     } else if (path.startsWith('conversations') || path.startsWith('chats')) {
       target = `${targetBase}/${path}`;
     } else {
