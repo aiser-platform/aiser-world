@@ -1532,19 +1532,18 @@
 
 /* Chat Input Area - Fixed Position */
 .chat-input-area {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    /* Use sticky so the input stays visible within the chat container while allowing the header to remain fixed */
+    position: sticky;
+    bottom: env(safe-area-inset-bottom, 0);
     background: var(--background);
     border-top: 1px solid var(--border-color);
-    padding: 12px 24px;
-    z-index: 1200;
-    box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.08);
+    padding: 12px 20px;
+    z-index: 120;
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.04);
 }
 
-/* Add spacing at the bottom of chat messages so last messages are not hidden under fixed input */
-.chat-messages { padding-bottom: 120px; }
+/* Ensure last messages are visible above the sticky input area */
+.chat-messages { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0)); }
 
 /* Message Container - Better Spacing */
 .message-container {
