@@ -43,7 +43,7 @@ export const LayoutHeader: React.FC<Props> = ({
                 borderBottom: `1px solid ${isDarkMode ? '#303030' : '#f0f0f0'}`,
             }}
         >
-            <div className="header-left flex items-center space-x-4" style={{ alignItems: 'center' }}>
+            <div className="header-left flex items-center space-x-2" style={{ alignItems: 'center' }}>
                 {/* Sidebar toggle (left of project selector) */}
                 <Tooltip title={collapsed ? 'Open sidebar' : 'Collapse sidebar'}>
                     <Button
@@ -67,9 +67,9 @@ export const LayoutHeader: React.FC<Props> = ({
             {/* spacer pushes header-right group to the far right */}
             <div style={{ flex: 1 }} />
 
-            <div className="header-right flex items-center space-x-2">
+            <div className="header-right flex items-center" style={{ gap: 8, alignItems: 'center' }}>
                 {/* Mode selector and AI Model selector in header for quick access */}
-                <div style={{ marginRight: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     <div style={{ width: 160 }}>
                         <ModeSelector
                             value={typeof window !== 'undefined' ? (localStorage.getItem('chat_mode') || 'standard') : 'standard'}
@@ -84,46 +84,44 @@ export const LayoutHeader: React.FC<Props> = ({
                         <ModelSelector onModelChange={() => {}} showCostInfo={false} compact={true} />
                     </div>
                 </div>
+
                 {/* GitHub Issue Buttons */}
-                <Tooltip title="🐛 Report Bug - Opens GitHub issue">
-                    <Button
-                        type="text"
-                        icon={<BugOutlined />}
-                        onClick={() => window.open('https://github.com/aiser-platform/aiser-world/issues/new?assignees=&labels=bug&projects=aiser-platform/2&template=bug_report.yml&title=%5BBUG%5D%3A+', '_blank')}
-                        style={{
-                            fontSize: '16px',
-                            width: 40,
-                            height: 40,
-                        }}
-                        className="hover:bg-gray-100"
-                    />
-                </Tooltip>
-                
-                <Tooltip title="✨ Request Feature - Opens GitHub issue">
-                    <Button
-                        type="text"
-                        icon={<StarOutlined />}
-                        onClick={() => window.open('https://github.com/aiser-platform/aiser-world/issues/new?assignees=&labels=enhancement&projects=aiser-platform/2&template=feature_request.yml&title=%5BFEATURE%5D%3A+', '_blank')}
-                        style={{
-                            fontSize: '16px',
-                            width: 40,
-                            height: 40,
-                        }}
-                        
-                    />
-                </Tooltip>
-                
-                <Tooltip title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
-                    <Button
-                        type="text"
-                        icon={isDarkMode ? <SunOutlined /> : <MoonOutlined />}
-                        onClick={() => setIsDarkMode(!isDarkMode)}
-                        aria-label={isDarkMode ? 'Light mode' : 'Dark mode'}
-                        style={{ fontSize: '16px', width: 40, height: 40 }}
-                    />
-                </Tooltip>
-                {/* hide text in profile when in header to avoid duplicate admin text */}
-                <UserProfileDropdown showText={false} />
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <Tooltip title="🐛 Report Bug - Opens GitHub issue">
+                        <Button
+                            type="text"
+                            icon={<BugOutlined />}
+                            onClick={() => window.open('https://github.com/aiser-platform/aiser-world/issues/new?assignees=&labels=bug&projects=aiser-platform/2&template=bug_report.yml&title=%5BBUG%5D%3A+', '_blank')}
+                            style={{ fontSize: '16px', width: 40, height: 40 }}
+                            className="hover:bg-gray-100"
+                        />
+                    </Tooltip>
+
+                    <Tooltip title="✨ Request Feature - Opens GitHub issue">
+                        <Button
+                            type="text"
+                            icon={<StarOutlined />}
+                            onClick={() => window.open('https://github.com/aiser-platform/aiser-world/issues/new?assignees=&labels=enhancement&projects=aiser-platform/2&template=feature_request.yml&title=%5BFEATURE%5D%3A+', '_blank')}
+                            style={{ fontSize: '16px', width: 40, height: 40 }}
+                        />
+                    </Tooltip>
+                </div>
+
+                {/* Theme toggle + profile grouped to ensure adjacency */}
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                    <Tooltip title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
+                        <Button
+                            type="text"
+                            icon={isDarkMode ? <SunOutlined /> : <MoonOutlined />}
+                            onClick={() => setIsDarkMode(!isDarkMode)}
+                            aria-label={isDarkMode ? 'Light mode' : 'Dark mode'}
+                            style={{ fontSize: '16px', width: 40, height: 40 }}
+                        />
+                    </Tooltip>
+
+                    {/* hide text in profile when in header to avoid duplicate admin text */}
+                    <UserProfileDropdown showText={false} />
+                </div>
             </div>
         </Layout.Header>
     );
