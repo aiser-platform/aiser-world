@@ -3098,7 +3098,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                     </div>
 
                     {/* Mode selector placed just below the input for per-chat control */}
-                    <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: 8 }}>
+                    <div className="mode-selector-sticky" style={{ position: 'sticky', bottom: 'calc(96px + env(safe-area-inset-bottom, 0))', zIndex: 121, marginTop: 8 }}>
                         <ModeSelector
                             value={mode}
                             onChange={(v: string) => { try { setMode(v); localStorage.setItem('chat_mode', v); } catch (e) {} }}
@@ -3118,16 +3118,8 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                     {/* Quick Actions - Full Width Modern Design */}
                     <div className="quick-actions-modern">
                         <div className="action-group" style={{ width: 240 }}>
-                            {/* ModeSelector placed below input for per-chat control */}
-                            <div style={{ width: 240 }}>
-                                <ModeSelector
-                                    value={mode}
-                                    onChange={(v: string) => {
-                                        try { setMode(v); localStorage.setItem('chat_mode', v); } catch (e) {}
-                                        try { window.dispatchEvent(new CustomEvent('chat_mode_changed', { detail: v })); } catch (e) {}
-                                    }}
-                                />
-                            </div>
+                            {/* Placeholder for alignment - ModeSelector is sticky near input */}
+                            <div style={{ width: 240 }} />
                         </div>
                         
 

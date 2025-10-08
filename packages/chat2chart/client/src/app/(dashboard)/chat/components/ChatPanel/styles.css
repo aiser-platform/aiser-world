@@ -65,6 +65,10 @@
     background: var(--background);
     scroll-behavior: smooth;
 }
+.mode-selector-sticky {
+    display: block;
+    width: 240px;
+}
 
 .chat-messages::-webkit-scrollbar {
     width: 6px;
