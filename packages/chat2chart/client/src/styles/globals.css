@@ -196,6 +196,19 @@ body {
     align-items: center !important;
 }
 
+/* Prevent header items wrapping and keep icons on a single line */
+.ant-layout-header {
+    flex-wrap: nowrap !important;
+}
+
+.header-left, .header-right {
+    white-space: nowrap;
+}
+
+.header-right > * {
+    flex: 0 0 auto;
+}
+
 .header-left { display: flex; align-items: center; gap: 10px; }
 .header-right { display: flex; align-items: center; gap: 6px; }
 .header-title { font-size: 17px; font-weight: 600; color: var(--heading-color); margin-left: 10px; }
