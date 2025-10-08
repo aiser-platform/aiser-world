@@ -11,8 +11,6 @@ import { Button, Layout, theme, Tooltip } from 'antd';
 import UserProfileDropdown from '@/components/UserProfileDropdown';
 import { useThemeMode } from '@/components/Providers/ThemeModeContext';
 import ProjectSelector from '@/app/(dashboard)/chat/components/ProjectSelector/ProjectSelector';
-import ModelSelector from '@/app/components/ModelSelector/ModelSelector';
-import ModeSelector from '@/app/components/ModeSelector/ModeSelector';
 
 type Props = {
     isBreakpoint: boolean;
@@ -68,22 +66,7 @@ export const LayoutHeader: React.FC<Props> = ({
             <div style={{ flex: 1 }} />
 
             <div className="header-right flex items-center" style={{ gap: 8, alignItems: 'center' }}>
-                {/* Mode selector and AI Model selector in header for quick access */}
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <div style={{ width: 160 }}>
-                        <ModeSelector
-                            value={typeof window !== 'undefined' ? (localStorage.getItem('chat_mode') || 'standard') : 'standard'}
-                            onChange={(v: string) => {
-                                try { localStorage.setItem('chat_mode', v); } catch (e) {}
-                                try { window.dispatchEvent(new CustomEvent('chat_mode_changed', { detail: v })); } catch (e) {}
-                            }}
-                            disabled={false}
-                        />
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center' }}>
-                        <ModelSelector onModelChange={() => {}} showCostInfo={false} compact={true} />
-                    </div>
-                </div>
+                {/* Header left intentionally minimal: only action icons and profile */}
 
                 {/* GitHub Issue Buttons */}
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
