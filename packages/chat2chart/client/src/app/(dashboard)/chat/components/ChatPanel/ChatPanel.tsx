@@ -3071,6 +3071,14 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                         </div>
                     </div>
 
+                    {/* Mode selector placed just below the input for per-chat control */}
+                    <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: 8 }}>
+                        <ModeSelector
+                            value={mode}
+                            onChange={(v: string) => { try { setMode(v); localStorage.setItem('chat_mode', v); } catch (e) {} }}
+                        />
+                    </div>
+
                     {/* Voice Status Indicator */}
                     {isRecording && (
                         <div className="voice-recording-status">
