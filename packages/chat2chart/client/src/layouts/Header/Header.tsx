@@ -80,7 +80,7 @@ export const LayoutHeader: React.FC<Props> = ({
                             disabled={false}
                         />
                     </div>
-                    <div>
+                    <div style={{ display: 'flex', alignItems: 'center' }}>
                         <ModelSelector onModelChange={() => {}} showCostInfo={false} compact={true} />
                     </div>
                 </div>
