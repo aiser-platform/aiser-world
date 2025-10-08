@@ -31,6 +31,7 @@
     --panel-background: var(--ant-color-bg-container, #ffffff);
     --header-background: #ffffff;
     --input-background: #ffffff;
+    --header-height: 56px;
 
     /* UI Elements */
     --border-radius-base: 2px;

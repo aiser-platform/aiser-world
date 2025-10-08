@@ -900,6 +900,13 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
             if (isNearBottom) {
                 containerRef.current.scrollTop = containerRef.current.scrollHeight;
             }
+            // Ensure focus/visibility for the input area when new messages arrive
+            try {
+                const textarea = document.querySelector('.chat-textarea') as HTMLTextAreaElement | null;
+                if (textarea) textarea.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            } catch (e) {
+                // ignore
+            }
         }
     };
 
@@ -2935,7 +2942,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
             </div>
 
             {/* Chat Messages Area */}
-            <div className="chat-messages" ref={containerRef}>
+            <div className="chat-messages" ref={containerRef} role="log" aria-live="polite">
                 {renderWelcomeMessage()}
                 {renderMessages()}
                 
