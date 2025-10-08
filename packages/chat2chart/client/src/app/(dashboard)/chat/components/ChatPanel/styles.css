@@ -1545,6 +1545,11 @@
 /* Ensure last messages are visible above the sticky input area */
 .chat-messages { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0)); }
 
+/* Jump to bottom button */
+.jump-to-bottom .ant-btn {
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+}
+
 /* Message Container - Better Spacing */
 .message-container {
     margin-bottom: 24px;

@@ -162,6 +162,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
     const [inputValue, setInputValue] = React.useState<string>('');
     const [aiVoiceEnabled, setAiVoiceEnabled] = React.useState<boolean>(false);
     const [isAiSpeaking, setIsAiSpeaking] = React.useState<boolean>(false);
+    const [showJumpToBottom, setShowJumpToBottom] = React.useState<boolean>(false);
     
 
 
@@ -909,6 +910,18 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
             }
         }
     };
+
+    // Track user scroll to show Jump-to-bottom indicator
+    useEffect(() => {
+        const el = containerRef.current;
+        if (!el) return;
+        const onScroll = () => {
+            const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+            setShowJumpToBottom(!atBottom);
+        };
+        el.addEventListener('scroll', onScroll);
+        return () => el.removeEventListener('scroll', onScroll);
+    }, []);
 
     const abortControllerRef = React.useRef<AbortController | null>(null);
     const activeRequestRef = React.useRef<string | null>(null);
@@ -2967,6 +2980,12 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                         </div>
                     </div>
                 )}
+            {/* Jump to bottom indicator */}
+            {showJumpToBottom && (
+                <div className="jump-to-bottom" style={{ position: 'fixed', right: 24, bottom: 'calc(96px + env(safe-area-inset-bottom, 0))', zIndex: 130 }}>
+                    <Button type="primary" shape="round" onClick={() => { containerRef.current && (containerRef.current.scrollTop = containerRef.current.scrollHeight); setShowJumpToBottom(false); }}>Jump to bottom</Button>
+                </div>
+            )}
             </div>
 
             {/* Chat Input Section */}
