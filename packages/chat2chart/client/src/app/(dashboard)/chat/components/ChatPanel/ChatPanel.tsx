@@ -3025,7 +3025,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                             value={inputValue}
                             onChange={(e) => setInputValue(e.target.value)}
                             placeholder="Ask me anything about your data... (Shift+Enter for new line)"
-                            autoSize={{ minRows: 3, maxRows: 6 }}
+                        autoSize={{ minRows: 4, maxRows: 10 }}
                             onPressEnter={(e) => {
                                 if (!e.shiftKey) {
                                     e.preventDefault();
@@ -3035,6 +3035,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                             className="chat-textarea"
                         aria-label="Chat input"
                         data-test-id="chat-input"
+                        style={{ minHeight: 64, resize: 'vertical' }}
                         />
                         
                         {/* Input Actions - Full Width */}

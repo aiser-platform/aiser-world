@@ -105,9 +105,9 @@ const Navigation: React.FC<NavigationProps> = (props: NavigationProps) => {
             style={{
                 background: isDarkMode ? '#1f1f1f' : '#ffffff',
                 borderRight: `1px solid ${isDarkMode ? '#303030' : '#f0f0f0'}`,
-                width: props.collapsed ? 64 : 220,
-                minWidth: props.collapsed ? 64 : 220,
-                maxWidth: props.collapsed ? 64 : 220,
+                width: props.collapsed ? 64 : 200,
+                minWidth: props.collapsed ? 64 : 200,
+                maxWidth: props.collapsed ? 64 : 200,
                 transition: 'width 0.2s ease'
             }}
         >
