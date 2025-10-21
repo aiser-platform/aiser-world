@@ -6,57 +6,57 @@
 }
 
 .dashboard-config-panel .ant-card {
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-radius: var(--border-radius-md);
+  box-shadow: var(--shadow-sm);
 }
 
 .dashboard-config-panel .ant-tabs-tab {
-  font-size: 13px;
-  font-weight: 500;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
 }
 
 .dashboard-config-panel .ant-tabs-content {
-  padding: 16px 0;
+  padding: var(--spacing-md) 0;
 }
 
 /* Section Headers */
 .dashboard-config-section {
-  margin-bottom: 24px;
+  margin-bottom: var(--spacing-lg);
 }
 
 .section-header {
   display: flex;
   align-items: center;
-  margin-bottom: 16px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #f0f0f0;
+  margin-bottom: var(--spacing-md);
+  padding-bottom: var(--spacing-xs);
+  border-bottom: 1px solid var(--color-border-primary);
 }
 
 .section-icon {
-  margin-right: 8px;
-  color: #1890ff;
-  font-size: 16px;
+  margin-right: var(--spacing-xs);
+  color: var(--color-brand-primary);
+  font-size: var(--font-size-md);
 }
 
 .section-header span {
-  font-weight: 600;
-  color: #262626;
-  font-size: 14px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
 }
 
 /* Configuration Rows */
 .config-row {
   display: flex;
   align-items: center;
-  margin-bottom: 12px;
-  gap: 12px;
+  margin-bottom: var(--spacing-sm);
+  gap: var(--spacing-sm);
 }
 
 .config-label {
   min-width: 120px;
-  font-size: 12px;
-  color: #595959;
-  font-weight: 500;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-medium);
 }
 
 .config-row .ant-input,
@@ -78,19 +78,19 @@
 .quick-layouts {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 12px;
+  gap: var(--spacing-xs);
+  margin-top: var(--spacing-sm);
 }
 
 .quick-layouts .ant-btn {
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   height: 28px;
-  padding: 0 12px;
+  padding: 0 var(--spacing-sm);
 }
 
 /* Widget Management */
 .widget-actions {
-  margin-bottom: 16px;
+  margin-bottom: var(--spacing-md);
 }
 
 .widget-list {
@@ -99,18 +99,18 @@
 }
 
 .widget-item {
-  transition: all 0.2s ease;
-  border: 1px solid #f0f0f0;
+  transition: all var(--transition-base);
+  border: 1px solid var(--color-border-primary);
 }
 
 .widget-item:hover {
-  border-color: #d9d9d9;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-color: var(--color-border-secondary);
+  box-shadow: var(--shadow-sm);
 }
 
 .widget-item.selected {
-  border-color: #1890ff;
-  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+  border-color: var(--color-brand-primary);
+  box-shadow: 0 0 0 2px var(--color-brand-primary-light);
 }
 
 .widget-header {
@@ -124,43 +124,43 @@
 }
 
 .widget-title {
-  font-weight: 500;
-  color: #262626;
-  margin-bottom: 4px;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacing-xs);
 }
 
 .widget-type {
   display: flex;
-  gap: 4px;
+  gap: var(--spacing-xs);
 }
 
 .widget-controls {
   display: flex;
-  gap: 4px;
+  gap: var(--spacing-xs);
 }
 
 .widget-controls .ant-btn {
-  padding: 2px 4px;
+  padding: var(--spacing-xs);
   height: 24px;
   min-width: 24px;
 }
 
 .widget-details {
-  margin-top: 12px;
+  margin-top: var(--spacing-sm);
 }
 
 .widget-details .config-row {
-  margin-bottom: 8px;
+  margin-bottom: var(--spacing-xs);
 }
 
 .widget-details .config-label {
   min-width: 80px;
-  font-size: 11px;
+  font-size: var(--font-size-xs);
 }
 
 /* Filter Management */
 .filter-actions {
-  margin-bottom: 16px;
+  margin-bottom: var(--spacing-md);
 }
 
 .filter-list {
@@ -179,49 +179,49 @@
 }
 
 .filter-title {
-  font-weight: 500;
-  color: #262626;
-  margin-bottom: 4px;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacing-xs);
 }
 
 .filter-type {
   display: flex;
-  gap: 4px;
+  gap: var(--spacing-xs);
 }
 
 .filter-controls {
   display: flex;
-  gap: 4px;
+  gap: var(--spacing-xs);
 }
 
 .filter-controls .ant-btn {
-  padding: 2px 4px;
+  padding: var(--spacing-xs);
   height: 24px;
   min-width: 24px;
 }
 
 .filter-details {
-  margin-top: 12px;
+  margin-top: var(--spacing-sm);
 }
 
 .filter-details .config-row {
-  margin-bottom: 8px;
+  margin-bottom: var(--spacing-xs);
 }
 
 .filter-details .config-label {
   min-width: 100px;
-  font-size: 11px;
+  font-size: var(--font-size-xs);
 }
 
 /* Action Buttons */
 .action-buttons {
   display: flex;
   justify-content: center;
-  margin-top: 16px;
+  margin-top: var(--spacing-md);
 }
 
 .action-buttons .ant-space {
-  gap: 12px;
+  gap: var(--spacing-sm);
 }
 
 /* Color Picker Enhancements */
@@ -233,93 +233,93 @@
 .ant-color-picker .ant-color-picker-trigger {
   width: 100%;
   height: 100%;
-  border-radius: 4px;
+  border-radius: var(--border-radius-xs);
 }
 
 /* Slider Enhancements */
 .ant-slider {
-  margin: 8px 0;
+  margin: var(--spacing-xs) 0;
 }
 
 .ant-slider .ant-slider-track {
-  background-color: #1890ff;
+  background-color: var(--color-brand-primary);
 }
 
 .ant-slider .ant-slider-handle {
-  border-color: #1890ff;
+  border-color: var(--color-brand-primary);
 }
 
 /* Input Enhancements */
 .ant-input,
 .ant-select,
 .ant-input-number {
-  border-radius: 4px;
+  border-radius: var(--border-radius-xs);
 }
 
 .ant-input:focus,
 .ant-select:focus,
 .ant-input-number:focus {
-  border-color: #1890ff;
-  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+  border-color: var(--color-brand-primary);
+  box-shadow: 0 0 0 2px var(--color-brand-primary-light);
 }
 
 /* Switch Enhancements */
 .ant-switch-checked {
-  background-color: #1890ff;
+  background-color: var(--color-brand-primary);
 }
 
 /* Tag Enhancements */
 .ant-tag {
-  border-radius: 4px;
-  font-size: 10px;
-  padding: 2px 6px;
+  border-radius: var(--border-radius-xs);
+  font-size: var(--font-size-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
   height: 20px;
   line-height: 16px;
 }
 
 /* Divider Enhancements */
 .ant-divider {
-  margin: 16px 0;
-  border-color: #f0f0f0;
+  margin: var(--spacing-md) 0;
+  border-color: var(--color-border-primary);
 }
 
 /* Card Enhancements */
 .ant-card {
-  border-radius: 6px;
+  border-radius: var(--border-radius-sm);
 }
 
 .ant-card-head {
-  border-bottom: 1px solid #f0f0f0;
-  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border-primary);
+  padding: var(--spacing-sm) var(--spacing-md);
 }
 
 .ant-card-head-title {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
 }
 
 .ant-card-body {
-  padding: 16px;
+  padding: var(--spacing-md);
 }
 
 /* Tabs Enhancements */
 .ant-tabs-tab {
-  padding: 8px 16px;
-  margin: 0 4px 0 0;
+  padding: var(--spacing-xs) var(--spacing-md);
+  margin: 0 var(--spacing-xs) 0 0;
 }
 
 .ant-tabs-tab-active {
-  background-color: #f6ffed;
-  border-radius: 6px 6px 0 0;
+  background-color: var(--color-functional-success-light);
+  border-radius: var(--border-radius-sm) var(--border-radius-sm) 0 0;
 }
 
 .ant-tabs-tab-active .ant-tabs-tab-btn {
-  color: #52c41a;
-  font-weight: 500;
+  color: var(--color-functional-success);
+  font-weight: var(--font-weight-medium);
 }
 
 .ant-tabs-ink-bar {
-  background-color: #52c41a;
+  background-color: var(--color-functional-success);
 }
 
 /* Responsive Design */
@@ -327,12 +327,12 @@
   .config-row {
     flex-direction: column;
     align-items: flex-start;
-    gap: 8px;
+    gap: var(--spacing-xs);
   }
   
   .config-label {
     min-width: auto;
-    margin-bottom: 4px;
+    margin-bottom: var(--spacing-xs);
   }
   
   .widget-controls,
@@ -350,52 +350,6 @@
   }
 }
 
-/* Dark Mode Support */
-@media (prefers-color-scheme: dark) {
-  .dashboard-config-panel .ant-card {
-    background-color: #1f1f1f;
-    border-color: #434343;
-  }
-  
-  .section-header {
-    border-bottom-color: #434343;
-  }
-  
-  .section-header span {
-    color: #ffffff;
-  }
-  
-  .config-label {
-    color: #d9d9d9;
-  }
-  
-  .widget-item {
-    background-color: #1f1f1f;
-    border-color: #434343;
-  }
-  
-  .widget-item:hover {
-    border-color: #595959;
-  }
-  
-  .widget-title,
-  .filter-title {
-    color: #ffffff;
-  }
-  
-  .ant-tabs-tab {
-    color: #d9d9d9;
-  }
-  
-  .ant-tabs-tab-active {
-    background-color: #1f1f1f;
-  }
-  
-  .ant-tabs-tab-active .ant-tabs-tab-btn {
-    color: #52c41a;
-  }
-}
-
 /* Scrollbar Styling */
 .dashboard-config-panel::-webkit-scrollbar,
 .widget-list::-webkit-scrollbar,
@@ -406,40 +360,40 @@
 .dashboard-config-panel::-webkit-scrollbar-track,
 .widget-list::-webkit-scrollbar-track,
 .filter-list::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 3px;
+  background: var(--color-surface-raised);
+  border-radius: var(--border-radius-xs);
 }
 
 .dashboard-config-panel::-webkit-scrollbar-thumb,
 .widget-list::-webkit-scrollbar-thumb,
 .filter-list::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
-  border-radius: 3px;
+  background: var(--color-border-secondary);
+  border-radius: var(--border-radius-xs);
 }
 
 .dashboard-config-panel::-webkit-scrollbar-thumb:hover,
 .widget-list::-webkit-scrollbar-thumb:hover,
 .filter-list::-webkit-scrollbar-thumb:hover {
-  background: #a8a8a8;
+  background: var(--color-text-tertiary);
 }
 
 /* Animation Enhancements */
 .widget-item,
 .filter-item {
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all var(--transition-base);
 }
 
 .config-row .ant-input:focus,
 .config-row .ant-select:focus,
 .config-row .ant-input-number:focus {
   transform: translateY(-1px);
-  transition: transform 0.2s ease;
+  transition: transform var(--transition-base);
 }
 
 /* Focus States */
 .widget-item:focus-within,
 .filter-item:focus-within {
-  outline: 2px solid #1890ff;
+  outline: 2px solid var(--color-brand-primary);
   outline-offset: 2px;
 }
 
@@ -457,8 +411,8 @@
   width: 20px;
   height: 20px;
   margin: -10px 0 0 -10px;
-  border: 2px solid #f3f3f3;
-  border-top: 2px solid #1890ff;
+  border: 2px solid var(--color-surface-raised);
+  border-top: 2px solid var(--color-brand-primary);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }

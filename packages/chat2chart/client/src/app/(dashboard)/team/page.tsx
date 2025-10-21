@@ -107,10 +107,10 @@ export default function TeamManagementPage() {
                         <div>
                             <Text strong>{record.username}</Text>
                             {record.role === 'admin' && (
-                                <CrownOutlined style={{ marginLeft: 8, color: '#faad14' }} />
+                                <CrownOutlined style={{ marginLeft: 8, color: 'var(--color-functional-warning)' }} />
                             )}
                         </div>
-                        <Text type="secondary" style={{ fontSize: '12px' }}>
+                        <Text type="secondary" style={{ fontSize: 'var(--font-size-sm)' }}>
                             {record.email}
                         </Text>
                     </div>
@@ -181,12 +181,12 @@ export default function TeamManagementPage() {
                 <Col span={6}>
                     <Card>
                         <div style={{ textAlign: 'center' }}>
-                            <TeamOutlined style={{ fontSize: 32, color: '#1890ff', marginBottom: 8 }} />
+                            <TeamOutlined style={{ fontSize: 32, color: 'var(--color-brand-primary)', marginBottom: 8 }} />
                             <div>
                                 <div style={{ fontSize: '24px', fontWeight: 'bold' }}>
                                     {teamMembers.length}
                                 </div>
-                                <div style={{ color: '#666' }}>Team Members</div>
+                                <div style={{ color: 'var(--color-text-secondary)' }}>Team Members</div>
                             </div>
                         </div>
                     </Card>
@@ -194,12 +194,12 @@ export default function TeamManagementPage() {
                 <Col span={6}>
                     <Card>
                         <div style={{ textAlign: 'center' }}>
-                            <UserOutlined style={{ fontSize: 32, color: '#52c41a', marginBottom: 8 }} />
+                            <UserOutlined style={{ fontSize: 32, color: 'var(--color-functional-success)', marginBottom: 8 }} />
                             <div>
                                 <div style={{ fontSize: '24px', fontWeight: 'bold' }}>
                                     {teamMembers.filter(m => m.status === 'active').length}
                                 </div>
-                                <div style={{ color: '#666' }}>Active Members</div>
+                                <div style={{ color: 'var(--color-text-secondary)' }}>Active Members</div>
                             </div>
                         </div>
                     </Card>
@@ -207,12 +207,12 @@ export default function TeamManagementPage() {
                 <Col span={6}>
                     <Card>
                         <div style={{ textAlign: 'center' }}>
-                            <MailOutlined style={{ fontSize: 32, color: '#faad14', marginBottom: 8 }} />
+                            <MailOutlined style={{ fontSize: 32, color: 'var(--color-functional-warning)', marginBottom: 8 }} />
                             <div>
                                 <div style={{ fontSize: '24px', fontWeight: 'bold' }}>
                                     {teamMembers.filter(m => m.status === 'invited').length}
                                 </div>
-                                <div style={{ color: '#666' }}>Pending Invites</div>
+                                <div style={{ color: 'var(--color-text-secondary)' }}>Pending Invites</div>
                             </div>
                         </div>
                     </Card>
@@ -220,12 +220,12 @@ export default function TeamManagementPage() {
                 <Col span={6}>
                     <Card>
                         <div style={{ textAlign: 'center' }}>
-                            <CrownOutlined style={{ fontSize: 32, color: '#faad14', marginBottom: 8 }} />
+                            <CrownOutlined style={{ fontSize: 32, color: 'var(--color-functional-warning)', marginBottom: 8 }} />
                             <div>
                                 <div style={{ fontSize: '24px', fontWeight: 'bold' }}>
                                     {teamMembers.filter(m => m.role === 'admin').length}
                                 </div>
-                                <div style={{ color: '#666' }}>Admins</div>
+                                <div style={{ color: 'var(--color-text-secondary)' }}>Admins</div>
                             </div>
                         </div>
                     </Card>

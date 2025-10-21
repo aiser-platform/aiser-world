@@ -3,54 +3,59 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 
-const TestAuthPage: React.FC = () => {
-    const { user, isAuthenticated, loading, initialized } = useAuth();
-    const [authStatus, setAuthStatus] = useState<string>('Checking...');
+export default function TestAuthPage() {
+  const { user, isAuthenticated, loading, authError, initialized } = useAuth();
+  const [testResults, setTestResults] = useState<string[]>([]);
 
-    useEffect(() => {
-        if (initialized) {
-            if (isAuthenticated && user) {
-                setAuthStatus(`✅ Authenticated as: ${user.email} (${user.username})`);
-            } else {
-                setAuthStatus('❌ Not authenticated');
-            }
-        }
-    }, [initialized, isAuthenticated, user]);
+  useEffect(() => {
+    const results = [
+      `Initialized: ${initialized}`,
+      `Loading: ${loading}`,
+      `Is Authenticated: ${isAuthenticated}`,
+      `User: ${user ? JSON.stringify(user) : 'null'}`,
+      `Auth Error: ${authError || 'none'}`,
+      `Cookies: ${typeof document !== 'undefined' ? document.cookie : 'N/A'}`,
+    ];
+    setTestResults(results);
+  }, [user, isAuthenticated, loading, authError, initialized]);
 
-    return (
-        <div style={{ padding: '20px', fontFamily: 'monospace' }}>
-            <h1>Authentication Test Page</h1>
-            <div style={{ marginBottom: '20px' }}>
-                <strong>Status:</strong> {authStatus}
-            </div>
-            <div style={{ marginBottom: '20px' }}>
-                <strong>Loading:</strong> {loading ? 'Yes' : 'No'}
-            </div>
-            <div style={{ marginBottom: '20px' }}>
-                <strong>Initialized:</strong> {initialized ? 'Yes' : 'No'}
-            </div>
-            <div style={{ marginBottom: '20px' }}>
-                <strong>Is Authenticated:</strong> {isAuthenticated ? 'Yes' : 'No'}
-            </div>
-            {user && (
-                <div style={{ marginBottom: '20px' }}>
-                    <strong>User Data:</strong>
-                    <pre style={{ background: '#f5f5f5', padding: '10px', borderRadius: '4px' }}>
-                        {JSON.stringify(user, null, 2)}
-                    </pre>
-                </div>
-            )}
-            <div style={{ marginBottom: '20px' }}>
-                <strong>Instructions:</strong>
-                <ol>
-                    <li>Go to <a href="/login">/login</a> and sign in with admin@aiser.app / Admin123</li>
-                    <li>Come back to this page to see if authentication is working</li>
-                </ol>
-            </div>
-        </div>
-    );
-};
+  const testAuthEndpoint = async () => {
+    try {
+      const response = await fetch('/api/auth/users/me', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
+      
+      const data = await response.json();
+      setTestResults(prev => [...prev, `API Test: ${response.status} - ${JSON.stringify(data)}`]);
+    } catch (error) {
+      setTestResults(prev => [...prev, `API Test Error: ${error}`]);
+    }
+  };
 
-export default TestAuthPage;
-
-
+  return (
+    <div style={{ padding: '20px', fontFamily: 'monospace' }}>
+      <h1>Authentication Test Page</h1>
+      <div style={{ marginBottom: '20px' }}>
+        <button onClick={testAuthEndpoint} style={{ padding: '10px', marginRight: '10px' }}>
+          Test Auth Endpoint
+        </button>
+        <button onClick={() => window.location.href = '/login'} style={{ padding: '10px', marginRight: '10px' }}>
+          Go to Login
+        </button>
+        <button onClick={() => window.location.href = '/dash-studio'} style={{ padding: '10px' }}>
+          Go to Dashboard Studio
+        </button>
+      </div>
+      <div>
+        <h2>Auth State:</h2>
+        {testResults.map((result, index) => (
+          <div key={index} style={{ marginBottom: '5px' }}>
+            {result}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

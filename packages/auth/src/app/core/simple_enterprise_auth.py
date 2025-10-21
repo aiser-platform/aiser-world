@@ -95,20 +95,29 @@ class SimpleEnterpriseAuthService:
     async def validate_token(self, token: str, db: Session) -> Optional[SimpleUserInfo]:
         """Simple token validation - extract user ID from demo token"""
         try:
+            logger.debug(f"Validating token: {token}")
+            
             if not token.startswith("demo_token_"):
+                logger.debug("Token does not start with 'demo_token_'")
                 return None
 
             # Extract user ID from demo token
             parts = token.split("_")
             if len(parts) < 3:
+                logger.debug(f"Token has insufficient parts: {len(parts)}")
                 return None
 
-            user_id = int(parts[2])
+            user_id = parts[2]
+            logger.debug(f"Extracted user_id: {user_id}")
+            
             user = db.query(User).filter(User.id == user_id).first()
+            logger.debug(f"User query result: {user}")
 
             if not user or not user.is_active:
+                logger.debug(f"User not found or inactive: user={user}, is_active={user.is_active if user else 'N/A'}")
                 return None
 
+            logger.debug(f"Token validation successful for user: {user.username}")
             return SimpleUserInfo(user)
 
         except Exception as e:

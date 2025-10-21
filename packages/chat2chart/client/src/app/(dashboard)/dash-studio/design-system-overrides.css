@@ -1,0 +1,551 @@
+/**
+ * Dashboard Studio Design System Overrides
+ * Uses Ant Design-prioritized design tokens for consistent theming
+ */
+
+/* =================================================================
+   GLOBAL DASHBOARD STUDIO STYLES
+   ================================================================= */
+
+.dashboard-studio {
+  background: var(--ant-color-bg-layout) !important;
+  color: var(--ant-color-text) !important;
+  font-family: var(--font-family-sans) !important;
+}
+
+.dashboard-studio * {
+  font-family: inherit !important;
+}
+
+.dashboard-studio .ant-layout {
+  background: var(--ant-color-bg-layout) !important;
+}
+
+.dashboard-studio .ant-layout-content {
+  background: var(--ant-color-bg-content) !important;
+}
+
+.dashboard-studio .dashboard-content {
+  background: var(--ant-color-bg-container) !important;
+}
+
+/* =================================================================
+   HEADER STYLES
+   ================================================================= */
+
+.modern-dashboard-header {
+  background: var(--ant-color-bg-header) !important;
+  border-bottom: 1px solid var(--ant-color-border) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06) !important;
+}
+
+.modern-dashboard-header .ant-breadcrumb,
+.modern-dashboard-header .ant-space,
+.modern-dashboard-header .ant-typography {
+  color: var(--ant-color-text) !important;
+}
+
+.modern-dashboard-header .ant-btn-text {
+  color: var(--ant-color-text-secondary) !important;
+}
+
+.modern-dashboard-header .ant-btn-text:hover {
+  background: var(--ant-color-fill-secondary) !important;
+  color: var(--ant-color-text) !important;
+}
+
+/* =================================================================
+   SIDEBAR STYLES
+   ================================================================= */
+
+.modern-sidebar {
+  background: var(--ant-color-bg-sider) !important;
+  border-right: 1px solid var(--ant-color-border) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06) !important;
+}
+
+.modern-sidebar .sidebar-header {
+  background: var(--ant-color-bg-container) !important;
+  border-bottom: 1px solid var(--ant-color-border) !important;
+}
+
+.modern-sidebar .ant-layout-sider-children {
+  background: var(--ant-color-bg-sider) !important;
+}
+
+.sidebar-header {
+  background: var(--ant-color-bg-header) !important;
+  border-bottom: 1px solid var(--ant-color-border) !important;
+  padding: 16px;
+}
+
+.sidebar-header .ant-typography {
+  color: var(--ant-color-text) !important;
+}
+
+/* =================================================================
+   MAIN CONTENT AREA
+   ================================================================= */
+
+.dashboard-content {
+  background: var(--ant-color-bg-container) !important;
+  border-radius: 12px !important;
+}
+
+.dashboard-content .ant-tabs-nav {
+  background: var(--ant-color-bg-header) !important;
+  padding: 0 16px !important;
+  border-bottom: 1px solid var(--ant-color-border) !important;
+}
+
+.dashboard-content .ant-tabs-tab {
+  color: var(--ant-color-text-secondary) !important;
+}
+
+.dashboard-content .ant-tabs-tab-active {
+  color: var(--ant-primary-color) !important;
+}
+
+.dashboard-content .ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: var(--ant-primary-color) !important;
+}
+
+/* =================================================================
+   WIDGET LIBRARY - CARDS & CATEGORIES
+   ================================================================= */
+
+/* Category Headers */
+.widget-category-header {
+  background: var(--ant-color-fill-secondary) !important;
+  color: var(--ant-color-text-tertiary) !important;
+  border-radius: 6px !important;
+  padding: 4px 8px !important;
+}
+
+/* Widget Cards */
+.widget-library .ant-card,
+.widget-library-card.ant-card {
+  background: var(--ant-color-bg-container) !important;
+  border: 1px solid var(--ant-color-border) !important;
+  color: var(--ant-color-text) !important;
+  border-radius: 12px !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06) !important;
+}
+
+.widget-library .ant-card:hover,
+.widget-library-card.ant-card:hover {
+  border-color: var(--ant-primary-color) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12) !important;
+  transform: translateY(-2px) !important;
+}
+
+.widget-library .ant-card .ant-typography,
+.widget-library-card.ant-card .ant-typography,
+.widget-library .ant-card div,
+.widget-library-card.ant-card div {
+  color: var(--ant-color-text) !important;
+}
+
+.widget-library .ant-card-body,
+.widget-library-card.ant-card-body {
+  padding: 12px 8px !important;
+}
+
+/* =================================================================
+   TAB CONTENT AREAS
+   ================================================================= */
+
+/* Query Editor Tab */
+.query-editor-toolbar {
+  background: var(--ant-color-bg-header) !important;
+  border: 1px solid var(--ant-color-border) !important;
+  border-radius: 12px !important;
+  padding: 16px !important;
+}
+
+.query-editor-panel {
+  background: var(--ant-color-bg-container) !important;
+  border: 1px solid var(--ant-color-border) !important;
+  border-radius: 12px !important;
+}
+
+/* Chart Preview Tab */
+.chart-preview-panel {
+  background: var(--ant-color-bg-container) !important;
+  border: 2px solid var(--ant-primary-color) !important;
+  border-radius: 12px !important;
+  padding: 20px !important;
+}
+
+.chart-preview-panel .ant-typography {
+  color: var(--ant-color-text) !important;
+}
+
+/* Dashboard Canvas Tab */
+.dashboard-canvas {
+  background: var(--ant-color-fill-secondary) !important;
+  border: 1px solid var(--ant-color-border) !important;
+  border-radius: 12px !important;
+}
+
+.dashboard-canvas.drag-over {
+  background: var(--ant-primary-color-outline) !important;
+  border-color: var(--ant-primary-color) !important;
+  box-shadow: 0 0 0 2px var(--ant-primary-color-outline) !important;
+}
+
+/* =================================================================
+   FILTER & CONTROLS TAB
+   ================================================================= */
+
+.filter-panel {
+  background: var(--ant-color-bg-header) !important;
+  border: 1px solid var(--ant-color-border) !important;
+  border-radius: 8px !important;
+  padding: 20px !important;
+}
+
+.filter-item {
+  background: var(--ant-color-bg-container) !important;
+  border: 1px solid var(--ant-color-border) !important;
+  border-radius: 6px !important;
+  padding: 12px !important;
+}
+
+.filter-item .ant-typography {
+  color: var(--ant-color-text) !important;
+}
+
+.filter-item-description {
+  color: var(--ant-color-text-secondary) !important;
+}
+
+.filter-drop-zone {
+  background: var(--ant-color-fill-secondary) !important;
+  border: 1px dashed var(--ant-color-border-secondary) !important;
+  border-radius: 6px !important;
+  color: var(--ant-color-text-tertiary) !important;
+}
+
+/* =================================================================
+   TOOLTIPS & ICONS
+   ================================================================= */
+
+.info-icon {
+  color: var(--ant-color-text-tertiary) !important;
+}
+
+.dashboard-studio .anticon {
+  color: inherit !important;
+}
+
+/* =================================================================
+   TITLES & TEXT
+   ================================================================= */
+
+.dashboard-studio .ant-typography {
+  color: var(--ant-color-text) !important;
+}
+
+.dashboard-studio h1,
+.dashboard-studio h2,
+.dashboard-studio h3,
+.dashboard-studio h4,
+.dashboard-studio h5,
+.dashboard-studio h6 {
+  color: var(--ant-color-text) !important;
+}
+
+.dashboard-studio .ant-typography-secondary {
+  color: var(--ant-color-text-secondary) !important;
+}
+
+.dashboard-studio .ant-typography-disabled {
+  color: var(--ant-color-text-tertiary) !important;
+}
+
+/* =================================================================
+   WIDGET GRID LAYOUT
+   ================================================================= */
+
+.react-grid-item {
+  background: var(--ant-color-bg-container) !important;
+  border: 1px solid var(--ant-color-border) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06) !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.react-grid-item:hover {
+  border-color: var(--ant-primary-color) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12) !important;
+}
+
+.react-grid-item.react-grid-placeholder {
+  background: var(--ant-primary-color) !important;
+  opacity: 0.2 !important;
+  border-radius: 12px !important;
+}
+
+.react-grid-item.react-draggable-dragging {
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* =================================================================
+   EMPTY STATES
+   ================================================================= */
+
+.dashboard-empty-state {
+  color: var(--ant-color-text-tertiary) !important;
+}
+
+.dashboard-empty-state .ant-typography {
+  color: var(--ant-color-text-secondary) !important;
+}
+
+.empty-state-icon {
+  color: var(--ant-color-text-tertiary) !important;
+}
+
+/* =================================================================
+   BUTTONS & CONTROLS
+   ================================================================= */
+
+.dashboard-studio .ant-btn-default {
+  background: var(--ant-color-bg-container) !important;
+  border-color: var(--ant-color-border) !important;
+  color: var(--ant-color-text) !important;
+  border-radius: 8px !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.dashboard-studio .ant-btn-default:hover {
+  background: var(--ant-color-bg-header) !important;
+  border-color: var(--ant-primary-color) !important;
+  color: var(--ant-primary-color) !important;
+  transform: translateY(-1px) !important;
+}
+
+.dashboard-studio .ant-btn-text {
+  color: var(--ant-color-text-secondary) !important;
+}
+
+.dashboard-studio .ant-btn-text:hover {
+  background: var(--ant-color-fill-secondary) !important;
+  color: var(--ant-primary-color) !important;
+}
+
+/* Active state for toggle buttons */
+.dashboard-studio .ant-btn-text[style*="background: rgba(24, 144, 255"] {
+  background: var(--ant-primary-color-outline) !important;
+  color: var(--ant-primary-color) !important;
+}
+
+/* =================================================================
+   DIVIDERS
+   ================================================================= */
+
+.dashboard-studio .ant-divider {
+  border-color: var(--ant-color-border) !important;
+}
+
+/* =================================================================
+   MODALS
+   ================================================================= */
+
+.dashboard-studio .ant-modal-content {
+  background: var(--ant-color-bg-elevated) !important;
+  color: var(--ant-color-text) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15) !important;
+}
+
+.dashboard-studio .ant-modal-header {
+  background: var(--ant-color-bg-elevated) !important;
+  border-bottom: 1px solid var(--ant-color-border) !important;
+}
+
+.dashboard-studio .ant-modal-title {
+  color: var(--ant-color-text) !important;
+  font-weight: 600 !important;
+}
+
+.dashboard-studio .ant-modal-footer {
+  border-top: 1px solid var(--ant-color-border) !important;
+}
+
+/* =================================================================
+   DROPDOWN MENUS
+   ================================================================= */
+
+.dashboard-studio .ant-dropdown-menu {
+  background: var(--ant-color-bg-elevated) !important;
+  border: 1px solid var(--ant-color-border) !important;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12) !important;
+  border-radius: 8px !important;
+}
+
+.dashboard-studio .ant-dropdown-menu-item {
+  color: var(--ant-color-text) !important;
+  border-radius: 6px !important;
+  margin: 2px 4px !important;
+}
+
+.dashboard-studio .ant-dropdown-menu-item:hover {
+  background: var(--ant-color-fill-secondary) !important;
+}
+
+/* =================================================================
+   FORM INPUTS & SELECTS
+   ================================================================= */
+
+.dashboard-studio .ant-input,
+.dashboard-studio .ant-select-selector {
+  background: var(--ant-color-bg-container) !important;
+  border-color: var(--ant-color-border) !important;
+  color: var(--ant-color-text) !important;
+  border-radius: 8px !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.dashboard-studio .ant-input:hover,
+.dashboard-studio .ant-select-selector:hover {
+  border-color: var(--ant-primary-color) !important;
+}
+
+.dashboard-studio .ant-input:focus,
+.dashboard-studio .ant-select-focused .ant-select-selector {
+  border-color: var(--ant-primary-color) !important;
+  box-shadow: 0 0 0 2px var(--ant-primary-color-outline) !important;
+}
+
+.dashboard-studio .ant-select-dropdown {
+  background: var(--ant-color-bg-elevated) !important;
+  border: 1px solid var(--ant-color-border) !important;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12) !important;
+  border-radius: 8px !important;
+}
+
+.dashboard-studio .ant-select-item {
+  color: var(--ant-color-text) !important;
+  border-radius: 6px !important;
+  margin: 2px 4px !important;
+}
+
+.dashboard-studio .ant-select-item:hover {
+  background: var(--ant-color-fill-secondary) !important;
+}
+
+.dashboard-studio .ant-select-item-option-selected {
+  background: var(--ant-primary-color-outline) !important;
+  color: var(--ant-primary-color) !important;
+}
+
+/* =================================================================
+   LOADING STATES
+   ================================================================= */
+
+.dashboard-studio-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  font-size: 16px;
+  color: var(--ant-color-text);
+  background: var(--ant-color-bg-layout);
+}
+
+/* =================================================================
+   RESPONSIVE ADJUSTMENTS
+   ================================================================= */
+
+@media (max-width: 1024px) {
+  .dashboard-studio .modern-sidebar {
+    position: absolute;
+    z-index: 1000;
+    height: 100%;
+  }
+  
+  .dashboard-content {
+    margin-left: 0 !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .modern-dashboard-header {
+    padding: 0 12px !important;
+  }
+  
+  .modern-dashboard-header .header-center {
+    display: none;
+  }
+  
+  .widget-library .ant-card {
+    margin-bottom: 8px;
+  }
+  
+  .filter-grid {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .dashboard-studio .ant-btn {
+    min-height: 44px !important;
+    font-size: 16px !important;
+  }
+  
+  .dashboard-studio .ant-input,
+  .dashboard-studio .ant-select-selector {
+    min-height: 44px !important;
+    font-size: 16px !important;
+  }
+}
+
+/* =================================================================
+   ACCESSIBILITY
+   ================================================================= */
+
+.dashboard-studio *:focus-visible {
+  outline: 2px solid var(--ant-primary-color) !important;
+  outline-offset: 2px !important;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .dashboard-studio .ant-card,
+  .dashboard-studio .ant-btn {
+    border-width: 2px !important;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-studio *,
+  .dashboard-studio *::before,
+  .dashboard-studio *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* =================================================================
+   PERFORMANCE OPTIMIZATIONS
+   ================================================================= */
+
+/* GPU acceleration for smooth animations */
+.dashboard-studio .ant-card,
+.dashboard-studio .ant-btn,
+.dashboard-studio .ant-input,
+.dashboard-studio .ant-select,
+.dashboard-studio .ant-modal {
+  will-change: transform !important;
+  backface-visibility: hidden !important;
+}
+
+/* Optimize repaints */
+.dashboard-studio .ant-layout-header,
+.dashboard-studio .ant-layout-sider,
+.dashboard-studio .ant-layout-content {
+  contain: layout style paint !important;
+}

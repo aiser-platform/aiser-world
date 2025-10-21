@@ -1,7 +1,3 @@
-# Load environment variables from .env file
-env_file:
-  - .env
-
 services:
   # PostgreSQL Database
   postgres:

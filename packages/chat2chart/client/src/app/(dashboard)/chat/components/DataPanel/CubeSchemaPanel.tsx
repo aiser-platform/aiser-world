@@ -246,7 +246,7 @@ const CubeSchemaPanel: React.FC<CubeSchemaPanelProps> = ({ dataSourceId, onSchem
                 type="error"
                 showIcon
                 action={
-                    <button onClick={loadCubeSchema} style={{ background: 'none', border: 'none', color: '#1890ff', cursor: 'pointer' }}>
+                    <button onClick={loadCubeSchema} style={{ background: 'none', border: 'none', color: 'var(--color-brand-primary)', cursor: 'pointer' }}>
                         Retry
                     </button>
                 }

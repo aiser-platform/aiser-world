@@ -30,10 +30,12 @@ export default function LoginPage() {
                 // Signup flow
                 if (!values.username) {
                     message.error('Username is required for signup');
+                    setLoading(false);
                     return;
                 }
                 if (values.password !== values.confirmPassword) {
                     message.error('Passwords do not match');
+                    setLoading(false);
                     return;
                 }
                 await signup(values.identifier, values.username, values.password);
@@ -45,7 +47,23 @@ export default function LoginPage() {
             }
             router.push('/chat');
         } catch (error) {
-            message.error(isSignUp ? 'Signup failed. Please try again.' : 'Login failed. Please check your credentials.');
+            console.error('Authentication error:', error);
+            const errorMessage = error instanceof Error ? error.message : 'Authentication failed';
+            
+            if (isSignUp) {
+                message.error(`Signup failed: ${errorMessage}`);
+            } else {
+                // Provide more specific error messages based on the error
+                if (errorMessage.includes('Invalid credentials') || errorMessage.includes('401')) {
+                    message.error('Invalid email or password. Please check your credentials.');
+                } else if (errorMessage.includes('Network error') || errorMessage.includes('fetch')) {
+                    message.error('Network error. Please check your connection and try again.');
+                } else if (errorMessage.includes('verify')) {
+                    message.error('Please verify your email before signing in.');
+                } else {
+                    message.error(`Login failed: ${errorMessage}`);
+                }
+            }
         } finally {
             setLoading(false);
         }
@@ -110,50 +128,71 @@ export default function LoginPage() {
                 }
                 
                 .logo-section h1 {
-                    font-size: 1.75rem;
+                    font-size: 1.875rem; /* 30px - standardized large heading */
                     font-weight: 700;
-                    color: #1f2937;
+                    color: var(--color-text-primary, #1f2937);
                     margin: 0;
+                    line-height: 1.2;
                 }
                 
                 .form-title {
-                    font-size: 1.5rem;
+                    font-size: 1.5rem; /* 24px - standardized medium heading */
                     font-weight: 600;
-                    color: #111827;
+                    color: var(--color-text-primary, #111827);
                     margin-bottom: 0.5rem;
                     text-align: center;
+                    line-height: 1.3;
                 }
                 
                 .form-subtitle {
-                    font-size: 1rem;
-                    color: #6b7280;
-                    margin-bottom: 2rem;
+                    font-size: 1rem; /* 16px - standardized body text */
+                    color: var(--color-text-secondary, #6b7280);
+                    margin-bottom: 2.5rem; /* Increased spacing */
                     text-align: center;
+                    line-height: 1.5;
                 }
                 
                 .form-card {
                     background: white;
                     border-radius: 12px;
-                    padding: 2rem;
+                    padding: 2.5rem; /* Increased padding */
                     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
                     border: 1px solid #e5e7eb;
+                    margin-top: 1rem; /* Add space from logo */
                 }
                 
                 .form-input {
-                    height: 48px;
+                    height: 52px; /* Slightly increased height */
                     border-radius: 8px;
-                    border: 1px solid #d1d5db;
+                    border: 1px solid var(--color-border-primary, #d1d5db);
+                    font-size: 1rem; /* 16px - standardized input text */
+                    padding: 0 18px; /* Increased padding */
+                    transition: all 0.2s ease;
+                    margin-bottom: 0.5rem; /* Add spacing between inputs */
+                }
+                
+                .form-input:focus {
+                    border-color: var(--color-brand-primary, #2563eb);
+                    box-shadow: 0 0 0 3px var(--color-brand-primary-light, rgba(37, 99, 235, 0.1));
                 }
                 
                 .form-button {
-                    height: 48px;
+                    height: 52px; /* Match input height */
                     border-radius: 8px;
-                    font-weight: 500;
+                    font-weight: 600;
+                    font-size: 1rem; /* 16px - standardized button text */
+                    transition: all 0.2s ease;
+                    margin-top: 1rem; /* Add spacing from inputs */
+                }
+                
+                .form-button:hover {
+                    transform: translateY(-1px);
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
                 }
                 
                 .toggle-section {
                     text-align: center;
-                    margin-top: 1.5rem;
+                    margin-top: 2rem; /* Increased spacing */
                     padding-top: 1.5rem;
                     border-top: 1px solid #e5e7eb;
                 }
@@ -163,9 +202,28 @@ export default function LoginPage() {
                     bottom: 1rem;
                     left: 50%;
                     transform: translateX(-50%);
-                    font-size: 0.75rem;
+                    font-size: 0.875rem; /* 14px - standardized small text */
                     color: #9ca3af;
                     text-align: center;
+                    line-height: 1.4;
+                }
+                
+                .terms-privacy-text {
+                    margin-top: 1rem;
+                    font-size: 0.875rem; /* 14px - same as "Don't have an account?" */
+                    color: #6b7280;
+                    text-align: center;
+                    line-height: 1.4;
+                }
+                
+                .terms-privacy-text a {
+                    color: #3b82f6;
+                    text-decoration: none;
+                    font-weight: 500;
+                }
+                
+                .terms-privacy-text a:hover {
+                    text-decoration: underline;
                 }
                 
                 .branding-content {
@@ -174,15 +232,33 @@ export default function LoginPage() {
                 }
                 
                 .branding-title {
-                    font-size: 1.5rem;
+                    font-size: 1.875rem; /* 30px - standardized large heading */
                     font-weight: 700;
                     margin-bottom: 1rem;
+                    line-height: 1.2;
+                    color: #ffffff;
                 }
                 
                 .branding-subtitle {
-                    font-size: 1rem;
+                    font-size: 1.125rem; /* 18px - standardized subtitle */
                     color: #cbd5e1;
                     margin-bottom: 1.5rem;
+                    line-height: 1.5;
+                }
+                
+                .branding-secondary-title {
+                    font-size: 1.5rem; /* 24px - standardized secondary heading */
+                    font-weight: 600;
+                    margin-top: 2rem;
+                    margin-bottom: 1rem;
+                    line-height: 1.3;
+                    color: #ffffff;
+                }
+                
+                .branding-description {
+                    font-size: 1rem; /* 16px - standardized body text */
+                    color: #cbd5e1;
+                    line-height: 1.5;
                 }
                 
                 .demo-image {
@@ -199,13 +275,27 @@ export default function LoginPage() {
                     }
                     
                     .branding-title {
-                        font-size: 2rem;
+                        font-size: 2.25rem; /* 36px - larger for desktop */
                         margin-bottom: 1rem;
+                        line-height: 1.1;
                     }
                     
                     .branding-subtitle {
-                        font-size: 1.125rem;
+                        font-size: 1.25rem; /* 20px - larger for desktop */
                         margin-bottom: 2rem;
+                        line-height: 1.4;
+                    }
+                    
+                    .branding-secondary-title {
+                        font-size: 1.75rem; /* 28px - larger for desktop */
+                        margin-top: 2rem;
+                        margin-bottom: 1rem;
+                        line-height: 1.2;
+                    }
+                    
+                    .branding-description {
+                        font-size: 1.125rem; /* 18px - larger for desktop */
+                        line-height: 1.5;
                     }
                     
                     .demo-image {
@@ -216,6 +306,28 @@ export default function LoginPage() {
                         left: 2rem;
                         transform: none;
                         text-align: left;
+                        font-size: 1rem; /* 16px - larger for desktop */
+                    }
+                    
+                    .form-title {
+                        font-size: 1.75rem; /* 28px - larger for desktop */
+                        margin-bottom: 0.75rem;
+                    }
+                    
+                    .form-subtitle {
+                        font-size: 1.125rem; /* 18px - larger for desktop */
+                        margin-bottom: 3rem;
+                    }
+                    
+                    .form-input {
+                        height: 56px; /* Larger for desktop */
+                        font-size: 1.125rem; /* 18px - larger for desktop */
+                        padding: 0 20px;
+                    }
+                    
+                    .form-button {
+                        height: 56px; /* Match input height */
+                        font-size: 1.125rem; /* 18px - larger for desktop */
                     }
                 }
             `}</style>
@@ -357,11 +469,11 @@ export default function LoginPage() {
                                     </p>
                                 )}
                                 
-                                <p style={{ marginTop: '1rem', fontSize: '0.75rem', color: '#9ca3af', textAlign: 'center' }}>
+                                <p className="terms-privacy-text">
                                     By signing {isSignUp ? 'up' : 'in'}, you agree to our{' '}
-                                    <a href="/terms" style={{ color: '#3b82f6' }}>Terms of Service</a>
+                                    <a href="/terms">Terms of Service</a>
                                     {' '}and{' '}
-                                    <a href="/privacy" style={{ color: '#3b82f6' }}>Privacy Policy</a>
+                                    <a href="/privacy">Privacy Policy</a>
                                 </p>
                             </div>
                         </div>
@@ -439,10 +551,10 @@ export default function LoginPage() {
                             className="demo-image"
                             unoptimized
                         />
-                        <h2 className="branding-title" style={{ fontSize: '1.5rem', marginTop: '2rem' }}>
+                        <h2 className="branding-secondary-title">
                             Transform data into insights instantly
                         </h2>
-                        <p className="branding-subtitle">
+                        <p className="branding-description">
                             Join thousands of users discovering patterns and making data-driven decisions with AI
                         </p>
                     </div>

@@ -76,10 +76,6 @@
     "text": "ProtectRoute: early pass-through, user authenticated"
   },
   {
-    "type": "error",
-    "text": "Failed to load resource: the server responded with a status of 404 (Not Found)"
-  },
-  {
     "type": "log",
     "text": "Loaded data sources from backend: [Object, Object]"
   },
@@ -109,7 +105,7 @@
   },
   {
     "type": "error",
-    "text": "Error fetching projects: Error: Failed to fetch projects\n    at w (http://localhost:3000/_next/static/chunks/3933-0c05b48fa588ea81.js:1:66176)\n    at async S (http://localhost:3000/_next/static/chunks/3933-0c05b48fa588ea81.js:1:65695)\n    at async Promise.all (index 0)\n    at async j (http://localhost:3000/_next/static/chunks/3933-0c05b48fa588ea81.js:1:65467)"
+    "text": "Error fetching projects: Error: Failed to fetch projects\n    at w (http://localhost:3000/_next/static/chunks/app/(dashboard)/layout-f62cfcfb405ec5f2.js:1:35833)\n    at async k (http://localhost:3000/_next/static/chunks/app/(dashboard)/layout-f62cfcfb405ec5f2.js:1:35352)\n    at async Promise.all (index 0)\n    at async _ (http://localhost:3000/_next/static/chunks/app/(dashboard)/layout-f62cfcfb405ec5f2.js:1:35124)"
   },
   {
     "type": "log",

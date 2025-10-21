@@ -548,7 +548,7 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
                                  <Text 
                                      strong 
                                      style={{ 
-                                         fontSize: '12px',
+                                         fontSize: 'var(--font-size-sm)',
                                          maxWidth: '100px',
                                          overflow: 'hidden',
                                          textOverflow: 'ellipsis',
@@ -599,11 +599,11 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
                                     minWidth: 0,
                                     flex: 1
                                 }}>
-                                    <TableOutlined style={{ marginRight: '4px', fontSize: '12px' }} />
+                                    <TableOutlined style={{ marginRight: '4px', fontSize: 'var(--font-size-sm)' }} />
                                     <Text 
                                         strong 
                                         style={{ 
-                                            fontSize: '12px',
+                                            fontSize: 'var(--font-size-sm)',
                                             maxWidth: '130px',
                                             overflow: 'hidden',
                                             textOverflow: 'ellipsis',
@@ -617,7 +617,7 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
                                         <Tooltip title={table.description}>
                                             <InfoCircleOutlined 
                                                 style={{ 
-                                                    color: 'var(--ant-color-primary, #1677ff)', 
+                                                    color: 'var(--ant-color-primary, var(--color-brand-primary))', 
                                                     marginLeft: '4px',
                                                     fontSize: '11px'
                                                 }} 
@@ -657,7 +657,7 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
                                          <Text 
                                              code 
                                              style={{ 
-                                                 fontSize: '12px',
+                                                 fontSize: 'var(--font-size-sm)',
                                                  maxWidth: '140px',
                                                  overflow: 'hidden',
                                                  textOverflow: 'ellipsis',
@@ -994,7 +994,7 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
                 size="small"
                 style={{
                     marginBottom: '8px',
-                    border: isSelected ? '2px solid var(--ant-color-primary, #1677ff)' : '1px solid var(--ant-color-border, #d9d9d9)',
+                    border: isSelected ? '2px solid var(--ant-color-primary, var(--color-brand-primary))' : '1px solid var(--ant-color-border, #d9d9d9)',
                     cursor: 'pointer',
                     background: 'var(--ant-color-bg-container, #ffffff)',
                     color: 'var(--ant-color-text, #141414)'
@@ -1008,7 +1008,7 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
                         <div>
                             <Text strong>{dataSource.name}</Text>
                             <br />
-                            <Text type="secondary" style={{ fontSize: '12px' }}>
+                            <Text type="secondary" style={{ fontSize: 'var(--font-size-sm)' }}>
                                 {dataSource.type.toUpperCase()}
                             </Text>
                         </div>
@@ -1017,8 +1017,8 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
                         {isSelected && (
                             <CheckCircleOutlined 
                                 style={{ 
-                                    color: 'var(--ant-color-success, #52c41a)', 
-                                    fontSize: '16px',
+                                    color: 'var(--ant-color-success, var(--color-functional-success))', 
+                                    fontSize: 'var(--font-size-md)',
                                     marginRight: '8px'
                                 }} 
                                 title="Selected for AI Analysis"
@@ -1037,7 +1037,7 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
                                 icon={<DeleteOutlined />}
                                 onClick={(e) => e.stopPropagation()}
                                 title="Delete data source"
-                                style={{ color: 'var(--ant-color-error, #ff4d4f)' }}
+                                style={{ color: 'var(--ant-color-error, var(--color-functional-danger))' }}
                             />
                         </Popconfirm>
                         <Tag color={getStatusColor(dataSource.status)}>
@@ -1066,7 +1066,7 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
                                 borderRadius: '6px',
                                 border: '1px solid var(--ant-color-border, #f0f0f0)'
                             }}>
-                                <Text strong style={{ display: 'block', marginBottom: '8px', fontSize: '12px' }}>
+                                <Text strong style={{ display: 'block', marginBottom: '8px', fontSize: 'var(--font-size-sm)' }}>
                                     📁 Available Files for Analysis
                                 </Text>
                                 {renderFileDropdown()}
@@ -1081,12 +1081,12 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
     };
 
     return (
-        <div className="collapsible-history-panel EnhancedDataPanel" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+        <div className="EnhancedDataPanel" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
             <div className="history-panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div className="DataTitle" style={{ 
                     display: 'flex',
                     alignItems: 'center',
-                    fontSize: '16px',
+                    fontSize: 'var(--font-size-md)',
                     fontWeight: '600'
                 }}>
                     <DatabaseOutlined />
@@ -1215,8 +1215,8 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
                 {selectedDataSource && (
                     <div style={{
                         padding: '12px 16px',
-                        background: 'linear-gradient(135deg, #1890ff20, #52c41a20)',
-                        border: '1px solid #1890ff',
+                        background: 'linear-gradient(135deg, var(--color-brand-primary)20, var(--color-functional-success)20)',
+                        border: '1px solid var(--color-brand-primary)',
                         borderRadius: '8px',
                         marginBottom: '16px',
                         display: 'flex',
@@ -1224,7 +1224,7 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
                         justifyContent: 'space-between'
                     }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{ fontSize: '16px' }}>🎯</span>
+                            <span style={{ fontSize: 'var(--font-size-md)' }}>🎯</span>
                             <Text strong>
                                 For AI: {selectedDataSource.name}
                             </Text>

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Response
 from fastapi.security import HTTPBearer
 from sqlalchemy.orm import Session
 from typing import Dict, Any, Optional
@@ -12,6 +12,8 @@ from app.core.simple_enterprise_auth import (
     SimpleUserInfo,
 )
 from app.modules.user.models import User
+from app.modules.authentication.utils.cookie_manager import manage_auth_cookies
+from app.modules.authentication.deps.auth_bearer import CookieTokenDep
 
 router = APIRouter(prefix="/enterprise", tags=["enterprise"])
 security = HTTPBearer()
@@ -38,7 +40,7 @@ class ConfigResponse(BaseModel):
 
 
 @router.post("/auth/login", response_model=LoginResponse)
-async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
+async def login(login_data: LoginRequest, response: Response, db: Session = Depends(get_db)):
     """Enterprise login endpoint"""
     auth_service = get_simple_enterprise_auth_service()
 
@@ -53,6 +55,13 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    # Set authentication cookies
+    tokens = {
+        "access_token": result["access_token"],
+        "refresh_token": result.get("refresh_token"),
+    }
+    manage_auth_cookies(response=response, tokens=tokens)
+
     return LoginResponse(
         access_token=result["access_token"],
         refresh_token=None,
@@ -63,18 +72,32 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
 
 @router.post("/auth/logout")
 async def logout(
+    response: Response,
     current_user: SimpleUserInfo = Depends(get_current_user_simple),
     db: Session = Depends(get_db),
 ):
     """Enterprise logout endpoint"""
+    # Clear authentication cookies
+    manage_auth_cookies(response=response, clear=True)
+    
     # For demo, just return success
     return {"message": "Logged out successfully"}
 
 
 @router.get("/auth/me")
-async def get_me(current_user: SimpleUserInfo = Depends(get_current_user_simple)):
+async def get_me(token: str = CookieTokenDep, db: Session = Depends(get_db)):
     """Get current user information"""
-    return current_user.to_dict()
+    auth_service = get_simple_enterprise_auth_service()
+    user_info = await auth_service.validate_token(token, db)
+    
+    if not user_info:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    return user_info.to_dict()
 
 
 @router.get("/config", response_model=ConfigResponse)

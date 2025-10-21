@@ -40,7 +40,7 @@ export default function NotificationsPage() {
         <div className="p-6 h-full overflow-y-auto">
             <div className="mb-8">
                 <Title level={2}>
-                    <BellOutlined style={{ marginRight: 12, color: '#1890ff' }} />
+                    <BellOutlined style={{ marginRight: 12, color: 'var(--color-brand-primary)' }} />
                     Notification Settings
                 </Title>
                 <Text type="secondary">

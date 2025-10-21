@@ -26,6 +26,21 @@ export const fetchApi = async (
     endpoint: string,
     options: RequestInit = {}
 ): Promise<Response> => {
+    // If AuthContext hasn't finished initializing, wait up to 1s for it to complete.
+    // This prevents firing authenticated requests that would otherwise arrive without
+    // the server-set HttpOnly cookie due to initialization race conditions.
+    try {
+        if (typeof window !== 'undefined' && !(window as any).__aiser_auth_initialized) {
+            const start = Date.now();
+            while (!(window as any).__aiser_auth_initialized && Date.now() - start < 1000) {
+                // small yield
+                // eslint-disable-next-line no-await-in-loop
+                await new Promise((r) => setTimeout(r, 50));
+            }
+        }
+    } catch (e) {
+        // swallow
+    }
     const defaultHeaders: Record<string, string> = {
         'Content-Type': 'application/json',
     };
@@ -46,6 +61,32 @@ export const fetchApi = async (
     // When calling auth endpoints from the browser, use the same-origin proxy
     // at `/api/auth/...` to ensure cookies are attached by the browser.
     const url = isAuthEndpoint && typeof window !== 'undefined' ? `/api/auth/${endpoint.replace(/^\/+/, '')}` : `${baseUrl}/${endpoint}`;
+
+    // Debugging aid: when running in the browser, log outgoing auth requests and
+    // current document.cookie to the debug endpoint so we can trace missing cookies
+    // that cause /api/auth/users/me to return 403 during initialization.
+    try {
+        if (typeof window !== 'undefined') {
+            // Lightweight console log
+            if (isAuthEndpoint) {
+                // eslint-disable-next-line no-console
+                console.debug('fetchApi: calling auth endpoint', url, 'document.cookie=', typeof document !== 'undefined' ? document.cookie : '');
+                // fire-and-forget debug POST so server logs the client cookie state
+                try {
+                    void fetch('/api/debug/client-error', {
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ event: 'client_auth_probe', url, cookie: typeof document !== 'undefined' ? document.cookie : '' })
+                    });
+                } catch (e) {
+                    // swallow
+                }
+            }
+        }
+    } catch (e) {
+        // swallow
+    }
 
     const response = await fetch(url, {
         ...options,

@@ -1,6 +1,7 @@
 'use client';
 export const dynamic = 'force-dynamic';
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '@/context/AuthContext';
 import {
     Card,
     Button,
@@ -34,7 +35,7 @@ import {
 } from '@ant-design/icons';
 import { dashboardAPIService } from '../dash-studio/services/DashboardAPIService';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/context/AuthContext';
+import LoadingStates from '@/app/components/LoadingStates';
 
 const { Title, Text } = Typography;
 const { Search } = Input;
@@ -178,12 +179,12 @@ const DashboardsPage: React.FC = () => {
             key: 'name',
             render: (text: string, record: Dashboard) => (
                 <Space>
-                    <DashboardOutlined style={{ color: '#1890ff' }} />
+                    <DashboardOutlined style={{ color: 'var(--color-brand-primary)' }} />
                     <div>
                         <Text strong>{text}</Text>
                         {record.description && (
                             <div>
-                                <Text type="secondary" style={{ fontSize: '12px' }}>
+                                <Text type="secondary" style={{ fontSize: 'var(--font-size-sm)' }}>
                                     {record.description}
                                 </Text>
                             </div>
@@ -295,114 +296,110 @@ const DashboardsPage: React.FC = () => {
     if (!isAuthenticated) {
         return (
             <div style={{ padding: 24, textAlign: 'center' }}>
-                <div>Loading...</div>
+                <LoadingStates type="dashboard" message="Loading dashboards..." />
             </div>
         );
     }
 
     return (
-        <div style={{ padding: 24 }}>
-            <div style={{ marginBottom: 24 }}>
-                <Title level={2}>Dashboards</Title>
-                <Text type="secondary">
+        <div className="page-wrapper">
+            <div className="page-header">
+                <Title level={2} className="page-title">Dashboards</Title>
+                <Text type="secondary" className="page-description">
                     Create, manage, and share your data dashboards
                 </Text>
             </div>
 
             {/* Statistics Cards */}
-            <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-                <Col span={6}>
-                    <Card>
+            <Row gutter={[16, 16]} style={{ marginBottom: 'var(--space-6)' }}>
+                <Col xs={24} sm={12} md={6}>
+                    <Card className="stat-card">
                         <Statistic
                             title="Total Dashboards"
                             value={stats.total}
-                            prefix={<DashboardOutlined />}
+                            prefix={<DashboardOutlined style={{ color: 'var(--color-brand-primary)' }} />}
                         />
                     </Card>
                 </Col>
-                <Col span={6}>
-                    <Card>
+                <Col xs={24} sm={12} md={6}>
+                    <Card className="stat-card">
                         <Statistic
                             title="Active"
                             value={stats.active}
-                            valueStyle={{ color: '#3f8600' }}
-                            prefix={<DashboardOutlined />}
+                            valueStyle={{ color: 'var(--color-functional-success)' }}
+                            prefix={<DashboardOutlined style={{ color: 'var(--color-functional-success)' }} />}
                         />
                     </Card>
                 </Col>
-                <Col span={6}>
-                    <Card>
+                <Col xs={24} sm={12} md={6}>
+                    <Card className="stat-card">
                         <Statistic
                             title="Drafts"
                             value={stats.draft}
-                            valueStyle={{ color: '#1890ff' }}
-                            prefix={<DashboardOutlined />}
+                            valueStyle={{ color: 'var(--color-brand-primary)' }}
+                            prefix={<DashboardOutlined style={{ color: 'var(--color-brand-primary)' }} />}
                         />
                     </Card>
                 </Col>
-                <Col span={6}>
-                    <Card>
+                <Col xs={24} sm={12} md={6}>
+                    <Card className="stat-card">
                         <Statistic
                             title="Public"
                             value={stats.public}
-                            valueStyle={{ color: '#722ed1' }}
-                            prefix={<ShareAltOutlined />}
+                            valueStyle={{ color: 'var(--color-functional-info)' }}
+                            prefix={<ShareAltOutlined style={{ color: 'var(--color-functional-info)' }} />}
                         />
                     </Card>
                 </Col>
             </Row>
 
             {/* Actions and Filters */}
-            <div style={{ marginBottom: 16 }}>
-                <Row justify="space-between" align="middle">
-                    <Col>
-                        <Space>
-                            <Button
-                                type="primary"
-                                icon={<PlusOutlined />}
-                                onClick={handleCreateDashboard}
-                            >
-                                Create Dashboard
-                            </Button>
-                            <Button
-                                icon={<ReloadOutlined />}
-                                onClick={loadDashboards}
-                                loading={loading}
-                            >
-                                Refresh
-                            </Button>
-                        </Space>
-                    </Col>
-                    <Col>
-                        <Space>
-                            <Search
-                                placeholder="Search dashboards..."
-                                value={searchText}
-                                onChange={(e) => setSearchText(e.target.value)}
-                                style={{ width: 200 }}
-                                prefix={<SearchOutlined />}
-                            />
-                            <Select
-                                value={statusFilter}
-                                onChange={setStatusFilter}
-                                style={{ width: 120 }}
-                                prefix={<FilterOutlined />}
-                            >
-                                <Option value="all">All Status</Option>
-                                <Option value="active">Active</Option>
-                                <Option value="draft">Draft</Option>
-                                <Option value="archived">Archived</Option>
-                            </Select>
-                        </Space>
-                    </Col>
-                </Row>
+            <div className="page-toolbar">
+                <div className="toolbar-left">
+                    <Button
+                        type="primary"
+                        icon={<PlusOutlined />}
+                        onClick={handleCreateDashboard}
+                        className="action-button-primary"
+                    >
+                        Create Dashboard
+                    </Button>
+                    <Button
+                        icon={<ReloadOutlined />}
+                        onClick={loadDashboards}
+                        loading={loading}
+                        className="action-button-secondary"
+                    >
+                        Refresh
+                    </Button>
+                </div>
+                <div className="toolbar-right">
+                    <Search
+                        placeholder="Search dashboards..."
+                        value={searchText}
+                        onChange={(e) => setSearchText(e.target.value)}
+                        style={{ width: 200 }}
+                        prefix={<SearchOutlined />}
+                    />
+                    <Select
+                        value={statusFilter}
+                        onChange={setStatusFilter}
+                        style={{ width: 120 }}
+                    >
+                        <Option value="all">All Status</Option>
+                        <Option value="active">Active</Option>
+                        <Option value="draft">Draft</Option>
+                        <Option value="archived">Archived</Option>
+                    </Select>
+                </div>
             </div>
 
-            <Divider />
+            <Divider className="page-divider" />
 
             {/* Dashboards Table */}
-            <Card>
+            <Card className="content-card">
                 <Table
+                    className="data-table"
                     columns={columns}
                     dataSource={filteredDashboards}
                     rowKey="id"

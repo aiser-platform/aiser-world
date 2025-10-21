@@ -23,17 +23,16 @@ export async function GET(request: NextRequest) {
     const response = await fetch(`${targetBase.replace(/\/$/, '')}/conversations/?${searchParams.toString()}`);
         
         if (!response.ok) {
-            throw new Error(`Backend responded with ${response.status}`);
+            console.error('conversations list: backend responded', response.status);
+            // return a safe empty result to avoid breaking the UI
+            return NextResponse.json({ items: [], pagination: { total: 0, offset: 0, limit: 0, has_more: false, total_pages: 0, current_page: 0 } });
         }
-        
+
         const data = await response.json();
         return NextResponse.json(data);
     } catch (error) {
         console.error('Failed to fetch conversations:', error);
-        return NextResponse.json(
-            { error: 'Failed to fetch conversations' },
-            { status: 500 }
-        );
+        return NextResponse.json({ items: [], pagination: { total: 0, offset: 0, limit: 0, has_more: false, total_pages: 0, current_page: 0 } });
     }
 }
 

@@ -57,6 +57,7 @@ import {
   // Properties Icons
   SettingOutlined,
   EyeOutlined,
+  ToolOutlined,
   LockOutlined,
   UnlockOutlined,
   SaveOutlined,
@@ -94,17 +95,13 @@ import {
   CrownOutlined,
   CloseOutlined,
   BgColorsOutlined,
-  ToolOutlined,
-  CodeOutlined
+  CodeOutlined,
+  ZoomInOutlined
 } from '@ant-design/icons';
 import dynamic from 'next/dynamic';
+import { useDashboardStore } from '@/stores/useDashboardStore';
 
 // Lazy load heavy components
-const AdvancedChartConfig = dynamic(() => import('./AdvancedChartConfig'), {
-  loading: () => <Spin size="small" />,
-  ssr: false
-});
-
 const DataSourceConfig = dynamic(() => import('./DataSourceConfig'), {
   loading: () => <Spin size="small" />,
   ssr: false
@@ -274,6 +271,75 @@ const UnifiedDesignPanel: React.FC<UnifiedDesignPanelProps> = ({
   showPanel,
   onClose
 }) => {
+  const [form] = Form.useForm();
+  
+  // Listen for inline editing updates to sync with form
+  useEffect(() => {
+    const handleTitleUpdate = (event: CustomEvent) => {
+      if (selectedWidget && event.detail.widgetId === selectedWidget.id) {
+        form.setFieldValue('title', event.detail.title);
+      }
+    };
+    
+    const handleSubtitleUpdate = (event: CustomEvent) => {
+      if (selectedWidget && event.detail.widgetId === selectedWidget.id) {
+        form.setFieldValue('subtitle', event.detail.subtitle);
+      }
+    };
+    
+    window.addEventListener('widget:title:updated', handleTitleUpdate as EventListener);
+    window.addEventListener('widget:subtitle:updated', handleSubtitleUpdate as EventListener);
+    
+    return () => {
+      window.removeEventListener('widget:title:updated', handleTitleUpdate as EventListener);
+      window.removeEventListener('widget:subtitle:updated', handleSubtitleUpdate as EventListener);
+    };
+  }, [selectedWidget, form]);
+
+  // Sync form with selected widget config
+  useEffect(() => {
+    if (selectedWidget && selectedWidget.config) {
+      const formValues = {
+        title: selectedWidget.config.title || selectedWidget.title || '',
+        subtitle: selectedWidget.config.subtitle || '',
+        backgroundColor: selectedWidget.config.backgroundColor || 'transparent',
+        borderColor: selectedWidget.config.borderColor || '#d9d9d9',
+        textColor: selectedWidget.config.textColor || (isDarkMode ? '#ffffff' : '#000000'),
+        legendShow: selectedWidget.config.legendShow !== false,
+        legendPosition: selectedWidget.config.legendPosition || 'top',
+        colorPalette: selectedWidget.config.colorPalette || 'default',
+        theme: selectedWidget.config.theme || 'auto',
+        tooltipShow: selectedWidget.config.tooltipShow !== false,
+        tooltipTrigger: selectedWidget.config.tooltipTrigger || 'axis',
+        tooltipFormatter: selectedWidget.config.tooltipFormatter || 'default',
+        tooltipCustomFormatter: selectedWidget.config.tooltipCustomFormatter || '',
+        animation: selectedWidget.config.animation !== false,
+        animationDuration: selectedWidget.config.animationDuration || 1000,
+        seriesLabelShow: selectedWidget.config.seriesLabelShow || false,
+        seriesLabelPosition: selectedWidget.config.seriesLabelPosition || 'top',
+        xAxisField: selectedWidget.config.xAxisField || 'category',
+        showXAxis: selectedWidget.config.showXAxis !== false,
+        yAxisField: selectedWidget.config.yAxisField || 'value',
+        showYAxis: selectedWidget.config.showYAxis !== false,
+        seriesField: selectedWidget.config.seriesField || 'auto',
+        dataLimit: selectedWidget.config.dataLimit || 1000,
+        dataLabelsShow: selectedWidget.config.dataLabelsShow || false,
+        dataLabelsFormat: selectedWidget.config.dataLabelsFormat || 'auto',
+        responsive: selectedWidget.config.responsive !== false,
+        draggable: selectedWidget.config.draggable !== false,
+        resizable: selectedWidget.config.resizable !== false,
+        padding: selectedWidget.config.padding || 0,
+        margin: selectedWidget.config.margin || 0,
+        isVisible: selectedWidget.config.isVisible !== false,
+        isLocked: selectedWidget.config.isLocked || false
+      };
+      
+      form.setFieldsValue(formValues);
+    } else {
+      form.resetFields();
+    }
+  }, [selectedWidget, form, isDarkMode]);
+  // Always initialize hooks unconditionally. Use `isVisible` later in render to shortcut UI.
   const [snapshotsList, setSnapshotsList] = useState<any[]>([]);
   const [selectedSnapshotId, setSelectedSnapshotId] = useState<number | null>(null);
   const [permissionModalVisible, setPermissionModalVisible] = useState(false);
@@ -282,19 +348,105 @@ const UnifiedDesignPanel: React.FC<UnifiedDesignPanelProps> = ({
   const [activeTab, setActiveTab] = useState('library');
   const [activeCategory, setActiveCategory] = useState('charts');
   const [searchQuery, setSearchQuery] = useState('');
-  const [form] = Form.useForm();
+  
+  // Get selectedWidgetIds from Zustand store for debugging
+  const selectedWidgetIds = useDashboardStore((state: any) => state.selectedWidgetIds);
+  const deselectAll = useDashboardStore((state: any) => state.deselectAll);
+  
+  // Also subscribe directly to the store's widget entry for the active widget id to ensure reactive updates
+  const storeWidget = useDashboardStore((state: any) => {
+    const activeId = selectedWidget?.id || (selectedWidgetIds && selectedWidgetIds.length > 0 ? selectedWidgetIds[0] : null);
+    if (!activeId) return null;
+    return state.widgets.find((w: any) => w.id === activeId) || null;
+  });
 
-  // Initialize form with current widget config
+  // Initialize form with current widget config from Zustand store (Single Source of Truth)
   useEffect(() => {
-    if (selectedWidget) {
-      form.setFieldsValue({
-        title: selectedWidget.title,
-        content: selectedWidget.content,
-        ...selectedWidget.config,
-        ...(selectedWidget.style || {})
-      });
+    // prefer storeWidget (subscribed to zustand) as the single source of truth for live updates
+    const widgetToUse = storeWidget || selectedWidget;
+      
+    if (widgetToUse) {
+
+      const allProperties = {
+        title: widgetToUse.title || '',
+        subtitle: widgetToUse.subtitle || '',
+        content: widgetToUse.content || '',
+        ...(widgetToUse.config || {}),
+        ...(widgetToUse.style || {}),
+        behaviorClickable: widgetToUse.behavior?.clickable || false,
+        behaviorHoverable: widgetToUse.behavior?.hoverable || false,
+        behaviorSelectable: widgetToUse.behavior?.selectable || false,
+        behaviorOnHover: widgetToUse.behavior?.onHover || 'highlight',
+        behaviorOnClick: widgetToUse.behavior?.onClick || 'select',
+        layoutShowOnMobile: widgetToUse.layout?.showOnMobile !== false,
+        layoutShowOnTablet: widgetToUse.layout?.showOnTablet !== false,
+        layoutShowOnDesktop: widgetToUse.layout?.showOnDesktop !== false,
+        layoutBreakpointsXs: widgetToUse.layout?.breakpoints?.xs || undefined,
+        layoutBreakpointsMd: widgetToUse.layout?.breakpoints?.md || undefined,
+        layoutBreakpointsLg: widgetToUse.layout?.breakpoints?.lg || undefined,
+        dataAutoRefresh: widgetToUse.data?.autoRefresh || false,
+        dataRefreshInterval: widgetToUse.data?.refreshInterval || 0,
+        dataCache: widgetToUse.data?.cache || false,
+        dataCacheTimeout: widgetToUse.data?.cacheTimeout || 300,
+        ...getDefaultConfig(widgetToUse?.type || 'bar')
+      };
+      
+      // Avoid overwriting form while user is inline-editing on the canvas.
+      // If an inline input is focused (data-widget-title / data-widget-subtitle), skip applying values.
+      try {
+        const isInlineEditing = (window as any).__widgetInlineEditing && (window as any).__widgetInlineEditing.id === widgetToUse.id;
+        const isInlineEditingPending = (window as any).__widgetInlineEditingPending && (window as any).__widgetInlineEditingPending.id === widgetToUse.id;
+        if (isInlineEditing || isInlineEditingPending) {
+        } else {
+          // Merge only changed fields to avoid stomping user edits
+          const currentValues = form.getFieldsValue(true) || {};
+          const merged: any = { ...currentValues };
+          Object.keys(allProperties).forEach((k) => {
+            // Only set if different to avoid unnecessary re-renders
+            if (JSON.stringify(currentValues[k]) !== JSON.stringify(allProperties[k])) {
+              merged[k] = allProperties[k];
+            }
+          });
+          form.setFieldsValue(merged);
+        }
+      } catch (err) {
+        try { form.setFieldsValue(allProperties); } catch (e) {}
+      }
+      // also listen to global widget:update events to force immediate sync
+      const onWidgetUpdated = (e: any) => {
+        try {
+          const detail = e.detail;
+          if (!detail) return;
+          if (detail.id === widgetToUse.id) {
+            const payload = detail.widget || detail.changes || {};
+            // Build nested payload to respect Form.Item names
+            const nestedValues: any = {};
+            if (payload.title) nestedValues.title = payload.title;
+            if (payload.subtitle) nestedValues.subtitle = payload.subtitle;
+            if (payload.content) nestedValues.content = payload.content;
+            if (payload.config) nestedValues.config = payload.config;
+            if (payload.style) nestedValues.style = payload.style;
+            if (payload.behavior) nestedValues.behavior = payload.behavior;
+            if (payload.layout) nestedValues.layout = payload.layout;
+            if (payload.data) nestedValues.data = payload.data;
+            // flat shortcuts
+            nestedValues.behaviorClickable = payload.behavior?.clickable || false;
+            nestedValues.behaviorHoverable = payload.behavior?.hoverable || false;
+            nestedValues.behaviorSelectable = payload.behavior?.selectable || false;
+
+            form.setFieldsValue(nestedValues);
+          }
+        } catch (err) {}
+      };
+      window.addEventListener('widget:updated', onWidgetUpdated as EventListener);
+      // cleanup
+      return () => {
+        try { window.removeEventListener('widget:updated', onWidgetUpdated as EventListener); } catch(e){}
+      };
+    } else {
+      form.resetFields();
     }
-  }, [selectedWidget, form]);
+  }, [storeWidget, selectedWidget?.id, form, selectedWidgetIds]);
 
   // Auto-switch to properties when widget is selected, back to library when deselected
   useEffect(() => {
@@ -305,28 +457,85 @@ const UnifiedDesignPanel: React.FC<UnifiedDesignPanelProps> = ({
     }
   }, [selectedWidget]);
 
-  const handleConfigUpdate = (values: any) => {
-    if (selectedWidget) {
-      const updatedConfig = {
-        ...selectedWidget.config,
-        ...values
-      };
-      onConfigUpdate(selectedWidget.id, updatedConfig);
+  // Handle form changes from AntD Form. AntD calls onValuesChange with
+  // (changedValues, allValues). We prefer to receive the changedValues and
+  // construct a minimal update payload that merges nested objects (config,
+  // style, behavior, layout, data) into the widget so updates apply in real-time
+  // without stomping unrelated fields.
+  const handleConfigUpdate = (changedValues: any, allValues?: any) => {
+    if (!selectedWidget) return;
+    const changes = changedValues || {};
+    
+    const updateData: any = {};
+    
+    // Merge nested objects explicitly when provided
+    if (changes.config && typeof changes.config === 'object') {
+      updateData.config = { ...(selectedWidget.config || {}), ...changes.config };
     }
+    if (changes.style && typeof changes.style === 'object') {
+      updateData.style = { ...(selectedWidget.style || {}), ...changes.style };
+    }
+    if (changes.behavior && typeof changes.behavior === 'object') {
+      updateData.behavior = { ...(selectedWidget.behavior || {}), ...changes.behavior };
+    }
+    if (changes.layout && typeof changes.layout === 'object') {
+      updateData.layout = { ...(selectedWidget.layout || {}), ...changes.layout };
+    }
+    if (changes.data && typeof changes.data === 'object') {
+      updateData.data = { ...(selectedWidget.data || {}), ...changes.data };
+    }
+
+    // Map flattened helper keys to nested structures
+    if (changes.behaviorClickable !== undefined) updateData.behavior = { ...(updateData.behavior || selectedWidget.behavior || {}), clickable: !!changes.behaviorClickable };
+    if (changes.behaviorHoverable !== undefined) updateData.behavior = { ...(updateData.behavior || selectedWidget.behavior || {}), hoverable: !!changes.behaviorHoverable };
+    if (changes.behaviorSelectable !== undefined) updateData.behavior = { ...(updateData.behavior || selectedWidget.behavior || {}), selectable: !!changes.behaviorSelectable };
+
+    if (changes.layoutShowOnMobile !== undefined) updateData.layout = { ...(updateData.layout || selectedWidget.layout || {}), showOnMobile: !!changes.layoutShowOnMobile };
+    if (changes.layoutShowOnTablet !== undefined) updateData.layout = { ...(updateData.layout || selectedWidget.layout || {}), showOnTablet: !!changes.layoutShowOnTablet };
+    if (changes.layoutShowOnDesktop !== undefined) updateData.layout = { ...(updateData.layout || selectedWidget.layout || {}), showOnDesktop: !!changes.layoutShowOnDesktop };
+
+    // Direct top-level properties
+    ['title','subtitle','content','isVisible','isLocked','isResizable','isDraggable'].forEach((k) => {
+      if (changes[k] !== undefined) updateData[k] = changes[k];
+    });
+
+    // For any other shallow keys (e.g., fontSize, margin, padding) copy through
+    Object.keys(changes).forEach((k) => {
+      if (['config','style','behavior','layout','data','title','subtitle','content','behaviorClickable','behaviorHoverable','behaviorSelectable','layoutShowOnMobile','layoutShowOnTablet','layoutShowOnDesktop'].includes(k)) return;
+      if (k in updateData) return; // already handled
+      updateData[k] = changes[k];
+    });
+
+
+    try {
+      const result: any = onConfigUpdate?.(selectedWidget.id, updateData);
+      if (result && typeof result.then === 'function') {
+        (result as Promise<any>).then((updatedWidget: any) => {
+          try {
+            if (updatedWidget) {
+              const nestedValues: any = {
+                title: updatedWidget.title || '',
+                subtitle: updatedWidget.subtitle || '',
+                content: updatedWidget.content || ''
+              };
+              if (updatedWidget.config) nestedValues.config = updatedWidget.config;
+              if (updatedWidget.style) nestedValues.style = updatedWidget.style;
+              if (updatedWidget.behavior) nestedValues.behavior = updatedWidget.behavior;
+              if (updatedWidget.layout) nestedValues.layout = updatedWidget.layout;
+              if (updatedWidget.data) nestedValues.data = updatedWidget.data;
+              nestedValues.behaviorClickable = updatedWidget.behavior?.clickable || false;
+              nestedValues.behaviorHoverable = updatedWidget.behavior?.hoverable || false;
+              nestedValues.behaviorSelectable = updatedWidget.behavior?.selectable || false;
+              form.setFieldsValue(nestedValues);
+            }
+          } catch (e) {}
+        }).catch(() => {});
+      }
+    } catch (e) {}
   };
 
-  const handleStyleUpdate = (styleUpdates: any) => {
-    if (selectedWidget) {
-      const updatedStyle = {
-        ...(selectedWidget.style || {}),
-        ...styleUpdates
-      };
-      onConfigUpdate(selectedWidget.id, {
-        ...selectedWidget.config,
-        style: updatedStyle
-      });
-    }
-  };
+  // SINGLE SOURCE OF TRUTH: All updates go through handleConfigUpdate
+  // No separate style update needed - everything flows through Zustand store
 
   // Filter widgets based on search query
   const getFilteredWidgets = (category: string) => {
@@ -400,6 +609,10 @@ const UnifiedDesignPanel: React.FC<UnifiedDesignPanelProps> = ({
                         }}
                         hoverable
                         draggable
+                        onClick={() => {
+                          // Single click selects in panel; adding is done via drag or the + button
+                          onWidgetSelect?.(widget);
+                        }}
                         onDragStart={(e) => {
                           e.dataTransfer.setData('application/json', JSON.stringify(widget));
                           e.dataTransfer.effectAllowed = 'copy';
@@ -409,10 +622,7 @@ const UnifiedDesignPanel: React.FC<UnifiedDesignPanelProps> = ({
                         onDragEnd={(e) => {
                           e.currentTarget.style.opacity = '1';
                         }}
-                        onClick={() => {
-                          onWidgetSelect(widget);
-                          // Don't auto-add on click, let user drag to canvas
-                        }}
+                        // removed duplicate onClick to avoid handler conflicts
                         bodyStyle={{ padding: '8px', textAlign: 'center' }}
                       >
                         <div style={{ color: isDarkMode ? '#ffffff' : '#000000' }}>
@@ -446,8 +656,370 @@ const UnifiedDesignPanel: React.FC<UnifiedDesignPanelProps> = ({
     </div>
   );
 
+  // Render Style Properties - NO DUPLICATIONS with Content tab
+  const renderStyleProperties = () => (
+    <div>
+      <Collapse size="small" ghost>
+        <Panel header="Appearance" key="appearance">
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item label="Background" name="backgroundColor">
+                <ColorPicker 
+                  onChange={(color) => {
+                    if (selectedWidget && onConfigUpdate) {
+                      onConfigUpdate(selectedWidget.id, { backgroundColor: color.toHexString() });
+                    }
+                  }}
+                />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="Border Color" name="borderColor">
+                <ColorPicker 
+                  onChange={(color) => {
+                    if (selectedWidget && onConfigUpdate) {
+                      onConfigUpdate(selectedWidget.id, { borderColor: color.toHexString() });
+                    }
+                  }}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item label="Border Width" name="borderWidth">
+                <InputNumber min={0} max={10} />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="Border Radius" name="borderRadius">
+                <InputNumber min={0} max={50} />
+              </Form.Item>
+            </Col>
+          </Row>
+        </Panel>
+        
+        <Panel header="Layout" key="layout">
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item label="Padding" name="padding">
+                <InputNumber 
+                  min={0} 
+                  max={100} 
+                  onChange={(value) => {
+                    if (selectedWidget && onConfigUpdate) {
+                      onConfigUpdate(selectedWidget.id, { padding: value });
+                    }
+                  }}
+                />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="Margin" name="margin">
+                <InputNumber 
+                  min={0} 
+                  max={100} 
+                  onChange={(value) => {
+                    if (selectedWidget && onConfigUpdate) {
+                      onConfigUpdate(selectedWidget.id, { margin: value });
+                    }
+                  }}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+        </Panel>
+        
+        <Panel header="Effects" key="effects">
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item label="Opacity" name="opacity">
+                <Slider min={0} max={1} step={0.1} />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="Box Shadow" name="boxShadow">
+                <Select>
+                  <Option value="none">None</Option>
+                  <Option value="small">Small</Option>
+                  <Option value="medium">Medium</Option>
+                  <Option value="large">Large</Option>
+                </Select>
+              </Form.Item>
+            </Col>
+          </Row>
+        </Panel>
+      </Collapse>
+    </div>
+  );
+
+  // Render Data Properties
+  const renderDataProperties = () => (
+    <div>
+      <DataSourceConfig 
+        widget={selectedWidget} 
+        onUpdate={handleConfigUpdate} 
+      />
+
+      <Divider />
+      <div style={{ marginBottom: 12 }}>
+        <Title level={5} style={{ margin: 0 }}>Snapshots</Title>
+        <Text type="secondary" style={{ fontSize: 12 }}>Bind saved snapshots to this widget</Text>
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+        <Button size="small" onClick={async () => {
+          try {
+            const res = await fetch(`${getBackendUrlForApi()}/api/queries/snapshots`);
+            if (res.status === 403) { setPermissionModalVisible(true); return; }
+            if (!res.ok) throw new Error('Failed to load');
+            const j = await res.json();
+            setSnapshotsList(Array.isArray(j.items) ? j.items : []);
+            message.success('Snapshots loaded');
+          } catch (e) { message.error('Failed to load snapshots'); }
+        }}>Load Snapshots</Button>
+        <Select
+          size="small"
+          style={{ minWidth: 220 }}
+          placeholder="Select snapshot to bind"
+          value={selectedSnapshotId || undefined}
+          onChange={(v) => setSelectedSnapshotId(v)}
+          options={(snapshotsList || []).map(s => ({ value: s.id, label: `${s.name || 'snapshot-'+s.id} (${s.row_count || 0} rows)` }))}
+        />
+        <Button size="small" type="primary" onClick={async () => {
+          if (!selectedWidget) return message.warning('Select a widget first');
+          if (!selectedSnapshotId) return message.warning('Select a snapshot');
+          try {
+            const confirmed = await new Promise<boolean>((resolve) => {
+              Modal.confirm({
+                title: 'Bind Snapshot',
+                content: 'Bind selected snapshot to this widget? This can be undone.',
+                okText: 'Bind',
+                cancelText: 'Cancel',
+                onOk: () => resolve(true),
+                onCancel: () => resolve(false)
+              });
+            });
+            if (!confirmed) return;
+
+            const res = await fetch(`${getBackendUrlForApi()}/api/queries/snapshots/${selectedSnapshotId}`);
+            if (res.status === 403) { setPermissionModalVisible(true); return; }
+            if (!res.ok) throw new Error('Failed to fetch snapshot');
+            const j = await res.json();
+            const snap = j.snapshot;
+            if (!snap) throw new Error('Snapshot empty');
+
+            // Save previous state for undo
+            const prevData = selectedWidget.data || {};
+
+            // Bind snapshot to widget by updating widget data
+            onConfigUpdate(selectedWidget.id, {
+              data: { snapshotId: snap.id, rows: snap.rows, columns: snap.columns },
+              dataSource: snap.data_source_id,
+              query: snap.sql
+            });
+
+            // Show undo option
+            message.success({
+              content: 'Snapshot bound to widget',
+              duration: 5,
+              onClose: undefined
+            });
+
+            // Visual badge update: optimistic UI
+            try {
+              // if widget object has an id and we're using a live dashboard, persist widget change
+              if (selectedWidget && selectedWidget.dashboardId) {
+                await fetch(`${getBackendUrlForApi()}/charts/builder/widget/${selectedWidget.id}`, {
+                  method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ data: { snapshotId: snap.id, rows: snap.rows, columns: snap.columns }, dataSource: snap.data_source_id, query: snap.sql })
+                });
+              }
+            } catch (e) {
+              // swallow persistence errors; user already has undo available
+              console.warn('Failed to persist widget binding', e);
+            }
+
+            // Add Undo action via notification
+            message.info({
+              content: (
+                <span>
+                  Bound. <a onClick={() => { onConfigUpdate(selectedWidget.id, { data: prevData }); message.success('Undo complete'); }}>Undo</a>
+                </span>
+              ),
+              duration: 8
+            });
+
+          } catch (e:any) { console.error(e); message.error(e.message || 'Bind failed'); }
+        }}>Bind Snapshot</Button>
+        <Button size="small" onClick={async () => {
+          if (!selectedWidget) return message.warning('Select a widget first');
+          const sid = selectedWidget.data?.snapshotId;
+          if (!sid) return message.warning('Widget not bound to snapshot');
+          try {
+            const res = await fetch(`${getBackendUrlForApi()}/api/queries/snapshots/${sid}`);
+            if (res.status === 403) { setPermissionModalVisible(true); return; }
+            if (!res.ok) throw new Error('Failed to fetch snapshot');
+            const j = await res.json();
+            const snap = j.snapshot;
+            onConfigUpdate(selectedWidget.id, { data: { snapshotId: snap.id, rows: snap.rows, columns: snap.columns } });
+            message.success('Snapshot refreshed');
+          } catch (e:any) { console.error(e); message.error(e.message || 'Refresh failed'); }
+        }}>Refresh Snapshot</Button>
+        <Button size="small" danger onClick={async () => {
+          if (!selectedWidget) return message.warning('Select a widget first');
+          const confirmed = await new Promise<boolean>((resolve) => {
+            Modal.confirm({
+              title: 'Unbind Snapshot',
+              content: 'Are you sure you want to unbind the snapshot from this widget? This can be undone.',
+              okText: 'Unbind',
+              cancelText: 'Cancel',
+              onOk: () => resolve(true),
+              onCancel: () => resolve(false)
+            });
+          });
+          if (!confirmed) return;
+
+          // Save previous state for undo
+          const prevData = selectedWidget.data || {};
+
+          onConfigUpdate(selectedWidget.id, { data: { snapshotId: null, rows: [], columns: [] }, dataSource: undefined, query: undefined });
+          message.success({
+            content: 'Snapshot unbound',
+            duration: 5
+          });
+          message.info({
+            content: (
+              <span>
+                Unbound. <a onClick={() => { onConfigUpdate(selectedWidget.id, { data: prevData }); message.success('Undo complete'); }}>Undo</a>
+              </span>
+            ),
+            duration: 8
+          });
+        }}>Unbind</Button>
+      </div>
+    </div>
+  );
+
+  // Render Behavior Properties
+  const renderBehaviorProperties = () => (
+    <div>
+      <Collapse size="small" ghost>
+        <Panel header="Interaction & Behavior" key="interaction">
+          <Form.Item label="Clickable" name="behaviorClickable" valuePropName="checked">
+            <Switch />
+          </Form.Item>
+          <Form.Item label="Hoverable" name="behaviorHoverable" valuePropName="checked">
+            <Switch />
+          </Form.Item>
+          <Form.Item label="Selectable" name="behaviorSelectable" valuePropName="checked">
+            <Switch />
+          </Form.Item>
+          <Form.Item label="On Hover" name="behaviorOnHover">
+            <Select>
+              <Option value="highlight">Highlight</Option>
+              <Option value="tooltip">Show Tooltip</Option>
+              <Option value="none">None</Option>
+            </Select>
+          </Form.Item>
+          <Form.Item label="On Click" name="behaviorOnClick">
+            <Select>
+              <Option value="select">Select</Option>
+              <Option value="drill">Drill Down</Option>
+              <Option value="navigate">Navigate</Option>
+              <Option value="none">None</Option>
+            </Select>
+          </Form.Item>
+        </Panel>
+        
+        <Panel header="Visibility & Display" key="visibility">
+          <Form.Item label="Visible" name="isVisible" valuePropName="checked">
+            <Switch 
+              onChange={(checked) => {
+                if (selectedWidget && onConfigUpdate) {
+                  onConfigUpdate(selectedWidget.id, { isVisible: checked });
+                }
+              }}
+            />
+          </Form.Item>
+          <Form.Item label="Show on Mobile" name="layoutShowOnMobile" valuePropName="checked">
+            <Switch />
+          </Form.Item>
+          <Form.Item label="Show on Tablet" name="layoutShowOnTablet" valuePropName="checked">
+            <Switch />
+          </Form.Item>
+          <Form.Item label="Show on Desktop" name="layoutShowOnDesktop" valuePropName="checked">
+            <Switch />
+          </Form.Item>
+          <Form.Item label="Locked" name="isLocked" valuePropName="checked">
+            <Switch 
+              onChange={(checked) => {
+                if (selectedWidget && onConfigUpdate) {
+                  onConfigUpdate(selectedWidget.id, { isLocked: checked });
+                }
+              }}
+            />
+          </Form.Item>
+        </Panel>
+        
+        <Panel header="Data & Refresh" key="data-refresh">
+          <Form.Item label="Auto Refresh" name="dataAutoRefresh" valuePropName="checked">
+            <Switch />
+          </Form.Item>
+          <Form.Item label="Refresh Interval" name="dataRefreshInterval">
+            <Select placeholder="Select interval">
+              <Option value={0}>No auto refresh</Option>
+              <Option value={30}>30 seconds</Option>
+              <Option value={60}>1 minute</Option>
+              <Option value={300}>5 minutes</Option>
+              <Option value={900}>15 minutes</Option>
+              <Option value={1800}>30 minutes</Option>
+              <Option value={3600}>1 hour</Option>
+            </Select>
+          </Form.Item>
+          <Form.Item label="Cache Data" name="dataCache" valuePropName="checked">
+            <Switch />
+          </Form.Item>
+          <Form.Item label="Cache Timeout" name="dataCacheTimeout">
+            <InputNumber min={60} max={3600} placeholder="seconds" />
+          </Form.Item>
+        </Panel>
+        
+        <Panel header="Responsive Behavior" key="responsive">
+          <Form.Item label="Responsive" name="responsive" valuePropName="checked">
+            <Switch />
+          </Form.Item>
+          <Form.Item label="Draggable" name="draggable" valuePropName="checked">
+            <Switch />
+          </Form.Item>
+          <Form.Item label="Resizable" name="resizable" valuePropName="checked">
+            <Switch />
+          </Form.Item>
+          <Form.Item label="Breakpoint - Mobile" name="layoutBreakpointsXs">
+            <Input.Group compact>
+              <InputNumber placeholder="W" min={1} max={12} style={{ width: '50%' }} />
+              <InputNumber placeholder="H" min={1} max={20} style={{ width: '50%' }} />
+            </Input.Group>
+          </Form.Item>
+          <Form.Item label="Breakpoint - Tablet" name="layoutBreakpointsMd">
+            <Input.Group compact>
+              <InputNumber placeholder="W" min={1} max={12} style={{ width: '50%' }} />
+              <InputNumber placeholder="H" min={1} max={20} style={{ width: '50%' }} />
+            </Input.Group>
+          </Form.Item>
+          <Form.Item label="Breakpoint - Desktop" name="layoutBreakpointsLg">
+            <Input.Group compact>
+              <InputNumber placeholder="W" min={1} max={12} style={{ width: '50%' }} />
+              <InputNumber placeholder="H" min={1} max={20} style={{ width: '50%' }} />
+            </Input.Group>
+          </Form.Item>
+        </Panel>
+      </Collapse>
+    </div>
+  );
+
   // Render Properties Tab
   const renderProperties = () => {
+    
     if (!selectedWidget) {
       return (
         <div style={{ 
@@ -469,94 +1041,108 @@ const UnifiedDesignPanel: React.FC<UnifiedDesignPanelProps> = ({
       );
     }
 
+    // FORCE RE-RENDER: Clear any cached content and show widget properties
+
     return (
       <div style={{ height: '100%', overflow: 'auto' }}>
+        {/* DEBUG: Visual indicator that renderProperties is working */}
+        <div style={{ 
+          background: '#52c41a', 
+          color: 'white', 
+          padding: '8px', 
+          marginBottom: '16px',
+          borderRadius: '4px',
+          fontSize: '12px'
+        }}>
+          ✅ PROPERTIES PANEL WORKING - Widget: {selectedWidget.name} (ID: {selectedWidget.id})
+        </div>
+        
         {/* Widget Header */}
         <div style={{ 
           padding: '16px', 
-          background: isDarkMode ? '#1f1f1f' : '#f5f5f5',
-          borderRadius: '8px',
+          borderBottom: `1px solid ${isDarkMode ? '#333' : '#f0f0f0'}`,
           marginBottom: '16px'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
-            <Avatar 
-              size="small" 
-              style={{ backgroundColor: ENHANCED_WIDGET_CATEGORIES[selectedWidget.category as keyof typeof ENHANCED_WIDGET_CATEGORIES]?.color || '#1890ff' }}
-            >
-              {selectedWidget.icon}
-            </Avatar>
-            <Title level={5} style={{ margin: '0 0 0 8px', color: isDarkMode ? '#ffffff' : '#000000' }}>
-              {selectedWidget.name}
+          <Title level={5} style={{ margin: 0, marginBottom: '8px' }}>
+            {selectedWidget.name} Properties
             </Title>
-          </div>
           <Text type="secondary" style={{ fontSize: '12px' }}>
-            {selectedWidget.tooltip}
+            Configure the properties for your {selectedWidget.type} widget
           </Text>
         </div>
 
-        {/* Properties Tabs */}
-        <Tabs
+        {/* Properties Form */}
+        <Form
+          form={form}
+          layout="vertical"
+          onValuesChange={handleConfigUpdate}
+          onFieldsChange={(changedFields, allFields) => {
+            // Handle field changes immediately
+            const values = form.getFieldsValue();
+            handleConfigUpdate(values);
+          }}
+          style={{ padding: '0 16px' }}
+        >
+          {/* Content Tab */}
+          <Collapse 
+            defaultActiveKey={['content']} 
           size="small"
-          style={{ marginTop: '-8px' }}
-          defaultActiveKey="content"
-          items={[
-            {
-              key: 'content',
-              label: (
-                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <SettingOutlined />
+            style={{ marginBottom: '16px' }}
+          >
+            <Collapse.Panel 
+              header={
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <FileTextOutlined />
                   <span>Content</span>
                 </span>
-              ),
-              children: (
-                <Form form={form} layout="horizontal" onValuesChange={handleConfigUpdate} size="small" labelCol={{ span: 8 }} wrapperCol={{ span: 16 }}>
+              } 
+              key="content"
+            >
                   {renderContentProperties()}
-                </Form>
-              )
-            },
-            {
-              key: 'style',
-              label: (
-                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            </Collapse.Panel>
+            
+            <Collapse.Panel 
+              header={
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <BgColorsOutlined />
                   <span>Style</span>
                 </span>
-              ),
-              children: (
-                <Form form={form} layout="horizontal" onValuesChange={handleStyleUpdate} size="small" labelCol={{ span: 8 }} wrapperCol={{ span: 16 }}>
+              } 
+              key="style"
+            >
                   {renderStyleProperties()}
-                </Form>
-              )
-            },
-            {
-              key: 'data',
-              label: (
-                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            </Collapse.Panel>
+            
+            <Collapse.Panel 
+              header={
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <DatabaseOutlined />
                   <span>Data</span>
                 </span>
-              ),
-              children: renderDataProperties()
-            },
-            {
-              key: 'behavior',
-              label: (
-                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <CodeOutlined />
+              } 
+              key="data"
+            >
+              {renderDataProperties()}
+            </Collapse.Panel>
+            
+            <Collapse.Panel 
+              header={
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <SettingOutlined />
                   <span>Behavior</span>
                 </span>
-              ),
-              children: (
-                <Form form={form} layout="horizontal" onValuesChange={handleConfigUpdate} size="small" labelCol={{ span: 8 }} wrapperCol={{ span: 16 }}>
+              } 
+              key="behavior"
+            >
                   {renderBehaviorProperties()}
+            </Collapse.Panel>
+          </Collapse>
                 </Form>
-              )
-            }
-          ]}
-        />
       </div>
     );
   };
+
+  // Render Style Properties - NO DUPLICATIONS with Content tab
 
   // Render Content Properties based on widget type
   const renderContentProperties = () => {
@@ -573,7 +1159,7 @@ const UnifiedDesignPanel: React.FC<UnifiedDesignPanelProps> = ({
       case 'heatmap':
       case 'funnel':
       case 'gauge':
-        return <AdvancedChartConfig widget={selectedWidget} onUpdate={handleConfigUpdate} />;
+        return renderChartContentProperties();
       
       case 'table':
       case 'pivot':
@@ -867,443 +1453,1708 @@ const UnifiedDesignPanel: React.FC<UnifiedDesignPanelProps> = ({
     }
   };
 
-  // Render Style Properties
-  const renderStyleProperties = () => (
-    <div>
-      <Collapse size="small" ghost>
-        <Panel header="Layout & Positioning" key="layout">
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item label="Width" name={['layout', 'width']}>
-                <InputNumber min={100} max={2000} placeholder="px" />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item label="Height" name={['layout', 'height']}>
-                <InputNumber min={100} max={2000} placeholder="px" />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item label="Min Width" name={['layout', 'minWidth']}>
-                <InputNumber min={50} max={1000} placeholder="px" />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item label="Min Height" name={['layout', 'minHeight']}>
-                <InputNumber min={50} max={1000} placeholder="px" />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Form.Item label="Responsive" name={['layout', 'responsive']} valuePropName="checked">
-            <Switch />
-          </Form.Item>
-          <Form.Item label="Draggable" name={['layout', 'isDraggable']} valuePropName="checked">
-            <Switch />
-          </Form.Item>
-          <Form.Item label="Resizable" name={['layout', 'isResizable']} valuePropName="checked">
-            <Switch />
-          </Form.Item>
-        </Panel>
+  // Get default configuration for widget type
+  const getDefaultConfig = (widgetType: string) => {
+    const defaults: Record<string, any> = {
+      bar: {
+        // Title & Subtitle
+        title: 'Bar Chart',
+        subtitle: 'Professional visualization',
         
-        <Panel header="Background & Borders" key="background">
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item label="Background" name={['style', 'backgroundColor']}>
-                <ColorPicker />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item label="Border Color" name={['style', 'borderColor']}>
-                <ColorPicker />
+        // Visual Configuration
+        colorPalette: 'default',
+        theme: 'auto',
+        legendShow: true,
+        legendPosition: 'top',
+        tooltipShow: true,
+        tooltipTrigger: 'axis',
+        tooltipFormatter: 'default',
+        tooltipCustomFormatter: '',
+        animation: true,
+        animationDuration: 1000,
+        seriesLabelShow: false,
+        seriesLabelPosition: 'top',
+        
+        // Data Configuration
+        xAxisField: 'category',
+        yAxisField: 'value',
+        seriesField: 'auto',
+        dataLimit: 1000,
+        showXAxis: true,
+        showYAxis: true,
+        dataLabelsShow: false,
+        dataLabelsFormat: 'auto',
+        
+        // Layout & Positioning
+        responsive: true,
+        draggable: true,
+        resizable: true,
+        backgroundColor: 'transparent',
+        borderColor: '#d9d9d9',
+        padding: 16,
+        margin: 8,
+        
+        // Typography
+        fontFamily: 'Arial',
+        fontSize: 12,
+        fontWeight: 'normal',
+        textColor: '#000000',
+        
+        // Effects & Animation
+        animationType: 'fadeIn',
+        animationDelay: 0,
+        shadowEffect: false,
+        glowEffect: false,
+        
+        // Advanced
+        customOptions: '',
+        performanceMode: false,
+        autoResize: true,
+        lazyLoading: false,
+        
+        // Data Zoom
+        dataZoomShow: false,
+        dataZoomType: 'inside',
+        dataZoomStart: 0,
+        dataZoomEnd: 100,
+        
+        // Mark Points & Lines
+        markPointShow: false,
+        markLineShow: false,
+        markPointMax: false,
+        markPointMin: false,
+        markLineAverage: false,
+        
+        // Brush Selection
+        brushShow: false,
+        brushType: 'rect',
+        
+        // Visual Mapping
+        visualMapShow: false,
+        visualMapDimension: '0',
+        visualMapMin: undefined,
+        visualMapMax: undefined,
+        
+        // Accessibility
+        ariaEnabled: true,
+        ariaLabel: 'Bar chart showing data values'
+      },
+      line: {
+        // Title & Subtitle
+        title: 'Line Chart',
+        subtitle: 'Trend visualization',
+        
+        // Visual Configuration
+        colorPalette: 'default',
+        theme: 'auto',
+        legendShow: true,
+        legendPosition: 'top',
+        tooltipShow: true,
+        tooltipTrigger: 'axis',
+        tooltipFormatter: 'default',
+        tooltipCustomFormatter: '',
+        animation: true,
+        animationDuration: 1000,
+        seriesLabelShow: false,
+        seriesLabelPosition: 'top',
+        
+        // Data Configuration
+        xAxisField: 'time',
+        yAxisField: 'value',
+        seriesField: 'auto',
+        dataLimit: 1000,
+        showXAxis: true,
+        showYAxis: true,
+        dataLabelsShow: false,
+        dataLabelsFormat: 'auto',
+        
+        // Layout & Positioning
+        responsive: true,
+        draggable: true,
+        resizable: true,
+        backgroundColor: 'transparent',
+        borderColor: '#d9d9d9',
+        padding: 16,
+        margin: 8,
+        
+        // Typography
+        fontFamily: 'Arial',
+        fontSize: 12,
+        fontWeight: 'normal',
+        textColor: '#000000',
+        
+        // Effects & Animation
+        animationType: 'fadeIn',
+        animationDelay: 0,
+        shadowEffect: false,
+        glowEffect: false,
+        
+        // Advanced
+        customOptions: '',
+        performanceMode: false,
+        autoResize: true,
+        lazyLoading: false,
+        
+        // Data Zoom
+        dataZoomShow: true,
+        dataZoomType: 'inside',
+        dataZoomStart: 0,
+        dataZoomEnd: 100,
+        
+        // Mark Points & Lines
+        markPointShow: true,
+        markLineShow: true,
+        markPointMax: true,
+        markPointMin: true,
+        markLineAverage: true,
+        
+        // Brush Selection
+        brushShow: false,
+        brushType: 'rect',
+        
+        // Visual Mapping
+        visualMapShow: false,
+        visualMapDimension: '0',
+        visualMapMin: undefined,
+        visualMapMax: undefined,
+        
+        // Accessibility
+        ariaEnabled: true,
+        ariaLabel: 'Line chart showing trend data'
+      },
+      pie: {
+        // Title & Subtitle
+        title: 'Pie Chart',
+        subtitle: 'Proportion visualization',
+        
+        // Visual Configuration
+        colorPalette: 'default',
+        theme: 'auto',
+        legendShow: true,
+        legendPosition: 'right',
+        tooltipShow: true,
+        tooltipTrigger: 'item',
+        tooltipFormatter: 'percentage',
+        tooltipCustomFormatter: '{b}: {d}%',
+        animation: true,
+        animationDuration: 1000,
+        seriesLabelShow: true,
+        seriesLabelPosition: 'outside',
+        
+        // Data Configuration
+        xAxisField: 'category',
+        yAxisField: 'value',
+        seriesField: 'auto',
+        dataLimit: 1000,
+        showXAxis: false,
+        showYAxis: false,
+        dataLabelsShow: true,
+        dataLabelsFormat: 'percentage',
+        
+        // Layout & Positioning
+        responsive: true,
+        draggable: true,
+        resizable: true,
+        backgroundColor: 'transparent',
+        borderColor: '#d9d9d9',
+        padding: 16,
+        margin: 8,
+        
+        // Typography
+        fontFamily: 'Arial',
+        fontSize: 12,
+        fontWeight: 'normal',
+        textColor: '#000000',
+        
+        // Effects & Animation
+        animationType: 'fadeIn',
+        animationDelay: 0,
+        shadowEffect: false,
+        glowEffect: false,
+        
+        // Advanced
+        customOptions: '',
+        performanceMode: false,
+        autoResize: true,
+        lazyLoading: false,
+        
+        // Data Zoom
+        dataZoomShow: false,
+        dataZoomType: 'inside',
+        dataZoomStart: 0,
+        dataZoomEnd: 100,
+        
+        // Mark Points & Lines
+        markPointShow: false,
+        markLineShow: false,
+        markPointMax: false,
+        markPointMin: false,
+        markLineAverage: false,
+        
+        // Brush Selection
+        brushShow: false,
+        brushType: 'rect',
+        
+        // Visual Mapping
+        visualMapShow: false,
+        visualMapDimension: '0',
+        visualMapMin: undefined,
+        visualMapMax: undefined,
+        
+        // Accessibility
+        ariaEnabled: true,
+        ariaLabel: 'Pie chart showing data proportions'
+      },
+      area: {
+        // Title & Subtitle
+        title: 'Area Chart',
+        subtitle: 'Area visualization',
+        
+        // Visual Configuration
+        colorPalette: 'default',
+        theme: 'auto',
+        legendShow: true,
+        legendPosition: 'top',
+        tooltipShow: true,
+        tooltipTrigger: 'axis',
+        tooltipFormatter: 'default',
+        tooltipCustomFormatter: '',
+        animation: true,
+        animationDuration: 1000,
+        seriesLabelShow: false,
+        seriesLabelPosition: 'top',
+        
+        // Data Configuration
+        xAxisField: 'time',
+        yAxisField: 'value',
+        seriesField: 'auto',
+        dataLimit: 1000,
+        showXAxis: true,
+        showYAxis: true,
+        dataLabelsShow: false,
+        dataLabelsFormat: 'auto',
+        
+        // Layout & Positioning
+        responsive: true,
+        draggable: true,
+        resizable: true,
+        backgroundColor: 'transparent',
+        borderColor: '#d9d9d9',
+        padding: 16,
+        margin: 8,
+        
+        // Typography
+        fontFamily: 'Arial',
+        fontSize: 12,
+        fontWeight: 'normal',
+        textColor: '#000000',
+        
+        // Effects & Animation
+        animationType: 'fadeIn',
+        animationDelay: 0,
+        shadowEffect: false,
+        glowEffect: false,
+        
+        // Advanced
+        customOptions: '',
+        performanceMode: false,
+        autoResize: true,
+        lazyLoading: false,
+        
+        // Data Zoom
+        dataZoomShow: true,
+        dataZoomType: 'inside',
+        dataZoomStart: 0,
+        dataZoomEnd: 100,
+        
+        // Mark Points & Lines
+        markPointShow: false,
+        markLineShow: false,
+        markPointMax: false,
+        markPointMin: false,
+        markLineAverage: false,
+        
+        // Brush Selection
+        brushShow: false,
+        brushType: 'rect',
+        
+        // Visual Mapping
+        visualMapShow: false,
+        visualMapDimension: '0',
+        visualMapMin: undefined,
+        visualMapMax: undefined,
+        
+        // Accessibility
+        ariaEnabled: true,
+        ariaLabel: 'Area chart showing filled data visualization'
+      },
+      scatter: {
+        // Title & Subtitle
+        title: 'Scatter Plot',
+        subtitle: 'Correlation visualization',
+        
+        // Visual Configuration
+        colorPalette: 'default',
+        theme: 'auto',
+        legendShow: true,
+        legendPosition: 'top',
+        tooltipShow: true,
+        tooltipTrigger: 'item',
+        tooltipFormatter: 'default',
+        tooltipCustomFormatter: '',
+        animation: true,
+        animationDuration: 1000,
+        seriesLabelShow: false,
+        seriesLabelPosition: 'top',
+        
+        // Data Configuration
+        xAxisField: 'x',
+        yAxisField: 'y',
+        seriesField: 'auto',
+        dataLimit: 1000,
+        showXAxis: true,
+        showYAxis: true,
+        dataLabelsShow: false,
+        dataLabelsFormat: 'auto',
+        
+        // Layout & Positioning
+        responsive: true,
+        draggable: true,
+        resizable: true,
+        backgroundColor: 'transparent',
+        borderColor: '#d9d9d9',
+        padding: 16,
+        margin: 8,
+        
+        // Typography
+        fontFamily: 'Arial',
+        fontSize: 12,
+        fontWeight: 'normal',
+        textColor: '#000000',
+        
+        // Effects & Animation
+        animationType: 'fadeIn',
+        animationDelay: 0,
+        shadowEffect: false,
+        glowEffect: false,
+        
+        // Advanced
+        customOptions: '',
+        performanceMode: false,
+        autoResize: true,
+        lazyLoading: false,
+        
+        // Data Zoom
+        dataZoomShow: true,
+        dataZoomType: 'inside',
+        dataZoomStart: 0,
+        dataZoomEnd: 100,
+        
+        // Mark Points & Lines
+        markPointShow: false,
+        markLineShow: false,
+        markPointMax: false,
+        markPointMin: false,
+        markLineAverage: false,
+        
+        // Brush Selection
+        brushShow: true,
+        brushType: 'rect',
+        
+        // Visual Mapping
+        visualMapShow: false,
+        visualMapDimension: '0',
+        visualMapMin: undefined,
+        visualMapMax: undefined,
+        
+        // Accessibility
+        ariaEnabled: true,
+        ariaLabel: 'Scatter plot showing data correlation'
+      },
+      radar: {
+        // Title & Subtitle
+        title: 'Radar Chart',
+        subtitle: 'Multi-dimensional visualization',
+        
+        // Visual Configuration
+        colorPalette: 'default',
+        theme: 'auto',
+        legendShow: true,
+        legendPosition: 'top',
+        tooltipShow: true,
+        tooltipTrigger: 'item',
+        tooltipFormatter: 'default',
+        tooltipCustomFormatter: '',
+        animation: true,
+        animationDuration: 1000,
+        seriesLabelShow: false,
+        seriesLabelPosition: 'top',
+        
+        // Data Configuration
+        xAxisField: 'category',
+        yAxisField: 'value',
+        seriesField: 'auto',
+        dataLimit: 1000,
+        showXAxis: false,
+        showYAxis: false,
+        dataLabelsShow: false,
+        dataLabelsFormat: 'auto',
+        
+        // Layout & Positioning
+        responsive: true,
+        draggable: true,
+        resizable: true,
+        backgroundColor: 'transparent',
+        borderColor: '#d9d9d9',
+        padding: 16,
+        margin: 8,
+        
+        // Typography
+        fontFamily: 'Arial',
+        fontSize: 12,
+        fontWeight: 'normal',
+        textColor: '#000000',
+        
+        // Effects & Animation
+        animationType: 'fadeIn',
+        animationDelay: 0,
+        shadowEffect: false,
+        glowEffect: false,
+        
+        // Advanced
+        customOptions: '',
+        performanceMode: false,
+        autoResize: true,
+        lazyLoading: false,
+        
+        // Data Zoom
+        dataZoomShow: false,
+        dataZoomType: 'inside',
+        dataZoomStart: 0,
+        dataZoomEnd: 100,
+        
+        // Mark Points & Lines
+        markPointShow: false,
+        markLineShow: false,
+        markPointMax: false,
+        markPointMin: false,
+        markLineAverage: false,
+        
+        // Brush Selection
+        brushShow: false,
+        brushType: 'rect',
+        
+        // Visual Mapping
+        visualMapShow: false,
+        visualMapDimension: '0',
+        visualMapMin: undefined,
+        visualMapMax: undefined,
+        
+        // Accessibility
+        ariaEnabled: true,
+        ariaLabel: 'Radar chart showing multi-dimensional data'
+      },
+      heatmap: {
+        // Title & Subtitle
+        title: 'Heatmap',
+        subtitle: 'Density visualization',
+        
+        // Visual Configuration
+        colorPalette: 'default',
+        theme: 'auto',
+        legendShow: true,
+        legendPosition: 'right',
+        tooltipShow: true,
+        tooltipTrigger: 'item',
+        tooltipFormatter: 'default',
+        tooltipCustomFormatter: '',
+        animation: true,
+        animationDuration: 1000,
+        seriesLabelShow: false,
+        seriesLabelPosition: 'top',
+        
+        // Data Configuration
+        xAxisField: 'x',
+        yAxisField: 'y',
+        seriesField: 'value',
+        dataLimit: 1000,
+        showXAxis: true,
+        showYAxis: true,
+        dataLabelsShow: false,
+        dataLabelsFormat: 'auto',
+        
+        // Layout & Positioning
+        responsive: true,
+        draggable: true,
+        resizable: true,
+        backgroundColor: 'transparent',
+        borderColor: '#d9d9d9',
+        padding: 16,
+        margin: 8,
+        
+        // Typography
+        fontFamily: 'Arial',
+        fontSize: 12,
+        fontWeight: 'normal',
+        textColor: '#000000',
+        
+        // Effects & Animation
+        animationType: 'fadeIn',
+        animationDelay: 0,
+        shadowEffect: false,
+        glowEffect: false,
+        
+        // Advanced
+        customOptions: '',
+        performanceMode: false,
+        autoResize: true,
+        lazyLoading: false,
+        
+        // Data Zoom
+        dataZoomShow: true,
+        dataZoomType: 'inside',
+        dataZoomStart: 0,
+        dataZoomEnd: 100,
+        
+        // Mark Points & Lines
+        markPointShow: false,
+        markLineShow: false,
+        markPointMax: false,
+        markPointMin: false,
+        markLineAverage: false,
+        
+        // Brush Selection
+        brushShow: true,
+        brushType: 'rect',
+        
+        // Visual Mapping
+        visualMapShow: true,
+        visualMapDimension: '2',
+        visualMapMin: 0,
+        visualMapMax: 100,
+        
+        // Accessibility
+        ariaEnabled: true,
+        ariaLabel: 'Heatmap showing data density'
+      },
+      funnel: {
+        // Title & Subtitle
+        title: 'Funnel Chart',
+        subtitle: 'Conversion visualization',
+        
+        // Visual Configuration
+        colorPalette: 'default',
+        theme: 'auto',
+        legendShow: true,
+        legendPosition: 'top',
+        tooltipShow: true,
+        tooltipTrigger: 'item',
+        tooltipFormatter: 'percentage',
+        tooltipCustomFormatter: '{b}: {d}%',
+        animation: true,
+        animationDuration: 1000,
+        seriesLabelShow: true,
+        seriesLabelPosition: 'inside',
+        
+        // Data Configuration
+        xAxisField: 'category',
+        yAxisField: 'value',
+        seriesField: 'auto',
+        dataLimit: 1000,
+        showXAxis: false,
+        showYAxis: false,
+        dataLabelsShow: true,
+        dataLabelsFormat: 'percentage',
+        
+        // Layout & Positioning
+        responsive: true,
+        draggable: true,
+        resizable: true,
+        backgroundColor: 'transparent',
+        borderColor: '#d9d9d9',
+        padding: 16,
+        margin: 8,
+        
+        // Typography
+        fontFamily: 'Arial',
+        fontSize: 12,
+        fontWeight: 'normal',
+        textColor: '#000000',
+        
+        // Effects & Animation
+        animationType: 'fadeIn',
+        animationDelay: 0,
+        shadowEffect: false,
+        glowEffect: false,
+        
+        // Advanced
+        customOptions: '',
+        performanceMode: false,
+        autoResize: true,
+        lazyLoading: false,
+        
+        // Data Zoom
+        dataZoomShow: false,
+        dataZoomType: 'inside',
+        dataZoomStart: 0,
+        dataZoomEnd: 100,
+        
+        // Mark Points & Lines
+        markPointShow: false,
+        markLineShow: false,
+        markPointMax: false,
+        markPointMin: false,
+        markLineAverage: false,
+        
+        // Brush Selection
+        brushShow: false,
+        brushType: 'rect',
+        
+        // Visual Mapping
+        visualMapShow: false,
+        visualMapDimension: '0',
+        visualMapMin: undefined,
+        visualMapMax: undefined,
+        
+        // Accessibility
+        ariaEnabled: true,
+        ariaLabel: 'Funnel chart showing conversion process'
+      },
+      gauge: {
+        // Title & Subtitle
+        title: 'Gauge Chart',
+        subtitle: 'Progress visualization',
+        
+        // Visual Configuration
+        colorPalette: 'default',
+        theme: 'auto',
+        legendShow: false,
+        legendPosition: 'top',
+        tooltipShow: true,
+        tooltipTrigger: 'item',
+        tooltipFormatter: 'default',
+        tooltipCustomFormatter: '',
+        animation: true,
+        animationDuration: 1000,
+        seriesLabelShow: true,
+        seriesLabelPosition: 'inside',
+        
+        // Data Configuration
+        xAxisField: 'category',
+        yAxisField: 'value',
+        seriesField: 'auto',
+        dataLimit: 1000,
+        showXAxis: false,
+        showYAxis: false,
+        dataLabelsShow: true,
+        dataLabelsFormat: 'percentage',
+        
+        // Layout & Positioning
+        responsive: true,
+        draggable: true,
+        resizable: true,
+        backgroundColor: 'transparent',
+        borderColor: '#d9d9d9',
+        padding: 16,
+        margin: 8,
+        
+        // Typography
+        fontFamily: 'Arial',
+        fontSize: 12,
+        fontWeight: 'normal',
+        textColor: '#000000',
+        
+        // Effects & Animation
+        animationType: 'fadeIn',
+        animationDelay: 0,
+        shadowEffect: false,
+        glowEffect: false,
+        
+        // Advanced
+        customOptions: '',
+        performanceMode: false,
+        autoResize: true,
+        lazyLoading: false,
+        
+        // Data Zoom
+        dataZoomShow: false,
+        dataZoomType: 'inside',
+        dataZoomStart: 0,
+        dataZoomEnd: 100,
+        
+        // Mark Points & Lines
+        markPointShow: false,
+        markLineShow: false,
+        markPointMax: false,
+        markPointMin: false,
+        markLineAverage: false,
+        
+        // Brush Selection
+        brushShow: false,
+        brushType: 'rect',
+        
+        // Visual Mapping
+        visualMapShow: false,
+        visualMapDimension: '0',
+        visualMapMin: undefined,
+        visualMapMax: undefined,
+        
+        // Accessibility
+        ariaEnabled: true,
+        ariaLabel: 'Gauge chart showing progress value'
+      }
+    };
+    
+    return defaults[widgetType] || defaults.bar;
+  };
+
+  // Render Chart Content Properties - ALL chart properties consolidated
+  const renderChartContentProperties = () => {
+    // Get defaults for the current widget type
+    const widgetDefaults = getDefaultConfig(selectedWidget?.type || 'bar');
+    
+    return (
+    <div>
+        <Collapse size="small" ghost defaultActiveKey={['title', 'visual', 'data', 'layout']}>
+        
+        {/* Title & Subtitle */}
+        <Panel header={
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <EditOutlined />
+            <span>Title & Subtitle</span>
+          </div>
+        } key="title">
+          <Row gutter={[8, 4]} style={{ marginBottom: '12px' }}>
+            <Col span={24}>
+              <Form.Item label="Title" name="title" style={{ marginBottom: '8px' }}>
+                <Input 
+                  placeholder="Chart Title" 
+                  size="small"
+                  onChange={(e) => {
+                    // Direct update without form dependency
+                    if (selectedWidget && onConfigUpdate) {
+                      onConfigUpdate(selectedWidget.id, { title: (e.target as HTMLInputElement).value });
+                    }
+                  }}
+                  onInput={(e) => {
+                    // Direct update without form dependency
+                    if (selectedWidget && onConfigUpdate) {
+                      onConfigUpdate(selectedWidget.id, { title: (e.target as HTMLInputElement).value });
+                    }
+                  }}
+                />
               </Form.Item>
             </Col>
           </Row>
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item label="Plot Background" name={['config', 'plotBackgroundColor']}>
-                <ColorPicker />
+          <Row gutter={[8, 4]} style={{ marginBottom: '12px' }}>
+            <Col span={24}>
+              <Form.Item label="Subtitle" name="subtitle" style={{ marginBottom: '8px' }}>
+                <Input 
+                  placeholder="Chart Subtitle (optional)" 
+                  size="small"
+                  onChange={(e) => {
+                    // Direct update without form dependency
+                    if (selectedWidget && onConfigUpdate) {
+                      onConfigUpdate(selectedWidget.id, { subtitle: (e.target as HTMLInputElement).value });
+                    }
+                  }}
+                  onInput={(e) => {
+                    // Direct update without form dependency
+                    if (selectedWidget && onConfigUpdate) {
+                      onConfigUpdate(selectedWidget.id, { subtitle: (e.target as HTMLInputElement).value });
+                    }
+                  }}
+                />
               </Form.Item>
             </Col>
           </Row>
-          <Row gutter={16}>
+        </Panel>
+
+        {/* Visual Configuration */}
+        <Panel header={
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <BgColorsOutlined />
+            <span>Visual</span>
+          </div>
+        } key="visual">
+          
+          {/* Color Palette */}
+          <Row gutter={[8, 4]} style={{ marginBottom: '12px' }}>
+            <Col span={24}>
+            <Form.Item label="Color Palette" name="colorPalette" style={{ marginBottom: '8px' }}>
+                <Select 
+                  placeholder="Select color palette" 
+                  size="small"
+                  onChange={(value) => {
+                    if (selectedWidget && onConfigUpdate) {
+                      onConfigUpdate(selectedWidget.id, { colorPalette: value });
+                    }
+                  }}
+                >
+                <Option value="default">Default</Option>
+                <Option value="vibrant">Vibrant</Option>
+                <Option value="pastel">Pastel</Option>
+                <Option value="monochrome">Monochrome</Option>
+                  <Option value="categorical">Categorical</Option>
+                  <Option value="tableau">Tableau</Option>
+                  <Option value="d3">D3</Option>
+                  <Option value="material">Material</Option>
+                  <Option value="highContrast">High Contrast</Option>
+              </Select>
+            </Form.Item>
+            </Col>
+          </Row>
+
+          {/* Theme */}
+          <Row gutter={[8, 4]} style={{ marginBottom: '12px' }}>
+            <Col span={24}>
+            <Form.Item label="Theme" name="theme" style={{ marginBottom: '8px' }}>
+                <Select 
+                  placeholder="Select theme" 
+                  size="small"
+                  onChange={(value) => {
+                    if (selectedWidget && onConfigUpdate) {
+                      onConfigUpdate(selectedWidget.id, { theme: value });
+                    }
+                  }}
+                >
+                <Option value="light">Light</Option>
+                <Option value="dark">Dark</Option>
+                <Option value="auto">Auto</Option>
+              </Select>
+            </Form.Item>
+            </Col>
+          </Row>
+
+          {/* Legend Configuration */}
+          <Row gutter={[8, 4]} style={{ marginBottom: '12px' }}>
             <Col span={12}>
-              <Form.Item label="Border Width" name={['style', 'borderWidth']}>
-                <InputNumber min={0} max={10} />
+              <Form.Item label="Show Legend" name="legendShow" valuePropName="checked" style={{ marginBottom: '8px' }}>
+                <Switch 
+                  size="small" 
+                  onChange={(checked) => {
+                    if (selectedWidget && onConfigUpdate) {
+                      onConfigUpdate(selectedWidget.id, { legendShow: checked });
+                    }
+                  }}
+                />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item label="Border Style" name={['style', 'borderStyle']}>
-                <Select>
-                  <Option value="solid">Solid</Option>
-                  <Option value="dashed">Dashed</Option>
-                  <Option value="dotted">Dotted</Option>
+              <Form.Item label="Legend Position" name="legendPosition" style={{ marginBottom: '8px' }}>
+                <Select 
+                  placeholder="Position" 
+                  size="small"
+                  onChange={(value) => {
+                    if (selectedWidget && onConfigUpdate) {
+                      onConfigUpdate(selectedWidget.id, { legendPosition: value });
+                    }
+                  }}
+                >
+                <Option value="top">Top</Option>
+                <Option value="bottom">Bottom</Option>
+                <Option value="left">Left</Option>
+                <Option value="right">Right</Option>
+                <Option value="inside">Inside</Option>
+                <Option value="insideTop">Inside Top</Option>
+                <Option value="insideBottom">Inside Bottom</Option>
+                <Option value="insideLeft">Inside Left</Option>
+                <Option value="insideRight">Inside Right</Option>
+              </Select>
+              </Form.Item>
+            </Col>
+          </Row>
+
+          {/* Tooltip Configuration */}
+          <Row gutter={[8, 4]} style={{ marginBottom: '12px' }}>
+            <Col span={12}>
+              <Form.Item label="Show Tooltip" name="tooltipShow" valuePropName="checked" style={{ marginBottom: '8px' }}>
+                <Switch 
+                  size="small" 
+                  onChange={(checked) => {
+                    if (selectedWidget && onConfigUpdate) {
+                      onConfigUpdate(selectedWidget.id, { tooltipShow: checked });
+                    }
+                  }}
+                />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="Tooltip Trigger" name="tooltipTrigger" style={{ marginBottom: '8px' }}>
+                <Select 
+                  placeholder="Trigger" 
+                  size="small"
+                  onChange={(value) => {
+                    if (selectedWidget && onConfigUpdate) {
+                      onConfigUpdate(selectedWidget.id, { tooltipTrigger: value });
+                    }
+                  }}
+                >
+                  <Option value="axis">Axis</Option>
+                  <Option value="item">Item</Option>
                   <Option value="none">None</Option>
                 </Select>
               </Form.Item>
             </Col>
           </Row>
-          <Form.Item label="Border Radius" name={['style', 'borderRadius']}>
-            <InputNumber min={0} max={50} />
-          </Form.Item>
-        </Panel>
         
-        <Panel header="Spacing & Padding" key="spacing">
-          <Row gutter={16}>
+          {/* Animation */}
+          <Row gutter={[8, 4]} style={{ marginBottom: '12px' }}>
             <Col span={12}>
-              <Form.Item label="Padding" name={['style', 'padding']}>
-                <InputNumber min={0} max={100} />
+            <Form.Item label="Animation" name="animation" valuePropName="checked" style={{ marginBottom: '8px' }}>
+                <Switch 
+                  size="small" 
+                  onChange={(checked) => {
+                    if (selectedWidget && onConfigUpdate) {
+                      onConfigUpdate(selectedWidget.id, { animation: checked });
+                    }
+                  }}
+                />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item label="Margin" name={['style', 'margin']}>
-                <InputNumber min={0} max={100} />
+            <Form.Item label="Animation Duration" name="animationDuration" style={{ marginBottom: '8px' }}>
+                <InputNumber 
+                  min={0} 
+                  max={5000} 
+                  step={100} 
+                  size="small" 
+                  style={{ width: '100%' }}
+                  onChange={(value) => {
+                    if (selectedWidget && onConfigUpdate) {
+                      onConfigUpdate(selectedWidget.id, { animationDuration: value });
+                    }
+                  }}
+                />
               </Form.Item>
             </Col>
           </Row>
-          <Form.Item label="Z-Index" name={['style', 'zIndex']}>
-            <InputNumber min={0} max={9999} />
-          </Form.Item>
-        </Panel>
-        
-        <Panel header="Typography" key="typography">
-          <Form.Item label="Font Family" name={['style', 'fontFamily']}>
-            <Select placeholder="Select font">
-              <Option value="Arial">Arial</Option>
-              <Option value="Helvetica">Helvetica</Option>
-              <Option value="Times New Roman">Times New Roman</Option>
-              <Option value="Georgia">Georgia</Option>
-              <Option value="Verdana">Verdana</Option>
-              <Option value="system-ui">System UI</Option>
-              <Option value="monospace">Monospace</Option>
-            </Select>
-          </Form.Item>
-          <Row gutter={16}>
+
+          {/* Series Label */}
+          <Row gutter={[8, 4]} style={{ marginBottom: '12px' }}>
             <Col span={12}>
-              <Form.Item label="Font Size" name={['style', 'fontSize']}>
-                <InputNumber min={8} max={72} />
+              <Form.Item label="Show Series Label" name="seriesLabelShow" valuePropName="checked" style={{ marginBottom: '8px' }}>
+                <Switch 
+                  size="small" 
+                  onChange={(checked) => {
+                    if (selectedWidget && onConfigUpdate) {
+                      onConfigUpdate(selectedWidget.id, { seriesLabelShow: checked });
+                    }
+                  }}
+                />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item label="Font Weight" name={['style', 'fontWeight']}>
-                <Select>
-                  <Option value="normal">Normal</Option>
-                  <Option value="bold">Bold</Option>
-                  <Option value="lighter">Light</Option>
-                  <Option value="bolder">Bolder</Option>
+              <Form.Item label="Label Position" name="seriesLabelPosition" style={{ marginBottom: '8px' }}>
+                <Select 
+                  placeholder="Position" 
+                  size="small"
+                  onChange={(value) => {
+                    if (selectedWidget && onConfigUpdate) {
+                      onConfigUpdate(selectedWidget.id, { seriesLabelPosition: value });
+                    }
+                  }}
+                >
+                <Option value="top">Top</Option>
+                <Option value="bottom">Bottom</Option>
+                <Option value="left">Left</Option>
+                <Option value="right">Right</Option>
+                  <Option value="inside">Inside</Option>
+                  <Option value="outside">Outside</Option>
+              </Select>
+              </Form.Item>
+            </Col>
+          </Row>
+
+          {/* Tooltip Formatter */}
+          <Row gutter={[8, 4]} style={{ marginBottom: '12px' }}>
+            <Col span={24}>
+              <Form.Item label="Tooltip Formatter" name="tooltipFormatter" style={{ marginBottom: '8px' }}>
+                <Select 
+                  placeholder="Select tooltip format" 
+                  size="small"
+                  onChange={(value) => {
+                    if (selectedWidget && onConfigUpdate) {
+                      onConfigUpdate(selectedWidget.id, { tooltipFormatter: value });
+                    }
+                  }}
+                >
+                  <Option value="default">Default Format</Option>
+                  <Option value="currency">Currency ($1,234.56)</Option>
+                  <Option value="percentage">Percentage (12.34%)</Option>
+                  <Option value="decimal">Decimal (1,234.56)</Option>
+                  <Option value="integer">Integer (1,234)</Option>
+                  <Option value="custom">Custom Format...</Option>
+                </Select>
+          </Form.Item>
+            </Col>
+          </Row>
+          
+          {/* Custom Tooltip Formatter */}
+          <Row gutter={[8, 4]} style={{ marginBottom: '12px' }}>
+            <Col span={24}>
+              <Form.Item label="Custom Format" name="tooltipCustomFormatter" style={{ marginBottom: '8px' }}>
+                <TextArea 
+                  placeholder="Example: '{b}: ${c}' (name: value)" 
+                  rows={2} 
+                  size="small"
+                  onChange={(e) => {
+                    if (selectedWidget && onConfigUpdate) {
+                      onConfigUpdate(selectedWidget.id, { tooltipCustomFormatter: e.target.value });
+                    }
+                  }}
+                />
+                <div style={{ fontSize: '11px', color: '#666', marginTop: '4px' }}>
+                  Variables: {'{b}'} = name, {'{c}'} = value, {'{d}'} = percentage
+                </div>
+            </Form.Item>
+            </Col>
+          </Row>
+        </Panel>
+        
+        {/* Data Configuration */}
+        <Panel header={
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <DatabaseOutlined />
+            <span>Data</span>
+          </div>
+        } key="data">
+          
+          {/* X Axis Configuration */}
+          <Row gutter={[8, 4]} style={{ marginBottom: '12px' }}>
+            <Col span={12}>
+              <Form.Item label="X Axis Field" name="xAxisField" style={{ marginBottom: '8px' }}>
+                <Select 
+                  placeholder="Select X axis field" 
+                  size="small"
+                  onChange={(value) => {
+                    if (selectedWidget && onConfigUpdate) {
+                      onConfigUpdate(selectedWidget.id, { xAxisField: value });
+                    }
+                  }}
+                >
+                  <Option value="category">Category</Option>
+                  <Option value="value">Value</Option>
+                  <Option value="time">Time</Option>
                 </Select>
               </Form.Item>
             </Col>
-          </Row>
-          <Row gutter={16}>
             <Col span={12}>
-              <Form.Item label="Text Color" name={['style', 'color']}>
-                <ColorPicker />
+              <Form.Item label="Show X Axis" name="showXAxis" valuePropName="checked" style={{ marginBottom: '8px' }}>
+                <Switch 
+                  size="small" 
+                  onChange={(checked) => {
+                    if (selectedWidget && onConfigUpdate) {
+                      onConfigUpdate(selectedWidget.id, { showXAxis: checked });
+                    }
+                  }}
+                />
               </Form.Item>
             </Col>
+          </Row>
+
+          {/* Y Axis Configuration */}
+          <Row gutter={[8, 4]} style={{ marginBottom: '12px' }}>
             <Col span={12}>
-              <Form.Item label="Text Align" name={['style', 'textAlign']}>
-                <Select>
-                  <Option value="left">Left</Option>
-                  <Option value="center">Center</Option>
-                  <Option value="right">Right</Option>
-                  <Option value="justify">Justify</Option>
+              <Form.Item label="Y Axis Field" name="yAxisField" style={{ marginBottom: '8px' }}>
+                <Select 
+                  placeholder="Select Y axis field" 
+                  size="small"
+                  onChange={(value) => {
+                    if (selectedWidget && onConfigUpdate) {
+                      onConfigUpdate(selectedWidget.id, { yAxisField: value });
+                    }
+                  }}
+                >
+                  <Option value="value">Value</Option>
+                <Option value="category">Category</Option>
+                  <Option value="time">Time</Option>
                 </Select>
+            </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="Show Y Axis" name="showYAxis" valuePropName="checked" style={{ marginBottom: '8px' }}>
+                <Switch 
+                  size="small" 
+                  onChange={(checked) => {
+                    if (selectedWidget && onConfigUpdate) {
+                      onConfigUpdate(selectedWidget.id, { showYAxis: checked });
+                    }
+                  }}
+                />
               </Form.Item>
             </Col>
           </Row>
-          <Form.Item label="Line Height" name={['style', 'lineHeight']}>
-            <InputNumber min={0.5} max={3} step={0.1} />
-          </Form.Item>
-        </Panel>
-        
-        <Panel header="Effects & Animation" key="effects">
-          <Form.Item label="Opacity" name={['style', 'opacity']}>
-            <Slider min={0} max={1} step={0.1} />
-          </Form.Item>
-          <Form.Item label="Box Shadow" name={['style', 'boxShadow']}>
-            <Select>
-              <Option value="none">None</Option>
-              <Option value="small">Small</Option>
-              <Option value="medium">Medium</Option>
-              <Option value="large">Large</Option>
-              <Option value="custom">Custom</Option>
-            </Select>
-          </Form.Item>
-          <Form.Item label="Animation Enabled" name={['animation', 'enabled']} valuePropName="checked">
-            <Switch />
-          </Form.Item>
-          <Form.Item label="Animation Duration" name={['animation', 'duration']}>
-            <InputNumber min={100} max={3000} step={100} placeholder="ms" />
-          </Form.Item>
-          <Form.Item label="Animation Type" name={['animation', 'type']}>
-            <Select>
-              <Option value="fade">Fade</Option>
-              <Option value="slide">Slide</Option>
-              <Option value="zoom">Zoom</Option>
-              <Option value="bounce">Bounce</Option>
-              <Option value="none">None</Option>
-            </Select>
-          </Form.Item>
-        </Panel>
-      </Collapse>
-    </div>
-  );
 
-  // Render Data Properties
-  const renderDataProperties = () => (
-    <div>
-      <DataSourceConfig 
-        widget={selectedWidget} 
-        onUpdate={handleConfigUpdate} 
-      />
-
-      <Divider />
-      <div style={{ marginBottom: 12 }}>
-        <Title level={5} style={{ margin: 0 }}>Snapshots</Title>
-        <Text type="secondary" style={{ fontSize: 12 }}>Bind saved snapshots to this widget</Text>
-      </div>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-        <Button size="small" onClick={async () => {
-          try {
-            const res = await fetch(`${getBackendUrlForApi()}/api/queries/snapshots`);
-            if (res.status === 403) { setPermissionModalVisible(true); return; }
-            if (!res.ok) throw new Error('Failed to load');
-            const j = await res.json();
-            setSnapshotsList(Array.isArray(j.items) ? j.items : []);
-            message.success('Snapshots loaded');
-          } catch (e) { message.error('Failed to load snapshots'); }
-        }}>Load Snapshots</Button>
+          {/* Series Field */}
+          <Row gutter={[8, 4]} style={{ marginBottom: '12px' }}>
+            <Col span={12}>
+              <Form.Item label="Series Field" name="seriesField" style={{ marginBottom: '8px' }}>
         <Select
+                  placeholder="Select series field" 
           size="small"
-          style={{ minWidth: 220 }}
-          placeholder="Select snapshot to bind"
-          value={selectedSnapshotId || undefined}
-          onChange={(v) => setSelectedSnapshotId(v)}
-          options={(snapshotsList || []).map(s => ({ value: s.id, label: `${s.name || 'snapshot-'+s.id} (${s.row_count || 0} rows)` }))}
-        />
-        <Button size="small" type="primary" onClick={async () => {
-          if (!selectedWidget) return message.warning('Select a widget first');
-          if (!selectedSnapshotId) return message.warning('Select a snapshot');
-          try {
-            const confirmed = await new Promise<boolean>((resolve) => {
-              Modal.confirm({
-                title: 'Bind Snapshot',
-                content: 'Bind selected snapshot to this widget? This can be undone.',
-                okText: 'Bind',
-                cancelText: 'Cancel',
-                onOk: () => resolve(true),
-                onCancel: () => resolve(false)
-              });
-            });
-            if (!confirmed) return;
+                  onChange={(value) => {
+                    if (selectedWidget && onConfigUpdate) {
+                      onConfigUpdate(selectedWidget.id, { seriesField: value });
+                    }
+                  }}
+                >
+                  <Option value="auto">Auto</Option>
+                  <Option value="manual">Manual</Option>
+                </Select>
+            </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="Data Limit" name="dataLimit" style={{ marginBottom: '8px' }}>
+                <InputNumber 
+                  min={1} 
+                  max={10000} 
+                  size="small" 
+                  style={{ width: '100%' }}
+                  onChange={(value) => {
+                    if (selectedWidget && onConfigUpdate) {
+                      onConfigUpdate(selectedWidget.id, { dataLimit: value });
+                    }
+                  }}
+                />
+            </Form.Item>
+            </Col>
+          </Row>
 
-            const res = await fetch(`${getBackendUrlForApi()}/api/queries/snapshots/${selectedSnapshotId}`);
-            if (res.status === 403) { setPermissionModalVisible(true); return; }
-            if (!res.ok) throw new Error('Failed to fetch snapshot');
-            const j = await res.json();
-            const snap = j.snapshot;
-            if (!snap) throw new Error('Snapshot empty');
+          {/* Data Labels */}
+          <Row gutter={[8, 4]} style={{ marginBottom: '12px' }}>
+            <Col span={12}>
+              <Form.Item label="Show Data Labels" name="dataLabelsShow" valuePropName="checked" style={{ marginBottom: '8px' }}>
+                <Switch 
+                  size="small" 
+                  onChange={(checked) => {
+                    if (selectedWidget && onConfigUpdate) {
+                      onConfigUpdate(selectedWidget.id, { dataLabelsShow: checked });
+                    }
+                  }}
+                />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="Label Format" name="dataLabelsFormat" style={{ marginBottom: '8px' }}>
+                <Select 
+                  placeholder="Format" 
+                  size="small"
+                  onChange={(value) => {
+                    if (selectedWidget && onConfigUpdate) {
+                      onConfigUpdate(selectedWidget.id, { dataLabelsFormat: value });
+                    }
+                  }}
+                >
+                  <Option value="auto">Auto</Option>
+                  <Option value="number">Number</Option>
+                <Option value="percentage">Percentage</Option>
+                  <Option value="currency">Currency</Option>
+              </Select>
+            </Form.Item>
+            </Col>
+          </Row>
+        </Panel>
 
-            // Save previous state for undo
-            const prevData = selectedWidget.data || {};
-
-            // Bind snapshot to widget by updating widget data
-            onConfigUpdate(selectedWidget.id, {
-              data: { snapshotId: snap.id, rows: snap.rows, columns: snap.columns },
-              dataSource: snap.data_source_id,
-              query: snap.sql
-            });
-
-            // Show undo option
-            message.success({
-              content: 'Snapshot bound to widget',
-              duration: 5,
-              onClose: undefined
-            });
-
-            // Visual badge update: optimistic UI
-            try {
-              // if widget object has an id and we're using a live dashboard, persist widget change
-              if (selectedWidget && selectedWidget.dashboardId) {
-                await fetch(`${getBackendUrlForApi()}/charts/builder/widget/${selectedWidget.id}`, {
-                  method: 'PUT', headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ data: { snapshotId: snap.id, rows: snap.rows, columns: snap.columns }, dataSource: snap.data_source_id, query: snap.sql })
-                });
-              }
-            } catch (e) {
-              // swallow persistence errors; user already has undo available
-              console.warn('Failed to persist widget binding', e);
-            }
-
-            // Add Undo action via notification
-            message.info({
-              content: (
-                <span>
-                  Bound. <a onClick={() => { onConfigUpdate(selectedWidget.id, { data: prevData }); message.success('Undo complete'); }}>Undo</a>
-                </span>
-              ),
-              duration: 8
-            });
-
-          } catch (e:any) { console.error(e); message.error(e.message || 'Bind failed'); }
-        }}>Bind Snapshot</Button>
-        <Button size="small" onClick={async () => {
-          if (!selectedWidget) return message.warning('Select a widget first');
-          const sid = selectedWidget.data?.snapshotId;
-          if (!sid) return message.warning('Widget not bound to snapshot');
-          try {
-            const res = await fetch(`${getBackendUrlForApi()}/api/queries/snapshots/${sid}`);
-            if (res.status === 403) { setPermissionModalVisible(true); return; }
-            if (!res.ok) throw new Error('Failed to fetch snapshot');
-            const j = await res.json();
-            const snap = j.snapshot;
-            onConfigUpdate(selectedWidget.id, { data: { snapshotId: snap.id, rows: snap.rows, columns: snap.columns } });
-            message.success('Snapshot refreshed');
-          } catch (e:any) { console.error(e); message.error(e.message || 'Refresh failed'); }
-        }}>Refresh Snapshot</Button>
-        <Button size="small" danger onClick={async () => {
-          if (!selectedWidget) return message.warning('Select a widget first');
-          const confirmed = await new Promise<boolean>((resolve) => {
-            Modal.confirm({
-              title: 'Unbind Snapshot',
-              content: 'Are you sure you want to unbind the snapshot from this widget? This can be undone.',
-              okText: 'Unbind',
-              cancelText: 'Cancel',
-              onOk: () => resolve(true),
-              onCancel: () => resolve(false)
-            });
-          });
-          if (!confirmed) return;
-
-          // Save previous state for undo
-          const prevData = selectedWidget.data || {};
-
-          onConfigUpdate(selectedWidget.id, { data: { snapshotId: null, rows: [], columns: [] }, dataSource: undefined, query: undefined });
-          message.success({
-            content: 'Snapshot unbound',
-            duration: 5
-          });
-          message.info({
-            content: (
-              <span>
-                Unbound. <a onClick={() => { onConfigUpdate(selectedWidget.id, { data: prevData }); message.success('Undo complete'); }}>Undo</a>
-              </span>
-            ),
-            duration: 8
-          });
-        }}>Unbind</Button>
+        {/* Layout & Positioning */}
+        <Panel header={
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <LayoutOutlined />
+            <span>Layout & Positioning</span>
       </div>
-    </div>
-  );
+        } key="layout">
+          
+          {/* Responsive Settings */}
+          <Row gutter={[8, 4]} style={{ marginBottom: '12px' }}>
+            <Col span={8}>
+              <Form.Item label="Responsive" name="responsive" valuePropName="checked" style={{ marginBottom: '8px' }}>
+                <Switch 
+                  size="small" 
+                  defaultChecked
+                  onChange={(checked) => {
+                    if (selectedWidget && onConfigUpdate) {
+                      onConfigUpdate(selectedWidget.id, { responsive: checked });
+                    }
+                  }}
+                />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item label="Draggable" name="draggable" valuePropName="checked" style={{ marginBottom: '8px' }}>
+                <Switch 
+                  size="small" 
+                  defaultChecked
+                  onChange={(checked) => {
+                    if (selectedWidget && onConfigUpdate) {
+                      onConfigUpdate(selectedWidget.id, { draggable: checked });
+                    }
+                  }}
+                />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item label="Resizable" name="resizable" valuePropName="checked" style={{ marginBottom: '8px' }}>
+                <Switch 
+                  size="small" 
+                  defaultChecked
+                  onChange={(checked) => {
+                    if (selectedWidget && onConfigUpdate) {
+                      onConfigUpdate(selectedWidget.id, { resizable: checked });
+                    }
+                  }}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
 
-  // Render Behavior Properties
-  const renderBehaviorProperties = () => (
-    <div>
-      <Collapse size="small" ghost>
-        <Panel header="Interaction & Behavior" key="interaction">
-          <Form.Item label="Clickable" name={['behavior', 'clickable']} valuePropName="checked">
-            <Switch />
+          {/* Background & Borders */}
+          <Row gutter={[8, 4]} style={{ marginBottom: '12px' }}>
+            <Col span={12}>
+              <Form.Item label="Background Color" name="backgroundColor" style={{ marginBottom: '8px' }}>
+                <ColorPicker 
+                  size="small" 
+                  onChange={(color) => {
+                    if (selectedWidget && onConfigUpdate) {
+                      onConfigUpdate(selectedWidget.id, { backgroundColor: color.toHexString() });
+                    }
+                  }}
+                />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="Border Color" name="borderColor" style={{ marginBottom: '8px' }}>
+                <ColorPicker 
+                  size="small" 
+                  onChange={(color) => {
+                    if (selectedWidget && onConfigUpdate) {
+                      onConfigUpdate(selectedWidget.id, { borderColor: color.toHexString() });
+                    }
+                  }}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          {/* Spacing & Padding */}
+          <Row gutter={[8, 4]} style={{ marginBottom: '12px' }}>
+            <Col span={12}>
+              <Form.Item label="Padding" name="padding" style={{ marginBottom: '8px' }}>
+                <InputNumber 
+                  min={0} 
+                  max={100} 
+                  size="small" 
+                  style={{ width: '100%' }}
+                  onChange={(value) => {
+                    if (selectedWidget && onConfigUpdate) {
+                      onConfigUpdate(selectedWidget.id, { padding: value });
+                    }
+                  }}
+                />
+            </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="Margin" name="margin" style={{ marginBottom: '8px' }}>
+                <InputNumber 
+                  min={0} 
+                  max={100} 
+                  size="small" 
+                  style={{ width: '100%' }}
+                  onChange={(value) => {
+                    if (selectedWidget && onConfigUpdate) {
+                      onConfigUpdate(selectedWidget.id, { margin: value });
+                    }
+                  }}
+                />
+            </Form.Item>
+            </Col>
+          </Row>
+        </Panel>
+
+        {/* Duplicate Typography panel removed (kept the main Typography Tab below) */}
+
+        {/* Effects & Animation */}
+        <Panel header={
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <ThunderboltOutlined />
+            <span>Effects & Animation</span>
+      </div>
+        } key="effects">
+          
+          {/* Animation Settings */}
+          <Row gutter={[8, 4]} style={{ marginBottom: '12px' }}>
+            <Col span={12}>
+              <Form.Item label="Animation Type" name="animationType" style={{ marginBottom: '8px' }}>
+                <Select placeholder="Animation type" size="small">
+                  <Option value="fadeIn">Fade In</Option>
+                  <Option value="slideIn">Slide In</Option>
+                  <Option value="bounceIn">Bounce In</Option>
+                  <Option value="zoomIn">Zoom In</Option>
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="Animation Delay" name="animationDelay" style={{ marginBottom: '8px' }}>
+                <InputNumber min={0} max={2000} step={100} size="small" style={{ width: '100%' }} />
+            </Form.Item>
+            </Col>
+          </Row>
+
+          {/* Effects */}
+          <Row gutter={[8, 4]} style={{ marginBottom: '12px' }}>
+            <Col span={12}>
+              <Form.Item label="Shadow Effect" name="shadowEffect" valuePropName="checked" style={{ marginBottom: '8px' }}>
+                <Switch size="small" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="Glow Effect" name="glowEffect" valuePropName="checked" style={{ marginBottom: '8px' }}>
+                <Switch size="small" />
+            </Form.Item>
+            </Col>
+          </Row>
+        </Panel>
+
+        {/* Advanced */}
+        <Panel header={
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <ToolOutlined />
+            <span>Advanced</span>
+    </div>
+        } key="advanced">
+          
+          {/* Custom ECharts Options */}
+          <Row gutter={[8, 4]} style={{ marginBottom: '12px' }}>
+            <Col span={24}>
+            <Form.Item label="Custom ECharts Options" name="customOptions" style={{ marginBottom: '8px' }}>
+              <TextArea 
+                  placeholder="Custom ECharts configuration (JSON)" 
+                rows={4} 
+                  size="small"
+              />
           </Form.Item>
-          <Form.Item label="Hoverable" name={['behavior', 'hoverable']} valuePropName="checked">
-            <Switch />
+            </Col>
+          </Row>
+
+          {/* Performance Settings */}
+          <Row gutter={[8, 4]} style={{ marginBottom: '12px' }}>
+            <Col span={8}>
+              <Form.Item label="Performance Mode" name="performanceMode" valuePropName="checked" style={{ marginBottom: '8px' }}>
+                <Switch size="small" />
           </Form.Item>
-          <Form.Item label="Selectable" name={['behavior', 'selectable']} valuePropName="checked">
-            <Switch />
+            </Col>
+            <Col span={8}>
+            <Form.Item label="Auto Resize" name="autoResize" valuePropName="checked" style={{ marginBottom: '8px' }}>
+                <Switch size="small" />
           </Form.Item>
-          <Form.Item label="Draggable" name={['behavior', 'draggable']} valuePropName="checked">
-            <Switch />
+            </Col>
+            <Col span={8}>
+              <Form.Item label="Lazy Loading" name="lazyLoading" valuePropName="checked" style={{ marginBottom: '8px' }}>
+                <Switch size="small" />
           </Form.Item>
-          <Form.Item label="Resizable" name={['behavior', 'resizable']} valuePropName="checked">
-            <Switch />
+            </Col>
+          </Row>
+        </Panel>
+
+        {/* Data Zoom Configuration */}
+        <Panel header={
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <ZoomInOutlined />
+            <span>Data Zoom</span>
+          </div>
+        } key="dataZoom">
+          <Row gutter={[8, 4]} style={{ marginBottom: '12px' }}>
+            <Col span={12}>
+              <Form.Item label="Enable Data Zoom" name="dataZoomShow" valuePropName="checked" style={{ marginBottom: '8px' }}>
+                <Switch size="small" />
           </Form.Item>
-          <Form.Item label="On Hover" name={['behavior', 'onHover']}>
-            <Select>
-              <Option value="highlight">Highlight</Option>
-              <Option value="tooltip">Show Tooltip</Option>
-              <Option value="none">None</Option>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="Zoom Type" name="dataZoomType" style={{ marginBottom: '8px' }}>
+                <Select placeholder="Select type" size="small">
+                  <Option value="inside">Inside</Option>
+                  <Option value="slider">Slider</Option>
+                  <Option value="both">Both</Option>
             </Select>
           </Form.Item>
-          <Form.Item label="On Click" name={['behavior', 'onClick']}>
-            <Select>
-              <Option value="select">Select</Option>
-              <Option value="drill">Drill Down</Option>
-              <Option value="navigate">Navigate</Option>
-              <Option value="none">None</Option>
+            </Col>
+          </Row>
+          <Row gutter={[8, 4]} style={{ marginBottom: '12px' }}>
+            <Col span={12}>
+              <Form.Item label="Start Range" name="dataZoomStart" style={{ marginBottom: '8px' }}>
+                <InputNumber min={0} max={100} placeholder="0" size="small" />
+          </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="End Range" name="dataZoomEnd" style={{ marginBottom: '8px' }}>
+                <InputNumber min={0} max={100} placeholder="100" size="small" />
+              </Form.Item>
+            </Col>
+          </Row>
+        </Panel>
+        
+        {/* Mark Points & Lines */}
+        <Panel header={
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <DotChartOutlined />
+            <span>Mark Points & Lines</span>
+          </div>
+        } key="markPoints">
+          <Row gutter={[8, 4]} style={{ marginBottom: '12px' }}>
+            <Col span={12}>
+              <Form.Item label="Show Mark Points" name="markPointShow" valuePropName="checked" style={{ marginBottom: '8px' }}>
+                <Switch size="small" />
+          </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="Show Mark Lines" name="markLineShow" valuePropName="checked" style={{ marginBottom: '8px' }}>
+                <Switch size="small" />
+          </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={[8, 4]} style={{ marginBottom: '12px' }}>
+            <Col span={8}>
+              <Form.Item label="Max Point" name="markPointMax" valuePropName="checked" style={{ marginBottom: '8px' }}>
+                <Switch size="small" />
+          </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item label="Min Point" name="markPointMin" valuePropName="checked" style={{ marginBottom: '8px' }}>
+                <Switch size="small" />
+          </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item label="Average Line" name="markLineAverage" valuePropName="checked" style={{ marginBottom: '8px' }}>
+                <Switch size="small" />
+          </Form.Item>
+            </Col>
+          </Row>
+        </Panel>
+        
+        {/* Brush Selection */}
+        <Panel header={
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <EditOutlined />
+            <span>Brush Selection</span>
+          </div>
+        } key="brush">
+          <Row gutter={[8, 4]} style={{ marginBottom: '12px' }}>
+            <Col span={12}>
+              <Form.Item label="Enable Brush" name="brushShow" valuePropName="checked" style={{ marginBottom: '8px' }}>
+                <Switch size="small" />
+          </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="Brush Type" name="brushType" style={{ marginBottom: '8px' }}>
+                <Select placeholder="Select type" size="small">
+                  <Option value="rect">Rectangle</Option>
+                  <Option value="polygon">Polygon</Option>
+                  <Option value="lineX">Line X</Option>
+                  <Option value="lineY">Line Y</Option>
             </Select>
           </Form.Item>
+            </Col>
+          </Row>
         </Panel>
         
-        <Panel header="Visibility & Display" key="visibility">
-          <Form.Item label="Visible" name="isVisible" valuePropName="checked">
-            <Switch />
+        {/* Visual Mapping */}
+        <Panel header={
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <BgColorsOutlined />
+            <span>Visual Mapping</span>
+          </div>
+        } key="visualMap">
+          <Row gutter={[8, 4]} style={{ marginBottom: '12px' }}>
+            <Col span={12}>
+              <Form.Item label="Enable Visual Map" name="visualMapShow" valuePropName="checked" style={{ marginBottom: '8px' }}>
+                <Switch size="small" />
           </Form.Item>
-          <Form.Item label="Show on Mobile" name={['layout', 'showOnMobile']} valuePropName="checked">
-            <Switch />
+            </Col>
+            <Col span={12}>
+              <Form.Item label="Map Dimension" name="visualMapDimension" style={{ marginBottom: '8px' }}>
+                <Select placeholder="Select dimension" size="small">
+                  <Option value="0">X Axis</Option>
+                  <Option value="1">Y Axis</Option>
+                  <Option value="2">Value</Option>
+                </Select>
           </Form.Item>
-          <Form.Item label="Show on Tablet" name={['layout', 'showOnTablet']} valuePropName="checked">
-            <Switch />
+            </Col>
+          </Row>
+          <Row gutter={[8, 4]} style={{ marginBottom: '12px' }}>
+            <Col span={12}>
+              <Form.Item label="Min Value" name="visualMapMin" style={{ marginBottom: '8px' }}>
+                <InputNumber placeholder="Auto" size="small" />
           </Form.Item>
-          <Form.Item label="Show on Desktop" name={['layout', 'showOnDesktop']} valuePropName="checked">
-            <Switch />
+            </Col>
+            <Col span={12}>
+              <Form.Item label="Max Value" name="visualMapMax" style={{ marginBottom: '8px' }}>
+                <InputNumber placeholder="Auto" size="small" />
           </Form.Item>
-          <Form.Item label="Locked" name="isLocked" valuePropName="checked">
-            <Switch />
+            </Col>
+          </Row>
+        </Panel>
+
+        {/* Aria Labels (Accessibility) */}
+        <Panel header={
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <EyeOutlined />
+            <span>Accessibility</span>
+          </div>
+        } key="aria">
+          <Row gutter={[8, 4]} style={{ marginBottom: '12px' }}>
+            <Col span={24}>
+              <Form.Item label="Enable Aria" name="ariaEnabled" valuePropName="checked" style={{ marginBottom: '8px' }}>
+                <Switch size="small" />
           </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={[8, 4]} style={{ marginBottom: '12px' }}>
+            <Col span={24}>
+              <Form.Item label="Aria Label" name="ariaLabel" style={{ marginBottom: '8px' }}>
+                <Input placeholder="Chart description for screen readers" size="small" />
+              </Form.Item>
+            </Col>
+          </Row>
         </Panel>
         
-        <Panel header="Data & Refresh" key="data-refresh">
-          <Form.Item label="Auto Refresh" name={['data', 'autoRefresh']} valuePropName="checked">
-            <Switch />
+        {/* Typography Tab */}
+        <Panel header={
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <FontSizeOutlined />
+            <span>Typography</span>
+          </div>
+        } key="typography">
+          <Row gutter={[8, 4]} style={{ marginBottom: '12px' }}>
+            <Col span={24}>
+              <Form.Item label="Font Family" name="fontFamily" style={{ marginBottom: '8px' }}>
+                <Select placeholder="Select font family" size="small">
+                  <Option value="Arial">Arial</Option>
+                  <Option value="Helvetica">Helvetica</Option>
+                  <Option value="Times New Roman">Times New Roman</Option>
+                  <Option value="Georgia">Georgia</Option>
+                  <Option value="Verdana">Verdana</Option>
+                  <Option value="system">System Font</Option>
+                </Select>
           </Form.Item>
-          <Form.Item label="Refresh Interval" name={['data', 'refreshInterval']}>
-            <Select placeholder="Select interval">
-              <Option value={0}>No auto refresh</Option>
-              <Option value={30}>30 seconds</Option>
-              <Option value={60}>1 minute</Option>
-              <Option value={300}>5 minutes</Option>
-              <Option value={900}>15 minutes</Option>
-              <Option value={1800}>30 minutes</Option>
-              <Option value={3600}>1 hour</Option>
+            </Col>
+          </Row>
+          <Row gutter={[8, 4]} style={{ marginBottom: '12px' }}>
+            <Col span={12}>
+              <Form.Item label="Font Size" name="fontSize" style={{ marginBottom: '8px' }}>
+                <InputNumber min={8} max={72} placeholder="14" size="small" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="Font Weight" name="fontWeight" style={{ marginBottom: '8px' }}>
+                <Select placeholder="Normal" size="small">
+                  <Option value="100">Thin</Option>
+                  <Option value="300">Light</Option>
+                  <Option value="400">Normal</Option>
+                  <Option value="500">Medium</Option>
+                  <Option value="600">Semi Bold</Option>
+                  <Option value="700">Bold</Option>
+                  <Option value="800">Extra Bold</Option>
             </Select>
           </Form.Item>
-          <Form.Item label="Cache Data" name={['data', 'cache']} valuePropName="checked">
-            <Switch />
+            </Col>
+          </Row>
+          <Row gutter={[8, 4]} style={{ marginBottom: '12px' }}>
+            <Col span={12}>
+              <Form.Item label="Line Height" name="lineHeight" style={{ marginBottom: '8px' }}>
+                <InputNumber min={0.5} max={3} step={0.1} placeholder="1.2" size="small" />
           </Form.Item>
-          <Form.Item label="Cache Timeout" name={['data', 'cacheTimeout']}>
-            <InputNumber min={60} max={3600} placeholder="seconds" />
+            </Col>
+            <Col span={12}>
+              <Form.Item label="Letter Spacing" name="letterSpacing" style={{ marginBottom: '8px' }}>
+                <InputNumber min={-2} max={5} step={0.1} placeholder="0" size="small" />
           </Form.Item>
+            </Col>
+          </Row>
         </Panel>
         
-        <Panel header="Responsive Behavior" key="responsive">
-          <Form.Item label="Responsive" name={['layout', 'responsive']} valuePropName="checked">
+        {/* Effects Tab */}
+        <Panel header={
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <EyeOutlined />
+            <span>Effects</span>
+          </div>
+        } key="effects">
+          <Row gutter={[8, 4]} style={{ marginBottom: '12px' }}>
+            <Col span={24}>
+              <Form.Item label="Shadow" name="boxShadow" style={{ marginBottom: '8px' }}>
+                <Select placeholder="Select shadow" size="small">
+                  <Option value="none">None</Option>
+                  <Option value="small">Small</Option>
+                  <Option value="medium">Medium</Option>
+                  <Option value="large">Large</Option>
+                  <Option value="custom">Custom</Option>
+                </Select>
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={[8, 4]} style={{ marginBottom: '12px' }}>
+            <Col span={12}>
+              <Form.Item label="Border Radius" name="borderRadius" style={{ marginBottom: '8px' }}>
+                <InputNumber min={0} max={20} placeholder="6" size="small" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="Opacity" name="opacity" style={{ marginBottom: '8px' }}>
+                <InputNumber min={0} max={1} step={0.1} placeholder="1" size="small" />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={[8, 4]} style={{ marginBottom: '12px' }}>
+            <Col span={24}>
+              <Form.Item label="Blur Effect" name="blurEffect" valuePropName="checked" style={{ marginBottom: '8px' }}>
             <Switch />
           </Form.Item>
-          <Form.Item label="Breakpoint - Mobile" name={['layout', 'breakpoints', 'xs']}>
-            <Input.Group compact>
-              <InputNumber placeholder="W" min={1} max={12} style={{ width: '50%' }} />
-              <InputNumber placeholder="H" min={1} max={20} style={{ width: '50%' }} />
-            </Input.Group>
+            </Col>
+          </Row>
+        </Panel>
+        
+        {/* Advanced Tab */}
+        <Panel header={
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <ToolOutlined />
+            <span>Advanced</span>
+          </div>
+        } key="advanced">
+          <Row gutter={[8, 4]} style={{ marginBottom: '12px' }}>
+            <Col span={24}>
+              <Form.Item label="Custom CSS" name="customCSS" style={{ marginBottom: '8px' }}>
+                <TextArea rows={4} placeholder="Enter custom CSS..." size="small" />
           </Form.Item>
-          <Form.Item label="Breakpoint - Tablet" name={['layout', 'breakpoints', 'md']}>
-            <Input.Group compact>
-              <InputNumber placeholder="W" min={1} max={12} style={{ width: '50%' }} />
-              <InputNumber placeholder="H" min={1} max={20} style={{ width: '50%' }} />
-            </Input.Group>
+            </Col>
+          </Row>
+          <Row gutter={[8, 4]} style={{ marginBottom: '12px' }}>
+            <Col span={24}>
+              <Form.Item label="Data Source" name="dataSource" style={{ marginBottom: '8px' }}>
+                <Select placeholder="Select data source" size="small">
+                  <Option value="static">Static Data</Option>
+                  <Option value="api">API Endpoint</Option>
+                  <Option value="database">Database</Option>
+                  <Option value="file">File Upload</Option>
+                </Select>
           </Form.Item>
-          <Form.Item label="Breakpoint - Desktop" name={['layout', 'breakpoints', 'lg']}>
-            <Input.Group compact>
-              <InputNumber placeholder="W" min={1} max={12} style={{ width: '50%' }} />
-              <InputNumber placeholder="H" min={1} max={20} style={{ width: '50%' }} />
-            </Input.Group>
+            </Col>
+          </Row>
+          <Row gutter={[8, 4]} style={{ marginBottom: '12px' }}>
+            <Col span={12}>
+              <Form.Item label="Refresh Interval" name="refreshInterval" style={{ marginBottom: '8px' }}>
+                <InputNumber min={0} max={3600} placeholder="0" size="small" />
           </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item label="Cache Duration" name="cacheDuration" style={{ marginBottom: '8px' }}>
+                <InputNumber min={0} max={86400} placeholder="300" size="small" />
+              </Form.Item>
+            </Col>
+          </Row>
         </Panel>
       </Collapse>
     </div>
   );
-
-  if (!showPanel) return null;
+  };
 
   return (
     <div style={{ 
@@ -1337,8 +3188,18 @@ const UnifiedDesignPanel: React.FC<UnifiedDesignPanelProps> = ({
       {/* Main Content */}
       <div style={{ flex: 1, padding: '16px' }}>
         <Tabs
-          activeKey={activeTab}
-          onChange={setActiveTab}
+          key={selectedWidget ? `properties-${selectedWidget.id}` : 'library'}
+          activeKey={selectedWidget ? 'properties' : activeTab}
+          onChange={(key) => {
+            // Allow switching to Library even when a widget is selected.
+            // If user chooses Library, clear selection so they can add new widgets.
+            if (key === 'library') {
+              try { deselectAll(); } catch (e) {}
+              setActiveTab('library');
+              return;
+            }
+            setActiveTab(key);
+          }}
           size="small"
           style={{ marginTop: '-8px' }}
           items={[

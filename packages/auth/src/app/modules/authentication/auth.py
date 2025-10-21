@@ -25,6 +25,11 @@ class Auth:
 
     def verify_password(self, password, hashed_password):
         try:
+            # Handle None or empty hashed password
+            if not hashed_password:
+                logger.warning("Attempted to verify password against None or empty hash")
+                return False
+                
             # First try pbkdf2_sha256 (current format)
             if pbkdf2_sha256.verify(password, hashed_password):
                 return True

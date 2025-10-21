@@ -9,9 +9,14 @@ import {
     BellOutlined, 
     SecurityScanOutlined,
     SaveOutlined,
-    ReloadOutlined
+    ReloadOutlined,
+    BgColorsOutlined,
+    SettingOutlined
 } from '@ant-design/icons';
 import { useDarkMode } from '@/hooks/useDarkMode';
+import dynamic from 'next/dynamic';
+
+const ThemeCustomizer = dynamic(() => import('@/components/ThemeCustomizer/ThemeCustomizer'), { ssr: false });
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -20,6 +25,7 @@ export default function GeneralSettingsPage() {
     const [form] = Form.useForm();
     const [loading, setLoading] = useState(false);
     const [isDarkMode, setIsDarkMode] = useDarkMode();
+    const [customizerOpen, setCustomizerOpen] = useState(false);
 
     const onFinish = async (values: any) => {
         setLoading(true);
@@ -43,7 +49,7 @@ export default function GeneralSettingsPage() {
         <div className="p-6 h-full overflow-y-auto">
             <div className="mb-8">
                 <Title level={2}>
-                    <GlobalOutlined style={{ marginRight: 12, color: '#1890ff' }} />
+                    <GlobalOutlined style={{ marginRight: 12, color: 'var(--color-brand-primary)' }} />
                     General Settings
                 </Title>
                 <Text type="secondary">
@@ -243,6 +249,44 @@ export default function GeneralSettingsPage() {
                     </Col>
 
                     <Col span={8}>
+                        {/* Brand Customization */}
+                        <Card title="Brand Customization" className="mb-6">
+                            <Space direction="vertical" style={{ width: '100%' }}>
+                                <div>
+                                    <Text type="secondary" style={{ fontSize: '13px' }}>
+                                        Customize your platform's appearance with brand colors, themes, and styling options.
+                                    </Text>
+                                </div>
+                                
+                                <Button 
+                                    type="primary"
+                                    icon={<BgColorsOutlined />} 
+                                    block
+                                    onClick={() => setCustomizerOpen(true)}
+                                    style={{
+                                        height: '40px',
+                                        fontSize: '14px',
+                                        fontWeight: '500'
+                                    }}
+                                >
+                                    Open Brand Customizer
+                                </Button>
+                                
+                                <Button 
+                                    type="default"
+                                    icon={<SettingOutlined />} 
+                                    block
+                                    onClick={() => setIsDarkMode(!isDarkMode)}
+                                    style={{
+                                        height: '36px',
+                                        fontSize: '13px'
+                                    }}
+                                >
+                                    Toggle Dark/Light Mode
+                                </Button>
+                            </Space>
+                        </Card>
+
                         {/* Quick Actions */}
                         <Card title="Quick Actions" className="mb-6">
                             <Space direction="vertical" style={{ width: '100%' }}>
@@ -294,7 +338,7 @@ export default function GeneralSettingsPage() {
                                 
                                 <Divider />
                                 
-                                <Text type="secondary" style={{ fontSize: '12px' }}>
+                                <Text type="secondary" style={{ fontSize: 'var(--font-size-sm)' }}>
                                     Changes will be applied immediately for most settings. Some changes may require a page refresh.
                                 </Text>
                             </div>
@@ -315,6 +359,9 @@ export default function GeneralSettingsPage() {
                     </Button>
                 </div>
             </Form>
+            
+            {/* Brand Customizer Drawer */}
+            <ThemeCustomizer open={customizerOpen} onClose={() => setCustomizerOpen(false)} />
         </div>
     );
 }

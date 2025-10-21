@@ -51,6 +51,29 @@ class ConversationService {
     }
   }
 
+  private async apiFetch(path: string, init?: RequestInit) {
+    // In browser use same-origin proxy with fetchApi helper to ensure auth init
+    if (typeof window !== 'undefined') {
+      // lazy require to avoid circular deps during build
+      try {
+        // Use dynamic import to satisfy ESLint and avoid require() style import
+        const mod = await import('@/utils/api');
+        const fetchApi = (mod as any).fetchApi || (mod as any).default?.fetchApi;
+        if (typeof fetchApi === 'function') {
+          return await fetchApi(path.replace(/^\/+/, ''), init || {});
+        }
+        // fallback to window.fetch
+        return await fetch(path, { ...(init || {}), credentials: 'include' });
+      } catch (e) {
+        // fallback to window fetch
+        return await fetch(path, { ...(init || {}), credentials: 'include' });
+      }
+    }
+    // server-side or node: call backendUrl directly
+    const full = `${this.backendUrl.replace(/\/$/, '')}/${path.replace(/^\/+/, '')}`;
+    return await fetch(full, init);
+  }
+
   // ===== Memory-First Operations =====
 
   /**
@@ -140,7 +163,7 @@ class ConversationService {
    */
   private async persistConversation(conversation: Conversation): Promise<void> {
     try {
-      const response = await fetch(`${this.backendUrl}/conversations`, {
+      const response = await this.apiFetch('conversations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -167,7 +190,7 @@ class ConversationService {
   private async persistMessage(message: Message): Promise<void> {
     try {
       const conversationId = message.conversation_id;
-      const response = await fetch(`${this.backendUrl}/conversations/${conversationId}/messages`, {
+      const response = await this.apiFetch(`conversations/${conversationId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -192,7 +215,7 @@ class ConversationService {
    */
   async loadConversations(): Promise<Conversation[]> {
     try {
-      const response = await fetch(`${this.backendUrl}/conversations`);
+      const response = await this.apiFetch('conversations');
       if (response.ok) {
         const conversations = await response.json();
         // Update memory with database data
@@ -214,7 +237,7 @@ class ConversationService {
    */
   async loadConversationMessages(conversationId: string): Promise<Message[]> {
     try {
-      const response = await fetch(`${this.backendUrl}/conversations/${conversationId}`);
+      const response = await this.apiFetch(`conversations/${conversationId}`);
       if (response.ok) {
         const conversation = await response.json();
         if (conversation.messages) {
@@ -267,7 +290,7 @@ class ConversationService {
    */
   async isDatabaseAvailable(): Promise<boolean> {
     try {
-      const response = await fetch(`${this.backendUrl}/health`);
+      const response = await this.apiFetch('health');
       return response.ok;
     } catch {
       return false;

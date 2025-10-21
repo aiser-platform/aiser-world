@@ -89,7 +89,6 @@ const DataSourceConfig: React.FC<DataSourceConfigProps> = ({ widget, onUpdate })
           throw new Error(`Project-scoped API failed: ${response.status}`);
         }
       } catch (projectError) {
-        console.log('Project-scoped API not available, falling back to global API');
         // Fallback to global data sources API
         response = await fetch(`${getBackendUrlForApi()}/data/sources`);
         if (!response.ok) {
@@ -124,7 +123,6 @@ const DataSourceConfig: React.FC<DataSourceConfigProps> = ({ widget, onUpdate })
           }
         }
       } catch (enterpriseError) {
-        console.log('Enterprise connections not available:', enterpriseError);
       }
       
       setDataSources(availableSources.map((source: any) => ({
@@ -246,7 +244,7 @@ const DataSourceConfig: React.FC<DataSourceConfigProps> = ({ widget, onUpdate })
   const renderConnectTab = () => (
     <div>
       <Title level={5} style={{ marginBottom: '12px' }}>Select Data Source</Title>
-      <Text type="secondary" style={{ fontSize: '12px' }}>Choose from your connected data sources</Text>
+      <Text type="secondary" style={{ fontSize: 'var(--font-size-sm)' }}>Choose from your connected data sources</Text>
       
       <div style={{ marginTop: '16px' }}>
         <Form.Item label="Data Source" name="dataSource" style={{ marginBottom: '12px' }}>
@@ -434,8 +432,8 @@ const DataSourceConfig: React.FC<DataSourceConfigProps> = ({ widget, onUpdate })
       <Divider style={{ margin: '16px 0' }} />
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-        <Title level={5} style={{ margin: 0, fontSize: '14px' }}>Available Sources</Title>
-        <Button type="text" icon={<PlusOutlined />} size="small" style={{ fontSize: '12px' }}>
+        <Title level={5} style={{ margin: 0, fontSize: 'var(--font-size-base)' }}>Available Sources</Title>
+        <Button type="text" icon={<PlusOutlined />} size="small" style={{ fontSize: 'var(--font-size-sm)' }}>
           Manage
         </Button>
       </div>
@@ -447,7 +445,7 @@ const DataSourceConfig: React.FC<DataSourceConfigProps> = ({ widget, onUpdate })
             size="small" 
             style={{ 
               marginBottom: '8px',
-              border: '1px solid #f0f0f0',
+              border: '1px solid var(--color-border-primary)',
               cursor: 'pointer'
             }}
             onClick={() => handlePreviewData(source)}
@@ -458,8 +456,8 @@ const DataSourceConfig: React.FC<DataSourceConfigProps> = ({ widget, onUpdate })
                  source.icon === 'api' ? <ApiOutlined /> : 
                  source.icon === 'file' ? <FileOutlined /> : <DatabaseOutlined />}
                 <div>
-                  <div style={{ fontSize: '12px', fontWeight: '500' }}>{source.name}</div>
-                  <div style={{ fontSize: '10px', color: '#666' }}>{source.tables} tables</div>
+                  <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: '500' }}>{source.name}</div>
+                  <div style={{ fontSize: '10px', color: 'var(--color-text-secondary)' }}>{source.tables} tables</div>
                 </div>
               </div>
               <Tag color={source.status === 'connected' ? 'green' : 'red'}>

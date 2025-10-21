@@ -1,9 +1,11 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
-const AUTH_TARGET = process.env.AUTH_SERVICE_URL || 'http://auth-service:5000';
+const AUTH_TARGET = process.env.NEXT_PUBLIC_AUTH_URL || process.env.AUTH_SERVICE_URL || 'http://auth-service:5000';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
+    console.log('🔍 Auth proxy: Request received', { method: req.method, url: req.url, path: req.query.path });
+    console.log('🔍 Auth proxy: AUTH_TARGET', AUTH_TARGET);
     // Determine target path robustly.
     // Prefer Next's parsed param (`req.query.path`), otherwise derive from the original
     // request URL by stripping the '/api/auth' prefix. This handles both /api/auth/users/signin
@@ -44,7 +46,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!path) path = '';
     // Normalize and trim whitespace to avoid accidental leading spaces
     path = String(path).trim().replace(/^\/+/, '');
-    const target = `${AUTH_TARGET.replace(/\/$/, '')}/${encodeURI(path)}`;
+
+    // Support legacy 'whoami' alias used by some dev tooling and probes
+    if (path === 'whoami') {
+      path = 'users/me';
+    }
+    
+    // Map frontend paths to auth service paths
+    if (path === 'users/me') {
+      path = '/api/v1/enterprise/auth/me';
+    } else if (path === 'login') {
+      path = '/api/v1/enterprise/auth/login';
+    } else if (path === 'logout') {
+      path = '/api/v1/enterprise/auth/logout';
+    } else if (path === 'refresh') {
+      path = '/api/v1/enterprise/auth/refresh';
+    } else if (path === 'users/signin') {
+      path = '/api/v1/enterprise/auth/login';
+    }
+    
+    const target = `${AUTH_TARGET.replace(/\/$/, '')}${path.startsWith('/') ? '' : '/'}${encodeURI(path)}`;
     console.log('Auth proxy forwarding', req.method, req.url, '->', target, 'parsedPath=', JSON.stringify(path));
 
     console.log('Auth proxy incoming:', {
@@ -53,6 +74,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       query: req.query,
       headers: Object.keys(req.headers),
     });
+    try {
+      console.log('Auth proxy incoming cookie:', req.headers.cookie ? '[present]' : '[none]', req.headers.cookie ? String(req.headers.cookie).slice(0,200) : '');
+    } catch (e) {}
 
     const headers: Record<string, string> = {};
     if (req.headers.cookie) headers.cookie = String(req.headers.cookie);
@@ -86,7 +110,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       res.setHeader(key, value as string);
     });
 
-    if (setCookieValues.length) res.setHeader('set-cookie', setCookieValues);
+    if (setCookieValues.length) {
+      console.log('Auth proxy: upstream Set-Cookie headers:', setCookieValues);
+      res.setHeader('set-cookie', setCookieValues);
+    }
 
     const buf = await upstream.arrayBuffer();
     if (buf && buf.byteLength > 0) res.send(Buffer.from(buf));

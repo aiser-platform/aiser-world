@@ -15,21 +15,29 @@ const AiserLogo: React.FC<AiserLogoProps> = ({
     showText = true 
 }) => {
     return (
-        <div className={`flex items-center space-x-2 ${className}`}>
+        <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '8px',
+            ...(className && { className })
+        }}>
             <Image
                 src="/aiser-logo.png"
                 alt="Aiser Logo"
                 width={size}
                 height={size}
-                className="rounded-lg"
+                style={{ borderRadius: '8px' }}
                 priority
             />
             {showText && (
-                <div className="flex flex-col">
-                    <span className="text-lg font-bold text-blue-600 dark:text-blue-400">
-                        Aiser
-                    </span>
-                </div>
+                <span style={{ 
+                    fontSize: '18px', 
+                    fontWeight: 'bold', 
+                    color: 'var(--color-text-primary)', // Use design system text color
+                    lineHeight: '1.2'
+                }} className="aiser-text">
+                    Aiser
+                </span>
             )}
         </div>
     );

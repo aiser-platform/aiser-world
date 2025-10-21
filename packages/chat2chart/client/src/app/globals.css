@@ -1,100 +1,246 @@
+/**
+ * Aiser Platform - Global Styles
+ * Single source of truth for all global styling
+ */
+
+/* Import Ant Design reset */
+@import 'antd/dist/reset.css';
+
+/* Import Tailwind CSS */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Basic optimizations */
+/* Import our comprehensive design system LAST for highest priority */
+@import '../styles/design-system.css';
+
+/* ========================================
+   GLOBAL RESET AND BASE STYLES
+   ======================================== */
+
 * {
   box-sizing: border-box;
 }
 
-html, body {
+html, body, #__next {
   height: 100%;
-  overflow-x: hidden;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden; /* Prevent double scrollbars */
 }
 
-/* Smooth scrolling */
-html {
-  scroll-behavior: smooth;
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
-/* Page container */
-.page-container {
-  height: 100vh;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
+/* Ensure images are responsive */
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
 }
 
-.page-content {
-  flex: 1;
-  overflow-y: auto;
-  padding: 24px;
+/* Basic link styling */
+a {
+  text-decoration: none;
+  color: inherit;
 }
 
-/* Responsive */
-@media (max-width: 768px) {
-  .page-content {
-    padding: 16px;
+a:hover {
+  text-decoration: underline;
+}
+
+/* Remove default button styles */
+button {
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+/* Remove default input styles */
+input, textarea, select {
+  font-family: inherit;
+}
+
+/* ========================================
+   LAYOUT COMPONENTS
+   ======================================== */
+
+/* Demo logo for sidebar */
+.demo-logo-vertical {
+  height: 32px;
+  margin: 16px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+}
+
+/* Layout content adjustments */
+.ant-layout-content {
+  margin: 0;
+  min-height: 280px;
+  position: relative;
+}
+
+/* Sidebar transitions */
+.ant-layout-sider {
+  transition: all 0.2s ease-in-out;
+}
+
+/* ========================================
+   RESPONSIVE LAYOUT
+   ======================================== */
+
+@media screen and (max-width: 992px) {
+  aside.ant-layout-sider {
+    position: absolute;
+    height: 100vh;
+    z-index: 999;
+    transform: translateX(0);
+    transition: all 0.2s ease-in-out;
+  }
+
+  .ant-layout-sider-collapsed {
+    opacity: 0;
+    visibility: hidden;
+    transform: translateX(-100%);
+    transition:
+      opacity 0.2s ease-in-out,
+      visibility 0.2s ease-in-out,
+      transform 0.2s ease-in-out;
   }
 }
 
-/* Dark theme enforcement for shell (Header/Sider/Menu) */
-html.dark .ant-layout-sider {
-  background: #1f1f1f !important;
-  border-right: 1px solid #303030 !important;
-  transition: background-color 0.2s ease, border-color 0.2s ease;
+/* ========================================
+   COMPONENT STYLES
+   ======================================== */
+
+/* Chat to Chart component */
+.ChatToChart {
+  position: absolute;
+  inset: 0;
+  background-color: transparent;
 }
 
-html.dark .ant-menu,
-html.dark .ant-menu-root,
-html.dark .ant-menu-inline,
-html.dark .ant-menu-sub,
-html.dark .ant-menu-light,
-html.dark .ant-menu-dark {
-  background: #1f1f1f !important;
-  transition: background-color 0.2s ease;
+.ChatToChart .ant-col {
+  max-height: 100%;
+  overflow: hidden;
 }
 
-html.dark .ant-menu-item-selected,
-html.dark .ant-menu-submenu-selected > .ant-menu-submenu-title {
-  background-color: rgba(22, 119, 255, 0.22) !important;
-  color: #e6f4ff !important;
+/* Custom spinner */
+.CustomSpinner {
+  color: inherit;
 }
 
-html.dark .ant-menu-item:hover,
-html.dark .ant-menu-submenu-title:hover {
-  background-color: #262626 !important;
-  color: rgba(255, 255, 255, 0.95) !important;
+.CustomSpinner :where(.ant-spin-dot-item) {
+  color: var(--color-brand-primary);
 }
 
-/* Dark menu text/base colors */
-html.dark .ant-menu .ant-menu-item,
-html.dark .ant-menu .ant-menu-submenu-title {
-  color: rgba(255, 255, 255, 0.85) !important;
+/* Upload section */
+.UploadSection {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100%;
+  color: var(--color-brand-primary);
 }
 
-/* Light mode fine-tuning for selection */
-html:not(.dark) .ant-menu-item-selected,
-html:not(.dark) .ant-menu-submenu-selected > .ant-menu-submenu-title {
-  background-color: rgba(22, 119, 255, 0.10) !important;
-  color: #1677ff !important;
+/* ========================================
+   HEADER STYLES
+   ======================================== */
+
+/* Header layout tweaks for consistent alignment */
+.ant-layout-header {
+  height: 56px !important;
+  padding: 0 12px !important;
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: nowrap !important;
 }
 
-/* Ensure submenu arrow/icon visibility in dark */
-html.dark .ant-menu-submenu-expand-icon,
-html.dark .ant-menu-submenu-arrow {
-  color: rgba(255, 255, 255, 0.65) !important;
+.header-left, .header-right {
+  white-space: nowrap;
 }
 
-/* Light-mode enforcement to avoid dark bleed on menu/sider */
-html:not(.dark) .ant-layout-sider {
-  background: #ffffff !important;
-  border-right: 1px solid #f0f0f0 !important;
+.header-right > * {
+  flex: 0 0 auto;
 }
 
-html:not(.dark) .ant-menu,
-html:not(.dark) .ant-menu-root,
-html:not(.dark) .ant-menu-light {
-  background: #ffffff !important;
-  color: #141414 !important;
+.header-left { 
+  display: flex; 
+  align-items: center; 
+  gap: 10px; 
+}
+
+.header-right { 
+  display: flex; 
+  align-items: center; 
+  gap: 6px; 
+}
+
+.header-title { 
+  font-size: 17px; 
+  font-weight: 600; 
+  color: var(--color-text-primary); 
+  margin-left: 10px; 
+}
+
+.logo-compact { 
+  width: 32px; 
+  height: 32px; 
+}
+
+/* Micro spacing adjustments for compact header */
+.ant-layout-header { 
+  padding: 0 10px !important; 
+}
+
+/* ========================================
+   TAILWIND UTILITIES
+   ======================================== */
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* ========================================
+   ACCESSIBILITY
+   ======================================== */
+
+/* Focus indicators */
+*:focus {
+  outline: 2px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
+
+/* Remove focus outline for mouse users */
+*:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Sidebar toggle focus */
+.sidebar-toggle:focus {
+  outline: 2px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
+
+/* ========================================
+   SMOOTH TRANSITIONS
+   ======================================== */
+
+/* Smooth theme transitions */
+* {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease !important;
+}
+
+/* ========================================
+   MODEL SELECTOR
+   ======================================== */
+
+.model-selector-compact .ant-select-selector {
+  min-width: 220px !important;
 }

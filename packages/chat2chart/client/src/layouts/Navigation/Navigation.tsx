@@ -80,7 +80,7 @@ const Navigation: React.FC<NavigationProps> = (props: NavigationProps) => {
                 router.push('/dash-studio?tab=query-editor');
                 break;
             case 'dash-studio-chart':
-                router.push('/dash-studio?tab=chart');
+                router.push('/dash-studio?tab=chart-designer');
                 break;
             case 'data':
                 router.push('/data');
@@ -93,7 +93,13 @@ const Navigation: React.FC<NavigationProps> = (props: NavigationProps) => {
     };
 
     const { token } = theme.useToken();
-    const { isDarkMode } = useThemeMode();
+    const { isDarkMode: isDarkModeContext } = useThemeMode();
+
+    // Avoid hydration mismatch by only applying the theme prop after client mount.
+    const [isDarkMode, setIsDarkMode] = React.useState<boolean>(false);
+    React.useEffect(() => {
+        setIsDarkMode(!!isDarkModeContext);
+    }, [isDarkModeContext]);
 
     return (
         <Layout.Sider
@@ -102,20 +108,34 @@ const Navigation: React.FC<NavigationProps> = (props: NavigationProps) => {
             collapsible
             collapsed={props.collapsed}
             breakpoint="lg"
+            width={props.collapsed ? 80 : 256}
             style={{
-                background: isDarkMode ? '#1f1f1f' : '#ffffff',
-                borderRight: `1px solid ${isDarkMode ? '#303030' : '#f0f0f0'}`,
-                width: props.collapsed ? 64 : 200,
-                minWidth: props.collapsed ? 64 : 200,
-                maxWidth: props.collapsed ? 64 : 200,
-                transition: 'width 0.2s ease'
+                width: props.collapsed ? 80 : 256,
+                minWidth: props.collapsed ? 80 : 256,
+                maxWidth: props.collapsed ? 80 : 256,
+                transition: 'all 0.2s ease',
+                height: '100vh',
+                position: 'fixed',
+                left: 0,
+                top: 0,
+                zIndex: 1100,
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+                borderRight: '1px solid var(--color-border-primary)',
+                margin: 0,
+                padding: 0,
+                // Let Ant Design handle the background through theme
             }}
         >
             <div style={{ 
-                padding: '16px', 
-                textAlign: 'center', 
-                borderBottom: `1px solid ${token.colorBorder}`,
-                marginBottom: '8px'
+                padding: props.collapsed ? '12px' : '16px', 
+                textAlign: 'left', 
+                marginBottom: '0px',
+                height: '64px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: props.collapsed ? 'center' : 'flex-start',
+                borderBottom: '1px solid var(--color-border-primary)',
+                // Let Ant Design handle the background
             }}>
                 <AiserLogo 
                     size={props.collapsed ? 32 : 48} 
@@ -129,7 +149,13 @@ const Navigation: React.FC<NavigationProps> = (props: NavigationProps) => {
                 items={items}
                 onClick={onClick}
                 theme={isDarkMode ? 'dark' : 'light'}
-                style={{ background: isDarkMode ? '#1f1f1f' : '#ffffff', color: token.colorText }}
+                style={{ 
+                    border: 'none',
+                    flex: 1,
+                    overflowY: 'auto',
+                    paddingBottom: '0px',
+                    // Let Ant Design handle the background through theme
+                }}
             />
         </Layout.Sider>
     );

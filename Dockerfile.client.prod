@@ -11,6 +11,9 @@ COPY package*.json ./
 COPY packages/shared/package*.json ./packages/shared/
 COPY packages/chat2chart/client/package*.json ./packages/chat2chart/client/
 
+# Copy tools directory for setup script
+COPY tools/ ./tools/
+
 # Install dependencies
 RUN npm ci --only=production
 

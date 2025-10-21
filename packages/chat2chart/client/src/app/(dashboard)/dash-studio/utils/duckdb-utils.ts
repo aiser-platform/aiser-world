@@ -5,7 +5,6 @@ let mockData: any[] = [];
 
 export const initDuckDB = async (): Promise<any> => {
   // Mock database initialization
-  console.log('Mock DuckDB initialized');
   
   // Create sample data
   mockData = [
@@ -112,6 +111,5 @@ export const getTableNames = async (database: any): Promise<string[]> => {
 
 export const closeDatabase = async (): Promise<void> => {
   // Mock database close
-  console.log('Mock DuckDB closed');
   mockData = [];
 };

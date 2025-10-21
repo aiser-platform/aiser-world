@@ -2,7 +2,7 @@ import { IFileUpload } from '@/app/components/FileUpload/types';
 import { fetchApi } from '@/utils/api';
 import { apiService } from '@/services/apiService';
 import { conversationService, Conversation, Message } from '@/services/conversationService';
-import { SendOutlined, BulbOutlined, AudioOutlined, LinkOutlined, DatabaseOutlined, SettingOutlined, UserOutlined, RobotOutlined, PlusOutlined, FileTextOutlined, BarChartOutlined, MessageOutlined, ReloadOutlined, DownloadOutlined, CopyOutlined, ShareAltOutlined, InfoCircleOutlined, CodeOutlined, FileOutlined, EyeOutlined, EyeInvisibleOutlined, EditOutlined, DeleteOutlined, MoreOutlined, RiseOutlined, PieChartOutlined, SearchOutlined, LikeOutlined, DislikeOutlined, HeartOutlined, RocketOutlined } from '@ant-design/icons';
+import { SendOutlined, BulbOutlined, AudioOutlined, LinkOutlined, DatabaseOutlined, SettingOutlined, UserOutlined, RobotOutlined, PlusOutlined, FileTextOutlined, BarChartOutlined, MessageOutlined, ReloadOutlined, DownloadOutlined, CopyOutlined, ShareAltOutlined, InfoCircleOutlined, CodeOutlined, FileOutlined, EyeOutlined, EyeInvisibleOutlined, EditOutlined, DeleteOutlined, MoreOutlined, RiseOutlined, PieChartOutlined, SearchOutlined, LikeOutlined, DislikeOutlined, HeartOutlined, RocketOutlined, StopOutlined, DownOutlined } from '@ant-design/icons';
 import { Button, Input, Card, Tag, Space, Tooltip, Alert, Typography, Avatar, Divider, Empty, Spin, Select, Tabs, Dropdown, Menu, message, Checkbox } from 'antd';
 import UniversalDataSourceModal from '@/app/components/UniversalDataSourceModal/UniversalDataSourceModal';
 import ModeSelector from '@/app/components/ModeSelector/ModeSelector';
@@ -19,6 +19,8 @@ import {
 } from '../../types';
 import ChatMessageBox from './MessageBox';
 import './styles.css';
+import Markdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
 // Use same-origin proxy for browser requests
 
 const { TextArea } = Input;
@@ -1571,18 +1573,19 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                             />
                         ) : (
                             <Alert
-                                message="No Data Source Connected"
-                                description="Go to the Data Panel (right side) and click on a data source to select it for AI analysis"
+                                message="Select Your Data For Analysis"
+                                description="Connect your data source to start AI-powered analysis and insights"
                                 type="info"
                                 showIcon
-                                icon={<LinkOutlined />}
+                                icon={<DatabaseOutlined />}
                                 action={
                                     <Button 
                                         size="small" 
                                         type="primary"
                                         onClick={() => setDataSourceModalVisible(true)}
+                                        icon={<PlusOutlined />}
                                     >
-                                        Add Your Data
+                                        Connect Data
                                     </Button>
                                 }
                             />
@@ -1684,6 +1687,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                         <Avatar 
                             icon={<UserOutlined />} 
                             className="user-avatar"
+                            size="large"
                         />
                         <div className="message-content user-content">
                             <div className="message-header">
@@ -1700,7 +1704,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                         <div className="message-avatar">
                             <Avatar 
                                 icon={<RobotOutlined />} 
-                                style={{ backgroundColor: '#1890ff' }}
+                                className="ai-avatar"
                                 size="large"
                             />
                         </div>
@@ -1711,13 +1715,11 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                                     {new Date(msg.created_at || Date.now()).toLocaleTimeString()}
                                 </span>
                             </div>
-                            
-                            <div 
-                                className="message-text markdown-content"
-                                dangerouslySetInnerHTML={{ 
-                                    __html: formatMessageContent(msg.answer || '') 
-                                }}
-                            />
+                            <div className="message-text markdown-content">
+                                <Markdown rehypePlugins={[rehypeRaw]}>
+                                    {msg.answer || ''}
+                                </Markdown>
+                            </div>
                             
                             {/* Execution Metadata Display */}
                             {msg.executionMetadata && (
@@ -1964,7 +1966,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                         <button class="series-type-btn" data-type="line" title="Line">Line</button>
                         <button class="series-type-btn" data-type="area" title="Area">Area</button>
                     </div>
-                    <span class="auto-exec-status" style="margin-right:8px;display:none;font-size:12px;color:#999;">Auto-running…</span>
+                    <span class="auto-exec-status" style="margin-right:8px;display:none;font-size:var(--font-size-sm);color:var(--color-text-tertiary);">Auto-running…</span>
                     <button class="chart-trust-btn" title="View Trust & Transparency">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/>
@@ -2296,7 +2298,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                     series: chartData.series || [{
                         type: 'bar',
                         data: chartData.data || [],
-                        itemStyle: { color: '#1890ff' }
+                        itemStyle: { color: 'var(--color-brand-primary)' }
                     }]
                 };
             
@@ -2309,7 +2311,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                         type: 'line',
                         data: chartData.data || [],
                         smooth: true,
-                        itemStyle: { color: '#52c41a' }
+                        itemStyle: { color: 'var(--color-functional-success)' }
                     }]
                 };
             
@@ -2324,9 +2326,9 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                         smooth: true,
                         areaStyle: {
                             opacity: 0.6,
-                            color: '#91cc75'
+                            color: 'var(--color-functional-success)'
                         },
-                        itemStyle: { color: '#52c41a' }
+                        itemStyle: { color: 'var(--color-functional-success)' }
                     }]
                 };
             
@@ -2356,7 +2358,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                         type: 'scatter',
                         data: chartData.data || [],
                         symbolSize: 8,
-                        itemStyle: { color: '#fa8c16' }
+                        itemStyle: { color: 'var(--color-functional-warning)' }
                     }]
                 };
             
@@ -2441,7 +2443,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                 const dataURL = chart.getDataURL({
                     type: 'png',
                     pixelRatio: 2,
-                    backgroundColor: 'var(--ant-color-bg-container, #ffffff)'
+                    backgroundColor: 'var(--ant-color-bg-container, var(--color-surface-base))'
                 });
                 
                 const link = document.createElement('a');
@@ -2756,13 +2758,14 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                 streaming: true
             };
             
-            // Start streaming request
-            const response = await fetch('http://127.0.0.1:8000/ai/chat/stream', {
+            // Start streaming request via Next.js proxy route to handle CORS/cookies
+            const response = await fetch('/api/ai/chat/stream', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(requestPayload)
+                body: JSON.stringify(requestPayload),
+                signal: abortControllerRef.current?.signal
             });
             
             if (!response.ok) {
@@ -2778,6 +2781,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
             let chartData: any = null;
             const sqlQueries: string[] = [];
             let executionMetadata: any = {};
+            let sseBuffer = '';
             
             try {
                 while (true) {
@@ -2785,35 +2789,46 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                     
                     if (done) break;
                     
-                    const chunk = new TextDecoder().decode(value);
-                    const lines = chunk.split('\n');
-                    
-                    for (const line of lines) {
-                        if (line.startsWith('data: ')) {
-                            const data = line.slice(6);
+                    sseBuffer += new TextDecoder().decode(value);
+                    let lineBreakIndex = -1;
+                    while ((lineBreakIndex = sseBuffer.indexOf('\n')) >= 0) {
+                        const rawLine = sseBuffer.slice(0, lineBreakIndex).trimEnd();
+                        sseBuffer = sseBuffer.slice(lineBreakIndex + 1);
+                        if (!rawLine) continue;
+                        if (rawLine.startsWith('data: ')) {
+                            const data = rawLine.slice(6).trim();
+                            if (!data) continue;
                             if (data === '[DONE]') break;
-                            
                             try {
                                 const parsed = JSON.parse(data);
-                                
-                                if (parsed.type === 'content') {
-                                    accumulatedResponse += parsed.content;
-                                    // Update streaming message
-                                    setMessages(prev => prev.map(msg => 
-                                        msg.id === messageId 
-                                            ? { ...msg, answer: accumulatedResponse }
-                                            : msg
-                                    ));
-                                } else if (parsed.type === 'chart_data') {
-                                    chartData = parsed.data;
-                                } else if (parsed.type === 'sql_query') {
-                                    sqlQueries.push(parsed.query);
-                                } else if (parsed.type === 'execution_metadata') {
-                                    executionMetadata = parsed.metadata;
+                                switch (parsed.type) {
+                                    case 'content': {
+                                        accumulatedResponse += parsed.content || '';
+                                        setMessages(prev => prev.map(msg => msg.id === messageId ? { ...msg, answer: accumulatedResponse } : msg));
+                                        break;
+                                    }
+                                    case 'chart':
+                                    case 'chart_data': {
+                                        chartData = parsed.data || parsed.config || parsed.chart_config || null;
+                                        break;
+                                    }
+                                    case 'sql_query': {
+                                        if (parsed.query) sqlQueries.push(parsed.query);
+                                        break;
+                                    }
+                                    case 'execution_metadata': {
+                                        executionMetadata = { ...executionMetadata, ...(parsed.metadata || {}) };
+                                        break;
+                                    }
+                                    case 'done': {
+                                        // upstream signaled completion
+                                        break;
+                                    }
+                                    default:
+                                        break;
                                 }
-                                
                             } catch (e) {
-                                console.warn('Failed to parse streaming data:', e);
+                                // tolerate partial JSON across chunks
                             }
                         }
                     }
@@ -2926,14 +2941,6 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                         <MessageOutlined /> AI-Native Chat
                     </Title>
                     <div className="header-actions">
-                        {/* Prefer centralized ModelSelector in header; keep compact model select here as fallback */}
-                        <div style={{ minWidth: 180 }}>
-                            <select value={selectedAIModel} onChange={(e) => setSelectedAIModel(e.target.value)} style={{ width: 180, padding: '6px 8px', borderRadius: 6 }}>
-                                <option value="gpt-4.1-mini">🤖 GPT-4.1 Mini</option>
-                                <option value="gpt-5-mini">🚀 GPT-5 Mini</option>
-                                <option value="gpt-4-mini">🧠 GPT-4 Mini</option>
-                            </select>
-                        </div>
                         <Select
                             placeholder="Navigate"
                             style={{ width: 200 }}
@@ -2964,6 +2971,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                         <Avatar 
                             icon={<RobotOutlined />} 
                             className="ai-avatar"
+                            size="large"
                         />
                         <div className="message-content ai-content typing">
                             <div className="message-header">
@@ -2980,129 +2988,301 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                         </div>
                     </div>
                 )}
-            {/* Jump to bottom indicator */}
-            {showJumpToBottom && (
-                <div className="jump-to-bottom" style={{ position: 'fixed', right: 24, bottom: 'calc(96px + env(safe-area-inset-bottom, 0))', zIndex: 130 }}>
-                    <Button type="primary" shape="round" onClick={() => { containerRef.current && (containerRef.current.scrollTop = containerRef.current.scrollHeight); setShowJumpToBottom(false); }}>Jump to bottom</Button>
-                </div>
-            )}
             </div>
 
             {/* Chat Input Section */}
-            <div className="chat-input-section">
-                {/* Data Source Status Indicator */}
-                {(props.selectedDataSources && props.selectedDataSources.length > 0) && (
-                    <div style={{
-                        padding: '8px 12px',
-                        background: 'rgba(24, 144, 255, 0.1)',
-                        border: '1px solid #1890ff',
-                        borderRadius: '6px',
-                        marginBottom: '12px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px'
-                    }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <DatabaseOutlined style={{ color: '#1890ff' }} />
-                            <Text style={{ color: 'var(--ant-color-text, #141414)', fontSize: '12px' }}>
-                                <strong>AI Analysis Sources:</strong> {props.selectedDataSources.map((ds: any) => ds.name).join(', ')}
-                            </Text>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <Checkbox
-                                checked={includeFilesInAnalysis}
-                                onChange={(e) => setIncludeFilesInAnalysis(e.target.checked)}
-                                style={{ color: 'var(--ant-color-text, #141414)', fontSize: 12 }}
-                            >
-                                Include files
-                            </Checkbox>
-                            {includeFilesInAnalysis && (props.selectedDataSources || []).some((ds: any) => ds.type === 'file') && (
-                                <Text style={{ color: 'var(--ant-color-text, #141414)', fontSize: '11px' }}>
-                                    Files: {(props.selectedDataSources || []).filter((ds: any) => ds.type === 'file').map((ds: any) => ds.name).join(', ')}
-                                </Text>
-                            )}
-                        </div>
-                    </div>
-                )}
-                
-                {/* No Data Sources Selected Message */}
-                {(!props.selectedDataSources || props.selectedDataSources.length === 0) && (
-                    <div style={{
-                        padding: '8px 12px',
-                        background: 'rgba(255, 193, 7, 0.1)',
-                        border: '1px solid #ffc107',
-                        borderRadius: '6px',
-                        marginBottom: '12px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px'
-                    }}>
-                        <InfoCircleOutlined style={{ color: '#ffc107' }} />
-                        <Text style={{ color: 'var(--ant-color-text, #141414)', fontSize: '12px' }}>
-                            <strong>No Data Sources Selected:</strong> Go to the Data Panel (right side) and click on a data source to select it for AI analysis.
-                        </Text>
-                    </div>
-                )}
-                
+            <div className="chat-input-section" style={{
+                paddingTop: '16px',
+                marginTop: '16px'
+            }}>
                 <div className="input-container">
-                    <div className="input-wrapper">
-                    <Input.TextArea
-                            ref={textAreaRef}
-                            value={inputValue}
-                            onChange={(e) => setInputValue(e.target.value)}
-                            placeholder="Ask me anything about your data... (Shift+Enter for new line)"
-                        autoSize={{ minRows: 4, maxRows: 10 }}
-                            onPressEnter={(e) => {
-                                if (!e.shiftKey) {
-                                    e.preventDefault();
-                                    handleSendMessage(inputValue);
+                    {/* Clean Modern Input Design */}
+                    <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '12px',
+                        background: 'var(--layout-panel-background)',
+                        border: '1px solid var(--color-border-primary)',
+                        borderRadius: '12px',
+                        padding: '16px',
+                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+                        transition: 'all 0.2s ease',
+                        width: '100%',
+                        maxWidth: '100%',
+                    }}>
+                        {/* Data Source Bar - Enhanced Design */}
+                        <div className="data-source-bar" style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                            padding: '12px 16px',
+                            background: 'var(--color-surface-raised)',
+                            borderRadius: '10px',
+                            fontSize: '14px',
+                            color: 'var(--color-text-secondary)',
+                            width: '100%',
+                            border: '1px solid var(--color-border-secondary)',
+                            transition: 'all 0.2s ease',
+                        }}>
+                            <DatabaseOutlined style={{ fontSize: '16px', color: 'var(--color-brand-primary)' }} />
+                            <span style={{ fontWeight: '500' }}>Data Source:</span>
+                            <span style={{ 
+                                color: 'var(--color-brand-primary)', 
+                                fontWeight: '600',
+                                backgroundColor: 'var(--color-brand-primary-light)',
+                                padding: '4px 8px',
+                                borderRadius: '6px',
+                                fontSize: '13px'
+                            }}>
+                                {props.selectedDataSources && props.selectedDataSources.length > 0 
+                                    ? props.selectedDataSources.map((ds: any) => ds.name).join(', ')
+                                    : 'None selected'
                                 }
-                            }}
-                            className="chat-textarea"
-                        aria-label="Chat input"
-                        data-test-id="chat-input"
-                        style={{ minHeight: 64, resize: 'vertical' }}
-                        />
-                        
-                        {/* Input Actions - Full Width */}
-                        <div className="input-actions">
+                            </span>
+                            <div style={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '12px',
+                                marginLeft: 'auto'
+                            }}>
+                                <label style={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    gap: '6px',
+                                    cursor: 'pointer',
+                                    fontSize: '13px',
+                                    fontWeight: '500',
+                                    color: 'var(--color-text-primary)'
+                                }}>
+                                    <input 
+                                        type="checkbox" 
+                                        checked={includeFilesInAnalysis}
+                                        onChange={(e) => setIncludeFilesInAnalysis(e.target.checked)}
+                                        style={{ 
+                                            accentColor: 'var(--color-brand-primary)',
+                                            cursor: 'pointer',
+                                            transform: 'scale(1.1)'
+                                        }}
+                                    />
+                                    Include files
+                                </label>
+                                
+                                {/* Jump to bottom button */}
+                                {showJumpToBottom && (
+                                    <Button 
+                                        type="text" 
+                                        shape="circle" 
+                                        size="small"
+                                        icon={<DownOutlined />}
+                                        onClick={() => { 
+                                            containerRef.current && (containerRef.current.scrollTop = containerRef.current.scrollHeight); 
+                                            setShowJumpToBottom(false); 
+                                        }}
+                                        title="Jump to bottom"
+                                        style={{ 
+                                            color: 'var(--color-brand-primary)',
+                                            fontSize: '14px',
+                                            width: '28px',
+                                            height: '28px',
+                                            minWidth: '28px',
+                                            border: '1px solid var(--color-brand-primary-light)',
+                                            backgroundColor: 'var(--color-brand-primary-light)'
+                                        }}
+                                    />
+                                )}
+                            </div>
+                        </div>
 
+                        {/* Enhanced Controls Row */}
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '16px',
+                            padding: '12px 16px',
+                            background: 'var(--color-surface-base)',
+                            borderRadius: '10px',
+                            height: '48px',
+                            width: '100%',
+                            border: '1px solid var(--color-border-secondary)',
+                            transition: 'all 0.2s ease',
+                        }}>
+                            {/* Mode Selector */}
+                            <div style={{ minWidth: '120px' }}>
+                                <ModeSelector
+                                    value={mode}
+                                    onChange={(v: string) => { try { setMode(v); localStorage.setItem('chat_mode', v); } catch (e) {} }}
+                                />
+                            </div>
                             
-                            {/* Voice Input - Single Click */}
-                            <Button
-                                type="text"
-                                icon={<AudioOutlined />}
-                                onClick={() => {
-                                    if (isRecording) {
-                                        stopVoiceInput();
-                                    } else {
-                                        startVoiceInput();
-                                    }
+                            <div style={{ width: '1px', height: '24px', background: 'var(--color-border-secondary)' }} />
+                            
+                            {/* AI Model Selector */}
+                            <div style={{ minWidth: '140px' }}>
+                                <select 
+                                    value={selectedAIModel} 
+                                    onChange={(e) => setSelectedAIModel(e.target.value)} 
+                                    style={{ 
+                                        height: '32px',
+                                        padding: '0 12px',
+                                        borderRadius: '8px',
+                                        border: '1px solid var(--color-border-primary)',
+                                        background: 'var(--color-surface-base)',
+                                        color: 'var(--color-text-primary)',
+                                        fontSize: '13px',
+                                        cursor: 'pointer',
+                                        width: '100%',
+                                        fontWeight: '500',
+                                        transition: 'all 0.2s ease',
+                                    }}
+                                >
+                                    <option value="gpt-4.1-mini">GPT-4.1 Mini</option>
+                                    <option value="gpt-5-mini">GPT-5 Mini</option>
+                                    <option value="gpt-4-mini">GPT-4 Mini</option>
+                                </select>
+                            </div>
+                            
+                            <div style={{ flex: 1 }} />
+                            
+                            {/* Action Controls */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Tooltip title="Voice input">
+                                    <Button
+                                        type="text"
+                                        icon={<AudioOutlined />}
+                                        size="small"
+                                        onClick={() => {
+                                            if (isRecording) {
+                                                stopVoiceInput();
+                                            } else {
+                                                startVoiceInput();
+                                            }
+                                        }}
+                                        className={`voice-button ${isRecording ? 'recording' : ''}`}
+                                        style={{ 
+                                            padding: '6px 10px', 
+                                            minWidth: '36px', 
+                                            height: '32px',
+                                            fontSize: '16px',
+                                            borderRadius: '8px',
+                                            border: '1px solid var(--color-border-secondary)',
+                                            backgroundColor: isRecording ? 'var(--color-functional-danger)' : 'transparent',
+                                            color: isRecording ? '#ffffff' : 'var(--color-text-primary)',
+                                        }}
+                                    />
+                                </Tooltip>
+                                
+                                {!chatLoading && (
+                                    <Tooltip title="Regenerate response">
+                                        <Button
+                                            type="text"
+                                            icon={<ReloadOutlined />}
+                                            size="small"
+                                            onClick={() => {
+                                                const last = [...messages].reverse().find(m => m.query);
+                                                if (last?.query) handleSendMessage(last.query);
+                                            }}
+                                            style={{ 
+                                                padding: '6px 10px', 
+                                                minWidth: '36px', 
+                                                height: '32px',
+                                                fontSize: '16px',
+                                                borderRadius: '8px',
+                                                border: '1px solid var(--color-border-secondary)',
+                                                backgroundColor: 'transparent',
+                                                color: 'var(--color-text-primary)',
+                                            }}
+                                        />
+                                    </Tooltip>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Enhanced Main Input Area */}
+                        <div style={{ 
+                            display: 'flex', 
+                            alignItems: 'flex-end', 
+                            gap: '16px',
+                            width: '100%',
+                        }}>
+                            <Input.TextArea
+                                ref={textAreaRef}
+                                value={inputValue}
+                                onChange={(e) => setInputValue(e.target.value)}
+                                placeholder="Ask me anything about your data... (Shift+Enter for new line)"
+                                autoSize={{ minRows: 2, maxRows: 6 }}
+                                onKeyDown={handleKeyPress}
+                                style={{ 
+                                    flex: 1,
+                                    border: '2px solid var(--color-border-primary)',
+                                    borderRadius: '12px',
+                                    fontSize: '15px',
+                                    background: 'var(--color-surface-base)',
+                                    color: 'var(--color-text-primary)',
+                                    resize: 'none',
+                                    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                                    width: '100%',
+                                    minWidth: 0,
+                                    outline: 'none',
+                                    padding: '16px',
+                                    transition: 'all 0.2s ease',
+                                    fontFamily: 'inherit',
+                                    lineHeight: '1.5',
                                 }}
-                                className={`voice-button ${isRecording ? 'recording' : ''}`}
-                                title={isRecording ? 'Click to stop voice input' : 'Click to start voice input'}
                             />
                             
-                            {/* Send Button */}
+                            {/* Enhanced Send Button */}
                             <Button
                                 type="primary"
                                 icon={<SendOutlined />}
                                 onClick={() => handleSendMessage(inputValue)}
                                 disabled={!inputValue.trim() || chatLoading}
                                 className="send-button"
-                                title="Send Message"
-                                aria-label="Send message"
-                                data-test-id="send-button"
-                            />
+                                size="large"
+                                style={{ 
+                                    minWidth: '100px', 
+                                    height: '48px',
+                                    fontWeight: '600',
+                                    fontSize: '15px',
+                                    borderRadius: '12px',
+                                    background: 'var(--color-brand-primary)',
+                                    borderColor: 'var(--color-brand-primary)',
+                                    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
+                                    flexShrink: 0,
+                                    transition: 'all 0.2s ease',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '8px',
+                                }}
+                            >
+                                Send
+                            </Button>
                         </div>
-                    </div>
 
-                    {/* Mode selector placed just below the input for per-chat control */}
-                    <div className="mode-selector-sticky" style={{ position: 'sticky', bottom: 'calc(96px + env(safe-area-inset-bottom, 0))', zIndex: 121, marginTop: 8 }}>
-                        <ModeSelector
-                            value={mode}
-                            onChange={(v: string) => { try { setMode(v); localStorage.setItem('chat_mode', v); } catch (e) {} }}
-                        />
+                        {/* Loading Controls */}
+                        {chatLoading && (
+                            <div style={{ 
+                                display: 'flex', 
+                                justifyContent: 'flex-end', 
+                                gap: 8, 
+                                marginTop: 8 
+                            }}>
+                                <Button
+                                    icon={<StopOutlined />}
+                                    onClick={() => {
+                                        try { abortControllerRef.current?.abort(); } catch {}
+                                        setChatLoading(false);
+                                    }}
+                                    style={{
+                                        background: 'var(--color-functional-error)',
+                                        borderColor: 'var(--color-functional-error)',
+                                        color: 'white',
+                                    }}
+                                >
+                                    Stop generating
+                                </Button>
+                            </div>
+                        )}
                     </div>
 
                     {/* Voice Status Indicator */}

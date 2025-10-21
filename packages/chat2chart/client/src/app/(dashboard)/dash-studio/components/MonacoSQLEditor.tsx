@@ -64,7 +64,6 @@ import {
   SyncOutlined,
   ThunderboltOutlined
 } from '@ant-design/icons';
-import { getBackendUrlForApi } from '@/utils/backendUrl';
 import { dashboardDataService } from '../services/DashboardDataService';
 import { dashboardAPIService } from '../services/DashboardAPIService';
 import { workingQueryService } from '../services/WorkingQueryService';
@@ -654,7 +653,6 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
           setSelectedDatabase(firstConnected.id);
         } else if (mergedSources.length === 0) {
           // No data sources available - show helpful message
-          console.log('No data sources connected. User can connect via + button.');
         }
       } else {
         throw new Error(result.error || 'Failed to load data sources');
@@ -665,9 +663,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
       // Handle different error types
       if (error instanceof Error) {
         if (error.name === 'AbortError') {
-          console.log('Data sources request timed out. User can connect via + button.');
         } else if (error.message.includes('Failed to load data sources')) {
-          console.log('No data sources available. User can connect via + button.');
         } else {
           message.warning('Using sample data sources. Connect to real data sources via /data page.');
         }
@@ -740,7 +736,6 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
       // Find the data source
       const dataSource = dataSources.find(ds => ds.id === dataSourceId);
       if (!dataSource) {
-        console.log('Data source not found:', dataSourceId);
         return;
       }
 
@@ -1239,7 +1234,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
         <Badge 
           status={record.state === 'success' ? 'success' : record.state === 'running' ? 'processing' : 'error'} 
           text={
-            <span style={{ fontSize: '12px' }}>
+            <span style={{ fontSize: 'var(--font-size-sm)' }}>
               {record.state === 'success' ? '✅ Success' : record.state === 'running' ? '🔄 Running' : '❌ Failed'}
             </span>
           }
@@ -1359,8 +1354,8 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
       height: '100%', 
       display: 'flex',
       flexDirection: 'column',
-      background: isDarkMode ? 'var(--ant-color-bg-layout, #141414)' : 'var(--ant-color-bg-layout, #ffffff)',
-      color: isDarkMode ? 'var(--ant-color-text, #e8e8e8)' : 'var(--ant-color-text, #141414)'
+      background: isDarkMode ? 'var(--ant-color-bg-layout, var(--layout-background))' : 'var(--ant-color-bg-layout, var(--color-surface-base))',
+      color: isDarkMode ? 'var(--ant-color-text, var(--color-text-primary))' : 'var(--ant-color-text, var(--layout-background))'
     }}>
       {/* Top Bar removed per UX request */}
 
@@ -1370,13 +1365,28 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
       <div style={{ flex: 1, display: 'grid', gridTemplateColumns: sidebarCollapsed ? '50px 1fr' : '350px 1fr', gap: '0', overflow: 'hidden', minHeight: 0, height: '100%' }}>
         {/* Left Sidebar - Data Sources & Schema Browser */}
         <div style={{
-          background: isDarkMode ? 'var(--ant-color-bg-container, #1a1a1a)' : 'var(--ant-color-fill-secondary, #fafafa)',
-          borderRight: `1px solid ${isDarkMode ? 'var(--ant-color-border, #303030)' : 'var(--ant-color-border, #d9d9d9)'}`,
+          background: 'var(--layout-panel-background-raised)',
+          border: '2px solid var(--color-border-secondary)',
+          borderRight: '2px solid var(--color-border-primary)',
+          borderRadius: 'var(--ant-border-radius-lg)',
           padding: sidebarCollapsed ? '8px' : '16px',
           overflowY: 'auto',
           minHeight: 0,
-          position: 'relative'
+          position: 'relative',
+          boxShadow: 'var(--shadow-md)',
+          margin: '8px',
         }}>
+          {/* Gradient Top Border */}
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '3px',
+            background: 'linear-gradient(90deg, var(--color-functional-info), var(--color-brand-primary))',
+            borderRadius: 'var(--ant-border-radius-lg) var(--ant-border-radius-lg) 0 0',
+            zIndex: 1,
+          }} />
           {/* Collapse Button */}
           <Button
             type="text"
@@ -1387,8 +1397,9 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
               top: '8px',
               right: '8px',
               zIndex: 10,
-              background: isDarkMode ? 'var(--ant-color-fill-secondary, #262626)' : 'var(--ant-color-bg-container, #ffffff)',
-              border: `1px solid ${isDarkMode ? 'var(--ant-color-border, #303030)' : 'var(--ant-color-border, #d9d9d9)'}`
+              background: 'var(--layout-panel-background-subtle)',
+              border: '1px solid var(--color-border-primary)',
+              borderRadius: 'var(--ant-border-radius-sm)',
             }}
             size="small"
           />
@@ -1396,9 +1407,9 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
           {!sidebarCollapsed && (
             <>
               {/* Data Sources Section */}
-              <div style={{ marginBottom: '20px' }}>
+              <div style={{ marginBottom: '20px', position: 'relative', zIndex: 2 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                  <Text strong style={{ color: isDarkMode ? 'var(--ant-color-text, #e8e8e8)' : 'var(--ant-color-text, #141414)', fontSize: '12px', textTransform: 'uppercase' }}>
+                  <Text strong style={{ color: 'var(--color-text-primary)', fontSize: 'var(--font-size-sm)', textTransform: 'uppercase' }}>
                     DATA SOURCE
                   </Text>
                   <Button 
@@ -1434,7 +1445,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                   loading={isLoadingDataSources}
                   placeholder={isLoadingDataSources ? "Loading data sources..." : "Select data source"}
                   notFoundContent={
-                    isLoadingDataSources ? "Loading..." : 
+                    isLoadingDataSources ? <LoadingStates type="data" message="Loading data sources..." /> : 
                     dataSources.length === 0 ? "No data sources connected. Click + to connect one." :
                     "No connected data sources available"
                   }
@@ -1447,7 +1458,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           {iconFor(ds.type)}
                           <span>{ds.name}</span>
-                          {ds.name.includes('Demo') && <span style={{ fontSize: '10px', color: '#666' }}>(Demo)</span>}
+                          {ds.name.includes('Demo') && <span style={{ fontSize: '10px', color: 'var(--color-text-secondary)' }}>(Demo)</span>}
                         </div>
                       )
                     }));
@@ -1496,8 +1507,8 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                 {selectedDatabase && (
                   <div style={{ marginTop: '6px' }}>
                     <Text style={{ 
-                      fontSize: '12px', 
-                      color: isDarkMode ? '#999' : '#666', 
+                      fontSize: 'var(--font-size-sm)', 
+                      color: 'var(--color-text-tertiary)', 
                       marginBottom: '8px', 
                       display: 'block',
                       fontWeight: '500'
@@ -1505,17 +1516,18 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                       Database Explorer
                     </Text>
                     <div style={{ 
-                      maxHeight: '300px', 
+                      maxHeight: '400px', 
                       overflow: 'auto', 
-                      border: `1px solid ${isDarkMode ? '#333' : '#d9d9d9'}`, 
-                      borderRadius: '4px',
-                      padding: '6px',
-                      background: isDarkMode ? '#1a1a1a' : '#fafafa',
-                      marginLeft: '0px'
+                      border: '2px solid var(--color-border-primary)', 
+                      borderRadius: 'var(--ant-border-radius-lg)',
+                      padding: '12px',
+                      background: 'var(--layout-panel-background-subtle)',
+                      marginLeft: '0px',
+                      boxShadow: 'none'
                     }}>
                       {isLoadingSchema ? (
-                        <div style={{ textAlign: 'center', padding: '16px' }}>
-                          <Spin size="small" /> Loading...
+                        <div style={{ textAlign: 'center', padding: '20px' }}>
+                          <LoadingStates type="query" message="Executing query..." size="small" />
                         </div>
                       ) : (
                         <Tree
@@ -1523,33 +1535,33 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                           defaultExpandAll
                           style={{ 
                             background: 'transparent',
-                            fontSize: '12px'
+                            fontSize: '13px'
                           }}
                           treeData={[
                             {
                               title: (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                  <DatabaseOutlined style={{ color: '#1890ff', fontSize: '12px' }} />
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0' }}>
+                                  <DatabaseOutlined style={{ color: 'var(--color-brand-primary)', fontSize: '14px' }} />
                                   <span style={{ 
                                     fontWeight: 'bold', 
-                                    fontSize: '11px',
-                                    color: isDarkMode ? '#fff' : '#000'
+                                    fontSize: '13px',
+                                    color: 'var(--color-text-primary)'
                                   }}>
                                     {selectedDataSource?.name || selectedDatabase}
                                   </span>
                                   {selectedDataSource?.name.includes('Demo') && (
-                                    <Tag color="orange" style={{ fontSize: '9px', padding: '0 4px' }}>Demo</Tag>
+                                    <Tag color="orange" style={{ fontSize: '10px', padding: '2px 6px' }}>Demo</Tag>
                                   )}
                                 </div>
                               ),
                               key: 'database',
                               children: availableSchemas.map(schema => ({
                                 title: (
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                    <span style={{ color: '#52c41a', fontSize: '10px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '2px 0' }}>
+                                    <span style={{ color: 'var(--color-functional-success)', fontSize: '12px' }}>
                                       {schema === 'file' ? '📄' : '📁'}
                                     </span>
-                                    <span style={{ fontSize: '10px', color: isDarkMode ? '#ccc' : '#666' }}>
+                                    <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)', fontWeight: '500' }}>
                                       {schema === 'file' ? 'File Data' : schema}
                                     </span>
                                   </div>
@@ -1560,7 +1572,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                                   .map(table => ({
                                     title: (
                                       <div 
-                                        style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', padding: '2px 4px', borderRadius: '3px', fontSize: '11px', marginLeft: 0 }}
+                                        style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '4px 6px', borderRadius: '4px', fontSize: '12px', marginLeft: 0 }}
                                         onClick={() => {
                                           setSelectedTable(table.name);
                                           setSelectedSchema(schema);
@@ -1569,26 +1581,29 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                                         }}
                                       >
                                         {schema === 'file' ? (
-                                          <FileTextOutlined style={{ color: '#fa8c16', fontSize: '10px' }} />
+                                          <FileTextOutlined style={{ color: 'var(--color-functional-warning)', fontSize: '12px' }} />
                                         ) : (
-                                          <TableOutlined style={{ color: '#722ed1', fontSize: '10px' }} />
+                                          <TableOutlined style={{ color: 'var(--color-functional-info)', fontSize: '12px' }} />
                                         )}
-                                        <span style={{ color: isDarkMode ? '#fff' : '#000', fontWeight: 500 }}>{table.name}</span>
+                                        <span style={{ color: 'var(--color-text-primary)', fontWeight: 500 }}>{table.name}</span>
                                         <span style={{ 
-                                          fontSize: '9px', 
-                                          color: isDarkMode ? '#666' : '#999' 
+                                          fontSize: '10px', 
+                                          color: 'var(--color-text-tertiary)',
+                                          backgroundColor: 'var(--color-surface-raised)',
+                                          padding: '2px 4px',
+                                          borderRadius: '3px'
                                         }}>
-                                          ({table.columns?.length || 0})
+                                          {table.columns?.length || 0} cols
                                         </span>
                                       </div>
                                     ),
                                     key: `table-${table.name}`,
                                     children: table.columns?.map((column: any, index: number) => ({
                                       title: (
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px', padding: '2px 0', marginLeft: 0 }}>
-                                          <span style={{ color: '#fa8c16' }}>•</span>
-                                          <span style={{ fontFamily: 'monospace', color: isDarkMode ? '#ccc' : '#666' }}>{column.name}</span>
-                                          <span style={{ color: isDarkMode ? '#666' : '#999', fontSize: '8px' }}>({column.type || 'string'})</span>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', padding: '2px 0', marginLeft: 0 }}>
+                                          <span style={{ color: 'var(--color-functional-warning)', fontSize: '8px' }}>•</span>
+                                          <span style={{ fontFamily: 'monospace', color: 'var(--color-text-secondary)', fontWeight: '500' }}>{column.name}</span>
+                                          <span style={{ color: 'var(--color-text-tertiary)', fontSize: '9px', backgroundColor: 'var(--color-surface-base)', padding: '1px 3px', borderRadius: '2px' }}>{column.type || 'string'}</span>
                                         </div>
                                       ),
                                       key: `column-${table.name}-${column.name}-${index}`,
@@ -1623,22 +1638,22 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                         key={index}
                         header={
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <TableOutlined style={{ fontSize: '12px' }} />
+                            <TableOutlined style={{ fontSize: 'var(--font-size-sm)' }} />
                             <span style={{ fontSize: '11px', fontWeight: 600 }}>{tableName}</span>
                             <Badge count={table.rowCount} size="small" />
                           </div>
                         }
                         style={{
-                background: isDarkMode ? 'var(--ant-color-fill-secondary, #262626)' : 'var(--ant-color-bg-container, #ffffff)',
-                border: `1px solid ${isDarkMode ? 'var(--ant-color-border, #303030)' : 'var(--ant-color-border, #d9d9d9)'}`,
+                background: isDarkMode ? 'var(--ant-color-fill-secondary, var(--color-surface-raised))' : 'var(--ant-color-bg-container, var(--color-surface-base))',
+                border: `1px solid ${isDarkMode ? 'var(--ant-color-border, var(--color-border-primary))' : 'var(--ant-color-border, var(--color-border-primary))'}`,
                 borderRadius: '4px',
                           marginBottom: '8px'
                         }}
                       >
                         <div style={{ padding: '6px 0' }}>
                           {/* Table Info */}
-                          <div style={{ marginBottom: '8px', padding: '6px', background: isDarkMode ? 'var(--ant-color-bg-container, #1a1a1a)' : 'var(--ant-color-fill-secondary, #f5f5f5)', borderRadius: '4px' }}>
-                            <div style={{ fontSize: '10px', color: isDarkMode ? 'var(--ant-color-text-secondary, #a6a6a6)' : 'var(--ant-color-text-secondary, #666)', marginBottom: '4px' }}>
+                          <div style={{ marginBottom: '8px', padding: '6px', background: isDarkMode ? 'var(--ant-color-bg-container, var(--color-surface-raised))' : 'var(--ant-color-fill-secondary, var(--color-surface-raised))', borderRadius: '4px' }}>
+                            <div style={{ fontSize: '10px', color: isDarkMode ? 'var(--ant-color-text-secondary, var(--color-text-tertiary))' : 'var(--ant-color-text-secondary, var(--color-text-secondary))', marginBottom: '4px' }}>
                               {table.description}
                             </div>
                             <div style={{ display: 'flex', gap: '6px', fontSize: '9px' }}>
@@ -1656,7 +1671,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                               gap: '6px',
                               padding: '2px 0',
                               fontSize: '10px',
-                              borderBottom: fieldIndex < table.fields.length - 1 ? `1px solid ${isDarkMode ? 'var(--ant-color-border, #303030)' : 'var(--ant-color-border, #eeeeee)'}` : 'none'
+                              borderBottom: fieldIndex < table.fields.length - 1 ? `1px solid ${isDarkMode ? 'var(--ant-color-border, var(--color-border-primary))' : 'var(--ant-color-border, var(--color-border-secondary))'}` : 'none'
                             }}>
                               <FieldBinaryOutlined style={{ fontSize: '10px' }} />
                               <Text style={{ fontFamily: 'monospace', fontSize: '10px' }}>{field.name}</Text>
@@ -1676,7 +1691,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
             {uiViews.length > 0 && (
               <div style={{ marginTop: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                  <Text strong style={{ color: isDarkMode ? '#ffffff' : '#000000', fontSize: '12px', textTransform: 'uppercase' }}>
+                  <Text strong style={{ color: isDarkMode ? 'var(--color-surface-base)' : 'var(--color-text-primary)000', fontSize: 'var(--font-size-sm)', textTransform: 'uppercase' }}>
                     VIEWS
                   </Text>
                 </div>
@@ -1704,10 +1719,10 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                           <span style={{ fontSize: 11, fontWeight: 'bold' }}>{viewName}</span>
                           <Tag>View</Tag>
                         </div>
-                      } style={{ background: isDarkMode ? 'var(--ant-color-fill-secondary, #262626)' : 'var(--ant-color-bg-container, #ffffff)', border: `1px solid ${isDarkMode ? 'var(--ant-color-border, #303030)' : 'var(--ant-color-border, #d9d9d9)'}`, borderRadius: 4, marginBottom: 8 }}>
+                      } style={{ background: isDarkMode ? 'var(--ant-color-fill-secondary, var(--color-surface-raised))' : 'var(--ant-color-bg-container, var(--color-surface-base))', border: `1px solid ${isDarkMode ? 'var(--ant-color-border, var(--color-border-primary))' : 'var(--ant-color-border, var(--color-border-primary))'}`, borderRadius: 4, marginBottom: 8 }}>
                         <div style={{ padding: '8px 0' }}>
                           {view.fields.map((field, fieldIndex) => (
-                            <div key={fieldIndex} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', fontSize: 11, borderBottom: fieldIndex < view.fields.length - 1 ? `1px solid ${isDarkMode ? 'var(--ant-color-border, #303030)' : 'var(--ant-color-border, #eeeeee)'}` : 'none' }}>
+                            <div key={fieldIndex} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', fontSize: 11, borderBottom: fieldIndex < view.fields.length - 1 ? `1px solid ${isDarkMode ? 'var(--ant-color-border, var(--color-border-primary))' : 'var(--ant-color-border, var(--color-border-secondary))'}` : 'none' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                                 <FieldBinaryOutlined style={{ fontSize: 10 }} />
                                 <Text style={{ fontFamily: 'monospace', fontSize: 10 }}>{field.name}</Text>
@@ -1731,12 +1746,12 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
           {/* AI Prompt Bar */}
           <div style={{
             padding: '16px 20px',
-            borderBottom: `1px solid ${isDarkMode ? 'var(--ant-color-border, #303030)' : 'var(--ant-color-border, #d9d9d9)'}`,
-            background: isDarkMode ? 'var(--ant-color-bg-container, #1a1a1a)' : 'var(--ant-color-bg-container, #ffffff)',
+            borderBottom: `1px solid ${isDarkMode ? 'var(--ant-color-border, var(--color-border-primary))' : 'var(--ant-color-border, var(--color-border-primary))'}`,
+            background: isDarkMode ? 'var(--ant-color-bg-container, var(--color-surface-raised))' : 'var(--ant-color-bg-container, var(--color-surface-base))',
             flexShrink: 0
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <Button size="middle" icon={<RobotOutlined />} style={{ background: '#722ed1', borderColor: '#722ed1' }}>
+              <Button size="middle" icon={<RobotOutlined />} style={{ background: 'var(--color-functional-info)', borderColor: 'var(--color-functional-info)' }}>
                 AI Assistant
               </Button>
               <Input
@@ -1749,7 +1764,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
           </div>
 
           {/* Query Tabs above editor */}
-          <div style={{ padding: '8px 16px', borderBottom: `1px solid ${isDarkMode ? 'var(--ant-color-border, #303030)' : 'var(--ant-color-border, #d9d9d9)'}`, background: isDarkMode ? 'var(--ant-color-bg-container, #1a1a1a)' : 'var(--ant-color-bg-container, #ffffff)' }}>
+          <div style={{ padding: '8px 16px', borderBottom: `1px solid ${isDarkMode ? 'var(--ant-color-border, var(--color-border-primary))' : 'var(--ant-color-border, var(--color-border-primary))'}`, background: isDarkMode ? 'var(--ant-color-bg-container, var(--color-surface-raised))' : 'var(--ant-color-bg-container, var(--color-surface-base))' }}>
             <Tabs
               size="small"
               type="editable-card"
@@ -1853,8 +1868,8 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
           {/* Query Controls & Results */}
           <div style={{
             padding: '16px',
-            borderTop: `1px solid ${isDarkMode ? '#303030' : '#d9d9d9'}`,
-            background: isDarkMode ? '#1a1a1a' : '#ffffff',
+            borderTop: `1px solid ${isDarkMode ? 'var(--color-border-primary)' : 'var(--color-border-primary)'}`,
+            background: isDarkMode ? 'var(--color-surface-raised)' : 'var(--color-surface-base)',
             flexShrink: 0
           }}>
             {/* Control Bar */}
@@ -1877,7 +1892,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                 </Button>
                 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Text style={{ fontSize: '12px' }}>Row Limit:</Text>
+                  <Text style={{ fontSize: 'var(--font-size-sm)' }}>Row Limit:</Text>
                   <Select
                     defaultValue="1000"
                     style={{ width: '80px' }}
@@ -1892,7 +1907,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
 
                 {/* Engine selector */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Text style={{ fontSize: '12px' }}>Engine:</Text>
+                  <Text style={{ fontSize: 'var(--font-size-sm)' }}>Engine:</Text>
                   <Select
                     value={selectedEngine}
                     onChange={(val) => setSelectedEngine(val)}
@@ -1907,16 +1922,16 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <ClockCircleOutlined style={{ fontSize: '14px' }} />
-                  <Text style={{ fontFamily: 'monospace', fontSize: '12px' }}>
+                  <ClockCircleOutlined style={{ fontSize: 'var(--font-size-base)' }} />
+                  <Text style={{ fontFamily: 'monospace', fontSize: 'var(--font-size-sm)' }}>
                     {executionTime ? `00:00:${(executionTime / 1000).toFixed(2)}` : '00:00:00.00'}
                   </Text>
                 </div>
 
                 {isExecuting && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <SyncOutlined spin style={{ fontSize: '14px', color: '#1890ff' }} />
-                    <Text style={{ fontSize: '12px', color: '#1890ff' }}>
+                    <SyncOutlined spin style={{ fontSize: 'var(--font-size-base)', color: 'var(--color-brand-primary)' }} />
+                    <Text style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-brand-primary)' }}>
                       {executionStatus}
                     </Text>
                   </div>
@@ -1925,8 +1940,8 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                 {/* Engine resolution banner */}
                 {(!isExecuting && (selectedEngine || executionStatus)) && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <ThunderboltOutlined style={{ fontSize: '14px', color: '#52c41a' }} />
-                    <Text style={{ fontSize: '12px', color: '#52c41a' }}>
+                    <ThunderboltOutlined style={{ fontSize: 'var(--font-size-base)', color: 'var(--color-functional-success)' }} />
+                    <Text style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-functional-success)' }}>
                       Resolved engine: {selectedEngine || 'auto (resolved on execute)'}
                     </Text>
                   </div>
@@ -2178,15 +2193,15 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                         alignItems: 'center', 
                         marginBottom: '16px',
                         padding: '12px',
-                        background: isDarkMode ? '#1f1f1f' : '#f5f5f5',
+                        background: isDarkMode ? 'var(--color-surface-raised)' : 'var(--color-surface-raised)',
                         borderRadius: '6px',
-                        border: `1px solid ${isDarkMode ? '#303030' : '#d9d9d9'}`
+                        border: `1px solid ${isDarkMode ? 'var(--color-border-primary)' : 'var(--color-border-primary)'}`
                       }}>
                         <div>
-                          <Title level={5} style={{ margin: 0, color: isDarkMode ? '#ffffff' : '#000000' }}>
+                          <Title level={5} style={{ margin: 0, color: isDarkMode ? 'var(--color-surface-base)' : 'var(--color-text-primary)000' }}>
                             {previewChart.title}
                           </Title>
-                          <Text type="secondary" style={{ fontSize: '12px' }}>
+                          <Text type="secondary" style={{ fontSize: 'var(--font-size-sm)' }}>
                             {previewChart.config.chartType} Chart Preview
                           </Text>
                         </div>
@@ -2238,7 +2253,6 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                                 try {
                                   const result = await dashboardAPIService.createChart(previewChart);
                                   message.success('Chart saved successfully!');
-                                  console.log('Saved chart:', result);
                                 } catch (error) {
                                   console.error('Failed to save chart:', error);
                                   message.error('Failed to save chart. Please try again.');
@@ -2253,8 +2267,8 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                       
                       <div style={{ 
                         height: '300px',
-                        background: isDarkMode ? '#1a1a1a' : '#ffffff',
-                        border: `1px solid ${isDarkMode ? '#303030' : '#d9d9d9'}`,
+                        background: isDarkMode ? 'var(--color-surface-raised)' : 'var(--color-surface-base)',
+                        border: `1px solid ${isDarkMode ? 'var(--color-border-primary)' : 'var(--color-border-primary)'}`,
                         borderRadius: '6px',
                         padding: '12px'
                       }}>
@@ -2274,13 +2288,13 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                       flexDirection: 'column',
                       alignItems: 'center', 
                       justifyContent: 'center',
-                      color: isDarkMode ? '#999' : '#666'
+                      color: isDarkMode ? 'var(--color-text-tertiary)' : 'var(--color-text-secondary)'
                     }}>
                       <BarChartOutlined style={{ fontSize: '48px', marginBottom: '16px', opacity: 0.5 }} />
-                      <Title level={4} style={{ color: isDarkMode ? '#999' : '#666', marginBottom: '8px' }}>
+                      <Title level={4} style={{ color: isDarkMode ? 'var(--color-text-tertiary)' : 'var(--color-text-secondary)', marginBottom: '8px' }}>
                         No Chart Preview
                       </Title>
-                      <Text style={{ color: isDarkMode ? '#666' : '#999' }}>
+                      <Text style={{ color: isDarkMode ? 'var(--color-text-secondary)' : 'var(--color-text-tertiary)' }}>
                         Execute a query and click "Generate Chart" to see a preview
                       </Text>
                     </div>
@@ -2327,7 +2341,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
       >
         <div style={{ marginBottom: 8 }}>
           <Text strong>Snapshots</Text>
-          <div style={{ fontSize: 12, color: '#888' }}>Select a snapshot to load or bind to a widget</div>
+          <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>Select a snapshot to load or bind to a widget</div>
         </div>
         <div style={{ marginBottom: 12, display: 'flex', gap: 8 }}>
           <Input placeholder="Name" style={{ width: 240 }} id="save-query-name" />

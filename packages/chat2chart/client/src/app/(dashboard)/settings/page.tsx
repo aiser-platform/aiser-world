@@ -358,12 +358,15 @@ const SettingsPage: React.FC = () => {
     ];
 
     return (
-    <Layout style={{ minHeight: '100vh', background: '#f5f5f5' }}>
-      <Content style={{ padding: '24px' }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-          <Title level={2} style={{ marginBottom: '24px' }}>
+      <div className="page-wrapper">
+        <div className="page-header">
+          <Title level={2} className="page-title">
             <SettingOutlined /> Settings
-                </Title>
+          </Title>
+          <Text type="secondary" className="page-description">
+            Manage your account, organization, and application preferences
+          </Text>
+        </div>
 
           <Tabs
             activeKey={activeTab}
@@ -378,7 +381,7 @@ const SettingsPage: React.FC = () => {
                   </span>
                 ),
                 children: (
-                  <Card title="Profile Settings" loading={loading}>
+                  <Card title="Profile Settings" loading={loading} className="content-card">
                     <Form
                       form={profileForm}
                       layout="vertical"
@@ -666,9 +669,7 @@ const SettingsPage: React.FC = () => {
               }
             ]}
           />
-        </div>
-      </Content>
-    </Layout>
+      </div>
     );
 };
 

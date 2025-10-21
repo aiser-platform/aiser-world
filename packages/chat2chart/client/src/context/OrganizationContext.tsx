@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
+import { fetchApi } from '@/utils/api';
 import { getBackendUrlForApi } from '@/utils/backendUrl';
 
 // Types
@@ -84,7 +85,7 @@ interface OrganizationProviderProps {
 }
 
 export const OrganizationProvider: React.FC<OrganizationProviderProps> = ({ children }) => {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, initialized } = useAuth();
   
   // State
   const [currentOrganization, setCurrentOrganization] = useState<Organization | null>(null);
@@ -95,12 +96,17 @@ export const OrganizationProvider: React.FC<OrganizationProviderProps> = ({ chil
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Load initial data when user is authenticated
+  // Load initial data only after auth initialization and when user is authenticated
   useEffect(() => {
-    if (isAuthenticated && user) {
-      loadInitialData();
+    if (initialized && isAuthenticated && user) {
+      // Add a small delay to ensure authentication cookies are properly set
+      const timer = setTimeout(() => {
+        loadInitialData();
+      }, 150); // slight delay
+      
+      return () => clearTimeout(timer);
     }
-  }, [isAuthenticated, user]);
+  }, [initialized, isAuthenticated, user]);
 
   const loadInitialData = async () => {
     try {
@@ -118,12 +124,12 @@ export const OrganizationProvider: React.FC<OrganizationProviderProps> = ({ chil
 
   const getOrganizations = async () => {
     try {
-      // Call the real API to get organizations
-      const response = await fetch(`/api/organizations`);
+      // Call the real API to get organizations with proper authentication
+      const response = await fetchApi('api/organizations', { method: 'GET' });
       if (response.ok) {
         const orgs = await response.json();
         setOrganizations(orgs);
-        
+
         // Set the first organization as current (or find by user's organization)
         if (orgs.length > 0) {
           setCurrentOrganization(orgs[0]);
@@ -132,11 +138,30 @@ export const OrganizationProvider: React.FC<OrganizationProviderProps> = ({ chil
           // Load usage stats for the current organization
           await getOrganizationUsage(orgs[0].id);
         }
-      } else {
-        throw new Error('Failed to fetch organizations');
+        return;
       }
+      // If proxy returned non-ok, throw to trigger fallback
+      throw new Error(`Proxy response: ${response.status}`);
     } catch (err) {
-      console.error('Error fetching organizations:', err);
+      console.warn('Error fetching organizations via proxy, attempting direct backend fallback:', err);
+      try {
+        // Try direct backend fetch as a fallback (useful for mixed dev/container setups)
+        const backend = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+        const direct = await fetch(`${backend.replace(/\/$/, '')}/api/organizations`, { method: 'GET', credentials: 'include' });
+        if (direct.ok) {
+          const orgs = await direct.json();
+          setOrganizations(orgs);
+          if (orgs.length > 0) {
+            setCurrentOrganization(orgs[0]);
+            await getProjects(orgs[0].id);
+            await getOrganizationUsage(orgs[0].id);
+          }
+          return;
+        }
+        console.warn('Direct backend fetch failed', direct.status);
+      } catch (e2) {
+        console.error('Direct backend fallback also failed', e2);
+      }
       // Fallback to default organization if API fails
       const defaultOrg: Organization = {
         id: 1,
@@ -154,16 +179,28 @@ export const OrganizationProvider: React.FC<OrganizationProviderProps> = ({ chil
 
   const getProjects = async (orgId?: number) => {
     try {
-      // Call the real API to get projects
-      const response = await fetch(`/api/projects?user_id=default`);
+      // Call the real API to get projects with proper authentication
+      const response = await fetchApi('api/projects?user_id=default', { method: 'GET' });
       if (response.ok) {
         const data = await response.json();
         setProjects(data.items || []);
-      } else {
-        throw new Error('Failed to fetch projects');
+        return;
       }
+      throw new Error(`Proxy response: ${response.status}`);
     } catch (err) {
-      console.error('Error fetching projects:', err);
+      console.warn('Error fetching projects via proxy, attempting direct backend fallback', err);
+      try {
+        const backend = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+        const direct = await fetch(`${backend.replace(/\/$/, '')}/api/projects?user_id=default`, { method: 'GET', credentials: 'include' });
+        if (direct.ok) {
+          const data = await direct.json();
+          setProjects(data.items || []);
+          return;
+        }
+        console.warn('Direct fetch projects failed', direct.status);
+      } catch (e2) {
+        console.error('Direct projects fallback failed', e2);
+      }
       // Fallback to default project if API fails
       const defaultProject: Project = {
         id: 1,
@@ -181,25 +218,46 @@ export const OrganizationProvider: React.FC<OrganizationProviderProps> = ({ chil
   const getOrganizationUsage = async (orgId: number) => {
     try {
       // Call the real API to get usage stats
-      const response = await fetch(`/api/organizations/${orgId}/usage`);
+      const response = await fetchApi(`api/organizations/${orgId}/usage`, { method: 'GET' });
       if (response.ok) {
         const usage = await response.json();
         // Transform the API response to match our UsageStats interface
         const transformedUsage: UsageStats = {
           organization_id: orgId,
-          ai_queries_used: usage.limits.ai_credits_used || 0,
-          ai_queries_limit: usage.limits.ai_credits_limit || 100,
+          ai_queries_used: usage.limits?.ai_credits_used || 0,
+          ai_queries_limit: usage.limits?.ai_credits_limit || 100,
           storage_used_mb: 0, // Not provided by API yet
-          storage_limit_mb: (usage.limits.max_storage_gb || 1) * 1024, // Convert GB to MB
-          projects_count: usage.limits.max_projects || 1,
-          projects_limit: usage.limits.max_projects || 5,
+          storage_limit_mb: (usage.limits?.max_storage_gb || 1) * 1024, // Convert GB to MB
+          projects_count: usage.limits?.max_projects || 1,
+          projects_limit: usage.limits?.max_projects || 5,
         };
         setUsageStats(transformedUsage);
-      } else {
-        throw new Error('Failed to fetch usage stats');
+        return;
       }
+      throw new Error(`Proxy response: ${response.status}`);
     } catch (err) {
-      console.error('Error fetching usage stats:', err);
+      console.warn('Error fetching usage stats via proxy, attempting direct backend fallback', err);
+      try {
+        const backend = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+        const direct = await fetch(`${backend.replace(/\/$/, '')}/api/organizations/${orgId}/usage`, { method: 'GET', credentials: 'include' });
+        if (direct.ok) {
+          const usage = await direct.json();
+          const transformedUsage: UsageStats = {
+            organization_id: orgId,
+            ai_queries_used: usage.limits?.ai_credits_used || 0,
+            ai_queries_limit: usage.limits?.ai_credits_limit || 100,
+            storage_used_mb: 0,
+            storage_limit_mb: (usage.limits?.max_storage_gb || 1) * 1024,
+            projects_count: usage.limits?.max_projects || 1,
+            projects_limit: usage.limits?.max_projects || 5,
+          };
+          setUsageStats(transformedUsage);
+          return;
+        }
+        console.warn('Direct usage fetch failed', direct.status);
+      } catch (e2) {
+        console.error('Direct usage fallback failed', e2);
+      }
       // Fallback to default usage stats if API fails
       const defaultUsage: UsageStats = {
         organization_id: orgId,

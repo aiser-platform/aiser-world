@@ -28,7 +28,7 @@ const OnboardingGuide: React.FC<OnboardingGuideProps> = ({ isDarkMode, onClose, 
     {
       title: 'Welcome to Dashboard Studio',
       description: 'Create professional BI dashboards with drag-and-drop widgets',
-      icon: <AppstoreOutlined style={{ fontSize: '24px', color: '#1890ff' }} />,
+      icon: <AppstoreOutlined style={{ fontSize: '24px', color: 'var(--color-brand-primary)' }} />,
       content: (
         <div>
           <Paragraph>
@@ -41,7 +41,7 @@ const OnboardingGuide: React.FC<OnboardingGuideProps> = ({ isDarkMode, onClose, 
     {
       title: 'Widget Library',
       description: 'Drag widgets from the library to your canvas',
-      icon: <DragOutlined style={{ fontSize: '24px', color: '#52c41a' }} />,
+      icon: <DragOutlined style={{ fontSize: '24px', color: 'var(--color-functional-success)' }} />,
       content: (
         <div>
           <Paragraph>
@@ -62,7 +62,7 @@ const OnboardingGuide: React.FC<OnboardingGuideProps> = ({ isDarkMode, onClose, 
     {
       title: 'Query & Data',
       description: 'Connect to your data sources and create visualizations',
-      icon: <DatabaseOutlined style={{ fontSize: '24px', color: '#faad14' }} />,
+      icon: <DatabaseOutlined style={{ fontSize: '24px', color: 'var(--color-functional-warning)' }} />,
       content: (
         <div>
           <Paragraph>
@@ -80,7 +80,7 @@ const OnboardingGuide: React.FC<OnboardingGuideProps> = ({ isDarkMode, onClose, 
     {
       title: 'Customize & Configure',
       description: 'Fine-tune your widgets with comprehensive properties',
-      icon: <SettingOutlined style={{ fontSize: '24px', color: '#722ed1' }} />,
+      icon: <SettingOutlined style={{ fontSize: '24px', color: 'var(--color-functional-info)' }} />,
       content: (
         <div>
           <Paragraph>
@@ -120,20 +120,20 @@ const OnboardingGuide: React.FC<OnboardingGuideProps> = ({ isDarkMode, onClose, 
         width: '600px',
         maxHeight: '80vh',
         zIndex: 1000,
-        background: isDarkMode ? '#1f1f1f' : '#ffffff',
-        border: `1px solid ${isDarkMode ? '#303030' : '#d9d9d9'}`,
-        boxShadow: '0 8px 32px rgba(0,0,0,0.3)'
+        background: 'var(--color-surface-base)',
+        border: '1px solid var(--color-border-primary)',
+        boxShadow: 'var(--shadow-lg)'
       }}
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <BarChartOutlined style={{ fontSize: '20px', color: '#1890ff' }} />
-          <Title level={4} style={{ margin: 0, color: isDarkMode ? '#ffffff' : '#000000' }}>
+          <BarChartOutlined style={{ fontSize: '20px', color: 'var(--color-brand-primary)' }} />
+          <Title level={4} style={{ margin: 0, color: 'var(--color-text-primary)' }}>
             Dashboard Studio Guide
           </Title>
         </div>
       }
       extra={
-        <Button type="text" onClick={onClose} style={{ color: isDarkMode ? '#999' : '#666' }}>
+        <Button type="text" onClick={onClose} style={{ color: 'var(--color-text-secondary)' }}>
           ✕
         </Button>
       }
@@ -152,10 +152,10 @@ const OnboardingGuide: React.FC<OnboardingGuideProps> = ({ isDarkMode, onClose, 
             {steps[currentStep].icon}
           </Col>
           <Col span={20}>
-            <Title level={5} style={{ margin: 0, color: isDarkMode ? '#ffffff' : '#000000' }}>
+            <Title level={5} style={{ margin: 0, color: 'var(--color-text-primary)' }}>
               {steps[currentStep].title}
             </Title>
-            <Text type="secondary" style={{ fontSize: '14px' }}>
+            <Text type="secondary" style={{ fontSize: 'var(--font-size-base)' }}>
               {steps[currentStep].description}
             </Text>
           </Col>
@@ -167,7 +167,7 @@ const OnboardingGuide: React.FC<OnboardingGuideProps> = ({ isDarkMode, onClose, 
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Button onClick={onClose} style={{ color: isDarkMode ? '#999' : '#666' }}>
+        <Button onClick={onClose} style={{ color: 'var(--color-text-secondary)' }}>
           Skip Guide
         </Button>
         

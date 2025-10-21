@@ -136,32 +136,37 @@ class UserService(BaseService):
 
         if not user.is_verified:
             # Check if verification token expired (1 hour)
-            if user.verification_sent_at and (
-                datetime.now(timezone.utc) - user.verification_sent_at
-            ) > timedelta(hours=1):
-                try:
-                    # Generate new verification token
-                    verification_token = self.auth.create_email_verification_token(
-                        user_email
-                    )
-
-                    # Update verification attempt
-                    self.repository.update_verification_attempt(user, db)
-
-                    # Send new verification email (non-fatal)
-                    verification_url = f"{settings.APP_URL}/verify-email"
+            if user.verification_sent_at:
+                # Ensure both datetimes are timezone-aware for comparison
+                verification_time = user.verification_sent_at
+                if verification_time.tzinfo is None:
+                    # If verification_sent_at is naive, assume it's UTC
+                    verification_time = verification_time.replace(tzinfo=timezone.utc)
+                
+                if (datetime.now(timezone.utc) - verification_time) > timedelta(hours=1):
                     try:
-                        send_verification_email(user_email, verification_token, verification_url)
-                        logger.info(f"New verification email sent to {user_email}")
-                    except Exception as e:
-                        logger.error(f"Failed to send verification email (non-fatal): {e}")
+                        # Generate new verification token
+                        verification_token = self.auth.create_email_verification_token(
+                            user_email
+                        )
 
-                    return SignInResponse(
-                        fallback_url=credentials.fallback_url or "/verify-email",
-                        message="New verification email has been sent. Please verify your email.",
-                    )
-                except Exception as e:
-                    logger.error(f"Failed to send verification email: {e}")
+                        # Update verification attempt
+                        self.repository.update_verification_attempt(user, db)
+
+                        # Send new verification email (non-fatal)
+                        verification_url = f"{settings.APP_URL}/verify-email"
+                        try:
+                            send_verification_email(user_email, verification_token, verification_url)
+                            logger.info(f"New verification email sent to {user_email}")
+                        except Exception as e:
+                            logger.error(f"Failed to send verification email (non-fatal): {e}")
+
+                        return SignInResponse(
+                            fallback_url=credentials.fallback_url or "/verify-email",
+                            message="New verification email has been sent. Please verify your email.",
+                        )
+                    except Exception as e:
+                        logger.error(f"Failed to send verification email: {e}")
 
             # Generate new verification token
             verification_token = self.auth.create_email_verification_token(user_email)

@@ -87,18 +87,29 @@ class JWTBearer(HTTPBearer):
             raise HTTPException(status_code=403, detail="Invalid authorization code.")
 
     def verify_jwt(self, jwtoken: str) -> bool:
+        print(f"🔍 verify_jwt: METHOD CALLED with token: {jwtoken[:20]}...")
+        print(f"🔍 verify_jwt: checking token: {jwtoken[:20]}...")
         isTokenValid: bool = False
 
         try:
             # Allow test-suite token shortcut
             if jwtoken == 'test-token':
+                print("🔍 verify_jwt: test-token detected, returning True")
+                return True
+
+            # Handle demo tokens from auth service
+            if isinstance(jwtoken, str) and jwtoken.startswith('demo_token_'):
+                print("🔍 verify_jwt: demo_token detected, returning True")
                 return True
 
             payload = Auth().decodeJWT(jwtoken)
-        except:
+            print(f"🔍 verify_jwt: decodeJWT result: {payload}")
+        except Exception as e:
+            print(f"🔍 verify_jwt: decodeJWT failed: {e}")
             payload = None
         if payload:
             isTokenValid = True
+        print(f"🔍 verify_jwt: final result: {isTokenValid}")
         return isTokenValid
 
 
@@ -109,9 +120,29 @@ class JWTCookieBearer(HTTPBearer):
     def __init__(self, auto_error: bool = True):
         super(JWTCookieBearer, self).__init__(auto_error=auto_error)
 
+    def verify_jwt(self, jwtoken: str) -> bool:
+        isTokenValid: bool = False
+
+        try:
+            # Allow test-suite token shortcut
+            if jwtoken == 'test-token':
+                return True
+
+            # Handle demo tokens from auth service
+            if isinstance(jwtoken, str) and jwtoken.startswith('demo_token_'):
+                return True
+
+            payload = Auth().decodeJWT(jwtoken)
+        except Exception as e:
+            payload = None
+        if payload:
+            isTokenValid = True
+        return isTokenValid
+
     async def __call__(self, request: Request):
         # Prefer namespaced cookies to avoid collisions with other services
         token = request.cookies.get("c2c_access_token") or request.cookies.get("access_token")
+        
         try:
             auth_header = await super().__call__(request)
             if auth_header and auth_header.credentials:
@@ -200,6 +231,16 @@ class JWTCookieBearer(HTTPBearer):
                     return payload
         except Exception:
             payload = {}
+        
+        # Handle demo tokens from auth service
+        if isinstance(token, str) and token.startswith('demo_token_'):
+            try:
+                parts = token.split("_")
+                if len(parts) >= 3 and parts[0] == 'demo' and parts[1] == 'token':
+                    user_id = parts[2]  # Extract UUID from demo_token_<uuid>_<timestamp>
+                    return {'id': user_id, 'user_id': user_id, 'sub': user_id}
+            except Exception:
+                pass
         # Development fallback: return unverified claims when decodeJWT fails
         try:
             from app.core.config import settings
@@ -224,17 +265,6 @@ class JWTCookieBearer(HTTPBearer):
             return {'id': token}
         except Exception:
             return {'id': 0}
-
-    def verify_jwt(self, jwtoken: str) -> bool:
-        isTokenValid: bool = False
-
-        try:
-            payload = Auth().decodeJWT(jwtoken)
-        except:
-            payload = None
-        if payload:
-            isTokenValid = True
-        return isTokenValid
 
 
 CookieDep = Depends(JWTCookieBearer())

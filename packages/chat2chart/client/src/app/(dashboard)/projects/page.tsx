@@ -96,7 +96,7 @@ const ProjectsPage: React.FC = React.memo(() => {
                 <div>
                     <Text strong>{text}</Text>
                     <br />
-                    <Text type="secondary" style={{ fontSize: '12px' }}>
+                    <Text type="secondary" style={{ fontSize: 'var(--font-size-sm)' }}>
                         {record.description}
                     </Text>
                 </div>
@@ -124,7 +124,7 @@ const ProjectsPage: React.FC = React.memo(() => {
                             style={{ 
                                 width: `${progress}%`, 
                                 height: 6, 
-                                backgroundColor: progress === 100 ? '#52c41a' : '#1890ff',
+                                backgroundColor: progress === 100 ? 'var(--color-functional-success)' : 'var(--color-brand-primary)',
                                 borderRadius: 3
                             }} 
                         />
@@ -149,14 +149,14 @@ const ProjectsPage: React.FC = React.memo(() => {
             render: (record: any) => (
                 <div>
                     <div className="flex items-center mb-1">
-                        <CalendarOutlined style={{ marginRight: 4, fontSize: '12px' }} />
-                        <Text style={{ fontSize: '12px' }}>
+                        <CalendarOutlined style={{ marginRight: 4, fontSize: 'var(--font-size-sm)' }} />
+                        <Text style={{ fontSize: 'var(--font-size-sm)' }}>
                             {new Date(record.startDate).toLocaleDateString()}
                         </Text>
                     </div>
                     <div className="flex items-center">
-                        <CalendarOutlined style={{ marginRight: 4, fontSize: '12px' }} />
-                        <Text style={{ fontSize: '12px' }}>
+                        <CalendarOutlined style={{ marginRight: 4, fontSize: 'var(--font-size-sm)' }} />
+                        <Text style={{ fontSize: 'var(--font-size-sm)' }}>
                             {new Date(record.endDate).toLocaleDateString()}
                         </Text>
                     </div>
@@ -252,7 +252,7 @@ const ProjectsPage: React.FC = React.memo(() => {
         <div className="p-6 h-full overflow-y-auto">
             <div className="mb-8">
                 <Title level={2}>
-                    <ProjectOutlined style={{ marginRight: 12, color: '#1890ff' }} />
+                    <ProjectOutlined style={{ marginRight: 12, color: 'var(--color-brand-primary)' }} />
                     Project Management
                 </Title>
                 <Text type="secondary">

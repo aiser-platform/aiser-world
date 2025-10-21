@@ -95,13 +95,13 @@ const DataSourcesPage: React.FC = () => {
     const getDataSourceIcon = (type: string) => {
         switch (type) {
             case 'database':
-                return <DatabaseOutlined style={{ color: '#1890ff' }} />;
+                return <DatabaseOutlined style={{ color: 'var(--color-brand-primary)' }} />;
             case 'file':
-                return <FileOutlined style={{ color: '#52c41a' }} />;
+                return <FileOutlined style={{ color: 'var(--color-functional-success)' }} />;
             case 'api':
-                return <ApiOutlined style={{ color: '#722ed1' }} />;
+                return <ApiOutlined style={{ color: 'var(--color-functional-info)' }} />;
             case 'warehouse':
-                return <CloudOutlined style={{ color: '#fa8c16' }} />;
+                return <CloudOutlined style={{ color: 'var(--color-functional-warning)' }} />;
             default:
                 return <DatabaseOutlined />;
         }
@@ -209,62 +209,63 @@ const DataSourcesPage: React.FC = () => {
     };
 
     return (
-        <div style={{ padding: 24 }}>
-            <div style={{ marginBottom: 24 }}>
-                <Title level={2}>Data Sources</Title>
-                <Text type="secondary">
+        <div className="page-wrapper">
+            <div className="page-header">
+                <Title level={2} className="page-title">Data Sources</Title>
+                <Text type="secondary" className="page-description">
                     Connect and manage your data sources for analytics and visualization
                 </Text>
             </div>
 
             {/* Statistics Cards */}
-            <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-                <Col span={6}>
-                    <Card>
+            <Row gutter={[16, 16]} style={{ marginBottom: 'var(--space-6)' }}>
+                <Col xs={24} sm={12} md={6}>
+                    <Card className="stat-card">
                         <Statistic
                             title="Total Sources"
                             value={stats.total}
-                            prefix={<DatabaseOutlined />}
+                            prefix={<DatabaseOutlined style={{ color: 'var(--color-brand-primary)' }} />}
                         />
                     </Card>
                 </Col>
-                <Col span={6}>
-                    <Card>
+                <Col xs={24} sm={12} md={6}>
+                    <Card className="stat-card">
                         <Statistic
                             title="Connected"
                             value={stats.connected}
-                            valueStyle={{ color: '#3f8600' }}
-                            prefix={<DatabaseOutlined />}
+                            valueStyle={{ color: 'var(--color-functional-success)' }}
+                            prefix={<DatabaseOutlined style={{ color: 'var(--color-functional-success)' }} />}
                         />
                     </Card>
                 </Col>
-                <Col span={6}>
-                    <Card>
+                <Col xs={24} sm={12} md={6}>
+                    <Card className="stat-card">
                         <Statistic
                             title="Databases"
                             value={stats.databases}
-                            prefix={<DatabaseOutlined />}
+                            prefix={<DatabaseOutlined style={{ color: 'var(--color-brand-primary)' }} />}
                         />
                     </Card>
                 </Col>
-                <Col span={6}>
-                    <Card>
+                <Col xs={24} sm={12} md={6}>
+                    <Card className="stat-card">
                         <Statistic
                             title="Files"
                             value={stats.files}
-                            prefix={<FileOutlined />}
+                            prefix={<FileOutlined style={{ color: 'var(--color-brand-primary)' }} />}
                         />
                     </Card>
                 </Col>
             </Row>
 
             {/* Actions */}
-            <div style={{ marginBottom: 16 }}>
-                <Space>
+            <div className="page-toolbar">
+                <div className="toolbar-left">
                     <Button
                         type="primary"
                         icon={<PlusOutlined />}
                         onClick={handleAddDataSource}
+                        className="action-button-primary"
                     >
                         Add Data Source
                     </Button>
@@ -272,18 +273,20 @@ const DataSourcesPage: React.FC = () => {
                         icon={<ReloadOutlined />}
                         onClick={loadDataSources}
                         loading={loading}
+                        className="action-button-secondary"
                     >
                         Refresh
                     </Button>
-                </Space>
+                </div>
             </div>
 
-            <Divider />
+            <Divider className="page-divider" />
 
             {/* Data Sources Table */}
-            <Card>
+            <Card className="content-card">
                 <div style={{ maxHeight: '70vh', overflowY: 'auto' }}>
                     <Table
+                    className="data-table"
                     columns={columns}
                     dataSource={dataSources}
                     rowKey="id"

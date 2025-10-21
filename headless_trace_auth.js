@@ -6,7 +6,7 @@ const { chromium, request: playwrightRequest } = require('playwright');
   const req = await playwrightRequest.newContext();
   try {
     console.log('POST signin ->', signinUrl);
-    const r = await req.post(signinUrl, { data: { identifier: 'admin@aiser.app', password: 'Admin123' } });
+    const r = await req.post(signinUrl, { data: { identifier: 'testuser123@test.com', password: 'test12345' } });
     console.log('signin status', r.status());
     const headers = r.headers();
     const setCookieRaw = headers['set-cookie'];

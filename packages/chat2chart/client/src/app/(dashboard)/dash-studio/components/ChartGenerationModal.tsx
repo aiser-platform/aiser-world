@@ -97,21 +97,21 @@ const ChartGenerationModal: React.FC<ChartGenerationModalProps> = ({
       title: {
         text: `${selectedChartType.charAt(0).toUpperCase() + selectedChartType.slice(1)} Chart`,
         subtext: `Based on ${queryData.length} data points`,
-        textStyle: { fontSize: 16, fontWeight: 'bold', color: '#333' },
-        subtextStyle: { fontSize: 12, color: '#666' }
+        textStyle: { fontSize: 16, fontWeight: 'bold', color: 'var(--color-text-primary)' },
+        subtextStyle: { fontSize: 12, color: 'var(--color-text-secondary)' }
       },
       showTitle: true,
       showSubtitle: true,
       showLegend: true,
       showTooltip: true,
       showGrid: true,
-      colors: ['#1890ff', '#52c41a', '#faad14', '#f5222d', '#722ed1', '#13c2c2', '#eb2f96'],
+      colors: ['var(--color-brand-primary)', 'var(--color-functional-success)', 'var(--color-functional-warning)', 'var(--color-functional-danger)', 'var(--color-functional-info)', 'var(--color-brand-primary-light)', 'var(--color-brand-primary-dark)'],
       animation: true,
-      backgroundColor: '#ffffff',
-      borderColor: '#e8e8e8',
+      backgroundColor: 'var(--color-surface-base)',
+      borderColor: 'var(--color-border-primary)',
       borderRadius: 8,
       padding: 16,
-      boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+      boxShadow: 'var(--shadow-sm)'
     };
 
     switch (selectedChartType) {
@@ -139,8 +139,8 @@ const ChartGenerationModal: React.FC<ChartGenerationModalProps> = ({
             data: chartData.yAxis,
             smooth: selectedChartType === 'line',
             itemStyle: {
-              color: selectedChartType === 'bar' ? '#1890ff' : 
-                     selectedChartType === 'line' ? '#52c41a' : '#faad14'
+              color: selectedChartType === 'bar' ? 'var(--color-brand-primary)' : 
+                     selectedChartType === 'line' ? 'var(--color-functional-success)' : 'var(--color-functional-warning)'
             }
           }]
         };
@@ -197,7 +197,7 @@ const ChartGenerationModal: React.FC<ChartGenerationModalProps> = ({
             type: 'scatter',
             data: chartData.series,
             itemStyle: {
-              color: '#faad14'
+              color: 'var(--color-functional-warning)'
             }
           }]
         };
@@ -249,8 +249,8 @@ const ChartGenerationModal: React.FC<ChartGenerationModalProps> = ({
     <Modal
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <BarChartOutlined style={{ fontSize: '20px', color: '#1890ff' }} />
-          <Title level={4} style={{ margin: 0, color: isDarkMode ? '#ffffff' : '#000000' }}>
+          <BarChartOutlined style={{ fontSize: '20px', color: 'var(--color-brand-primary)' }} />
+          <Title level={4} style={{ margin: 0, color: 'var(--color-text-primary)' }}>
             Generate Chart
           </Title>
         </div>
@@ -277,12 +277,12 @@ const ChartGenerationModal: React.FC<ChartGenerationModalProps> = ({
       }}
     >
       <div style={{ 
-        background: isDarkMode ? '#1f1f1f' : '#ffffff',
-        color: isDarkMode ? '#ffffff' : '#000000'
+        background: 'var(--color-surface-base)',
+        color: 'var(--color-text-primary)'
       }}>
         {/* Chart Type Selection */}
         <div style={{ marginBottom: '24px' }}>
-          <Title level={5} style={{ marginBottom: '16px', color: isDarkMode ? '#ffffff' : '#000000' }}>
+          <Title level={5} style={{ marginBottom: '16px', color: 'var(--color-text-primary)' }}>
             Select Chart Type
           </Title>
           <Row gutter={[12, 12]}>
@@ -292,22 +292,22 @@ const ChartGenerationModal: React.FC<ChartGenerationModalProps> = ({
                   hoverable
                   size="small"
                   style={{
-                    border: selectedChartType === chart.key ? '2px solid #1890ff' : '1px solid #d9d9d9',
+                    border: selectedChartType === chart.key ? '2px solid var(--color-brand-primary)' : '1px solid var(--color-border-primary)',
                     background: selectedChartType === chart.key ? 
-                      (isDarkMode ? 'rgba(24, 144, 255, 0.1)' : 'rgba(24, 144, 255, 0.05)') : 
-                      (isDarkMode ? '#2a2a2a' : '#ffffff'),
+                      'var(--color-brand-primary-light)' : 
+                      'var(--color-surface-base)',
                     cursor: 'pointer'
                   }}
                   onClick={() => setSelectedChartType(chart.key)}
                 >
                   <div style={{ textAlign: 'center', padding: '8px' }}>
-                    <div style={{ fontSize: '24px', marginBottom: '8px', color: '#1890ff' }}>
+                    <div style={{ fontSize: '24px', marginBottom: '8px', color: 'var(--color-brand-primary)' }}>
                       {chart.icon}
                     </div>
-                    <div style={{ fontSize: '12px', fontWeight: '500', marginBottom: '4px' }}>
+                    <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: '500', marginBottom: '4px' }}>
                       {chart.name}
                     </div>
-                    <div style={{ fontSize: '10px', color: isDarkMode ? '#999' : '#666' }}>
+                    <div style={{ fontSize: '10px', color: 'var(--color-text-tertiary)' }}>
                       {chart.description}
                     </div>
                   </div>
@@ -321,13 +321,13 @@ const ChartGenerationModal: React.FC<ChartGenerationModalProps> = ({
 
         {/* Data Configuration */}
         <div style={{ marginBottom: '24px' }}>
-          <Title level={5} style={{ marginBottom: '16px', color: isDarkMode ? '#ffffff' : '#000000' }}>
+          <Title level={5} style={{ marginBottom: '16px', color: 'var(--color-text-primary)' }}>
             Configure Data
           </Title>
           <Row gutter={[16, 16]}>
             <Col span={12}>
               <div style={{ marginBottom: '12px' }}>
-                <Text strong style={{ color: isDarkMode ? '#ffffff' : '#000000' }}>
+                <Text strong style={{ color: 'var(--color-text-primary)' }}>
                   X-Axis / Category
                 </Text>
                 <Select
@@ -344,7 +344,7 @@ const ChartGenerationModal: React.FC<ChartGenerationModalProps> = ({
             </Col>
             <Col span={12}>
               <div style={{ marginBottom: '12px' }}>
-                <Text strong style={{ color: isDarkMode ? '#ffffff' : '#000000' }}>
+                <Text strong style={{ color: 'var(--color-text-primary)' }}>
                   Y-Axis / Value
                 </Text>
                 <Select
@@ -365,24 +365,24 @@ const ChartGenerationModal: React.FC<ChartGenerationModalProps> = ({
         {/* Data Preview */}
         {chartConfig && (
           <div style={{ marginBottom: '24px' }}>
-            <Title level={5} style={{ marginBottom: '16px', color: isDarkMode ? '#ffffff' : '#000000' }}>
+            <Title level={5} style={{ marginBottom: '16px', color: 'var(--color-text-primary)' }}>
               Chart Preview
             </Title>
             <Card
               size="small"
               style={{
-                background: isDarkMode ? '#2a2a2a' : '#f5f5f5',
-                border: `1px solid ${isDarkMode ? '#404040' : '#d9d9d9'}`
+                background: 'var(--color-surface-raised)',
+                border: '1px solid var(--color-border-primary)'
               }}
             >
               <div style={{ textAlign: 'center', padding: '20px' }}>
-                <div style={{ fontSize: '32px', color: '#1890ff', marginBottom: '12px' }}>
+                <div style={{ fontSize: '32px', color: 'var(--color-brand-primary)', marginBottom: '12px' }}>
                   {chartTypes.find(c => c.key === selectedChartType)?.icon}
                 </div>
-                <div style={{ fontSize: '16px', fontWeight: '500', marginBottom: '8px' }}>
+                <div style={{ fontSize: 'var(--font-size-md)', fontWeight: '500', marginBottom: '8px' }}>
                   {chartConfig.title.text}
                 </div>
-                <div style={{ fontSize: '12px', color: isDarkMode ? '#999' : '#666' }}>
+                <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-tertiary)' }}>
                   {queryData.length} data points • {selectedXAxis} vs {selectedYAxis}
                 </div>
               </div>
@@ -392,7 +392,7 @@ const ChartGenerationModal: React.FC<ChartGenerationModalProps> = ({
 
         {/* Data Summary */}
         <div>
-          <Title level={5} style={{ marginBottom: '16px', color: isDarkMode ? '#ffffff' : '#000000' }}>
+          <Title level={5} style={{ marginBottom: '16px', color: 'var(--color-text-primary)' }}>
             Data Summary
           </Title>
           <Row gutter={[16, 8]}>

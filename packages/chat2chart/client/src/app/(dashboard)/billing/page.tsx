@@ -99,7 +99,7 @@ const BillingPage: React.FC = React.memo(() => {
         <div className="p-6 h-full overflow-y-auto">
             <div className="mb-8">
                 <Title level={2}>
-                    <CreditCardOutlined style={{ marginRight: 12, color: '#1890ff' }} />
+                    <CreditCardOutlined style={{ marginRight: 12, color: 'var(--color-brand-primary)' }} />
                     Billing & Usage
                 </Title>
                 <Text type="secondary">
@@ -112,7 +112,7 @@ const BillingPage: React.FC = React.memo(() => {
                 <Row gutter={24} align="middle">
                     <Col span={16}>
                         <div className="flex items-center mb-4">
-                            <CrownOutlined style={{ fontSize: 24, color: '#1890ff', marginRight: 12 }} />
+                            <CrownOutlined style={{ fontSize: 24, color: 'var(--color-brand-primary)', marginRight: 12 }} />
                             <div>
                                 <Title level={3} style={{ margin: 0 }}>
                                     {billingData.planName}
@@ -133,7 +133,7 @@ const BillingPage: React.FC = React.memo(() => {
                             <Statistic
                                 title="Plan Type"
                                 value={billingData.currentPlan?.toUpperCase() || 'UNKNOWN'}
-                                valueStyle={{ color: '#1890ff' }}
+                                valueStyle={{ color: 'var(--color-brand-primary)' }}
                             />
                         </Space>
                     </Col>
@@ -155,7 +155,7 @@ const BillingPage: React.FC = React.memo(() => {
                 <Col xs={24} md={8}>
                     <Card>
                         <div className="text-center">
-                            <BarChartOutlined style={{ fontSize: 32, color: '#1890ff', marginBottom: 16 }} />
+                            <BarChartOutlined style={{ fontSize: 32, color: 'var(--color-brand-primary)', marginBottom: 16 }} />
                             <Title level={4}>AI Credits</Title>
                             <Progress 
                                 percent={billingData.usage.aiCredits.percentage} 
@@ -170,7 +170,7 @@ const BillingPage: React.FC = React.memo(() => {
                 <Col xs={24} md={8}>
                     <Card>
                         <div className="text-center">
-                            <BarChartOutlined style={{ fontSize: 32, color: '#52c41a', marginBottom: 16 }} />
+                            <BarChartOutlined style={{ fontSize: 32, color: 'var(--color-functional-success)', marginBottom: 16 }} />
                             <Title level={4}>Storage</Title>
                             <Progress 
                                 percent={billingData.usage.storage.percentage} 
@@ -185,7 +185,7 @@ const BillingPage: React.FC = React.memo(() => {
                 <Col xs={24} md={8}>
                     <Card>
                         <div className="text-center">
-                            <TeamOutlined style={{ fontSize: 32, color: '#722ed1', marginBottom: 16 }} />
+                            <TeamOutlined style={{ fontSize: 32, color: 'var(--color-functional-info)', marginBottom: 16 }} />
                             <Title level={4}>Team Members</Title>
                             <Progress 
                                 percent={billingData.usage.teamMembers.percentage} 

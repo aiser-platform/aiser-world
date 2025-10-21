@@ -120,7 +120,6 @@ class WorkingQueryService {
           throw new Error(`Project-scoped API failed: ${response.status}`);
         }
       } catch (projectError) {
-        console.log('Project-scoped API not available, falling back to global API');
         // Fallback to global API
         response = await fetch(`/api/data/sources/${dataSourceId}/data`);
         if (!response.ok) {

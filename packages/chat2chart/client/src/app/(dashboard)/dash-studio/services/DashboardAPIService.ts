@@ -1,5 +1,6 @@
 // Dashboard API Service - Integration with backend API routes
 import { fetchWithAuth } from '@/services/apiService';
+import { fetchApi } from '@/utils/api';
 export class DashboardAPIService {
   private baseURL: string;
 
@@ -65,26 +66,21 @@ export class DashboardAPIService {
       const canUseProject = organizationId && projectId && /^\d+$/.test(String(organizationId)) && /^\d+$/.test(String(projectId));
       if (canUseProject) {
         try {
-          response = await fetchWithAuth(`${this.baseURL}/charts/api/organizations/${organizationId}/projects/${projectId}/dashboards`, {
+          response = await fetchApi(`charts/api/organizations/${organizationId}/projects/${projectId}/dashboards`, {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(dashboardData),
           });
-          if (!response.ok) {
-            throw new Error(`Project-scoped API failed: ${response.status}`);
-          }
+          if (!response.ok) throw new Error(`Project-scoped API failed: ${response.status}`);
         } catch (projectError) {
-          console.log('Project-scoped API not available, falling back to global API');
-          response = await fetchWithAuth(`${this.baseURL}/charts/dashboards/`, {
+          response = await fetchApi('charts/dashboards/', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(dashboardData),
           });
         }
       } else {
-        response = await fetchWithAuth(`${this.baseURL}/charts/dashboards/`, {
+        response = await fetchApi('charts/dashboards/', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(dashboardData),
@@ -108,7 +104,7 @@ export class DashboardAPIService {
 
   async getDashboard(dashboardId: string) {
     try {
-      const response = await fetch(`${this.baseURL}/charts/dashboards/${dashboardId}`, this.withCreds());
+      const response = await fetchApi(`charts/dashboards/${dashboardId}`, { method: 'GET' });
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -123,13 +119,11 @@ export class DashboardAPIService {
 
   async updateDashboard(dashboardId: string, dashboardData: any) {
     try {
-      const response = await fetch(`${this.baseURL}/charts/dashboards/${dashboardId}`, this.withCreds({
+      const response = await fetchApi(`charts/dashboards/${dashboardId}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(dashboardData),
-      }));
+      });
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -144,7 +138,7 @@ export class DashboardAPIService {
 
   async deleteDashboard(dashboardId: string) {
     try {
-      const response = await fetch(`${this.baseURL}/charts/dashboards/${dashboardId}`, this.withCreds({ method: 'DELETE' }));
+      const response = await fetchApi(`charts/dashboards/${dashboardId}`, { method: 'DELETE' });
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -159,7 +153,7 @@ export class DashboardAPIService {
 
   async listDashboards() {
     try {
-      const response = await fetch(`${this.baseURL}/charts/dashboards/`, this.withCreds());
+      const response = await fetchApi('charts/dashboards/', { method: 'GET' });
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -175,13 +169,11 @@ export class DashboardAPIService {
   // Widget Management
   async createWidget(dashboardId: string, widgetData: any) {
     try {
-      const response = await fetch(`${this.baseURL}/charts/dashboards/${dashboardId}/widgets`, this.withCreds({
+      const response = await fetchApi(`charts/dashboards/${dashboardId}/widgets`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(widgetData),
-      }));
+      });
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -196,13 +188,11 @@ export class DashboardAPIService {
 
   async updateWidget(dashboardId: string, widgetId: string, widgetData: any) {
     try {
-      const response = await fetch(`${this.baseURL}/charts/dashboards/${dashboardId}/widgets/${widgetId}`, this.withCreds({
+      const response = await fetchApi(`charts/dashboards/${dashboardId}/widgets/${widgetId}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(widgetData),
-      }));
+      });
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -217,7 +207,7 @@ export class DashboardAPIService {
 
   async deleteWidget(dashboardId: string, widgetId: string) {
     try {
-      const response = await fetch(`${this.baseURL}/charts/dashboards/${dashboardId}/widgets/${widgetId}`, this.withCreds({ method: 'DELETE' }));
+      const response = await fetchApi(`charts/dashboards/${dashboardId}/widgets/${widgetId}`, { method: 'DELETE' });
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -232,7 +222,7 @@ export class DashboardAPIService {
 
   async listWidgets(dashboardId: string) {
     try {
-      const response = await fetch(`${this.baseURL}/charts/dashboards/${dashboardId}/widgets`, this.withCreds());
+      const response = await fetchApi(`charts/dashboards/${dashboardId}/widgets`, { method: 'GET' });
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);

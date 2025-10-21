@@ -1,0 +1,78 @@
+
+
+/* ========================================
+   PROPER ANT DESIGN INTEGRATION
+   ======================================== */
+
+/* Remove aggressive overrides and work with Ant Design's theming */
+/* Let Ant Design handle layout colors through its token system */
+
+/* Ensure proper CSS variable usage */
+:root {
+  /* Use Ant Design's CSS variables */
+  --ant-color-bg-layout: var(--layout-background);
+  --ant-color-bg-container: var(--layout-panel-background);
+  --ant-color-bg-elevated: var(--layout-panel-background);
+}
+
+[data-theme="dark"] {
+  --ant-color-bg-layout: var(--layout-background);
+  --ant-color-bg-container: var(--layout-panel-background);
+  --ant-color-bg-elevated: var(--layout-panel-background);
+}
+
+/* Minimal overrides only where necessary */
+.ant-layout-header {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 1000 !important;
+}
+
+.ant-layout-sider {
+  position: fixed !important;
+  top: 64px !important; /* Account for fixed header */
+  left: 0 !important;
+  bottom: 0 !important;
+  z-index: 999 !important;
+}
+
+.ant-layout-content {
+  margin-top: 64px !important; /* Account for fixed header */
+  margin-left: 200px !important; /* Account for fixed sidebar */
+  transition: margin-left 0.2s ease !important;
+}
+
+.ant-layout-sider-collapsed + .ant-layout-content {
+  margin-left: 80px !important; /* Account for collapsed sidebar */
+}
+
+/* Panel styling using Ant Design tokens */
+.enhanced-chat-panel,
+.enhanced-data-panel,
+.chat-history-panel,
+.query-editor-panel,
+.chart-preview-panel,
+.chart-config-panel,
+.dashboard-canvas,
+.unified-design-panel {
+  background: var(--ant-color-bg-elevated) !important;
+  border: 1px solid var(--ant-color-border) !important;
+  border-radius: var(--ant-border-radius-lg) !important;
+  box-shadow: var(--ant-box-shadow) !important;
+  margin: 8px !important;
+}
+
+/* Remove debug colors */
+html {
+  background: transparent !important;
+}
+
+body {
+  background: transparent !important;
+}
+
+#__next {
+  background: transparent !important;
+}

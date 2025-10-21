@@ -7,6 +7,7 @@ import { MessageOutlined, DatabaseOutlined, BarChartOutlined, HistoryOutlined, S
 import ModelSelector from '@/app/components/ModelSelector/ModelSelector';
 import React, { useState, useEffect, useCallback } from 'react';
 import ChatPanel from './components/ChatPanel/ChatPanel';
+import ErrorBoundary from '@/app/components/ErrorBoundary';
 import EnhancedDataPanel from './components/DataPanel/EnhancedDataPanel';
 import ChatHistoryPanel from './components/HistoryPanel/HistoryPanel';
 import CollapsibleHistoryPanel from './components/HistoryPanel/CollapsibleHistoryPanel';
@@ -53,6 +54,7 @@ const ChatToChart = () => {
     const [isDragging, setIsDragging] = React.useState<boolean>(false);
     const [isDraggingHistory, setIsDraggingHistory] = React.useState<boolean>(false);
     const [selectedDataSources, setSelectedDataSources] = React.useState<DataSource[]>([]); // Data sources selected from DataPanel
+    const autoCollapseRef = React.useRef<{ applied: boolean; mode: 'none' | 'both' | 'history' } | null>(null);
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [dbList, setDbList] = React.useState<IDatabase[]>([]);
@@ -279,6 +281,37 @@ const ChatToChart = () => {
         }
     };
 
+    // Responsive auto-collapse for side panels
+    useEffect(() => {
+        const applyResponsiveLayout = () => {
+            if (typeof window === 'undefined') return;
+            const w = window.innerWidth;
+            // <1280px: collapse both side panels
+            if (w < 1280) {
+                setHistoryPanelCollapsed(true);
+                setDataPanelCollapsed(true);
+                autoCollapseRef.current = { applied: true, mode: 'both' };
+                return;
+            }
+            // 1280-1535px: collapse history, keep data panel
+            if (w < 1536) {
+                setHistoryPanelCollapsed(true);
+                setDataPanelCollapsed(false);
+                autoCollapseRef.current = { applied: true, mode: 'history' };
+                return;
+            }
+            // >=1536px: expand both unless user collapsed manually later
+            if (autoCollapseRef.current?.applied) {
+                setHistoryPanelCollapsed(false);
+                setDataPanelCollapsed(false);
+                autoCollapseRef.current = { applied: false, mode: 'none' };
+            }
+        };
+        applyResponsiveLayout();
+        window.addEventListener('resize', applyResponsiveLayout);
+        return () => window.removeEventListener('resize', applyResponsiveLayout);
+    }, []);
+
     const renderWelcomeCards = () => (
         <Row gutter={[16, 16]} style={{ padding: '24px' }}>
             <Col span={8}>
@@ -287,7 +320,7 @@ const ChatToChart = () => {
                     onClick={() => setShowDataSourceModal(true)}
                     style={{ textAlign: 'center', height: 200 }}
                 >
-                    <DatabaseOutlined style={{ fontSize: 48, color: '#1890ff', marginBottom: 16 }} />
+                    <DatabaseOutlined style={{ fontSize: 48, color: 'var(--color-brand-primary)', marginBottom: 16 }} />
                     <h3>Connect Data Sources</h3>
                     <p>Upload files or connect to databases to get started with your analysis</p>
                 </Card>
@@ -298,7 +331,7 @@ const ChatToChart = () => {
                     onClick={() => setActiveTab('chat')}
                     style={{ textAlign: 'center', height: 200 }}
                 >
-                    <MessageOutlined style={{ fontSize: 48, color: '#52c41a', marginBottom: 16 }} />
+                    <MessageOutlined style={{ fontSize: 48, color: 'var(--color-functional-success)', marginBottom: 16 }} />
                     <h3>Chat to Chart</h3>
                     <p>Ask questions in natural language and get instant visualizations</p>
                 </Card>
@@ -309,7 +342,7 @@ const ChatToChart = () => {
                     onClick={() => setActiveTab('charts')}
                     style={{ textAlign: 'center', height: 200 }}
                 >
-                    <BarChartOutlined style={{ fontSize: 48, color: '#fa8c16', marginBottom: 16 }} />
+                    <BarChartOutlined style={{ fontSize: 48, color: 'var(--color-functional-warning)', marginBottom: 16 }} />
                     <h3>Generated Charts</h3>
                     <p>View and manage all your generated charts and visualizations</p>
                 </Card>
@@ -323,7 +356,7 @@ const ChatToChart = () => {
                 {generatedCharts.length === 0 ? (
                     <Col span={24}>
                         <Card style={{ textAlign: 'center', padding: '48px' }}>
-                            <BarChartOutlined style={{ fontSize: 64, color: '#d9d9d9', marginBottom: 16 }} />
+                            <BarChartOutlined style={{ fontSize: 64, color: 'var(--color-border-primary)', marginBottom: 16 }} />
                             <h3>No Charts Generated Yet</h3>
                             <p>Start by connecting a data source and asking questions in the chat</p>
                             <Space>
@@ -341,7 +374,7 @@ const ChatToChart = () => {
                         <Col key={index} span={8}>
                             <Card
                                 hoverable
-                                cover={<div style={{ height: 200, backgroundColor: 'var(--ant-color-fill-secondary, #f5f5f5)' }}>Chart Preview</div>}
+                                cover={<div style={{ height: 200, backgroundColor: 'var(--ant-color-fill-secondary, var(--color-surface-raised))' }}>Chart Preview</div>}
                                 actions={[
                                     <Button key="view" type="text">View</Button>,
                                     <Button key="download" type="text">Download</Button>,
@@ -361,195 +394,159 @@ const ChatToChart = () => {
     );
 
     return (
-        <div className="ChatToChart" style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-            <Tabs 
-                activeKey={activeTab} 
-                onChange={setActiveTab}
-                style={{ flex: 1, display: 'flex', flexDirection: 'column' }}
-                tabBarStyle={{ paddingLeft: 16, paddingRight: 16 }}
-                items={[
-                    {
-                        key: 'chat',
-                        label: (
-                            <span>
-                                <MessageOutlined />
-                                Chat to Chart
-                            </span>
-                        ),
-                        children: (
-                            <Row style={{ height: 'calc(100vh - 120px)' }} className="chat-container">
-                                {/* Left Panel: Chat History - Fixed width when expanded */}
-                                <Col 
-                                    span={historyPanelCollapsed ? 2 : 6}
-                                    style={{ 
-                                        borderRight: '1px solid var(--border-color-light)',
-                                        background: 'var(--panel-background)',
-                                        transition: 'all 0.3s ease',
-                                        position: 'relative',
-                                        minWidth: historyPanelCollapsed ? '50px' : '240px',
-                                        maxWidth: historyPanelCollapsed ? '50px' : '240px'
-                                    }}
-                                >
-                                    {/* History Panel Content */}
-                                    <CollapsibleHistoryPanel
-                                        id={conversationState?.id || ''}
-                                        current={conversationState!}
-                                        collapsed={historyPanelCollapsed}
-                                        onClick={(props: IConversation) => {
-                                            handleSelectConversation(props);
-                                            setDb(undefined);
-                                            setSchema(undefined);
-                                            setTables(undefined);
-                                        }}
-                                        onCollapsedChange={handleHistoryPanelExpand}
-                                        onNewChat={() => {
-                                            handleNewConversation();
-                                            setDb(undefined);
-                                            setSchema(undefined);
-                                            setTables(undefined);
-                                            setFile(undefined);
-                                        }}
-                                    />
-                                </Col>
-                                
-                                {/* Center Panel: Main Chat Interface - Flexible width */}
-                                <Col 
-                                    flex="1"
-                                    style={{ 
-                                        transition: 'all 0.3s ease',
-                                        borderRight: dataPanelCollapsed ? 'none' : '1px solid var(--border-color-light)',
-                                        background: 'var(--background)',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        minWidth: '400px'
-                                    }}
-                                >
-                                    <ChatPanel
-                                        id="chat-panel"
-                                        file={file}
-                                        db={db}
-                                        schema={schema}
-                                        tables={tables}
-                                        customAIModel={openAIModel}
-                                        onDefaultDbChange={setDb}
-                                        onDefaultSchemaChange={setSchema}
-                                        onDefaultTablesChange={setTables}
-                                        onFileChange={setFile}
-                                        callback={(props: {
-                                            conversation: IConversation;
-                                        }) => {
-                                            setConversationState(props.conversation);
-                                        }}
-                                        selectedDataSource={selectedDataSource}
-                                        conversationId={currentConversationId}
-                                        selectedDataSources={selectedDataSources}
-                                    />
-                                </Col>
-                                
-                                {/* Right Panel: Data Panel - Fixed width when expanded */}
-                                <Col 
-                                    span={dataPanelCollapsed ? 2 : 8}
-                                    style={{ 
-                                        borderLeft: '1px solid var(--border-color-light)',
-                                        background: 'var(--panel-background)',
-                                        transition: 'all 0.3s ease',
-                                        position: 'relative',
-                                        minWidth: dataPanelCollapsed ? '50px' : '320px',
-                                        maxWidth: dataPanelCollapsed ? '50px' : '320px'
-                                    }}
-                                >
-                                    {/* Data Panel Content - Show only icons when collapsed */}
-                                    {dataPanelCollapsed ? (
-                                        <div style={{ 
-                                            padding: '16px 8px',
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            alignItems: 'center',
-                                            gap: '16px'
-                                        }}>
-                                            <Tooltip title="Expand" placement="left">
-                                                <Button type="text" onClick={handleDataPanelExpand} icon={<ExpandOutlined />} />
-                                            </Tooltip>
-                                            <Tooltip title="Add Source" placement="left">
-                                                <Button type="text" onClick={() => setShowDataSourceModal(true)} icon={<PlusOutlined />} />
-                                            </Tooltip>
-                                            <Tooltip title="Data Sources" placement="right">
-                                                <DatabaseOutlined style={{ fontSize: '20px', color: '#1890ff' }} />
-                                            </Tooltip>
-                                            <Tooltip title="Files" placement="right">
-                                                <FileTextOutlined style={{ fontSize: '20px', color: '#52c41a' }} />
-                                            </Tooltip>
-                                            <Tooltip title="Settings" placement="right">
-                                                <SettingOutlined style={{ fontSize: '20px', color: '#fa8c16' }} />
-                                            </Tooltip>
-                                        </div>
-                                    ) : (
-                                        <EnhancedDataPanel
-                                            onDataSourceSelect={(dataSource) => {
-                                                console.log('🔄 Chat page onDataSourceSelect called with:', dataSource);
-                                                setSelectedDataSource(dataSource);
-                                                
-                                                // Update selectedDataSources for AI analysis
-                                                if (dataSource) {
-                                                    console.log('✅ Setting selectedDataSources to:', [dataSource]);
-                                                    setSelectedDataSources([dataSource]);
-                                                } else {
-                                                    console.log('❌ Clearing selectedDataSources');
-                                                    setSelectedDataSources([]);
-                                                }
-                                                
-                                                // Also update the file/db state for backward compatibility
-                                                if (dataSource && dataSource.type === 'file') {
-                                                    setFile({
-                                                        filename: dataSource.name,
-                                                        content_type: 'application/octet-stream',
-                                                        storage_type: 'local',
-                                                        file_size: 0,
-                                                        uuid_filename: dataSource.id
-                                                    });
-                                                } else if (dataSource && dataSource.type === 'database') {
-                                                    setDb({
-                                                        id: Number(dataSource.id) || undefined,
-                                                        name: dataSource.name,
-                                                        type: dataSource.config?.db_type || 'postgresql',
-                                                        host: dataSource.config?.host || '',
-                                                        port: Number(dataSource.config?.port) || 5432,
-                                                        database: dataSource.config?.database || '',
-                                                        username: dataSource.config?.username || ''
-                                                    });
-                                                }
-                                            }}
-                                            selectedDataSource={selectedDataSource}
-                                            onCollapse={() => setDataPanelCollapsed(true)}
-                                            onRefresh={() => {
-                                                // Refresh data sources
-                                                console.log('Refreshing data sources...');
-                                            }}
-                                            onDataSourcesChange={(sources) => {
-                                                console.log('🔄 Chat page onDataSourcesChange called with:', sources);
-                                                setSelectedDataSources(sources);
-                                                console.log('✅ Updated selectedDataSources to:', sources);
-                                            }}
-                                        />
-                                    )}
-                                </Col>
-                            </Row>
-                        )
-                    },
-                    {
-                        key: 'charts',
-                        label: (
-                            <span>
-                                <BarChartOutlined />
-                                Generated Charts
-                            </span>
-                        ),
-                        children: renderChartsGallery()
-                    }
-                ]}
-            />
+        <div className="chat-page-container" style={{ 
+            height: '100%', 
+            display: 'flex', 
+            flexDirection: 'row',
+            overflow: 'hidden',
+            background: 'var(--layout-background)'
+        }}>
+            {/* Left Panel: Chat History */}
+            <div style={{ 
+                width: historyPanelCollapsed ? '64px' : '280px',
+                minWidth: historyPanelCollapsed ? '64px' : '280px',
+                height: '100%',
+                borderRight: '1px solid var(--color-border-primary)',
+                background: 'var(--layout-panel-background)',
+                transition: 'all var(--transition-base)',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+            }}>
+                <CollapsibleHistoryPanel
+                    id={conversationState?.id || ''}
+                    current={conversationState!}
+                    collapsed={historyPanelCollapsed}
+                    onClick={(props: IConversation) => {
+                        handleSelectConversation(props);
+                        setDb(undefined);
+                        setSchema(undefined);
+                        setTables(undefined);
+                    }}
+                    onCollapsedChange={handleHistoryPanelExpand}
+                    onNewChat={() => {
+                        handleNewConversation();
+                        setDb(undefined);
+                        setSchema(undefined);
+                        setTables(undefined);
+                        setFile(undefined);
+                    }}
+                />
+            </div>
 
-            {/* Universal Data Source Modal */}
+            {/* Center: Main Chat Area */}
+            <div style={{ 
+                flex: 1,
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                minWidth: 0,
+                overflow: 'hidden'
+            }}>
+                <ErrorBoundary>
+                    <ChatPanel
+                        id="chat-panel"
+                        file={file}
+                        db={db}
+                        schema={schema}
+                        tables={tables}
+                        customAIModel={openAIModel}
+                        onDefaultDbChange={setDb}
+                        onDefaultSchemaChange={setSchema}
+                        onDefaultTablesChange={setTables}
+                        onFileChange={setFile}
+                        callback={(props: {
+                            conversation: IConversation;
+                        }) => {
+                            setConversationState(props.conversation);
+                        }}
+                        selectedDataSource={selectedDataSource}
+                        conversationId={currentConversationId}
+                        selectedDataSources={selectedDataSources}
+                    />
+                </ErrorBoundary>
+            </div>
+
+            {/* Right Panel: Data Sources */}
+            <div style={{ 
+                width: dataPanelCollapsed ? '64px' : '320px',
+                minWidth: dataPanelCollapsed ? '64px' : '320px',
+                height: '100%',
+                borderLeft: '1px solid var(--color-border-primary)',
+                background: 'var(--layout-panel-background)',
+                transition: 'all var(--transition-base)',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+            }}>
+                {dataPanelCollapsed ? (
+                    <div style={{ 
+                        padding: '16px 8px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '16px',
+                        background: 'var(--ant-color-bg-container)',
+                        border: '1px solid var(--ant-color-border)',
+                        borderRadius: 'var(--ant-border-radius-lg)',
+                        height: '100%',
+                        boxShadow: 'var(--ant-box-shadow)'
+                    }}>
+                        <Tooltip title="Expand Data Panel" placement="left">
+                            <Button type="text" onClick={handleDataPanelExpand} icon={<ExpandOutlined />} />
+                        </Tooltip>
+                        <Tooltip title="Add Data Source" placement="left">
+                            <Button type="text" onClick={() => setShowDataSourceModal(true)} icon={<PlusOutlined />} />
+                        </Tooltip>
+                        <Tooltip title="Data Sources" placement="left">
+                            <DatabaseOutlined style={{ fontSize: '20px', color: 'var(--color-brand-primary)' }} />
+                        </Tooltip>
+                    </div>
+                ) : (
+                    <EnhancedDataPanel
+                        onDataSourceSelect={(dataSource) => {
+                            console.log('🔄 Chat page onDataSourceSelect called with:', dataSource);
+                            setSelectedDataSource(dataSource);
+                            
+                            if (dataSource) {
+                                setSelectedDataSources([dataSource]);
+                            } else {
+                                setSelectedDataSources([]);
+                            }
+                            
+                            if (dataSource && dataSource.type === 'file') {
+                                setFile({
+                                    filename: dataSource.name,
+                                    content_type: 'application/octet-stream',
+                                    storage_type: 'local',
+                                    file_size: 0,
+                                    uuid_filename: dataSource.id
+                                });
+                            } else if (dataSource && dataSource.type === 'database') {
+                                setDb({
+                                    id: Number(dataSource.id) || undefined,
+                                    name: dataSource.name,
+                                    type: dataSource.config?.db_type || 'postgresql',
+                                    host: dataSource.config?.host || '',
+                                    port: Number(dataSource.config?.port) || 5432,
+                                    database: dataSource.config?.database || '',
+                                    username: dataSource.config?.username || ''
+                                });
+                            }
+                        }}
+                        selectedDataSource={selectedDataSource}
+                        onCollapse={() => setDataPanelCollapsed(true)}
+                        onRefresh={() => {
+                            console.log('Refreshing data sources...');
+                        }}
+                        onDataSourcesChange={(sources) => {
+                            setSelectedDataSources(sources);
+                        }}
+                    />
+                )}
+            </div>
+
+            {/* Modals */}
             <UniversalDataSourceModal
                 isOpen={showDataSourceModal}
                 onClose={() => setShowDataSourceModal(false)}
@@ -557,8 +554,6 @@ const ChatToChart = () => {
                 initialDataSourceType="file"
                 isChatIntegration={true}
             />
-
-            {/* Platform Onboarding Modal */}
             <PlatformOnboardingModal />
         </div>
     );

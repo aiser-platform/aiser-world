@@ -350,7 +350,7 @@
     "pidtree": "^0.6.0",
     "pirates": "^4.0.7",
     "pkg-dir": "^4.2.0",
-    "playwright": "^1.55.1",
+    "playwright": "^1.56.0",
     "possible-typed-array-names": "^1.1.0",
     "prelude-ls": "^1.2.1",
     "pretty-format": "^29.7.0",

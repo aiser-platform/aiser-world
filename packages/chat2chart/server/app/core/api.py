@@ -106,6 +106,15 @@ api_router.include_router(
     responses={404: {"description": "Not found"}},
 )
 
+# Conversations endpoints
+from app.modules.conversations.api import router as conversations_router
+api_router.include_router(
+    router=conversations_router,
+    prefix="/api",
+    tags=["conversations"],
+    responses={404: {"description": "Not found"}},
+)
+
 # Debug endpoints (development only)
 api_router.include_router(router=debug_router, prefix="/debug", tags=["debug"]) 
 

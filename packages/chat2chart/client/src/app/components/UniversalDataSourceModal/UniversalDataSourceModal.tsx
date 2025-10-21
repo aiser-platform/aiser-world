@@ -3169,7 +3169,7 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
             onCancel={onClose}
             footer={null}
             width={900}
-            destroyOnClose
+            destroyOnHidden
         >
             {renderWorkflowNavigation()}
             {renderMainContent()}

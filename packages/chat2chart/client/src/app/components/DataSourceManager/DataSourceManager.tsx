@@ -484,7 +484,7 @@ const DataSourceManager: React.FC<DataSourceManagerProps> = ({
                     }
                 }}
                 width={600}
-                destroyOnClose
+                destroyOnHidden
             >
                 <Form form={form} layout="vertical" initialValues={{ name: '', description: '' }}>
                     <Form.Item name="name" label="Name" rules={[{ required: true, message: 'Name is required' }]}>
@@ -532,7 +532,7 @@ const DataSourceManager: React.FC<DataSourceManagerProps> = ({
                 footer={null}
                 width={1200}
                 centered
-                destroyOnClose
+                destroyOnHidden
             >
                 {currentDataSourceForModeling && (
                     <DataModelingWorkflow

@@ -72,7 +72,7 @@ const EditableWidget: React.FC<EditableWidgetProps> = ({
   const textStyle: React.CSSProperties = {
     fontSize,
     fontWeight,
-    color: color || (isDarkMode ? '#ffffff' : '#000000'),
+    color: color || 'var(--color-text-primary)',
     cursor: 'pointer',
     minHeight: multiline ? '60px' : 'auto',
     padding: '4px 8px',
@@ -84,8 +84,8 @@ const EditableWidget: React.FC<EditableWidgetProps> = ({
 
   const editingStyle: React.CSSProperties = {
     ...textStyle,
-    border: `1px solid #1890ff`,
-    backgroundColor: isDarkMode ? 'rgba(24, 144, 255, 0.1)' : 'rgba(24, 144, 255, 0.05)',
+    border: `1px solid var(--color-brand-primary)`,
+    backgroundColor: 'var(--color-brand-primary-light)',
     cursor: 'text'
   };
 
@@ -127,25 +127,25 @@ const EditableWidget: React.FC<EditableWidgetProps> = ({
           right: '0',
           display: 'flex',
           gap: '4px',
-          background: isDarkMode ? '#2a2a2a' : '#ffffff',
+          background: 'var(--color-surface-base)',
           padding: '2px 4px',
           borderRadius: '4px',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-          border: `1px solid ${isDarkMode ? '#404040' : '#d9d9d9'}`
+          boxShadow: 'var(--shadow-sm)',
+          border: '1px solid var(--color-border-primary)'
         }}>
           <CheckOutlined 
             style={{ 
-              color: '#52c41a', 
+              color: 'var(--color-functional-success)', 
               cursor: 'pointer',
-              fontSize: '12px'
+              fontSize: 'var(--font-size-sm)'
             }}
             onClick={handleSave}
           />
           <CloseOutlined 
             style={{ 
-              color: '#f5222d', 
+              color: 'var(--color-functional-danger)', 
               cursor: 'pointer',
-              fontSize: '12px'
+              fontSize: 'var(--font-size-sm)'
             }}
             onClick={handleCancel}
           />
@@ -165,7 +165,7 @@ const EditableWidget: React.FC<EditableWidgetProps> = ({
         style={{ 
           marginLeft: '8px', 
           opacity: 0.5,
-          fontSize: '12px'
+          fontSize: 'var(--font-size-sm)'
         }} 
       />
     </div>

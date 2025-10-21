@@ -78,7 +78,7 @@ export default function SecurityPage() {
         <div className="p-6 h-full overflow-y-auto">
             <div className="mb-8">
                 <Title level={2}>
-                    <SafetyOutlined style={{ marginRight: 12, color: '#1890ff' }} />
+                    <SafetyOutlined style={{ marginRight: 12, color: 'var(--color-brand-primary)' }} />
                     Security Settings
                 </Title>
                 <Text type="secondary">
@@ -344,29 +344,29 @@ export default function SecurityPage() {
                     <Card title="Security Tips">
                         <div className="space-y-3">
                             <div className="flex items-start">
-                                <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-2"></div>
-                                <Text style={{ fontSize: '12px' }}>
+                                <div style={{ width: 8, height: 8, background: 'var(--color-brand-primary)', borderRadius: '50%', marginTop: 8, marginRight: 8 }}></div>
+                                <Text style={{ fontSize: 'var(--font-size-sm)' }}>
                                     Use a strong, unique password for your account
                                 </Text>
                             </div>
                             
                             <div className="flex items-start">
-                                <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-2"></div>
-                                <Text style={{ fontSize: '12px' }}>
+                                <div style={{ width: 8, height: 8, background: 'var(--color-brand-primary)', borderRadius: '50%', marginTop: 8, marginRight: 8 }}></div>
+                                <Text style={{ fontSize: 'var(--font-size-sm)' }}>
                                     Enable two-factor authentication for extra security
                                 </Text>
                             </div>
                             
                             <div className="flex items-start">
-                                <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-2"></div>
-                                <Text style={{ fontSize: '12px' }}>
+                                <div style={{ width: 8, height: 8, background: 'var(--color-brand-primary)', borderRadius: '50%', marginTop: 8, marginRight: 8 }}></div>
+                                <Text style={{ fontSize: 'var(--font-size-sm)' }}>
                                     Regularly review your active sessions
                                 </Text>
                             </div>
                             
                             <div className="flex items-start">
-                                <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-2"></div>
-                                <Text style={{ fontSize: '12px' }}>
+                                <div style={{ width: 8, height: 8, background: 'var(--color-brand-primary)', borderRadius: '50%', marginTop: 8, marginRight: 8 }}></div>
+                                <Text style={{ fontSize: 'var(--font-size-sm)' }}>
                                     Never share your API keys or credentials
                                 </Text>
                             </div>

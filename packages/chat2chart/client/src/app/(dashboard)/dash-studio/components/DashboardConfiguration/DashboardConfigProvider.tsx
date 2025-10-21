@@ -36,6 +36,7 @@ export interface DashboardWidget {
   subtitle?: string;
   position: { x: number; y: number; w: number; h: number };
   config: any;
+  options?: any; // For comprehensive defaults compatibility
   dataSource?: string;
   refreshInterval?: number;
   isVisible: boolean;
@@ -250,7 +251,7 @@ const defaultLayout: DashboardLayout = {
   rows: 8,
   gap: 16,
   padding: 20,
-  backgroundColor: '#ffffff',
+  backgroundColor: 'var(--color-surface-base)',
   borderRadius: 8,
   shadow: true,
 };
@@ -258,12 +259,12 @@ const defaultLayout: DashboardLayout = {
 const defaultTheme: DashboardTheme = {
   id: 'default-light',
   name: 'Default Light',
-  primaryColor: '#1890ff',
-  secondaryColor: '#52c41a',
-  backgroundColor: '#ffffff',
-  textColor: '#262626',
-  accentColor: '#fa8c16',
-  borderColor: '#d9d9d9',
+  primaryColor: 'var(--color-brand-primary)',
+  secondaryColor: 'var(--color-functional-success)',
+  backgroundColor: 'var(--color-surface-base)',
+  textColor: 'var(--color-text-primary)',
+  accentColor: 'var(--color-functional-warning)',
+  borderColor: 'var(--color-border-primary)',
   isDark: false,
 };
 
@@ -298,34 +299,34 @@ const predefinedThemes: DashboardTheme[] = [
   {
     id: 'dark-mode',
     name: 'Dark Mode',
-    primaryColor: '#177ddc',
-    secondaryColor: '#49aa19',
-    backgroundColor: '#141414',
-    textColor: '#ffffff',
-    accentColor: '#d89614',
-    borderColor: '#434343',
+    primaryColor: 'var(--color-brand-primary-dark)',
+    secondaryColor: 'var(--color-functional-success-dark)',
+    backgroundColor: 'var(--layout-background)',
+    textColor: 'var(--color-surface-base)',
+    accentColor: 'var(--color-functional-warning-dark)',
+    borderColor: 'var(--color-border-secondary)',
     isDark: true,
   },
   {
     id: 'blue-theme',
     name: 'Blue Theme',
-    primaryColor: '#1890ff',
-    secondaryColor: '#52c41a',
-    backgroundColor: '#f0f8ff',
-    textColor: '#262626',
-    accentColor: '#fa8c16',
-    borderColor: '#91d5ff',
+    primaryColor: 'var(--color-brand-primary)',
+    secondaryColor: 'var(--color-functional-success)',
+    backgroundColor: 'var(--color-brand-primary-light)',
+    textColor: 'var(--color-text-primary)',
+    accentColor: 'var(--color-functional-warning)',
+    borderColor: 'var(--color-brand-primary-light)',
     isDark: false,
   },
   {
     id: 'green-theme',
     name: 'Green Theme',
-    primaryColor: '#52c41a',
-    secondaryColor: '#1890ff',
-    backgroundColor: '#f6ffed',
-    textColor: '#262626',
-    accentColor: '#fa8c16',
-    borderColor: '#b7eb8f',
+    primaryColor: 'var(--color-functional-success)',
+    secondaryColor: 'var(--color-brand-primary)',
+    backgroundColor: 'var(--color-functional-success-light)',
+    textColor: 'var(--color-text-primary)',
+    accentColor: 'var(--color-functional-warning)',
+    borderColor: 'var(--color-functional-success-light)',
     isDark: false,
   },
 ];
@@ -341,7 +342,7 @@ const predefinedLayouts: DashboardLayout[] = [
     rows: 12,
     gap: 8,
     padding: 12,
-    backgroundColor: '#ffffff',
+    backgroundColor: 'var(--color-surface-base)',
     borderRadius: 4,
     shadow: false,
   },
@@ -353,7 +354,7 @@ const predefinedLayouts: DashboardLayout[] = [
     rows: 6,
     gap: 24,
     padding: 32,
-    backgroundColor: '#ffffff',
+    backgroundColor: 'var(--color-surface-base)',
     borderRadius: 12,
     shadow: true,
   },
@@ -365,7 +366,7 @@ const predefinedLayouts: DashboardLayout[] = [
     rows: 0,
     gap: 16,
     padding: 20,
-    backgroundColor: '#ffffff',
+    backgroundColor: 'var(--color-surface-base)',
     borderRadius: 8,
     shadow: true,
   },
@@ -565,143 +566,442 @@ export const DashboardConfigProvider: React.FC<{ children: ReactNode }> = ({ chi
         case 'chart':
           return {
             chartType: 'bar',
-            title: {
-              text: 'New Bar Chart',
-              subtext: '',
-              left: 'left', // Left alignment as requested
-              textStyle: {
-                color: '#333333',
-                fontSize: 16,
-                fontFamily: 'Arial'
-              },
-              subtextStyle: {
-                color: '#666666',
-                fontSize: 12,
-                fontFamily: 'Arial'
-              }
+            title: { 
+              text: 'New Bar Chart', 
+              subtext: 'Professional visualization',
+              textStyle: { fontSize: 16, fontWeight: 'bold', color: 'var(--ant-color-text, var(--color-text-primary))' },
+              subtextStyle: { fontSize: 12, color: 'var(--ant-color-text-secondary, var(--color-text-secondary))' }
             },
-            tooltip: {
+            showTitle: true,
+            showSubtitle: true,
+            showContainer: true,
+            
+            // Visual defaults
+            colorPalette: 'default',
+            theme: 'auto',
+            legend: { 
+              show: true, 
+              position: 'top',
+              orient: 'horizontal',
+              textStyle: { fontSize: 12, color: 'var(--ant-color-text, var(--color-text-primary))' }
+            },
+            tooltip: { 
+              show: true, 
               trigger: 'axis',
               backgroundColor: 'rgba(255,255,255,0.9)',
-              borderColor: '#d9d9d9',
-              textStyle: {
-                color: '#333333'
-              }
+              borderColor: 'var(--ant-color-border, var(--color-border-primary))',
+              textStyle: { color: 'var(--ant-color-text, var(--color-text-primary))' }
             },
-            legend: {
-              data: [],
-              bottom: 10,
-              orient: 'horizontal',
-              textStyle: {
-                color: '#333333',
+            animation: false,
+            animationDuration: 1000,
+            animationEasing: 'cubicOut',
+            
+            // Series Label defaults
+            seriesLabel: {
+              show: false,
+              position: 'top',
+              fontSize: 12,
+              color: 'var(--ant-color-text, var(--color-text-primary))',
+              fontWeight: 'normal'
+            },
+            
+            // Layout defaults
+            responsive: true,
+            draggable: true,
+            resizable: true,
+            backgroundColor: 'transparent',
+            borderColor: 'var(--ant-color-border, var(--color-border-primary))',
+            padding: 20,
+            margin: 10,
+            
+            // Typography defaults
+            fontFamily: 'Arial',
+            fontSize: 12,
+            fontWeight: 'normal',
+            textColor: 'var(--ant-color-text, var(--color-text-primary))',
+            
+            // Data defaults
+            dataLimit: 1000,
+            xAxisField: 'category',
+            yAxisField: 'value',
+            seriesField: 'auto',
+            
+            // Data Labels
+            dataLabels: {
+              show: false,
+              format: 'auto'
+            },
+            
+            // X Axis defaults
+            xAxis: {
+              type: 'category',
+              data: type === 'pie' || type === 'doughnut' ? [] : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+              show: true,
+              name: '',
+              nameLocation: 'middle',
+              nameTextStyle: {
+                color: 'var(--ant-color-text-secondary, var(--color-text-secondary))',
                 fontSize: 12
+              },
+              axisLine: {
+                show: true,
+                lineStyle: {
+                  color: 'var(--ant-color-border, var(--color-border-primary))',
+                  width: 1
+                }
+              },
+              axisTick: {
+                show: true,
+                length: 5
+              },
+              axisLabel: {
+                show: true,
+                color: 'var(--ant-color-text-secondary, var(--color-text-secondary))',
+                fontSize: 12,
+                fontFamily: 'Arial',
+                rotate: 0
+              },
+              splitLine: {
+                show: false,
+                lineStyle: {
+                  color: 'var(--ant-color-border, var(--color-border-primary))',
+                  type: 'solid'
+                }
               }
             },
-            color: [
-              '#5470c6',
-              '#91cc75',
-              '#fac858',
-              '#ee6666',
-              '#73c0de'
-            ],
-            animation: true,
+            
+            // Y Axis defaults
+            yAxis: {
+              type: 'value',
+              show: true,
+              name: '',
+              nameLocation: 'middle',
+              nameTextStyle: {
+                color: 'var(--ant-color-text-secondary, var(--color-text-secondary))',
+                fontSize: 12
+              },
+              axisLine: {
+                show: true,
+                lineStyle: {
+                  color: 'var(--ant-color-border, var(--color-border-primary))',
+                  width: 1
+                }
+              },
+              axisTick: {
+                show: true,
+                length: 5
+              },
+              axisLabel: {
+                show: true,
+                color: 'var(--ant-color-text-secondary, var(--color-text-secondary))',
+                fontSize: 12,
+                fontFamily: 'Arial'
+              },
+              splitLine: {
+                show: true,
+                lineStyle: {
+                  color: 'var(--ant-color-border, var(--color-border-primary))',
+                  type: 'solid'
+                }
+              }
+            },
+            
+            // Grid defaults
             grid: {
-              top: 60,
+              top: 70,
               right: 40,
               bottom: 60,
               left: 60,
-              backgroundColor: 'transparent',
               show: true
             },
-            xAxis: {
-              type: 'category',
-              data: [],
-              axisLine: {
-                show: true,
-                lineStyle: {
-                  color: '#d9d9d9'
-                }
-              },
-              axisTick: {
-                show: true
-              },
-              axisLabel: {
-                show: true,
-                color: '#666666',
-                fontSize: 12,
-                fontFamily: 'Arial'
-              },
-              splitLine: {
-                show: true,
-                lineStyle: {
-                  color: '#f0f0f0'
-                }
-              }
-            },
-            yAxis: {
-              type: 'value',
-              axisLine: {
-                show: true,
-                lineStyle: {
-                  color: '#d9d9d9'
-                }
-              },
-              axisTick: {
-                show: true
-              },
-              axisLabel: {
-                show: true,
-                color: '#666666',
-                fontSize: 12,
-                fontFamily: 'Arial'
-              },
-              splitLine: {
-                show: true,
-                lineStyle: {
-                  color: '#f0f0f0'
+            
+            // Color defaults
+            color: ['#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de', '#3ba272', '#fc8452', '#9a60b4', '#ea7ccc'],
+            
+            // Sample data for immediate visualization (will be replaced when data is connected)
+            series: [
+              {
+                name: type === 'pie' || type === 'doughnut' ? 'Sample Data' : 'Series 1',
+                type: type || 'bar',
+                data: type === 'pie' || type === 'doughnut'
+                  ? [
+                      { value: 335, name: 'Category A' },
+                      { value: 234, name: 'Category B' },
+                      { value: 154, name: 'Category C' },
+                      { value: 135, name: 'Category D' },
+                      { value: 148, name: 'Category E' }
+                    ]
+                  : [120, 200, 150, 80, 300, 230, 180],
+                label: {
+                  show: false,
+                  position: 'top'
                 }
               }
-            },
-            series: []
+            ],
+            
+            // Effects & Animation defaults
+            animationType: 'fadeIn',
+            animationDelay: 0,
+            shadowEffect: false,
+            glowEffect: false,
+            
+            // Advanced defaults
+            performanceMode: false,
+            autoResize: true,
+            lazyLoading: false,
+            customOptions: '',
+            
+            // Professional styling
+            containerBackgroundColor: 'var(--ant-color-bg-container, var(--color-surface-base))',
+            containerBorderColor: 'var(--ant-color-border, var(--color-border-primary))',
+            containerBorderRadius: 8,
+            containerPadding: 16,
+            containerBoxShadow: '0 2px 8px rgba(0,0,0,0.1)'
           };
 
         case 'markdown':
           return {
-            content: '# New Markdown Widget\n\nAdd your markdown content here...',
-            enableHtml: false,
-            syntaxHighlighting: false
+            title: { 
+              text: 'Rich Content Widget', 
+              subtext: 'Markdown support included',
+              textStyle: { fontSize: 16, fontWeight: 'bold', color: 'var(--ant-color-text, var(--color-text-primary))' },
+              subtextStyle: { fontSize: 12, color: 'var(--ant-color-text-secondary, var(--color-text-secondary))' }
+            },
+            showTitle: true,
+            showSubtitle: true,
+            showContainer: true,
+            
+            // Text-specific defaults
+            content: '# Welcome to Your Dashboard\n\nThis is a **professional markdown widget** with:\n\n- *Italic text*\n- **Bold text**\n- `Code snippets`\n- Lists and more\n\nCustomize this content to fit your needs.',
+            enableHtml: true,
+            enableMarkdown: true,
+            enableLinks: true,
+            enableImages: true,
+            
+            // Styling defaults
+            fontSize: 14,
+            fontWeight: 'normal',
+            color: 'var(--ant-color-text, var(--color-text-primary))',
+            textAlign: 'left',
+            lineHeight: 1.6,
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            
+            // Layout defaults
+            responsive: true,
+            draggable: true,
+            resizable: true,
+            
+            // Professional styling
+            backgroundColor: 'var(--ant-color-bg-container, var(--color-surface-base))',
+            borderColor: 'var(--ant-color-border, var(--color-border-primary))',
+            borderRadius: 8,
+            padding: 20,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
           };
 
         case 'image':
           return {
+            title: { 
+              text: 'Image Widget', 
+              subtext: 'Visual content display',
+              textStyle: { fontSize: 16, fontWeight: 'bold', color: 'var(--ant-color-text, var(--color-text-primary))' },
+              subtextStyle: { fontSize: 12, color: 'var(--ant-color-text-secondary, var(--color-text-secondary))' }
+            },
+            showTitle: true,
+            showSubtitle: true,
+            showContainer: true,
+            
+            // Image-specific defaults
             imageUrl: '',
-            altText: 'Image widget',
-            fitMode: 'contain'
+            altText: 'Image',
+            fitMode: 'contain',
+            showCaption: false,
+            caption: '',
+            enableZoom: true,
+            enableDownload: true,
+            lazyLoading: true,
+            
+            // Styling defaults
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: 'var(--ant-color-border, var(--color-border-primary))',
+            backgroundColor: 'var(--ant-color-bg-container, var(--color-surface-base))',
+            
+            // Layout defaults
+            responsive: true,
+            draggable: true,
+            resizable: true,
+            
+            // Professional styling
+            padding: 16,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
           };
 
         case 'table':
           return {
-            columns: ['Column 1', 'Column 2', 'Column 3'],
-            dataSource: 'sample',
+            title: { 
+              text: 'Professional Data Table', 
+              subtext: 'Clean and organized data display',
+              textStyle: { fontSize: 16, fontWeight: 'bold', color: 'var(--ant-color-text, var(--color-text-primary))' },
+              subtextStyle: { fontSize: 12, color: 'var(--ant-color-text-secondary, var(--color-text-secondary))' }
+            },
+            showTitle: true,
+            showSubtitle: true,
+            showContainer: true,
+            
+            // Table-specific defaults
             pagination: true,
-            pageSize: 10
+            pageSize: 10,
+            showBorder: true,
+            striped: true,
+            hoverable: true,
+            sortable: true,
+            filterable: true,
+            searchable: true,
+            exportable: true,
+            
+            // Data defaults
+            dataLimit: 1000,
+            autoRefresh: false,
+            refreshInterval: 300000, // 5 minutes
+            
+            // Styling defaults
+            headerStyle: {
+              backgroundColor: 'var(--ant-color-bg-container, var(--color-surface-base))',
+              color: 'var(--ant-color-text, var(--color-text-primary))',
+              fontWeight: 'bold',
+              fontSize: 14
+            },
+            rowStyle: {
+              fontSize: 13,
+              color: 'var(--ant-color-text, var(--color-text-primary))'
+            },
+            alternateRowStyle: {
+              backgroundColor: 'var(--ant-color-bg-container, var(--color-surface-subtle))'
+            },
+            
+            // Professional styling
+            backgroundColor: 'var(--ant-color-bg-container, var(--color-surface-base))',
+            borderColor: 'var(--ant-color-border, var(--color-border-primary))',
+            borderRadius: 8,
+            padding: 16,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+            
+            // Layout defaults
+            responsive: true,
+            draggable: true,
+            resizable: true,
+            
+            // Typography defaults
+            fontFamily: 'Arial',
+            fontSize: 13,
+            fontWeight: 'normal',
+            textColor: 'var(--ant-color-text, var(--color-text-primary))'
           };
 
         case 'metric':
           return {
-            value: '0',
+            title: { 
+              text: 'Key Performance Metric', 
+              subtext: 'Real-time business indicator',
+              textStyle: { fontSize: 14, fontWeight: '500', color: 'var(--ant-color-text-secondary, var(--color-text-secondary))' },
+              subtextStyle: { fontSize: 12, color: 'var(--ant-color-text-tertiary, var(--color-text-tertiary))' }
+            },
+            showTitle: true,
+            showSubtitle: true,
+            showContainer: true,
+            
+            // Metric-specific defaults
+            value: '1,234',
             format: 'number',
             prefix: '',
             suffix: '',
-            showTrend: false
+            showTrend: true,
+            trendValue: '+12.5%',
+            trendDirection: 'up',
+            showSparkline: false,
+            showComparison: false,
+            comparisonValue: '1,100',
+            comparisonLabel: 'Previous Period',
+            
+            // Data defaults
+            autoRefresh: true,
+            refreshInterval: 60000, // 1 minute
+            dataSource: undefined,
+            query: undefined,
+            
+            // Styling defaults
+            valueStyle: { 
+              fontSize: 32, 
+              fontWeight: 'bold', 
+              color: 'var(--ant-color-primary, var(--color-brand-primary))' 
+            },
+            trendStyle: { 
+              fontSize: 14, 
+              color: 'var(--ant-color-success, var(--color-functional-success))' 
+            },
+            comparisonStyle: {
+              fontSize: 12,
+              color: 'var(--ant-color-text-secondary, var(--color-text-secondary))'
+            },
+            
+            // Professional styling
+            backgroundColor: 'var(--ant-color-bg-container, var(--color-surface-base))',
+            borderColor: 'var(--ant-color-border, var(--color-border-primary))',
+            borderRadius: 8,
+            padding: 20,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+            
+            // Layout defaults
+            responsive: true,
+            draggable: true,
+            resizable: true,
+            
+            // Typography defaults
+            fontFamily: 'Arial',
+            fontSize: 14,
+            fontWeight: 'normal',
+            textColor: 'var(--ant-color-text, var(--color-text-primary))'
           };
 
         case 'text':
           return {
-            content: 'New Text Widget\n\nAdd your text content here...',
+            title: { 
+              text: 'Text Widget', 
+              subtext: 'Simple text display',
+              textStyle: { fontSize: 16, fontWeight: 'bold', color: 'var(--ant-color-text, var(--color-text-primary))' },
+              subtextStyle: { fontSize: 12, color: 'var(--ant-color-text-secondary, var(--color-text-secondary))' }
+            },
+            showTitle: true,
+            showSubtitle: true,
+            showContainer: true,
+            
+            // Text-specific defaults
+            content: 'Welcome to your professional dashboard! This text widget provides a clean and elegant way to display important information, announcements, or instructions to your users.',
+            enableHtml: false,
+            enableMarkdown: false,
+            enableLinks: true,
+            enableImages: false,
+            
+            // Styling defaults
             fontSize: 14,
             fontWeight: 'normal',
-            color: '#333333'
+            color: 'var(--ant-color-text, var(--color-text-primary))',
+            textAlign: 'left',
+            lineHeight: 1.6,
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            
+            // Layout defaults
+            responsive: true,
+            draggable: true,
+            resizable: true,
+            
+            // Professional styling
+            backgroundColor: 'var(--ant-color-bg-container, var(--color-surface-base))',
+            borderColor: 'var(--ant-color-border, var(--color-border-primary))',
+            borderRadius: 8,
+            padding: 20,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
           };
 
         default:
@@ -720,7 +1020,6 @@ export const DashboardConfigProvider: React.FC<{ children: ReactNode }> = ({ chi
       isLocked: false,
     };
     
-    console.log('Creating new widget:', newWidget);
     dispatch({ type: 'ADD_WIDGET', payload: newWidget });
   };
 

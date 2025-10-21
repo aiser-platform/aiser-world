@@ -126,7 +126,7 @@ const EnhancedChatPanel: React.FC<EnhancedChatPanelProps> = ({ selectedDataSourc
         if (!metadata) return null;
 
         return (
-            <Card size="small" style={{ marginTop: '8px', backgroundColor: '#fafafa' }}>
+            <Card size="small" style={{ marginTop: '8px', backgroundColor: 'var(--color-surface-raised)' }}>
                 <Collapse size="small" ghost>
                     <Panel 
                         header={
@@ -143,12 +143,12 @@ const EnhancedChatPanel: React.FC<EnhancedChatPanelProps> = ({ selectedDataSourc
                                 <div>
                                     <Text strong>SQL Query:</Text>
                                     <div style={{ 
-                                        backgroundColor: '#f0f0f0', 
+                                        backgroundColor: 'var(--color-surface-raised)', 
                                         padding: '8px', 
                                         borderRadius: '4px',
                                         marginTop: '4px',
                                         fontFamily: 'monospace',
-                                        fontSize: '12px'
+                                        fontSize: 'var(--font-size-sm)'
                                     }}>
                                         <Space>
                                             <Text code>{metadata.sql}</Text>
@@ -199,14 +199,14 @@ const EnhancedChatPanel: React.FC<EnhancedChatPanelProps> = ({ selectedDataSourc
                     <Avatar 
                         icon={isUser ? <UserOutlined /> : <RobotOutlined />}
                         style={{ 
-                            backgroundColor: isUser ? '#1890ff' : '#52c41a',
+                            backgroundColor: isUser ? 'var(--color-brand-primary)' : 'var(--color-functional-success)',
                             flexShrink: 0
                         }}
                     />
                     <div style={{ flex: 1 }}>
                         <div style={{ marginBottom: '8px' }}>
                             <Text strong>{isUser ? 'You' : 'AI Assistant'}</Text>
-                            <Text type="secondary" style={{ marginLeft: '8px', fontSize: '12px' }}>
+                            <Text type="secondary" style={{ marginLeft: '8px', fontSize: 'var(--font-size-sm)' }}>
                                 {new Date(msg.timestamp).toLocaleTimeString()}
                             </Text>
                         </div>

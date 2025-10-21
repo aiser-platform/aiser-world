@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '@/context/AuthContext';
 import {
     Card,
     Button,
@@ -37,7 +38,7 @@ import {
     FileImageOutlined,
 } from '@ant-design/icons';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/context/AuthContext';
+import LoadingStates from '@/app/components/LoadingStates';
 
 const { Title, Text } = Typography;
 const { Search } = Input;
@@ -208,19 +209,19 @@ const ChartsPage: React.FC = () => {
     const getChartIcon = (type: string) => {
         switch (type) {
             case 'bar':
-                return <BarChartOutlined style={{ color: '#1890ff' }} />;
+                return <BarChartOutlined style={{ color: 'var(--color-brand-primary)' }} />;
             case 'line':
-                return <LineChartOutlined style={{ color: '#52c41a' }} />;
+                return <LineChartOutlined style={{ color: 'var(--color-functional-success)' }} />;
             case 'pie':
-                return <PieChartOutlined style={{ color: '#722ed1' }} />;
+                return <PieChartOutlined style={{ color: 'var(--color-functional-info)' }} />;
             case 'scatter':
-                return <BarChartOutlined style={{ color: '#fa8c16' }} />;
+                return <BarChartOutlined style={{ color: 'var(--color-functional-warning)' }} />;
             case 'area':
-                return <LineChartOutlined style={{ color: '#13c2c2' }} />;
+                return <LineChartOutlined style={{ color: 'var(--color-functional-info)' }} />;
             case 'gauge':
-                return <BarChartOutlined style={{ color: '#eb2f96' }} />;
+                return <BarChartOutlined style={{ color: 'var(--color-functional-danger)' }} />;
             case 'table':
-                return <BarChartOutlined style={{ color: '#2f54eb' }} />;
+                return <BarChartOutlined style={{ color: 'var(--color-brand-primary)' }} />;
             default:
                 return <BarChartOutlined />;
         }
@@ -266,8 +267,8 @@ const ChartsPage: React.FC = () => {
                         <div style={{ 
                             width: 40, 
                             height: 30, 
-                            backgroundColor: '#f0f0f0', 
-                            borderRadius: 4,
+                            backgroundColor: 'var(--color-surface-raised)', 
+                            borderRadius: 'var(--radius-sm)',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center'
@@ -289,7 +290,7 @@ const ChartsPage: React.FC = () => {
                         <Text strong>{text}</Text>
                         {record.description && (
                             <div>
-                                <Text type="secondary" style={{ fontSize: '12px' }}>
+                                <Text type="secondary" style={{ fontSize: 'var(--font-size-sm)' }}>
                                     {record.description}
                                 </Text>
                             </div>
@@ -427,168 +428,164 @@ const ChartsPage: React.FC = () => {
     if (!isAuthenticated) {
         return (
             <div style={{ padding: 24, textAlign: 'center' }}>
-                <div>Loading...</div>
+                <LoadingStates type="chart" message="Loading charts..." />
             </div>
         );
     }
 
     return (
-        <div style={{ padding: 24 }}>
-            <div style={{ marginBottom: 24 }}>
-                <Title level={2}>Charts</Title>
-                <Text type="secondary">
+        <div className="page-wrapper">
+            <div className="page-header">
+                <Title level={2} className="page-title">Charts</Title>
+                <Text type="secondary" className="page-description">
                     Create, manage, and share your data visualizations
                 </Text>
             </div>
 
             {/* Statistics Cards */}
-            <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-                <Col span={6}>
-                    <Card>
+            <Row gutter={[16, 16]} style={{ marginBottom: 'var(--space-6)' }}>
+                <Col xs={24} sm={12} md={6}>
+                    <Card className="stat-card">
                         <Statistic
                             title="Total Charts"
                             value={stats.total}
-                            prefix={<BarChartOutlined />}
+                            prefix={<BarChartOutlined style={{ color: 'var(--color-brand-primary)' }} />}
                         />
                     </Card>
                 </Col>
-                <Col span={6}>
-                    <Card>
+                <Col xs={24} sm={12} md={6}>
+                    <Card className="stat-card">
                         <Statistic
                             title="Active"
                             value={stats.active}
-                            valueStyle={{ color: '#3f8600' }}
-                            prefix={<BarChartOutlined />}
+                            valueStyle={{ color: 'var(--color-functional-success)' }}
+                            prefix={<BarChartOutlined style={{ color: 'var(--color-functional-success)' }} />}
                         />
                     </Card>
                 </Col>
-                <Col span={6}>
-                    <Card>
+                <Col xs={24} sm={12} md={6}>
+                    <Card className="stat-card">
                         <Statistic
                             title="Drafts"
                             value={stats.draft}
-                            valueStyle={{ color: '#1890ff' }}
-                            prefix={<BarChartOutlined />}
+                            valueStyle={{ color: 'var(--color-brand-primary)' }}
+                            prefix={<BarChartOutlined style={{ color: 'var(--color-brand-primary)' }} />}
                         />
                     </Card>
                 </Col>
-                <Col span={6}>
-                    <Card>
+                <Col xs={24} sm={12} md={6}>
+                    <Card className="stat-card">
                         <Statistic
                             title="Public"
                             value={stats.public}
-                            valueStyle={{ color: '#722ed1' }}
-                            prefix={<ShareAltOutlined />}
+                            valueStyle={{ color: 'var(--color-functional-info)' }}
+                            prefix={<ShareAltOutlined style={{ color: 'var(--color-functional-info)' }} />}
                         />
                     </Card>
                 </Col>
             </Row>
 
             {/* Chart Type Statistics */}
-            <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-                <Col span={6}>
-                    <Card>
+            <Row gutter={[16, 16]} style={{ marginBottom: 'var(--space-6)' }}>
+                <Col xs={24} sm={12} md={6}>
+                    <Card className="stat-card">
                         <Statistic
                             title="Bar Charts"
                             value={chartTypeStats.bar}
-                            prefix={<BarChartOutlined />}
+                            prefix={<BarChartOutlined style={{ color: 'var(--color-brand-primary)' }} />}
                         />
                     </Card>
                 </Col>
-                <Col span={6}>
-                    <Card>
+                <Col xs={24} sm={12} md={6}>
+                    <Card className="stat-card">
                         <Statistic
                             title="Line Charts"
                             value={chartTypeStats.line}
-                            prefix={<LineChartOutlined />}
+                            prefix={<LineChartOutlined style={{ color: 'var(--color-functional-success)' }} />}
                         />
                     </Card>
                 </Col>
-                <Col span={6}>
-                    <Card>
+                <Col xs={24} sm={12} md={6}>
+                    <Card className="stat-card">
                         <Statistic
                             title="Pie Charts"
                             value={chartTypeStats.pie}
-                            prefix={<PieChartOutlined />}
+                            prefix={<PieChartOutlined style={{ color: 'var(--color-functional-info)' }} />}
                         />
                     </Card>
                 </Col>
-                <Col span={6}>
-                    <Card>
+                <Col xs={24} sm={12} md={6}>
+                    <Card className="stat-card">
                         <Statistic
                             title="Other Types"
                             value={chartTypeStats.other}
-                            prefix={<FileImageOutlined />}
+                            prefix={<FileImageOutlined style={{ color: 'var(--color-text-tertiary)' }} />}
                         />
                     </Card>
                 </Col>
             </Row>
 
             {/* Actions and Filters */}
-            <div style={{ marginBottom: 16 }}>
-                <Row justify="space-between" align="middle">
-                    <Col>
-                        <Space>
-                            <Button
-                                type="primary"
-                                icon={<PlusOutlined />}
-                                onClick={handleCreateChart}
-                            >
-                                Create Chart
-                            </Button>
-                            <Button
-                                icon={<ReloadOutlined />}
-                                onClick={loadCharts}
-                                loading={loading}
-                            >
-                                Refresh
-                            </Button>
-                        </Space>
-                    </Col>
-                    <Col>
-                        <Space>
-                            <Search
-                                placeholder="Search charts..."
-                                value={searchText}
-                                onChange={(e) => setSearchText(e.target.value)}
-                                style={{ width: 200 }}
-                                prefix={<SearchOutlined />}
-                            />
-                            <Select
-                                value={typeFilter}
-                                onChange={setTypeFilter}
-                                style={{ width: 120 }}
-                                prefix={<FilterOutlined />}
-                            >
-                                <Option value="all">All Types</Option>
-                                <Option value="bar">Bar</Option>
-                                <Option value="line">Line</Option>
-                                <Option value="pie">Pie</Option>
-                                <Option value="scatter">Scatter</Option>
-                                <Option value="area">Area</Option>
-                                <Option value="gauge">Gauge</Option>
-                                <Option value="table">Table</Option>
-                            </Select>
-                            <Select
-                                value={statusFilter}
-                                onChange={setStatusFilter}
-                                style={{ width: 120 }}
-                            >
-                                <Option value="all">All Status</Option>
-                                <Option value="active">Active</Option>
-                                <Option value="draft">Draft</Option>
-                                <Option value="archived">Archived</Option>
-                            </Select>
-                        </Space>
-                    </Col>
-                </Row>
+            <div className="page-toolbar">
+                <div className="toolbar-left">
+                    <Button
+                        type="primary"
+                        icon={<PlusOutlined />}
+                        onClick={handleCreateChart}
+                        className="action-button-primary"
+                    >
+                        Create Chart
+                    </Button>
+                    <Button
+                        icon={<ReloadOutlined />}
+                        onClick={loadCharts}
+                        loading={loading}
+                        className="action-button-secondary"
+                    >
+                        Refresh
+                    </Button>
+                </div>
+                <div className="toolbar-right">
+                    <Search
+                        placeholder="Search charts..."
+                        value={searchText}
+                        onChange={(e) => setSearchText(e.target.value)}
+                        style={{ width: 200 }}
+                        prefix={<SearchOutlined />}
+                    />
+                    <Select
+                        value={typeFilter}
+                        onChange={setTypeFilter}
+                        style={{ width: 120 }}
+                    >
+                        <Option value="all">All Types</Option>
+                        <Option value="bar">Bar</Option>
+                        <Option value="line">Line</Option>
+                        <Option value="pie">Pie</Option>
+                        <Option value="scatter">Scatter</Option>
+                        <Option value="area">Area</Option>
+                        <Option value="gauge">Gauge</Option>
+                        <Option value="table">Table</Option>
+                    </Select>
+                    <Select
+                        value={statusFilter}
+                        onChange={setStatusFilter}
+                        style={{ width: 120 }}
+                    >
+                        <Option value="all">All Status</Option>
+                        <Option value="active">Active</Option>
+                        <Option value="draft">Draft</Option>
+                        <Option value="archived">Archived</Option>
+                    </Select>
+                </div>
             </div>
 
-            <Divider />
+            <Divider className="page-divider" />
 
             {/* Charts Table */}
-            <Card>
+            <Card className="content-card">
                 <Table
+                    className="data-table"
                     columns={columns}
                     dataSource={filteredCharts}
                     rowKey="id"

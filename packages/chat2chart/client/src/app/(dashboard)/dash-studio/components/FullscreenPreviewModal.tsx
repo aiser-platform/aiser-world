@@ -26,7 +26,7 @@ const FullscreenPreviewModal: React.FC<FullscreenPreviewModalProps> = ({ visible
       bodyStyle={{ height: '100vh', padding: 0 }}
       closable={true}
     >
-      <div style={{ height: '100%', background: isDarkMode ? '#000' : '#fff' }}>
+      <div style={{ height: '100%', background: 'var(--layout-background)' }}>
         <AdvancedDashboardCanvas
           widgets={widgets}
           layout={layout}

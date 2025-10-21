@@ -17,6 +17,8 @@ from datetime import datetime
 from app.db.session import get_async_session
 from app.core.cache import cache
 import time
+import socketio
+from app.modules.collaboration.socketio_manager import get_socketio_app, sio
 
 logger = logging.getLogger(__name__)
 
@@ -254,3 +256,13 @@ async def exception_handler(request: Request, exc: Exception):
 #             status_code=500,
 #             content={"error": "Internal server error in middleware"}
 #         )
+
+# Mount Socket.io for real-time collaboration
+socket_app = socketio.ASGIApp(
+    sio,
+    other_asgi_app=app,
+    socketio_path='/socket.io'
+)
+
+# Export the socket app as the main ASGI application
+# This will be used by uvicorn instead of the plain FastAPI app

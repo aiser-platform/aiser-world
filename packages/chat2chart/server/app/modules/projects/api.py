@@ -134,7 +134,16 @@ async def get_projects(
         # Resolve user id from JWT token
         try:
             user_payload = current_token if isinstance(current_token, dict) else Auth().decodeJWT(current_token) or {}
-            user_id = int(user_payload.get('id') or user_payload.get('sub'))
+            # Handle both integer and UUID string user IDs
+            user_id_raw = user_payload.get('id') or user_payload.get('sub') or user_payload.get('user_id')
+            if user_id_raw:
+                # Try to convert to int first (for legacy integer IDs), fall back to string (for UUIDs)
+                try:
+                    user_id = int(user_id_raw)
+                except (ValueError, TypeError):
+                    user_id = str(user_id_raw)  # Keep as string for UUIDs
+            else:
+                user_id = None
         except Exception:
             user_id = None
 

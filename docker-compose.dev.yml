@@ -163,9 +163,10 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=${NODE_ENV:-development}
-      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
-      - NEXT_PUBLIC_AUTH_URL=${NEXT_PUBLIC_AUTH_URL:-http://localhost:5000}
-      - NEXT_PUBLIC_CUBE_URL=${NEXT_PUBLIC_CUBE_URL:-http://localhost:4000}
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://chat2chart-server:8000}
+      - NEXT_PUBLIC_AUTH_URL=${NEXT_PUBLIC_AUTH_URL:-http://auth-service:5000}
+      - NEXT_PUBLIC_CUBE_URL=${NEXT_PUBLIC_CUBE_URL:-http://cube-server:4000}
+      - NEXT_PUBLIC_BACKEND_URL=${NEXT_PUBLIC_BACKEND_URL:-http://chat2chart-server:8000}
     volumes:
       - ./packages/chat2chart/client:/app
       - ./packages/shared:/shared

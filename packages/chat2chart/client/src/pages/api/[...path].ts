@@ -1,8 +1,12 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 const BACKEND = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
-// Map localhost/127.0.0.1 to internal docker hostname when running inside container
-const INTERNAL_BACKEND = BACKEND && (/localhost|127\.0\.0\.1/.test(BACKEND)) ? 'http://chat2chart-server:8000' : BACKEND;
+// Use BACKEND as-is. In some dev/container setups an internal docker hostname
+// (e.g. chat2chart-server) may be required, but remapping here caused the
+// proxy to attempt to fetch an unreachable host in non-container environments
+// and produced `fetch failed` errors. If you need docker hostname mapping set
+// NEXT_PUBLIC_API_URL appropriately in your environment.
+const INTERNAL_BACKEND = BACKEND;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -53,7 +57,39 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     console.log('Proxying /api ->', target, 'method=', req.method);
-    const upstream = await fetch(target, fetchOptions);
+    let upstream: Response | null = null;
+    const candidateTargets: string[] = [target, `${targetBase.replace(/\/$/, '')}`.replace(/\/$/, '')];
+    // Ensure we have sensible fallbacks: try localhost then docker hostname
+    if (!candidateTargets.includes('http://localhost:8000')) candidateTargets.push('http://localhost:8000');
+    if (!candidateTargets.includes('http://chat2chart-server:8000')) candidateTargets.push('http://chat2chart-server:8000');
+
+    let lastError: any = null;
+    for (const t of candidateTargets) {
+      try {
+        // If the candidate already appears to include the desired path, use it as-is.
+        let trial: string;
+        const normalizedT = t.replace(/\/$/, '');
+        if (path && (normalizedT.endsWith(`/${path}`) || normalizedT === `${targetBase}` || normalizedT.endsWith(`/api/${path}`) || normalizedT.includes(`/${path}`))) {
+          trial = normalizedT;
+        } else {
+          trial = path ? (normalizedT + '/' + path) : normalizedT;
+        }
+        console.log('Proxy trying target', trial);
+        upstream = await fetch(trial, fetchOptions);
+        if (upstream) {
+          console.log('Proxy succeeded to', trial, 'status=', upstream.status);
+          break;
+        }
+      } catch (e) {
+        lastError = e;
+        console.warn('Proxy fetch to', t, 'failed:', String(e));
+      }
+    }
+
+    if (!upstream) {
+      console.error('Proxy failed to reach any upstream for', target, 'lastError=', String(lastError));
+      return res.status(502).json({ error: 'Proxy failed', detail: String(lastError || 'Upstream unreachable') });
+    }
 
     res.status(upstream.status);
     const setCookieValues: string[] = [];

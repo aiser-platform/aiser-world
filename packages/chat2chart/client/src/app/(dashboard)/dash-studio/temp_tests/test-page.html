@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Studio Interactive Testing</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .test-button {
+            background: #1890ff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-button:hover {
+            background: #40a9ff;
+        }
+        .test-results {
+            background: #f6ffed;
+            border: 1px solid #b7eb8f;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 15px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .error {
+            background: #fff2f0;
+            border: 1px solid #ffccc7;
+            color: #a8071a;
+        }
+        .success {
+            background: #f6ffed;
+            border: 1px solid #b7eb8f;
+            color: #389e0d;
+        }
+        iframe {
+            width: 100%;
+            height: 600px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🧪 Dashboard Studio Interactive Testing</h1>
+        <p>This page will load the dashboard studio and run comprehensive tests to identify real issues.</p>
+        
+        <div>
+            <button class="test-button" onclick="loadDashboardStudio()">Load Dashboard Studio</button>
+            <button class="test-button" onclick="runTests()">Run All Tests</button>
+            <button class="test-button" onclick="clearResults()">Clear Results</button>
+        </div>
+        
+        <div id="test-results" class="test-results" style="display: none;"></div>
+    </div>
+    
+    <div class="test-container">
+        <h2>Dashboard Studio</h2>
+        <iframe id="dashboard-iframe" src="about:blank"></iframe>
+    </div>
+
+    <script>
+        let testResults = [];
+        
+        function loadDashboardStudio() {
+            const iframe = document.getElementById('dashboard-iframe');
+            iframe.src = 'http://localhost:3000/dash-studio';
+            
+            iframe.onload = function() {
+                console.log('Dashboard studio loaded');
+                addTestResult('Dashboard Studio Load', true, 'Dashboard studio loaded successfully');
+            };
+            
+            iframe.onerror = function() {
+                console.error('Failed to load dashboard studio');
+                addTestResult('Dashboard Studio Load', false, 'Failed to load dashboard studio');
+            };
+        }
+        
+        function runTests() {
+            const iframe = document.getElementById('dashboard-iframe');
+            const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+            
+            if (!iframeDoc || iframeDoc.location.href === 'about:blank') {
+                addTestResult('Test Execution', false, 'Dashboard studio not loaded. Please load it first.');
+                return;
+            }
+            
+            // Inject test script into iframe
+            const script = iframeDoc.createElement('script');
+            script.textContent = `
+                // Simplified test script for iframe
+                console.log('🧪 Running tests in dashboard studio...');
+                
+                // Test 1: Check basic elements
+                const canvas = document.querySelector('.dashboard-canvas-wrapper') || 
+                             document.querySelector('[class*="canvas"]');
+                const widgetLibrary = document.querySelector('.widget-library') ||
+                                     document.querySelector('[class*="library"]');
+                const propertiesPanel = document.querySelector('.properties-panel') ||
+                                      document.querySelector('[class*="properties"]');
+                
+                const results = {
+                    canvas: !!canvas,
+                    widgetLibrary: !!widgetLibrary,
+                    propertiesPanel: !!propertiesPanel
+                };
+                
+                // Send results back to parent
+                window.parent.postMessage({
+                    type: 'test-results',
+                    results: results
+                }, '*');
+                
+                console.log('Test results:', results);
+            `;
+            
+            iframeDoc.head.appendChild(script);
+            
+            // Listen for test results
+            window.addEventListener('message', function(event) {
+                if (event.data.type === 'test-results') {
+                    const results = event.data.results;
+                    
+                    addTestResult('Canvas Element', results.canvas, results.canvas ? 'Canvas found' : 'Canvas not found');
+                    addTestResult('Widget Library', results.widgetLibrary, results.widgetLibrary ? 'Widget library found' : 'Widget library not found');
+                    addTestResult('Properties Panel', results.propertiesPanel, results.propertiesPanel ? 'Properties panel found' : 'Properties panel not found');
+                    
+                    // Run additional tests
+                    runAdditionalTests(iframeDoc);
+                }
+            });
+        }
+        
+        function runAdditionalTests(iframeDoc) {
+            // Test widget library
+            const chartWidgets = iframeDoc.querySelectorAll('[data-widget-type="chart"], [data-widget-type="bar"], [data-widget-type="line"]');
+            addTestResult('Chart Widgets', chartWidgets.length > 0, `Found ${chartWidgets.length} chart widgets`);
+            
+            // Test form controls
+            const inputs = iframeDoc.querySelectorAll('input');
+            const selects = iframeDoc.querySelectorAll('.ant-select, select');
+            const switches = iframeDoc.querySelectorAll('.ant-switch, input[type="checkbox"]');
+            
+            addTestResult('Form Inputs', inputs.length > 0, `Found ${inputs.length} input fields`);
+            addTestResult('Select Dropdowns', selects.length > 0, `Found ${selects.length} select dropdowns`);
+            addTestResult('Switches', switches.length > 0, `Found ${switches.length} switches`);
+            
+            // Test save button
+            const saveButton = iframeDoc.querySelector('button[title*="Save"], button:contains("Save")');
+            addTestResult('Save Button', !!saveButton, saveButton ? 'Save button found' : 'Save button not found');
+            
+            // Test for console errors
+            const errorElements = iframeDoc.querySelectorAll('[class*="error"]');
+            addTestResult('Error Elements', errorElements.length === 0, `Found ${errorElements.length} error elements`);
+        }
+        
+        function addTestResult(testName, passed, details) {
+            testResults.push({
+                test: testName,
+                passed: passed,
+                details: details,
+                timestamp: new Date().toLocaleTimeString()
+            });
+            
+            updateResultsDisplay();
+        }
+        
+        function updateResultsDisplay() {
+            const resultsDiv = document.getElementById('test-results');
+            resultsDiv.style.display = 'block';
+            
+            const passed = testResults.filter(r => r.passed).length;
+            const failed = testResults.filter(r => !r.passed).length;
+            const total = testResults.length;
+            
+            let html = `📊 Test Results Summary\n`;
+            html += `✅ Passed: ${passed}\n`;
+            html += `❌ Failed: ${failed}\n`;
+            html += `📊 Total: ${total}\n`;
+            html += `🎯 Success Rate: ${total > 0 ? Math.round((passed / total) * 100) : 0}%\n\n`;
+            
+            html += `📋 Detailed Results:\n`;
+            testResults.forEach(result => {
+                const status = result.passed ? '✅' : '❌';
+                html += `${status} ${result.test}: ${result.details} (${result.timestamp})\n`;
+            });
+            
+            if (failed > 0) {
+                html += `\n🚨 Issues Found:\n`;
+                testResults.filter(r => !r.passed).forEach(result => {
+                    html += `- ${result.test}: ${result.details}\n`;
+                });
+            }
+            
+            resultsDiv.textContent = html;
+            resultsDiv.className = `test-results ${failed > 0 ? 'error' : 'success'}`;
+        }
+        
+        function clearResults() {
+            testResults = [];
+            document.getElementById('test-results').style.display = 'none';
+        }
+        
+        // Auto-load dashboard studio
+        window.onload = function() {
+            setTimeout(loadDashboardStudio, 1000);
+        };
+    </script>
+</body>
+</html>
+
+

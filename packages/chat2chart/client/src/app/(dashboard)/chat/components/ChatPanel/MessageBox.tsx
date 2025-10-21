@@ -15,6 +15,7 @@ import Markdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
+import LoadingStates from '@/app/components/LoadingStates';
 import './styles.css';
 
 interface ChartButton {
@@ -49,7 +50,7 @@ const AIProfile: React.FC = () => (
             <Avatar 
                 size={40}
                 style={{ 
-                    backgroundColor: '#1890ff',
+                    backgroundColor: 'var(--color-brand-primary)',
                     border: '2px solid #40a9ff',
                     boxShadow: '0 0 10px rgba(24, 144, 255, 0.3)'
                 }}
@@ -77,7 +78,7 @@ const UserProfile: React.FC = () => {
             <Avatar 
                 size={40}
                 style={{ 
-                    backgroundColor: '#52c41a',
+                    backgroundColor: 'var(--color-functional-success)',
                     border: '2px solid #73d13d'
                 }}
                 icon={<UserOutlined style={{ fontSize: '20px' }} />}
@@ -126,15 +127,12 @@ export default function ChatMessageBox({
                                 className={`Message ai-message ${answer?.includes('<iframe') ? 'has-iframe' : ''}`}
                             >
                                 {id === 'loading' || id.startsWith('error') ? (
-                                    <span
-                                        className={
-                                            id === 'loading'
-                                                ? 'Loading'
-                                                : 'Error'
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+                                        {id === 'loading'
+                                            ? <LoadingStates type="default" message="Processing..." size="small" />
+                                            : <div style={{ color: 'var(--color-functional-error)', fontWeight: '500' }}>Error occurred</div>
                                         }
-                                    >
-                                        {answer}
-                                    </span>
+                                    </div>
                                 ) : (
                                     <Markdown rehypePlugins={[rehypeRaw]}>
                                         {answer ?? ''}

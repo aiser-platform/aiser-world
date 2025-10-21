@@ -139,7 +139,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
           series: config.series || [{
             type: 'bar',
             data: config.data || [],
-            itemStyle: { color: '#1890ff' }
+            itemStyle: { color: 'var(--color-brand-primary)' }
           }]
         };
       
@@ -152,7 +152,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
             type: 'line',
             data: config.data || [],
             smooth: true,
-            itemStyle: { color: '#52c41a' }
+            itemStyle: { color: 'var(--color-functional-success)' }
           }]
         };
       
@@ -182,7 +182,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
             type: 'scatter',
             data: config.data || [],
             symbolSize: 8,
-            itemStyle: { color: '#fa8c16' }
+            itemStyle: { color: 'var(--color-functional-warning)' }
           }]
         };
       

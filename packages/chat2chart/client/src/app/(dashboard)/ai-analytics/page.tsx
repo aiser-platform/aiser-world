@@ -205,7 +205,7 @@ export default function AIAnalyticsDashboard() {
             {/* Header */}
             <div style={{ marginBottom: '24px' }}>
                 <Title level={2} style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <BulbOutlined style={{ color: '#1890ff' }} />
+                    <BulbOutlined style={{ color: 'var(--color-brand-primary)' }} />
                     AI Analytics Dashboard
                 </Title>
                 <Text type="secondary">
@@ -260,7 +260,7 @@ export default function AIAnalyticsDashboard() {
                                 value={stats.success_rate}
                                 prefix={<CheckCircleOutlined />}
                                 suffix="%"
-                                valueStyle={{ color: '#3f8600' }}
+                                valueStyle={{ color: 'var(--color-functional-success)' }}
                             />
                         </Card>
                     </Col>
@@ -271,7 +271,7 @@ export default function AIAnalyticsDashboard() {
                                 value={stats.ai_enhancement_rate}
                                 prefix={<RocketOutlined />}
                                 suffix="%"
-                                valueStyle={{ color: '#1890ff' }}
+                                valueStyle={{ color: 'var(--color-brand-primary)' }}
                             />
                         </Card>
                     </Col>
@@ -282,7 +282,7 @@ export default function AIAnalyticsDashboard() {
                                 value={stats.average_response_time}
                                 prefix={<ThunderboltOutlined />}
                                 suffix="s"
-                                valueStyle={{ color: '#fa8c16' }}
+                                valueStyle={{ color: 'var(--color-functional-warning)' }}
                             />
                         </Card>
                     </Col>
@@ -297,8 +297,8 @@ export default function AIAnalyticsDashboard() {
                             percent={stats?.ai_enhancement_rate || 0}
                             status="active"
                             strokeColor={{
-                                '0%': '#108ee9',
-                                '100%': '#87d068',
+                                '0%': 'var(--color-brand-primary)',
+                                '100%': 'var(--color-functional-success)',
                             }}
                         />
                         <Text type="secondary">
@@ -312,8 +312,8 @@ export default function AIAnalyticsDashboard() {
                             percent={stats?.success_rate || 0}
                             status="success"
                             strokeColor={{
-                                '0%': '#52c41a',
-                                '100%': '#1890ff',
+                                '0%': 'var(--color-functional-success)',
+                                '100%': 'var(--color-brand-primary)',
                             }}
                         />
                         <Text type="secondary">
@@ -346,13 +346,13 @@ export default function AIAnalyticsDashboard() {
                                 ]}
                             >
                                 <div style={{ textAlign: 'center' }}>
-                                    <div style={{ fontSize: '24px', marginBottom: '8px', color: '#1890ff' }}>
+                                    <div style={{ fontSize: '24px', marginBottom: '8px', color: 'var(--color-brand-primary)' }}>
                                         {capability.icon}
                                     </div>
                                     <Title level={5} style={{ margin: '8px 0' }}>
                                         {capability.name}
                                     </Title>
-                                    <Text type="secondary" style={{ fontSize: '12px' }}>
+                                    <Text type="secondary" style={{ fontSize: 'var(--font-size-sm)' }}>
                                         {capability.description}
                                     </Text>
                                     <div style={{ marginTop: '8px' }}>

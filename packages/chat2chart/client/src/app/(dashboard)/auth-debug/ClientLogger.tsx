@@ -50,7 +50,7 @@ export default function ClientLogger() {
     try {
       const payload = { logs: bufferRef.current, url: window.location.href, userAgent: navigator.userAgent };
       // Try same-origin proxy first
-      let res = await fetch('/api/debug/client-error', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const res = await fetch('/api/debug/client-error', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       if (!res.ok) {
         // Fallback: post directly to backend debug endpoint
         try {

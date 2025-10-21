@@ -240,7 +240,7 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({
                         onChange={handleProjectChange}
                         loading={loading}
                         style={{ minWidth: isHeader ? 260 : 200 }}
-                        dropdownMatchSelectWidth={false}
+                        popupMatchSelectWidth={false}
                         placeholder={projects.length === 0 ? "No Projects" : (currentProject ? currentProject.name : "Select Project")}
                         suffixIcon={<FolderOutlined />}
                         disabled={projects.length === 0}
@@ -309,7 +309,7 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({
                 open={modalVisible}
                 onCancel={() => setModalVisible(false)}
                 footer={null}
-                destroyOnClose
+                destroyOnHidden
                 width={600}
             >
                 <Form
@@ -407,7 +407,7 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({
                 open={editModalVisible}
                 onCancel={() => setEditModalVisible(false)}
                 footer={null}
-                destroyOnClose
+                destroyOnHidden
             >
                 <Form
                     form={editForm}

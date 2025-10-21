@@ -13,9 +13,6 @@ interface CustomLayoutProps {
 const CustomLayout: React.FC<CustomLayoutProps> = React.memo(({ children }) => {
     const [collapsed, setCollapsed] = useState(true);
     const [isBreakpoint, setIsBreakpoint] = useState(false);
-    const {
-        token: { borderRadiusLG },
-    } = theme.useToken();
 
     const screens = useBreakpoint();
 
@@ -25,7 +22,16 @@ const CustomLayout: React.FC<CustomLayoutProps> = React.memo(({ children }) => {
     }, [screens]);
 
     return (
-        <Layout className="h-screen overflow-hidden" hasSider>
+        <Layout 
+            className="h-screen overflow-hidden" 
+            style={{ 
+                height: '100vh',
+                margin: 0,
+                padding: 0,
+                background: 'var(--layout-background)',
+            }} 
+            hasSider
+        >
             <Navigation
                 collapsed={collapsed}
                 isBreakpoint={isBreakpoint}
@@ -36,7 +42,15 @@ const CustomLayout: React.FC<CustomLayoutProps> = React.memo(({ children }) => {
             <Layout
                 className={`${
                     isBreakpoint && !collapsed ? 'filter brightness-25' : ''
-                } transition-all duration-300`}
+                } transition-all min-h-0`}
+                style={{ 
+                    height: '100vh',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    transition: 'all 0.2s ease',
+                    marginLeft: 0, // Remove margin since header is now positioned correctly
+                    width: '100%',
+                }}
             >
                 <LayoutHeader
                     isBreakpoint={isBreakpoint}
@@ -45,13 +59,29 @@ const CustomLayout: React.FC<CustomLayoutProps> = React.memo(({ children }) => {
                 />
                 <Content
                     style={{
-                        margin: '8px',
-                        padding: 24,
-                        minHeight: 280,
-                        borderRadius: borderRadiusLG,
+                        flex: 1,
+                        margin: 0,
+                        marginLeft: collapsed ? '80px' : '256px', // Account for fixed sidebar
+                        marginTop: '64px', // Account for fixed header height
+                        padding: 0,
+                        minHeight: 0,
+                        overflow: 'auto',
+                        position: 'relative',
+                        background: 'var(--layout-background)',
+                        width: `calc(100% - ${collapsed ? '80px' : '256px'})`, // Adjust width for sidebar
+                        height: '100%',
+                        transition: 'all 0.2s ease', // Smooth transition
                     }}
                 >
-                    {children}
+                    <div className="page-content" style={{ 
+                        width: '100%',
+                        height: '100%',
+                        padding: '0', // Removed padding to eliminate white edges
+                        background: 'var(--layout-background)',
+                        margin: 0,
+                    }}>
+                        {children}
+                    </div>
                 </Content>
             </Layout>
         </Layout>

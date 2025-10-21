@@ -113,31 +113,41 @@ class JWTCookie(HTTPBearer):
             # First try regular JWT decoding
             self.payload = Auth().decodeJWT(jwtoken)
             print("DEBUG: Regular JWT decode successful")
+            # Check if payload is empty (demo token case)
+            if not self.payload and jwtoken.startswith("demo_token_"):
+                print("DEBUG: Empty payload for demo token, falling back to demo token handling")
+                return self._handle_demo_token(jwtoken)
             return bool(self.payload)
         except Exception as e:
             print(f"DEBUG: Regular JWT decode failed: {e}")
             # Fallback: Handle enterprise demo tokens
             if jwtoken and jwtoken.startswith("demo_token_"):
-                print("DEBUG: Handling demo token")
-                try:
-                    # Extract user ID from demo token format: demo_token_{user_id}_{timestamp}
-                    parts = jwtoken.split("_")
-                    if len(parts) >= 3:
-                        user_id = int(parts[2])
-                        # Create a mock payload for demo tokens
-                        self.payload = {
-                            "user_id": user_id,
-                            "email": "test@dataticon.com",  # Default for demo
-                            "exp": 9999999999,  # Far future expiry
-                        }
-                        print(
-                            f"DEBUG: Demo token processed successfully for user {user_id}"
-                        )
-                        return True
-                except Exception as e2:
-                    print(f"DEBUG: Demo token processing failed: {e2}")
+                return self._handle_demo_token(jwtoken)
             print("DEBUG: Token verification failed")
             return False
+
+    def _handle_demo_token(self, jwtoken: str) -> bool:
+        """Handle demo token processing"""
+        print("DEBUG: Handling demo token")
+        try:
+            # Extract user ID from demo token format: demo_token_{user_id}_{timestamp}
+            parts = jwtoken.split("_")
+            if len(parts) >= 3:
+                user_id = parts[2]  # Keep as string for UUID support
+                # Create a mock payload for demo tokens
+                self.payload = {
+                    "user_id": user_id,
+                    "email": "test@dataticon.com",  # Default for demo
+                    "exp": 9999999999,  # Far future expiry
+                }
+                print(
+                    f"DEBUG: Demo token processed successfully for user {user_id}"
+                )
+                return True
+        except Exception as e2:
+            print(f"DEBUG: Demo token processing failed: {e2}")
+        print("DEBUG: Token verification failed")
+        return False
 
 
 CookieTokenDep = Depends(JWTCookie())

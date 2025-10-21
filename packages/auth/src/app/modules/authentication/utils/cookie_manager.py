@@ -1,4 +1,4 @@
-from fastapi import Response
+from fastapi import Response  # type: ignore[reportMissingImports]
 from app.core.config import settings
 
 
@@ -13,6 +13,24 @@ def manage_auth_cookies(response: Response, tokens: dict | None = None, clear: b
         "secure": settings.COOKIE_SECURE,
         "samesite": settings.COOKIE_SAMESITE,
     }
+
+    # If SameSite=None is requested and we're not on localhost, ensure Secure is True
+    try:
+        samesite_lower = str(cookie_settings.get("samesite", "")).lower()
+    except Exception:
+        samesite_lower = ""
+
+    if samesite_lower == "none":
+        # only force secure when not running on localhost to avoid dev HTTPS requirement
+        is_localhost = str(settings.COOKIE_DOMAIN or "").lower().startswith("localhost") or str(settings.COOKIE_DOMAIN or "").strip() == ""
+        if not is_localhost and not cookie_settings.get("secure"):
+            # enforce secure for SameSite=None in non-localhost environments
+            cookie_settings["secure"] = True
+            # log for debugging
+            try:
+                print(f"cookie_manager: forcing Secure=true because SameSite=None and domain is not localhost")
+            except Exception:
+                pass
 
     # Only set explicit domain when configured and not localhost (to avoid
     # host/port mismatches during local development).

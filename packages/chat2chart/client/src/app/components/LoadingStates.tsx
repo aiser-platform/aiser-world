@@ -6,6 +6,22 @@ import { LoadingOutlined, DatabaseOutlined, BarChartOutlined } from '@ant-design
 
 const { Title, Text } = Typography;
 
+// Add CSS animation for smooth spinning
+const spinKeyframes = `
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+`;
+
+// Inject CSS if not already present
+if (typeof document !== 'undefined' && !document.getElementById('loading-spin-styles')) {
+  const style = document.createElement('style');
+  style.id = 'loading-spin-styles';
+  style.textContent = spinKeyframes;
+  document.head.appendChild(style);
+}
+
 interface LoadingStatesProps {
   type?: 'default' | 'chart' | 'data' | 'query' | 'dashboard';
   message?: string;
@@ -20,15 +36,21 @@ const LoadingStates: React.FC<LoadingStatesProps> = ({
   size = 'default'
 }) => {
   const getLoadingIcon = () => {
+    const iconStyle = { 
+      fontSize: size === 'large' ? 32 : size === 'small' ? 20 : 24,
+      color: 'var(--color-brand-primary)',
+      animation: 'spin 1s linear infinite'
+    };
+    
     switch (type) {
       case 'chart':
-        return <BarChartOutlined style={{ fontSize: 24, color: '#1890ff' }} spin />;
+        return <BarChartOutlined style={iconStyle} />;
       case 'data':
-        return <DatabaseOutlined style={{ fontSize: 24, color: '#52c41a' }} spin />;
+        return <DatabaseOutlined style={iconStyle} />;
       case 'query':
-        return <LoadingOutlined style={{ fontSize: 24, color: '#722ed1' }} spin />;
+        return <LoadingOutlined style={iconStyle} />;
       default:
-        return <LoadingOutlined style={{ fontSize: 24, color: '#1890ff' }} spin />;
+        return <LoadingOutlined style={iconStyle} />;
     }
   };
 
@@ -163,21 +185,53 @@ const LoadingStates: React.FC<LoadingStatesProps> = ({
       alignItems: 'center', 
       justifyContent: 'center',
       minHeight: '200px',
-      flexDirection: 'column'
+      flexDirection: 'column',
+      background: 'var(--layout-panel-background)',
+      borderRadius: '12px',
+      border: '1px solid var(--color-border-primary)',
+      padding: '40px 20px'
     }}>
-      <Spin 
-        indicator={getLoadingIcon()} 
-        size={size}
-      />
-      <Text type="secondary" style={{ marginTop: '16px' }}>
-        {getLoadingMessage()}
-      </Text>
-      {progress !== undefined && (
-        <Progress 
-          percent={progress} 
-          style={{ width: '200px', marginTop: '16px' }}
-        />
-      )}
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '16px'
+      }}>
+        <div style={{
+          width: '48px',
+          height: '48px',
+          borderRadius: '50%',
+          background: 'var(--color-brand-primary-light)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          animation: 'pulse 2s infinite'
+        }}>
+          {getLoadingIcon()}
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <Text style={{ 
+            fontSize: '16px', 
+            fontWeight: '500',
+            color: 'var(--color-text-primary)',
+            marginBottom: '4px',
+            display: 'block'
+          }}>
+            {getLoadingMessage()}
+          </Text>
+          <Text type="secondary" style={{ fontSize: '14px' }}>
+            Please wait while we process your request...
+          </Text>
+        </div>
+        {progress !== undefined && (
+          <Progress 
+            percent={progress} 
+            style={{ width: '200px' }}
+            strokeColor="var(--color-brand-primary)"
+            trailColor="var(--color-border-secondary)"
+          />
+        )}
+      </div>
     </div>
   );
 };
