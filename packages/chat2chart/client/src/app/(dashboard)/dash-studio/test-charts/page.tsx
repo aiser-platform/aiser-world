@@ -157,13 +157,14 @@ export default function TestChartsPage() {
     message.success('Configuration updated');
   };
 
-  const handleTitleChange = (title: string, subtitle: string) => {
+  // ChartWidget onTitleChange expects a single-arg signature; provide a compatible wrapper
+  const handleTitleChange = (title: string, subtitle?: string) => {
     setWidgetConfig((prev: any) => ({
       ...prev,
       title: {
         ...prev.title,
         text: title,
-        subtext: subtitle
+        subtext: subtitle ?? prev.title.subtext
       }
     }));
   };

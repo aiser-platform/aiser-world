@@ -1047,22 +1047,12 @@ function InternalMigratedDashboardStudio() {
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   
-  // Use theme from ThemeProvider for synchronized dark mode with error handling
-  let isDarkMode = false;
-  try {
-    const themeContext = useThemeMode();
-    isDarkMode = themeContext?.isDarkMode || false;
-  } catch (error) {
-    console.warn('Failed to load theme context:', error);
-  }
-  
-  // expose auth for debug and guard checks with error handling
-  let auth = { isAuthenticated: false, user: null, loading: true, initialized: false };
-  try {
-    auth = useAuth();
-  } catch (error) {
-    console.warn('Failed to load auth context:', error);
-  }
+  // Use theme from ThemeProvider for synchronized dark mode
+  const themeContext = useThemeMode();
+  const isDarkMode = themeContext?.isDarkMode || false;
+
+  // Expose auth; useAuth is available (we provide a fallback in AuthContext)
+  const auth = useAuth();
   
   // Client-side markers for testing
   useEffect(() => {
@@ -1078,31 +1068,15 @@ function InternalMigratedDashboardStudio() {
   const initialTab = searchParams?.get('tab') || 'dashboard';
   const router = useRouter();
 
-  // Add core state management
-  // Zustand store hooks with error handling
-  let widgets: any[] = [];
-  let selectedWidgetIds: string[] = [];
-  let addWidget: any = () => {};
-  let updateWidget: any = () => {};
-  let removeWidget: any = () => {};
-  let selectWidget: any = () => {};
-  let deselectAll: any = () => {};
-  let updateLayout: any = () => {};
-  
-  try {
-    widgets = useDashboardStore((state: any) => state.widgets) || [];
-    selectedWidgetIds = useDashboardStore((state: any) => state.selectedWidgetIds) || [];
-    addWidget = useDashboardStore((state: any) => state.addWidget) || (() => {});
-    updateWidget = useDashboardStore((state: any) => state.updateWidget) || (() => {});
-    removeWidget = useDashboardStore((state: any) => state.removeWidget) || (() => {});
-    selectWidget = useDashboardStore((state: any) => state.selectWidget) || (() => {});
-    deselectAll = useDashboardStore((state: any) => state.deselectAll) || (() => {});
-    updateLayout = useDashboardStore((state: any) => state.updateLayout) || (() => {});
-  } catch (error) {
-    console.warn('Failed to load Zustand store:', error);
-    setHasError(true);
-    setErrorMessage('Failed to initialize dashboard store');
-  }
+  // Add core state management (Zustand hooks called unconditionally to satisfy hooks rules)
+  const widgets = useDashboardStore((state: any) => state.widgets) || [];
+  const selectedWidgetIds = useDashboardStore((state: any) => state.selectedWidgetIds) || [];
+  const addWidget = useDashboardStore((state: any) => state.addWidget) || (() => {});
+  const updateWidget = useDashboardStore((state: any) => state.updateWidget) || (() => {});
+  const removeWidget = useDashboardStore((state: any) => state.removeWidget) || (() => {});
+  const selectWidget = useDashboardStore((state: any) => state.selectWidget) || (() => {});
+  const deselectAll = useDashboardStore((state: any) => state.deselectAll) || (() => {});
+  const updateLayout = useDashboardStore((state: any) => state.updateLayout) || (() => {});
   
   // Undo/Redo
   const undo = useUndo();
@@ -1110,19 +1084,17 @@ function InternalMigratedDashboardStudio() {
   const canUndo = useCanUndo();
   const canRedo = useCanRedo();
   
-  // React Query hooks with error handling
-  const dashboardQuery = useDashboard ? useDashboard(dashboardId) : { data: null, isLoading: false, error: null };
+  // React Query hooks with error handling (call unconditionally; fallbacks were set at module init)
+  const dashboardQuery = useDashboard(dashboardId);
   const { data: dashboard, isLoading: isLoadingDashboard } = dashboardQuery;
-  const saveDashboardMutation: any = useSaveDashboard ? useSaveDashboard() : { mutate: () => {}, isLoading: false };
+  const saveDashboardMutation: any = useSaveDashboard();
   const saveDashboard = saveDashboardMutation.mutate;
   const isSaving: boolean = !!(saveDashboardMutation as any).isLoading;
-  const deleteDashboardMutation: any = useDeleteDashboard ? useDeleteDashboard() : { mutate: () => {}, isLoading: false };
+  const deleteDashboardMutation: any = useDeleteDashboard();
   const deleteDashboard = deleteDashboardMutation.mutate;
   
-  // Collaboration with error handling
-  if (useCollaboration) {
-    useCollaboration(dashboardId);
-  }
+  // Collaboration (hook called unconditionally; fallback is noop)
+  useCollaboration(dashboardId);
   
   // Local state for UI
   const [isEditing, setIsEditing] = useState(true);
@@ -1191,7 +1163,7 @@ function InternalMigratedDashboardStudio() {
 
   // Memoize layout to prevent infinite re-renders
   const layout = useMemo(() => {
-    return widgets.map((w: any) => ({
+    return widgets.map((w: { id: string; position: { x: number; y: number; w: number; h: number } }) => ({
       i: w.id,
       x: w.position.x,
       y: w.position.y,
@@ -1254,6 +1226,45 @@ function InternalMigratedDashboardStudio() {
     selectWidget(widgetId);
   }, [selectWidget]);
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl/Cmd + S: Save dashboard
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        handleSaveDashboard();
+      }
+
+      // Delete: Delete selected widget
+      if (e.key === 'Delete' && selectedWidgetIds.length > 0) {
+        e.preventDefault();
+        // Use existing handler to remove widgets
+        handleWidgetRemove(selectedWidgetIds[0]);
+      }
+
+      // Escape: Deselect all widgets
+      if (e.key === 'Escape') {
+        deselectAll();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedWidgetIds, handleSaveDashboard, handleWidgetRemove, deselectAll]);
+
+  // Auto-save functionality
+  useEffect(() => {
+    if (widgets.length === 0) return;
+
+    const autoSaveInterval = setInterval(() => {
+      if (dashboardId && dashboardId !== 'new') {
+        handleSaveDashboard();
+      }
+    }, 30000); // Auto-save every 30 seconds
+
+    return () => clearInterval(autoSaveInterval);
+  }, [widgets, dashboardId, handleSaveDashboard]);
+
   // Handle layout changes
   const handleLayoutChange = useCallback((newLayout: any[]) => {
     updateLayout(newLayout);
@@ -1312,7 +1323,7 @@ function InternalMigratedDashboardStudio() {
       // Delete key to remove selected widget
       if (e.key === 'Delete' && selectedWidgetIds.length > 0) {
         e.preventDefault();
-        selectedWidgetIds.forEach(id => handleWidgetRemove(id));
+        selectedWidgetIds.forEach((id: string) => handleWidgetRemove(id));
       }
       // Escape to deselect all
       if (e.key === 'Escape') {
@@ -1502,8 +1513,9 @@ function InternalMigratedDashboardStudio() {
               compactType="vertical"
               allowOverlap={false}
             >
-              {widgets.map((widget) => {
+              {widgets.map((widget: { id: string; config?: any; data?: any; position?: any; }) => {
                 // widget rendering
+                const widgetData = widget.config?.data || widget.data || {};
     return (
                 <div key={widget.id} style={{ 
               background: 'var(--color-surface-raised)', 
@@ -1551,9 +1563,9 @@ function InternalMigratedDashboardStudio() {
                     }}
                     config={widget.config}
                     data={widgetData}
-                  onConfigUpdate={(updateConfig: any) => {
+                    onConfigUpdate={(updateConfig: any) => {
                     try {
-                      const currentWidget = widgets.find(w => w.id === widget.id);
+                      const currentWidget = widgets.find((w: { id: string }) => w.id === widget.id);
                       if (!currentWidget) return;
                       
                       // Detect which specific properties changed for granular updates
@@ -1586,10 +1598,7 @@ function InternalMigratedDashboardStudio() {
                           } catch (e) {}
                         }, 0);
                         
-                        // granular update for widget
-                          changedProperties,
-                          granularUpdate: updateConfig?.granularUpdate || false
-                        });
+                        // end dispatch
                       }
                     } catch (e) {
                       console.error('Failed to handle onConfigUpdate for widget', widget.id, e);
@@ -1598,7 +1607,7 @@ function InternalMigratedDashboardStudio() {
                     isSelected={selectedWidgetIds.includes(widget.id)}
                     onUpdate={(updateData: any) => {
                       // WidgetRenderer onUpdate called
-                      const currentWidget = widgets.find(w => w.id === widget.id);
+                      const currentWidget = widgets.find((w: { id: string }) => w.id === widget.id);
                       if (currentWidget) {
                         const widgetUpdate = {
                           ...currentWidget,
@@ -1752,44 +1761,7 @@ function InternalMigratedDashboardStudio() {
     );
   }
 
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Ctrl/Cmd + S: Save dashboard
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-        e.preventDefault();
-        handleSaveDashboard();
-      }
-      
-      // Delete: Delete selected widget
-      if (e.key === 'Delete' && selectedWidgetIds.length > 0) {
-        e.preventDefault();
-        // Use existing handler to remove widgets
-        handleWidgetRemove(selectedWidgetIds[0]);
-      }
-      
-      // Escape: Deselect all widgets
-      if (e.key === 'Escape') {
-        deselectAll();
-      }
-    };
-    
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedWidgetIds, handleSaveDashboard, handleWidgetRemove, deselectAll]);
-
-  // Auto-save functionality
-  useEffect(() => {
-    if (widgets.length === 0) return;
-    
-    const autoSaveInterval = setInterval(() => {
-      if (dashboardId && dashboardId !== 'new') {
-        handleSaveDashboard();
-      }
-    }, 30000); // Auto-save every 30 seconds
-    
-    return () => clearInterval(autoSaveInterval);
-  }, [widgets, dashboardId, handleSaveDashboard]);
+  
 
   return (
     <div className="dashboard-studio" style={{ height: '100vh', background: 'var(--layout-background)', display: 'flex', flexDirection: 'column' }}>
@@ -1897,16 +1869,16 @@ function InternalMigratedDashboardStudio() {
           {showProperties && (
             <div style={{ height: '100%', overflow: 'auto' }}>
               <UnifiedDesignPanel
-                selectedWidget={widgets.find((w: any) => selectedWidgetIds.includes(w.id))}
+                selectedWidget={widgets.find((w: { id: string }) => selectedWidgetIds.includes(w.id))}
                 onConfigUpdate={(widgetId: string, config: any) => {
                   // Handle granular property updates
                   const changedProperties = Object.keys(config || {}).filter(key => {
-                    const currentWidget = widgets.find(w => w.id === widgetId);
+                    const currentWidget = widgets.find((w: { id: string }) => w.id === widgetId);
                     return currentWidget && JSON.stringify(currentWidget.config?.[key]) !== JSON.stringify(config[key]);
                   });
                   
                   if (changedProperties.length > 0) {
-                    const currentWidget = widgets.find(w => w.id === widgetId);
+                    const currentWidget = widgets.find((w: { id: string }) => w.id === widgetId);
                     if (currentWidget) {
                       const mergedConfig = { ...(currentWidget.config || {}), ...config };
                       updateWidget(widgetId, { ...currentWidget, config: mergedConfig });

@@ -448,7 +448,9 @@ const AdvancedDashboardCanvas: React.FC<AdvancedDashboardCanvasProps> = ({
           container.style.borderColor = 'var(--color-brand-primary)';
         }
       }
-    } catch (err) {}
+    } catch (err) {
+      // ignore
+    }
   };
 
   const handleDragStop = (layout?: any, oldItem?: any, newItem?: any, e?: any) => {
@@ -536,7 +538,11 @@ const AdvancedDashboardCanvas: React.FC<AdvancedDashboardCanvasProps> = ({
         // prevent echo: mark we're applying layout so incoming prop effect doesn't loop
         applyingLayoutRef.current = true;
         try { updateLayoutStore(resolved); } catch (e) {}
-        try { onLayoutChange && onLayoutChange(resolved); } catch (e) {}
+        try {
+          if (onLayoutChange) onLayoutChange(resolved);
+        } catch (e) {
+          // ignore
+        }
         try { if (JSON.stringify(debugLayout) !== JSON.stringify(resolved)) setDebugLayout(resolved); } catch (e) {}
         // clear applying flag shortly after
         setTimeout(() => { applyingLayoutRef.current = false; }, 300);
@@ -546,8 +552,16 @@ const AdvancedDashboardCanvas: React.FC<AdvancedDashboardCanvasProps> = ({
       applyingLayoutRef.current = false;
     }
     // Schedule autosave after layout settled
-    try { scheduleAutosaveAfterLayoutChange(); } catch (e) {}
-    try { setPlaceholderItem(null); } catch (e) {}
+    try {
+      scheduleAutosaveAfterLayoutChange();
+    } catch (e) {
+      // ignore
+    }
+    try {
+      setPlaceholderItem(null);
+    } catch (e) {
+      // ignore
+    }
     // Debug: log DOM sizes for the moved widget to help diagnose sizing issues
     try {
       const id = newItem?.i || oldItem?.i;
@@ -557,7 +571,11 @@ const AdvancedDashboardCanvas: React.FC<AdvancedDashboardCanvasProps> = ({
             const gridItem = document.querySelector(`.react-grid-item[data-grid-id="${id}"]`) || document.querySelector(`.react-grid-item[data-grid='{"i":"${id}"}']`);
             const wrapper = document.querySelector(`[data-grid-id="${id}"]`) || document.querySelector(`[data-grid='{"i":"${id}"}']`);
             const widgetEl = document.querySelector(`[data-widget-id="${id}"]`) || document.querySelector(`[data-grid-id="${id}"] .dashboard-visual`);
-          } catch (err) {}
+            // no-op; variables captured for debugging use only
+            void gridItem; void wrapper; void widgetEl;
+          } catch (err) {
+            // ignore
+          }
         }, 80);
       }
     } catch (err) {}
@@ -593,10 +611,18 @@ const AdvancedDashboardCanvas: React.FC<AdvancedDashboardCanvasProps> = ({
           const normalized = layout.map((l: any) => ({ i: l.i, x: l.x, y: l.y, w: l.w, h: l.h }));
           draggingLayoutRef.current = normalized;
           // do NOT call onLayoutChange here to avoid writing intermediate positions to store
-          try { if (placeholder && JSON.stringify(placeholderItem) !== JSON.stringify(placeholder)) setPlaceholderItem(placeholder || null); } catch (e) {}
+          try {
+            if (placeholder && JSON.stringify(placeholderItem) !== JSON.stringify(placeholder)) {
+              setPlaceholderItem(placeholder || null);
+            }
+          } catch (e) {
+            // ignore
+          }
         } catch (err) {}
       });
-    } catch (e) {}
+    } catch (e) {
+      // ignore
+    }
   };
 
   // Handle window resize events to recompute grid positions
@@ -794,11 +820,28 @@ const AdvancedDashboardCanvas: React.FC<AdvancedDashboardCanvasProps> = ({
   const scheduleAutosaveAfterLayoutChange = () => {
     try {
       if ((window as any).requestIdleCallback) {
-        (window as any).requestIdleCallback(() => (window as any).__scheduleSaveBridge ? (window as any).__scheduleSaveBridge(800) : scheduleSave(800));
+        (window as any).requestIdleCallback(() => {
+          if ((window as any).__scheduleSaveBridge) {
+            (window as any).__scheduleSaveBridge(800);
+          } else {
+            scheduleSave(800);
+          }
+        });
       } else {
-        (window as any).__scheduleSaveBridge ? (window as any).__scheduleSaveBridge(800) : scheduleSave(800);
+        if ((window as any).__scheduleSaveBridge) {
+          (window as any).__scheduleSaveBridge(800);
+        } else {
+          scheduleSave(800);
+        }
       }
-    } catch (e) { (window as any).__scheduleSaveBridge ? (window as any).__scheduleSaveBridge(800) : scheduleSave(800); }
+    } catch (e) {
+      // best-effort fallback
+      if ((window as any).__scheduleSaveBridge) {
+        try { (window as any).__scheduleSaveBridge(800); } catch (_) {}
+      } else {
+        try { scheduleSave(800); } catch (_) {}
+      }
+    }
   };
 
   // scheduleSave bridge - exposeable and fallback save handler
@@ -810,7 +853,11 @@ const AdvancedDashboardCanvas: React.FC<AdvancedDashboardCanvasProps> = ({
       }
     } catch (e) {}
     // fallback: call handleSave after delay
-    try { window.setTimeout(() => handleSave(), delay); } catch (e) { }
+    try {
+      window.setTimeout(() => handleSave(), delay);
+    } catch (e) {
+      // ignore
+    }
   };
 
   const handleResizeStart = () => {

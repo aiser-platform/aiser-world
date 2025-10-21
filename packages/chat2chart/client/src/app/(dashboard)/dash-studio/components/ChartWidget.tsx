@@ -27,7 +27,7 @@ const createDebounced = (func: Function, delay: number) => {
   let timeoutId: NodeJS.Timeout;
   return (...args: any[]) => {
     clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => func.apply(null, args), delay);
+    timeoutId = setTimeout(() => func(...args), delay);
   };
 };
 
@@ -123,11 +123,11 @@ interface ChartWidgetProps {
   widget: any;
   config: any;
   data: any;
-  onConfigUpdate: (newConfig: any) => void;
-  onWidgetClick: (widgetId: string) => void;
-  onDelete: (widgetId: string) => void;
-  onDuplicate: (widgetId: string) => void;
-  onUpdate: (widgetId: string, update: any) => void;
+  onConfigUpdate?: (newConfig: any) => void;
+  onWidgetClick?: (widgetId: string) => void;
+  onDelete?: (widgetId: string) => void;
+  onDuplicate?: (widgetId: string) => void;
+  onUpdate?: (widgetId: string, update: any) => void;
   isPreviewMode?: boolean;
   isEditing?: boolean;
   isSelected?: boolean;
@@ -152,6 +152,13 @@ const ChartWidget: React.FC<ChartWidgetProps> = ({
   showEditableTitle = false,
   onTitleChange
 }) => {
+
+  // Ensure optional callbacks have safe defaults to simplify callers
+  const _onConfigUpdate = onConfigUpdate ?? (() => {});
+  const _onWidgetClick = onWidgetClick ?? (() => {});
+  const _onDelete = onDelete ?? (() => {});
+  const _onDuplicate = onDuplicate ?? (() => {});
+  const _onUpdate = onUpdate ?? (() => {});
   
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstance = useRef<echarts.ECharts | null>(null);
@@ -339,6 +346,23 @@ const getSampleDataForChartType = (chartType: string) => {
   return DEFAULT_SAMPLE_DATA[chartType as keyof typeof DEFAULT_SAMPLE_DATA] || DEFAULT_SAMPLE_DATA.bar;
 };
 
+// Safe access helpers for union-typed data payloads
+const getXFromData = (d: any, chartType: string) => {
+  try {
+    if (d && typeof d === 'object' && Array.isArray((d as any).xAxis)) return (d as any).xAxis;
+  } catch (_) {}
+  return (getSampleDataForChartType(chartType) as any).xAxis;
+};
+
+const getYFromData = (d: any, chartType: string) => {
+  try {
+    if (d && typeof d === 'object' && Array.isArray((d as any).yAxis)) return (d as any).yAxis;
+    // heatmap/radar/gauge may provide series/data differently
+    if (d && typeof d === 'object' && Array.isArray((d as any).data)) return (d as any).data;
+  } catch (_) {}
+  return (getSampleDataForChartType(chartType) as any).yAxis;
+};
+
 // Color palette definitions - moved outside component for reuse
 const colorPalettes = {
   default: ['#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de', '#3ba272', '#fc8452', '#9a60b4', '#ea7ccc'],
@@ -414,7 +438,7 @@ const colorPalettes = {
       case 'bar':
         options.xAxis = {
           type: 'category',
-          data: data?.xAxis || getSampleDataForChartType('bar').xAxis,
+          data: getXFromData(data, 'bar'),
           axisLine: { show: true, lineStyle: { color: isDarkMode ? '#333333' : '#d9d9d9' } },
           axisLabel: { color: isDarkMode ? '#cccccc' : '#666666' }
         };
@@ -425,7 +449,7 @@ const colorPalettes = {
         };
         options.series = [{
           type: 'bar',
-          data: data?.yAxis || getSampleDataForChartType('bar').yAxis,
+          data: getYFromData(data, 'bar'),
           label: {
             show: config?.seriesLabelShow || false,
             position: config?.seriesLabelPosition || 'top'
@@ -439,7 +463,7 @@ const colorPalettes = {
       case 'line':
         options.xAxis = {
           type: 'category',
-          data: data?.xAxis || getSampleDataForChartType('line').xAxis,
+          data: getXFromData(data, 'line'),
           axisLine: { show: true, lineStyle: { color: isDarkMode ? '#333333' : '#d9d9d9' } },
           axisLabel: { color: isDarkMode ? '#cccccc' : '#666666' }
         };
@@ -450,7 +474,7 @@ const colorPalettes = {
         };
         options.series = [{
           type: 'line',
-          data: data?.yAxis || [150, 230, 224, 218, 135, 147, 260],
+          data: getYFromData(data, 'line'),
           label: {
             show: config?.seriesLabelShow || false,
             position: config?.seriesLabelPosition || 'top'
@@ -481,7 +505,7 @@ const colorPalettes = {
         options.xAxis = {
           type: 'category',
           boundaryGap: false,
-          data: data?.xAxis || getSampleDataForChartType('line').xAxis,
+          data: getXFromData(data, 'line'),
           axisLine: { show: true, lineStyle: { color: isDarkMode ? '#333333' : '#d9d9d9' } },
           axisLabel: { color: isDarkMode ? '#cccccc' : '#666666' }
         };
@@ -494,7 +518,7 @@ const colorPalettes = {
           type: 'line',
           areaStyle: {},
           emphasis: { focus: 'series' },
-          data: data?.yAxis || getSampleDataForChartType('line').yAxis,
+          data: getYFromData(data, 'line'),
           label: {
             show: config?.seriesLabelShow || false,
             position: config?.seriesLabelPosition || 'top'
@@ -531,7 +555,7 @@ const colorPalettes = {
 
       case 'radar':
         options.radar = {
-          indicator: data?.indicators || [
+          indicator: (data && (data as any).indicators) ? (data as any).indicators : [
             { name: 'Metric A', max: 100 },
             { name: 'Metric B', max: 100 },
             { name: 'Metric C', max: 100 },
@@ -573,12 +597,12 @@ const colorPalettes = {
       case 'heatmap':
         options.xAxis = {
           type: 'category',
-          data: data?.xAxis || getSampleDataForChartType('line').xAxis,
+          data: getXFromData(data, 'line'),
           splitArea: { show: true }
         };
         options.yAxis = {
           type: 'category',
-          data: data?.yAxis || getSampleDataForChartType('heatmap').yAxis,
+          data: getYFromData(data, 'heatmap'),
           splitArea: { show: true }
         };
         options.visualMap = {
@@ -632,7 +656,7 @@ const colorPalettes = {
         // Fallback for unknown chart types
         options.xAxis = {
           type: 'category',
-          data: data?.xAxis || getSampleDataForChartType('scatter').xAxis,
+          data: getXFromData(data, 'scatter'),
           axisLine: { show: true, lineStyle: { color: isDarkMode ? '#333333' : '#d9d9d9' } },
           axisLabel: { color: isDarkMode ? '#cccccc' : '#666666' }
         };
@@ -643,7 +667,7 @@ const colorPalettes = {
         };
         options.series = [{
           type: 'bar',
-          data: data?.yAxis || getSampleDataForChartType('scatter').yAxis,
+          data: getYFromData(data, 'scatter'),
           label: {
             show: config?.seriesLabelShow || false,
             position: config?.seriesLabelPosition || 'top'
@@ -671,9 +695,9 @@ const colorPalettes = {
       return {
         title: { show: false },
         tooltip: { trigger: 'axis' },
-        xAxis: { type: 'category', data: getSampleDataForChartType('bar').xAxis },
+        xAxis: { type: 'category', data: (getSampleDataForChartType('bar') as any).xAxis },
         yAxis: { type: 'value' },
-        series: [{ type: 'bar', data: getSampleDataForChartType('bar').yAxis }]
+        series: [{ type: 'bar', data: (getSampleDataForChartType('bar') as any).yAxis }]
       };
     }
     
@@ -697,11 +721,11 @@ const colorPalettes = {
         
         // Use requestAnimationFrame to avoid main process issues
         requestAnimationFrame(() => {
+          const chartType = config?.chartType || widget.type || 'bar';
           const effectiveData = (data && Object.keys(data).length > 0)
             ? data
             : getSampleDataForChartType(chartType);
-            const chartType = config?.chartType || widget.type || 'bar';
-            const options = generateChartOptions(chartType, config, effectiveData);
+          const options = generateChartOptions(chartType, config, effectiveData);
             
             if (options && typeof options === 'object' && options.series && Array.isArray(options.series)) {
               // chart options being set
@@ -801,7 +825,7 @@ const colorPalettes = {
       
       if (majorChanges.length > 0 || dataChanges.length > 0) {
         requestAnimationFrame(() => {
-      const chartType = config?.chartType || widget.type;
+          const chartType = config?.chartType || widget.type || 'bar';
           const effectiveData = (data && Object.keys(data).length > 0)
             ? data
             : getSampleDataForChartType(chartType);
@@ -1016,7 +1040,7 @@ const colorPalettes = {
               onClick={(e) => e.stopPropagation()}
             />
           ) : (
-            (getWidgetSubtitle()?.length > 0) && (
+            getWidgetSubtitle()?.length > 0 && (
               <span 
                 style={{
                   color: isDarkMode ? '#bfbfbf' : '#595959',

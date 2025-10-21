@@ -60,13 +60,13 @@ function SimpleDashboardStudio() {
   const { isDarkMode } = useThemeMode();
   const { user } = useAuth();
   const searchParams = useSearchParams();
-  const activeTab = searchParams.get('tab') || 'dashboard';
+  const activeTab = searchParams?.get('tab') || 'dashboard';
 
   // Client-side markers for testing
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      window.__migrated_dashboard_client_marker = true;
-      window.__migrated_dashboard_mounted = true;
+      (window as any).__migrated_dashboard_client_marker = true;
+      (window as any).__migrated_dashboard_mounted = true;
     }
   }, []);
 

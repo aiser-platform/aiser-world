@@ -1,0 +1,16 @@
+node_modules/
+.next/
+.next-dev/
+.next.broken/
+tmp/
+tmp/**
+**/temp_tests/**
+**/test-*.js
+**/temp-*.js
+**/*.pack.gz
+*.nft.json
+
+# ignore generated types and caches
+*.tsbuildinfo
+
+
