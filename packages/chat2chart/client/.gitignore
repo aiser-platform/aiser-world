@@ -41,3 +41,17 @@ fix-permissions.sh
 # Cache directories
 .cache/
 node_modules/.cache/
+
+.next/
+.next-dev/
+.next.broken/
+tmp/
+tmp/next-dev-cache/
+.next/cache/
+.next/static/
+*.nft.json
+.next/**/*.hot-update.js
+.next/static/webpack/*.hot-update.js
+.next/static/webpack/*.webpack.hot-update.json
+.next/**/hot-update.js
+tmp/**

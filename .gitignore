@@ -204,3 +204,19 @@ Icon?
 
 # Dev tokens file created by automation - should never be committed
 scripts/dev_tokens.env
+
+# Additional Next.js & temp caches to ignore
+.next-dev/
+.next.broken/
+tmp/
+tmp/next-dev-cache/
+.next/cache/
+.next/static/
+.next.broken/
+.next-dev/
+
+# Local package build artifacts
+packages/chat2chart/client/.next/
+packages/chat2chart/client/.next-dev/
+packages/chat2chart/client/.next.broken/
+packages/chat2chart/client/tmp/
