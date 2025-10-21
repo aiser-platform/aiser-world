@@ -220,3 +220,14 @@ packages/chat2chart/client/.next/
 packages/chat2chart/client/.next-dev/
 packages/chat2chart/client/.next.broken/
 packages/chat2chart/client/tmp/
+# Next.js build & temp
+.next/
+.next-dev/
+.next.broken/
+tmp/
+tmp/**
+/packages/*/.next/
+/packages/*/tmp/
+/packages/tmp/
+/packages/**/cache/
+/packages/**/node_modules/
