@@ -231,3 +231,13 @@ tmp/**
 /packages/tmp/
 /packages/**/cache/
 /packages/**/node_modules/
+# Next.js & temp caches
+.next/
+.next-dev/
+.next.broken/
+tmp/
+tmp/**
+packages/*/.next/
+packages/*/tmp/
+packages/tmp/
+packages/**/cache/
