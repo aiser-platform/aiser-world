@@ -23,11 +23,12 @@ import {
 const { Title } = Typography;
 
 // Utility function to create a debounced function
-const createDebounced = (func: Function, delay: number) => {
-  let timeoutId: NodeJS.Timeout;
+type AnyFunction = (...args: any[]) => void;
+const createDebounced = (func: AnyFunction, delay: number) => {
+  let timeoutId: NodeJS.Timeout | null = null;
   return (...args: any[]) => {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => func(...args), delay);
+    if (timeoutId) clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => func(...args), delay) as unknown as NodeJS.Timeout;
   };
 };
 
