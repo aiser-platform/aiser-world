@@ -368,24 +368,26 @@ class LangGraphMultiAgentOrchestrator:
                     existing_has_chart = bool(existing_ai.ai_metadata and existing_ai.ai_metadata.get('echarts_config'))
                     new_has_chart = bool(has_chart)
                     
-                    # Consider it a duplicate if:
-                    # 1. Content starts match AND both have or don't have charts
-                    # 2. OR it's a placeholder message
-                    is_duplicate = (
+                    # Check if content is identical
+                    content_matches = (
                         existing_answer_start == new_answer_start and 
                         existing_has_chart == new_has_chart
-                    ) or is_placeholder
+                    )
                     
-                    if is_duplicate:
-                        # Update existing message with better content if new one is more complete
-                        if is_successful and (has_chart or has_insights or has_query_result):
-                            logger.info(f"💾 Updating existing AI message with more complete response (prevented duplicate)")
+                    if content_matches:
+                        # Only skip if BOTH responses are not successful
+                        # If one is successful, always update to the successful one
+                        existing_status = existing_ai.status or "unknown"
+                        if is_successful or existing_status != "completed":
+                            # Update with current (better or successful) response
+                            logger.info(f"💾 Updating with better quality response (was {existing_status})")
                             existing_ai.answer = ai_response_full
                             existing_ai.ai_metadata = ai_metadata if ai_metadata else existing_ai.ai_metadata
                             existing_ai.status = "completed"
                             await session.commit()
                         else:
-                            logger.debug(f"💾 Duplicate AI message detected and skipped (placeholder or identical content)")
+                            # Both are unsuccessful/fallback - skip to avoid duplicate fallbacks
+                            logger.debug(f"💾 Skipping duplicate fallback response (already have similar content)")
                     else:
                         # Different content - create new message
                         ai_message = ChatMessage(
