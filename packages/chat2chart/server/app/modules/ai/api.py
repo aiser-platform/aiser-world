@@ -288,7 +288,7 @@ async def analyze_chat_query(
                     conversation_id=request.conversation_id or "",
                     user_id=user_id,
                     organization_id=organization_id or None,
-                    model=request.model  # Pass model from request
+                    model=request.model,  # Pass model from request
                     data_source_id=None,  # Explicitly None for conversational mode
                     analysis_mode="standard"
                 )
