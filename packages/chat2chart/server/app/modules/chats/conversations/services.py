@@ -334,39 +334,45 @@ class ConversationService(
                 """)
                 
                 now = datetime.now(timezone.utc)
-                result = await session.execute(delete_conv_query, {
-                    'conversation_id': conversation_uuid,
-                    'deleted_at': now,
-                    'updated_at': now
-                })
+            result = await session.execute(delete_conv_query, {
+                'conversation_id': conversation_uuid,
+                'deleted_at': now,
+                'updated_at': now
+            })
+            
+            # CRITICAL: Validate that conversation was actually deleted
+            if result.rowcount == 0:
+                logger.warning(f"⚠️ Conversation {conversation_id} not found or already deleted (rowcount: {result.rowcount})")
+                return False
                 
-                # Also soft delete all messages in this conversation
-                delete_messages_query = text("""
-                    UPDATE chat_message
-                    SET is_deleted = TRUE,
-                        deleted_at = :deleted_at,
-                        updated_at = :updated_at
-                    WHERE conversation_id = :conversation_id
-                    AND (is_deleted = FALSE OR is_deleted IS NULL)
-                """)
-                
-                await session.execute(delete_messages_query, {
-                    'conversation_id': conversation_uuid,
-                    'deleted_at': now,
-                    'updated_at': now
-                })
-                
-                await session.commit()
-                
-                # Invalidate cache
-                try:
-                    from app.modules.chats.conversations.cache_service import ConversationCacheService
-                    await ConversationCacheService.invalidate_conversation(conversation_id)
-                except Exception as cache_error:
-                    logger.warning(f"Failed to invalidate cache: {cache_error}")
-                
-                logger.info(f"✅ Soft deleted conversation {conversation_id} and all its messages")
-                return True
+            # Also soft delete all messages in this conversation
+            delete_messages_query = text("""
+                UPDATE chat_message
+                SET is_deleted = TRUE,
+                    deleted_at = :deleted_at,
+                    updated_at = :updated_at
+                WHERE conversation_id = :conversation_id
+                AND (is_deleted = FALSE OR is_deleted IS NULL)
+            """)
+            
+            msg_result = await session.execute(delete_messages_query, {
+                'conversation_id': conversation_uuid,
+                'deleted_at': now,
+                'updated_at': now
+            })
+            
+            await session.commit()
+            
+            logger.info(f"✅ Soft deleted conversation {conversation_id} and {msg_result.rowcount} messages")
+            
+            # Invalidate cache
+            try:
+                from app.modules.chats.conversations.cache_service import ConversationCacheService
+                await ConversationCacheService.invalidate_conversation(conversation_id)
+            except Exception as cache_error:
+                logger.warning(f"Failed to invalidate cache: {cache_error}")
+            
+            return True
                 
         except Exception as e:
             logger.error(f"Failed to delete conversation {conversation_id}: {str(e)}", exc_info=True)

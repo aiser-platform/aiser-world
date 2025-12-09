@@ -202,7 +202,9 @@ class LangGraphMultiAgentOrchestrator:
         result: Dict[str, Any]
     ) -> None:
         """
-        Save user query and AI response to conversation messages.
+        Save user query and AI response to conversation messages atomically.
+        
+        CRITICAL: Both messages saved in single transaction to prevent message loss.
         
         Args:
             conversation_id: Conversation UUID
@@ -277,6 +279,7 @@ class LangGraphMultiAgentOrchestrator:
                     )
                     existing_user = very_recent_msg.scalar_one_or_none()
                 
+                # ===== ATOMIC TRANSACTION: Save both messages together =====
                 if not existing_user:
                     # Save user message only if it doesn't exist
                     user_message = ChatMessage(

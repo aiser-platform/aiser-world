@@ -99,18 +99,28 @@ const SessionHistoryDropdown: React.FC<SessionHistoryDropdownProps> = ({
             if (response.ok && result.success !== false) {
                 // Remove from local state
                 setConversations(prev => prev.filter(c => c.id !== conversationId));
+                
+                // CRITICAL FIX: Clear related localStorage caches
+                localStorage.removeItem(`conv_messages_${conversationId}`);
+                localStorage.removeItem(`conv_charts_${conversationId}`);
+                localStorage.removeItem(`conv_progress_${conversationId}`);
+                localStorage.removeItem(`conv_has_data_source_${conversationId}`);
+                
                 antMessage.success('Conversation deleted successfully');
                 
-                // If deleted conversation was current, notify parent
+                // If deleted conversation was current, notify parent and reset state
                 if (conversationId === currentConversationId) {
+                    // Clear current conversation from localStorage
+                    localStorage.removeItem('current_conversation_id');
                     onConversationDeleted?.();
                 }
             } else {
                 const errorMsg = result.message || result.detail || result.error || 'Failed to delete conversation';
+                console.error('❌ Delete failed:', errorMsg);
                 antMessage.error(errorMsg);
             }
         } catch (error) {
-            console.error('Error deleting conversation:', error);
+            console.error('❌ Error deleting conversation:', error);
             antMessage.error('Failed to delete conversation');
         } finally {
             setLoading(false);

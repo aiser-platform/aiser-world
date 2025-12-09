@@ -40,6 +40,19 @@ const ChatHistoryPanel: React.FC<ChatHistoryPanelProps> = (props) => {
             if (response.ok && result.success !== false) {
                 // Remove from local state immediately for better UX
                 setConversations(prev => prev.filter(c => c.id !== conversationId));
+                
+                // CRITICAL FIX: Clear related localStorage caches to prevent state inconsistency
+                localStorage.removeItem(`conv_messages_${conversationId}`);
+                localStorage.removeItem(`conv_charts_${conversationId}`);
+                localStorage.removeItem(`conv_progress_${conversationId}`);
+                localStorage.removeItem(`conv_has_data_source_${conversationId}`);
+                
+                // Check if this was the current conversation
+                const currentConvId = localStorage.getItem('current_conversation_id');
+                if (currentConvId === conversationId) {
+                    localStorage.removeItem('current_conversation_id');
+                }
+                
                 // Refresh list to ensure consistency
                 await fetchConversations(0, true);
                 // Show success message

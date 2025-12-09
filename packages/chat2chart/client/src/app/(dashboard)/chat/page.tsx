@@ -273,6 +273,43 @@ const ChatToChart = () => {
         }
     }, []); // Only run on mount
 
+    // CRITICAL FIX: When conversation switches, restore data source from conversation metadata
+    // This prevents data source from "randomly" being deselected on conversation switch
+    useEffect(() => {
+        if (currentConversationId && conversationState && conversationState.json_metadata) {
+            try {
+                const metadata = typeof conversationState.json_metadata === 'string'
+                    ? JSON.parse(conversationState.json_metadata)
+                    : conversationState.json_metadata;
+                
+                const dataSourceId = metadata.last_data_source_id || metadata.data_source_id;
+                
+                // Only restore if it's different from current selection
+                if (dataSourceId && (!selectedDataSource || selectedDataSource.id !== dataSourceId)) {
+                    // Verify the data source still exists
+                    fetch(`/api/data/sources/${dataSourceId}`, {
+                        credentials: 'include'
+                    }).then(response => {
+                        if (response.ok) {
+                            response.json().then(dsData => {
+                                // Double-check we haven't changed conversations in the meantime
+                                if (currentConversationId === dsData.conversation_id || 
+                                    currentConversationId === conversationState.id) {
+                                    setSelectedDataSource(dsData);
+                                    console.log('✅ Restored data source on conversation switch:', dsData.name);
+                                }
+                            });
+                        }
+                    }).catch(err => {
+                        console.warn('Failed to restore data source for conversation:', err);
+                    });
+                }
+            } catch (e) {
+                console.warn('Failed to parse conversation metadata:', e);
+            }
+        }
+    }, [currentConversationId]); // Trigger only when conversation changes
+
     // Load conversations from API (not localStorage)
     const loadConversations = async () => {
         try {
