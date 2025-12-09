@@ -223,12 +223,14 @@ async def deep_file_analysis_node(state: AiserWorkflowState) -> AiserWorkflowSta
         state["query_result"] = combined_data
         
         from app.modules.ai.nodes.unified_node import unified_chart_insights_node
-        state = await unified_chart_insights_node(state)
+        from app.modules.ai.services.litellm_service import LiteLLMService
+        litellm_svc = LiteLLMService()
+        state = await unified_chart_insights_node(state, litellm_svc)
         
         logger.info(f"✅ Unified node complete:")
         logger.info(f"   - Insights: {len(state.get('insights', []))}")
         logger.info(f"   - Recommendations: {len(state.get('recommendations', []))}")
-        logger.info(f"   - Executive summary length: {len(state.get('executive_summary', ''))}")
+        logger.info(f"   - Executive summary length: {len(state.get('executive_summary') or '')}")
         
         # IMPORTANT: Preserve deep_analysis_charts from our multi-chart generation
         if deep_analysis_charts and "execution_metadata" in state:
@@ -311,7 +313,10 @@ async def _run_data_profiling(data_source: Dict[str, Any]) -> Dict[str, Any]:
             column_names = [col[0] for col in columns_info]
             
             # For each column, get statistical summary
-            for col_name, col_type in columns_info:
+            # Note: DuckDB DESCRIBE returns (column_name, column_type, null, default, expr_type)
+            for col_info in columns_info:
+                col_name = col_info[0]
+                col_type = col_info[1]
                 col_profile = {
                     "name": col_name,
                     "type": col_type,
@@ -457,7 +462,7 @@ Return a JSON object with this structure:
             "max_tokens": 2000
         }
         if model:
-            call_kwargs["model"] = model
+            call_kwargs["model_id"] = model  # Use model_id not model
         
         response = await litellm_service.generate_completion(**call_kwargs)
         
