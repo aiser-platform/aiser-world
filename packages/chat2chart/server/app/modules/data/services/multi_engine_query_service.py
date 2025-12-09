@@ -149,12 +149,12 @@ class MultiEngineQueryService:
             query_analysis = self._analyze_query(query, data_source)
 
             # CRITICAL: For file data sources, ALWAYS rewrite table names to 'data' BEFORE execution
-            # This must happen regardless of whether sample_data exists, as DuckDB always uses 'data' table
+            # Each file is loaded as 'data' table in DuckDB when executed
+            # This ensures generated SQL always uses the correct table name for file sources
             if data_source.get('type') == 'file':
                 import re
                 # Pattern to match: FROM "table" or FROM table or FROM "schema"."table"
                 # Handles both quoted identifiers (double quotes) and unquoted, including file_* patterns
-                # More aggressive pattern: match any table name that starts with 'file_' or is not 'data'
                 table_pattern = r'(?i)(from|join)\s+(?:"([^"]+)"|`([^`]+)`|([a-zA-Z0-9_\.]+))'
                 matches = list(re.finditer(table_pattern, query))
                 table_names_found = []
