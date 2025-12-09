@@ -446,18 +446,30 @@ class DuckDBEngine(BaseQueryEngine):
 
             # Load data into DuckDB
             if data_source["type"] == "file":
-                # NEW: Load the current file as 'data' AND its ID as alternate table name
-                # This allows queries to reference either "data" (backward compat) or file_XXXXX (multi-file)
+                # MULTI-FILE SUPPORT: Detect if query references multiple files and load them all
+                detected_file_ids = self._detect_file_references(query)
+                logger.info(f"🔍 Detected file references in query: {detected_file_ids}")
+                
+                # Prepare list of files to load:
+                # 1. Current data_source (always included)
+                # 2. Any additional files detected in query
+                primary_file_id = data_source.get('id', 'data')
+                files_to_load = {primary_file_id: data_source}
+                
+                # If query references additional files, we'd load them here
+                # For now, we just load the primary file and create aliases
+                # TODO: In future, fetch and load referenced files from database
+                
+                # Load the current (primary) file
                 await self._load_file_data(conn, data_source)
                 
                 # IMPORTANT: Create an alias for multi-file support
                 # Allow queries to reference table by file_id (e.g., file_1765031881)
-                file_id = data_source.get('id', 'data')
-                if file_id and file_id != 'data':
+                if primary_file_id and primary_file_id != 'data':
                     try:
                         # Create a view with the file_id as table name (for multi-file queries)
-                        conn.execute(f'CREATE OR REPLACE VIEW "{file_id}" AS SELECT * FROM "data"')
-                        logger.info(f"✅ Created table alias '{file_id}' pointing to 'data' table")
+                        conn.execute(f'CREATE OR REPLACE VIEW "{primary_file_id}" AS SELECT * FROM "data"')
+                        logger.info(f"✅ Created table alias '{primary_file_id}' pointing to 'data' table")
                     except Exception as e:
                         logger.warning(f"⚠️ Could not create file_id alias: {e}")
                 
@@ -540,6 +552,19 @@ class DuckDBEngine(BaseQueryEngine):
             logger.error(f"❌ DuckDB query execution failed: {str(e)}")
             return {"success": False, "error": str(e)}
 
+    def _detect_file_references(self, query: str) -> list:
+        """
+        Detect all file_* table references in a SQL query.
+        Returns list of detected file IDs (e.g., ['file_1765031881', 'file_1765033843'])
+        """
+        import re
+        # Pattern to match file_* table references (quoted or unquoted)
+        # Matches: file_1234567890, "file_1234567890", `file_1234567890`
+        pattern = r'(?:["\'`]?)?(file_\d+)(?:["\'`]?)'
+        matches = re.findall(pattern, query, re.IGNORECASE)
+        # Return unique file IDs
+        return list(set(m.lower() for m in matches))
+    
     async def _load_file_data(
         self, conn: duckdb.DuckDBPyConnection, data_source: Dict[str, Any]
     ):
