@@ -931,34 +931,37 @@ Return only valid JSON array.
                 }
             
             # Prepare LiteLLM parameters with correct Azure format
+            # CRITICAL: NEVER pass api_version as a direct parameter (it breaks AsyncCompletions)
             if model_config['provider'] == 'azure':
                 # Use the exact Azure format as specified
                 litellm_params = {
-                    'model': f"azure/{os.environ['AZURE_OPENAI_DEPLOYMENT_NAME']}",
+                    'model': f"azure/{os.environ.get('AZURE_OPENAI_DEPLOYMENT_NAME', 'gpt-4.1-mini')}",
                     'messages': final_messages,
-                    'api_base': os.environ["AZURE_OPENAI_ENDPOINT"],
-                    'api_key': os.environ["AZURE_OPENAI_API_KEY"]
+                    'api_base': os.environ.get("AZURE_OPENAI_ENDPOINT"),
+                    'api_key': os.environ.get("AZURE_OPENAI_API_KEY")
                 }
-                # Add api_version via extra_headers for Azure
+                # CRITICAL: Pass api_version via extra_headers ONLY, never as direct parameter
                 if os.environ.get("AZURE_OPENAI_API_VERSION"):
                     litellm_params['extra_headers'] = {
-                        'api-version': os.environ["AZURE_OPENAI_API_VERSION"]
+                        'api-version': os.environ.get("AZURE_OPENAI_API_VERSION")
                     }
             else:
                 # Use standard format for other providers
                 litellm_params = {
                     'model': model_config['model'],
                     'messages': final_messages,
-                    'api_key': model_config['api_key'],
-                    'api_base': model_config.get('api_base')
+                    'api_key': model_config['api_key']
                 }
-                # Add api_version via extra_headers if provided (for non-Azure providers that support it)
-                if model_config.get('api_version'):
-                    litellm_params['extra_headers'] = {
-                        'api-version': model_config['api_version']
-                    }
-                # CRITICAL: Ensure api_version is NOT passed as a direct parameter
-                litellm_params.pop('api_version', None)
+                # Only add api_base for Azure models
+                if model_config.get('api_base'):
+                    litellm_params['api_base'] = model_config['api_base']
+            
+            # CRITICAL: Explicitly remove api_version from any location it might be
+            # This ensures AsyncCompletions.create() never receives it
+            if 'api_version' in litellm_params:
+                litellm_params.pop('api_version')
+            # Also check model_config didn't add it
+            litellm_params = {k: v for k, v in litellm_params.items() if k != 'api_version'}
             
             # Handle temperature for GPT-5 models (only supports temperature=1)
             if 'gpt-5' in model_config['model']:
@@ -1594,15 +1597,24 @@ Please try connecting a data source to get started, or let me know if you need h
             enhanced_messages = self._enhance_messages_with_context(messages, data_context)
             
             # Prepare LiteLLM parameters
+            # CRITICAL: NEVER pass api_version as a direct parameter
             litellm_params = {
                 'model': model_config['model'],
                 'messages': enhanced_messages,
                 'temperature': temperature,
                 'stream': stream,
-                'api_key': model_config['api_key'],
-                'api_base': model_config.get('api_base'),
-                'api_version': model_config.get('api_version')
+                'api_key': model_config['api_key']
             }
+            
+            # Only add api_base if it exists
+            if model_config.get('api_base'):
+                litellm_params['api_base'] = model_config['api_base']
+            
+            # CRITICAL: Pass api_version via extra_headers only, never as direct parameter
+            if model_config.get('api_version'):
+                litellm_params['extra_headers'] = {
+                    'api-version': model_config['api_version']
+                }
             
             # Handle temperature for GPT-5 models (only supports temperature=1)
             if 'gpt-5' in model_config['model']:
