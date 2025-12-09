@@ -1,5 +1,5 @@
 # Production Multi-stage Dockerfile for Chat2Chart Server
-FROM python:3.11-slim AS base
+FROM python:3.14-slim AS base
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
@@ -28,7 +28,7 @@ COPY packages/chat2chart/server/pyproject.toml packages/chat2chart/server/poetry
 RUN poetry install --only=main && rm -rf $POETRY_CACHE_DIR
 
 # Production stage
-FROM python:3.11-slim AS production
+FROM python:3.14-slim AS production
 WORKDIR /app
 
 # Install runtime dependencies only
