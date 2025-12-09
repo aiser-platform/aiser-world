@@ -56,7 +56,7 @@ snowflake-connector-python = "^3.6.0"
 google-cloud-bigquery = "^3.13.0"
 redshift-connector = "^2.0.908"
 databricks-sql-connector = "^3.0.0"
-databricks-connect = "^14.0.0"
+databricks-connect = "^16.1.7"
 clickhouse-connect = "^0.7.0"
 clickhouse-driver = "^0.2.6"
 # Additional utilities
