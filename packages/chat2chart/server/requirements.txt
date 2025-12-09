@@ -61,7 +61,7 @@ clickhouse-driver==0.2.6
 
 # Utils
 colorama==0.4.6
-setuptools==65.5.0
+setuptools==80.9.0
 
 # Cache
 redis==5.0.1
