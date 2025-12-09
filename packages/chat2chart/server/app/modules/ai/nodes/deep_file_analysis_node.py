@@ -223,9 +223,8 @@ async def deep_file_analysis_node(state: AiserWorkflowState) -> AiserWorkflowSta
         state["query_result"] = combined_data
         
         from app.modules.ai.nodes.unified_node import unified_chart_insights_node
-        from app.modules.ai.services.litellm_service import LiteLLMService
-        litellm_svc = LiteLLMService()
-        state = await unified_chart_insights_node(state, litellm_svc)
+        # unified_node gets litellm_service from LangGraph execution context
+        state = await unified_chart_insights_node(state)
         
         logger.info(f"✅ Unified node complete:")
         logger.info(f"   - Insights: {len(state.get('insights', []))}")

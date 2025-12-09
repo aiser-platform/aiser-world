@@ -506,6 +506,24 @@ class DuckDBEngine(BaseQueryEngine):
                 if duckdb_query != query:
                     logger.info(f"🔄 Converted DATE_TRUNC to date_trunc for DuckDB compatibility")
             
+            # CRITICAL: Convert ClickHouse SUBSTRING syntax to DuckDB syntax
+            # ClickHouse: SUBSTRING("Email" FROM "@" + 1)
+            # DuckDB: SUBSTRING("Email", POSITION('@' IN "Email") + 1)
+            if 'SUBSTRING' in duckdb_query and ' FROM ' in duckdb_query:
+                # Handle: SUBSTRING(col FROM pattern + offset)
+                # Convert to: SUBSTRING(col, POSITION(pattern IN col) + offset)
+                import re as regex
+                # Pattern: SUBSTRING("col" FROM "pattern" + offset)
+                substring_pattern = r'SUBSTRING\s*\(([^,]+?)\s+FROM\s+(".*?"\(.*?\))\s*\)'
+                duckdb_query = regex.sub(substring_pattern, r'SUBSTRING(\1, POSITION(\2)', duckdb_query, flags=regex.IGNORECASE)
+                
+                # Also handle simpler cases: SUBSTRING(col FROM num)
+                simple_pattern = r'SUBSTRING\s*\(([^,]+?)\s+FROM\s+(\d+)\s*\)'
+                duckdb_query = regex.sub(simple_pattern, r'SUBSTRING(\1, \2)', duckdb_query, flags=regex.IGNORECASE)
+                
+                if duckdb_query != query:
+                    logger.info(f"🔄 Converted ClickHouse SUBSTRING to DuckDB SUBSTRING syntax")
+            
             # Execute query
             try:
                 result = conn.execute(duckdb_query).fetchall()

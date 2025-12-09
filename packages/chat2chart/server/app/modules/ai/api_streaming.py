@@ -15,6 +15,16 @@ from app.modules.ai.services.litellm_service import LiteLLMService
 from app.db.session import get_async_session
 
 
+class DateTimeEncoder(json.JSONEncoder):
+    """Custom JSON encoder that handles date and datetime objects"""
+    def default(self, obj):
+        from datetime import date, datetime
+        if isinstance(obj, (date, datetime)):
+            return obj.isoformat()
+        return super().default(obj)
+
+
+
 class ChatRequestSchema(BaseModel):
     query: str
     conversation_id: Optional[str] = None
@@ -130,7 +140,7 @@ async def analyze_query_streaming(
                     # Remove None values
                     event_data = {k: v for k, v in event_data.items() if v is not None}
                     
-                    yield f"data: {json.dumps(event_data)}\n\n"
+                    yield f"data: {json.dumps(event_data, cls=DateTimeEncoder)}\n\n"
                     
             except Exception as e:
                 logger.error(f"❌ Streaming error: {e}", exc_info=True)
@@ -138,7 +148,7 @@ async def analyze_query_streaming(
                     'type': 'error',
                     'message': str(e)
                 }
-                yield f"data: {json.dumps(error_event)}\n\n"
+                yield f"data: {json.dumps(error_event, cls=DateTimeEncoder)}\n\n"
             
             # Send completion event
             yield f"data: {json.dumps({'type': 'complete'})}\n\n"
