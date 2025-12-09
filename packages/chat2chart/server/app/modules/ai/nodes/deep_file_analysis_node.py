@@ -99,6 +99,10 @@ async def deep_file_analysis_node(state: AiserWorkflowState) -> AiserWorkflowSta
         })
         
         analysis_plan = await _create_analysis_plan(query, profile_result, data_source, model=model)
+        logger.info(f"📋 Analysis plan created: {len(analysis_plan.get('sub_questions', []))} sub-questions")
+        for idx, sq in enumerate(analysis_plan.get('sub_questions', []), 1):
+            logger.info(f"  Q{idx}: {sq.get('question', 'Unknown')}")
+            logger.info(f"       SQL: {sq.get('sql', 'No SQL')[:100]}...")
         if reasoning_steps and len(reasoning_steps) > 0:
             reasoning_steps[-1]["status"] = "complete"
         state["progress_percentage"] = 50.0
@@ -118,6 +122,11 @@ async def deep_file_analysis_node(state: AiserWorkflowState) -> AiserWorkflowSta
         })
         
         query_results = await _execute_analysis_queries(analysis_plan, data_source)
+        logger.info(f"📊 Query execution complete: {len(query_results)} results")
+        for idx, qr in enumerate(query_results, 1):
+            result = qr.get("result", {})
+            data_len = len(result.get("data", [])) if result.get("data") else 0
+            logger.info(f"  Result Q{idx}: success={result.get('success')}, rows={data_len}")
         if reasoning_steps and len(reasoning_steps) > 0:
             reasoning_steps[-1]["status"] = "complete"
         state["progress_percentage"] = 80.0
@@ -206,10 +215,20 @@ async def deep_file_analysis_node(state: AiserWorkflowState) -> AiserWorkflowSta
                 state["echarts_config"] = deep_analysis_charts[0]["option"]
         
         # Now use unified node on COMBINED data to generate insights/recommendations
+        logger.info(f"📊 Preparing unified node call:")
+        logger.info(f"   - Total combined data rows: {len(combined_data)}")
+        logger.info(f"   - Query: {query[:100]}...")
+        logger.info(f"   - Charts generated: {len(deep_analysis_charts)}")
+        
         state["query_result"] = combined_data
         
         from app.modules.ai.nodes.unified_node import unified_chart_insights_node
         state = await unified_chart_insights_node(state)
+        
+        logger.info(f"✅ Unified node complete:")
+        logger.info(f"   - Insights: {len(state.get('insights', []))}")
+        logger.info(f"   - Recommendations: {len(state.get('recommendations', []))}")
+        logger.info(f"   - Executive summary length: {len(state.get('executive_summary', ''))}")
         
         # IMPORTANT: Preserve deep_analysis_charts from our multi-chart generation
         if deep_analysis_charts and "execution_metadata" in state:
@@ -443,18 +462,44 @@ Return a JSON object with this structure:
         response = await litellm_service.generate_completion(**call_kwargs)
         
         if not response.get("success") or not response.get("content"):
-            logger.warning("⚠️ LLM failed to generate analysis plan, using fallback")
-            # Fallback: create simple plan
+            logger.error(f"❌ LLM failed to generate analysis plan: success={response.get('success')}, error={response.get('error')}")
+            # Fallback: create basic plan from available columns
+            fallback_queries = [
+                {
+                    "question": "What is the total row count?",
+                    "sql": "SELECT COUNT(*) as total_rows FROM data",
+                    "output_type": "metric",
+                    "priority": 1
+                }
+            ]
+            
+            # Add basic groupby queries for each numeric/categorical column
+            columns = profile.get("columns", [])
+            numeric_cols = [col['name'] for col in columns if col['type'] in ['INTEGER', 'BIGINT', 'DOUBLE', 'FLOAT']]
+            cat_cols = [col['name'] for col in columns if col['type'] in ['VARCHAR', 'TEXT']]
+            
+            if numeric_cols and len(numeric_cols) > 0:
+                num_col = numeric_cols[0]
+                fallback_queries.append({
+                    "question": f"What are the statistics for {num_col}?",
+                    "sql": f"SELECT {num_col}, COUNT(*) as count FROM data WHERE {num_col} IS NOT NULL GROUP BY {num_col} ORDER BY count DESC LIMIT 10",
+                    "output_type": "bar_chart",
+                    "priority": 2
+                })
+            
+            if cat_cols and len(cat_cols) > 0:
+                cat_col = cat_cols[0]
+                fallback_queries.append({
+                    "question": f"What are the top categories in {cat_col}?",
+                    "sql": f"SELECT {cat_col}, COUNT(*) as count FROM data WHERE {cat_col} IS NOT NULL GROUP BY {cat_col} ORDER BY count DESC LIMIT 10",
+                    "output_type": "bar_chart",
+                    "priority": 3
+                })
+            
+            logger.warning(f"⚠️ Using fallback analysis plan with {len(fallback_queries)} queries")
             return {
-                "sub_questions": [
-                    {
-                        "question": "Basic data summary",
-                        "sql": "SELECT COUNT(*) as total_rows FROM data",
-                        "output_type": "metric",
-                        "priority": 1
-                    }
-                ],
-                "overall_strategy": "Basic analysis"
+                "sub_questions": fallback_queries,
+                "overall_strategy": "Basic statistical analysis using available columns"
             }
         
         # Parse JSON response
