@@ -122,8 +122,8 @@ async def deep_file_analysis_node(state: AiserWorkflowState) -> AiserWorkflowSta
             reasoning_steps[-1]["status"] = "complete"
         state["progress_percentage"] = 80.0
         
-        # Step 4: Use unified node for chart, insights, and recommendations
-        logger.info("🎨 Step 4: Generating charts and insights via unified node...")
+        # Step 4: Generate multiple charts (one per query result) + unified insights/recommendations
+        logger.info("🎨 Step 4: Generating charts per result and insights via unified node...")
         state["progress_message"] = "Generating visualizations and insights..."
         state["progress_percentage"] = 90.0
         state["current_stage"] = "deep_analysis_synthesis"
@@ -132,32 +132,88 @@ async def deep_file_analysis_node(state: AiserWorkflowState) -> AiserWorkflowSta
         reasoning_steps = state["execution_metadata"]["reasoning_steps"]
         reasoning_steps.append({
             "step": "Chart & Insights Generation",
-            "description": "Generating visualizations, insights, and recommendations using unified analysis engine",
+            "description": "Generating one chart per query result, plus insights and recommendations",
             "status": "processing"
         })
         
-        # Combine all query results into query_result for unified node
+        # Generate ONE CHART per query result
+        deep_analysis_charts = []
         combined_data = []
-        for qr in query_results:
-            result = qr.get("result", {})
-            if result.get("success") and result.get("data"):
-                data = result.get("data", [])
-                if isinstance(data, list):
-                    combined_data.extend(data)
         
-        # Set query_result for unified node to process
+        from app.modules.ai.agents.chart_generation_agent import IntelligentChartGenerationAgent
+        
+        for idx, qr in enumerate(query_results):
+            result = qr.get("result", {})
+            if not result or result.get("success") is False:
+                logger.debug(f"⏭️ Skipping chart for failed query: {result.get('error', 'Unknown')}")
+                continue
+            
+            chart_data = result.get("data", [])
+            if not chart_data or len(chart_data) == 0:
+                logger.debug(f"⏭️ Skipping chart - no data for: {qr.get('question', 'Unknown')}")
+                continue
+            
+            # Add to combined data for insights generation
+            if isinstance(chart_data, list):
+                combined_data.extend(chart_data)
+            
+            # Generate chart for THIS specific query result
+            try:
+                chart_state = {
+                    "query": qr.get("question", "Analysis Result"),
+                    "query_result": chart_data,
+                    "sql_query": qr.get("sql", ""),
+                    "data_source_id": state.get("data_source_id")
+                }
+                
+                # Use IntelligentChartGenerationAgent to generate chart
+                try:
+                    from app.modules.data.services.multi_engine_query_service import MultiEngineQueryService
+                    chart_agent = IntelligentChartGenerationAgent(MultiEngineQueryService())
+                    chart_result = await chart_agent.generate_chart_config(
+                        query=qr.get("question", ""),
+                        query_result=chart_data
+                    )
+                    if chart_result and chart_result.get("echarts_config"):
+                        deep_analysis_charts.append({
+                            "title": qr.get("question", f"Chart {idx + 1}"),
+                            "type": chart_result.get("chart_type", "bar"),
+                            "option": chart_result["echarts_config"]
+                        })
+                        logger.info(f"✅ Generated chart for: {qr.get('question', 'Result')}")
+                except Exception as chart_agent_error:
+                    logger.debug(f"Chart agent generation failed, using fallback: {chart_agent_error}")
+                    # Fallback: Use basic chart generation
+                    basic_chart = _generate_basic_chart_config(
+                        data=chart_data,
+                        title=qr.get("question", f"Chart {idx + 1}"),
+                        chart_type="bar"
+                    )
+                    if basic_chart and basic_chart.get("option"):
+                        deep_analysis_charts.append(basic_chart)
+                        logger.info(f"✅ Generated fallback chart for: {qr.get('question', 'Result')}")
+                        
+            except Exception as e:
+                logger.error(f"❌ Failed to generate chart for '{qr.get('question', 'Unknown')}': {e}", exc_info=True)
+        
+        # Store all generated charts in deep_analysis_charts for carousel
+        if deep_analysis_charts:
+            if "execution_metadata" not in state:
+                state["execution_metadata"] = {}
+            state["execution_metadata"]["deep_analysis_charts"] = deep_analysis_charts
+            # Also set primary chart (first one)
+            if deep_analysis_charts and deep_analysis_charts[0].get("option"):
+                state["echarts_config"] = deep_analysis_charts[0]["option"]
+        
+        # Now use unified node on COMBINED data to generate insights/recommendations
         state["query_result"] = combined_data
         
-        # Use unified node for chart/insights/recommendations generation
-        # This reuses the battle-tested unified node instead of custom synthesis logic
         from app.modules.ai.nodes.unified_node import unified_chart_insights_node
         state = await unified_chart_insights_node(state)
         
-        # Store generated chart in deep_analysis_charts for carousel display
-        if state.get("echarts_config"):
-            if "execution_metadata" not in state:
-                state["execution_metadata"] = {}
-            state["execution_metadata"]["deep_analysis_charts"] = [state["echarts_config"]]
+        # IMPORTANT: Preserve deep_analysis_charts from our multi-chart generation
+        if deep_analysis_charts and "execution_metadata" in state:
+            state["execution_metadata"]["deep_analysis_charts"] = deep_analysis_charts
         
         if reasoning_steps and len(reasoning_steps) > 0:
             reasoning_steps[-1]["status"] = "complete"
