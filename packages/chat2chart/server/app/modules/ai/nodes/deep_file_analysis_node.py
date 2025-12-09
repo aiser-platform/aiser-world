@@ -461,8 +461,13 @@ Return a JSON object with this structure:
         
         response = await litellm_service.generate_completion(**call_kwargs)
         
+        logger.info(f"📋 LLM response for analysis plan: success={response.get('success')}, has_content={bool(response.get('content'))}")
+        if response.get('content'):
+            logger.info(f"📋 Response length: {len(response.get('content', ''))} chars")
+            logger.debug(f"📋 First 200 chars: {response.get('content', '')[:200]}")
+        
         if not response.get("success") or not response.get("content"):
-            logger.error(f"❌ LLM failed to generate analysis plan: success={response.get('success')}, error={response.get('error')}")
+            logger.error(f"❌ LLM failed to generate analysis plan: success={response.get('success')}, error={response.get('error')}, content_length={len(response.get('content', ''))}")
             # Fallback: create basic plan from available columns
             fallback_queries = [
                 {
