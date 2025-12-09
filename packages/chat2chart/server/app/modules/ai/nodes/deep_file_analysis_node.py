@@ -27,8 +27,10 @@ async def deep_file_analysis_node(state: AiserWorkflowState) -> AiserWorkflowSta
     Workflow:
     1. Profiling: Run statistical profile queries (SUMMARIZE, DISTINCT counts, etc.)
     2. Planning: LLM breaks user query into sub-questions
-    3. Execution: Run multiple SQL queries in parallel
-    4. Synthesis: Combine results into comprehensive report with multiple charts
+    3. Execution: Run multiple SQL queries in parallel via MultiEngineQueryService
+    4. Use existing unified_chart_insights_node for chart/insights/recommendations generation
+    
+    This reuses the battle-tested unified node instead of custom synthesis logic.
     """
     try:
         logger.info("🔬 Starting deep file analysis workflow")
@@ -57,21 +59,23 @@ async def deep_file_analysis_node(state: AiserWorkflowState) -> AiserWorkflowSta
             state["current_stage"] = "deep_analysis_skipped"
             return state
         
-        # Get model from state or use default from litellm_service
+        # Get model from state or use default
         execution_metadata = state.get("execution_metadata", {})
         model = execution_metadata.get("model_used") or state.get("model") or None
         
-        # Step 1: Data Profiling (Smart Statistical Summary)
-        logger.info("📊 Step 1: Running data profiling...")
-        state["progress_message"] = "Analyzing data structure and statistics..."
-        state["progress_percentage"] = 20.0
-        state["current_stage"] = "deep_analysis_profiling"
-        # Add reasoning step for streaming
+        # Ensure execution_metadata and reasoning_steps exist
         if "execution_metadata" not in state:
             state["execution_metadata"] = {}
         if "reasoning_steps" not in state["execution_metadata"] or state["execution_metadata"]["reasoning_steps"] is None:
             state["execution_metadata"]["reasoning_steps"] = []
+        
         reasoning_steps = state["execution_metadata"]["reasoning_steps"]
+        
+        # Step 1: Data Profiling
+        logger.info("📊 Step 1: Running data profiling...")
+        state["progress_message"] = "Analyzing data structure and statistics..."
+        state["progress_percentage"] = 20.0
+        state["current_stage"] = "deep_analysis_profiling"
         reasoning_steps.append({
             "step": "Data Profiling",
             "description": "Analyzing data structure, statistics, and data quality metrics",
@@ -88,9 +92,6 @@ async def deep_file_analysis_node(state: AiserWorkflowState) -> AiserWorkflowSta
         state["progress_message"] = "Planning comprehensive analysis strategy..."
         state["progress_percentage"] = 40.0
         state["current_stage"] = "deep_analysis_planning"
-        if "reasoning_steps" not in state["execution_metadata"] or state["execution_metadata"]["reasoning_steps"] is None:
-            state["execution_metadata"]["reasoning_steps"] = []
-        reasoning_steps = state["execution_metadata"]["reasoning_steps"]
         reasoning_steps.append({
             "step": "Analysis Planning",
             "description": "Breaking query into sub-questions and creating execution plan",
@@ -121,45 +122,49 @@ async def deep_file_analysis_node(state: AiserWorkflowState) -> AiserWorkflowSta
             reasoning_steps[-1]["status"] = "complete"
         state["progress_percentage"] = 80.0
         
-        # Step 4: Synthesize Results
-        logger.info("📝 Step 4: Synthesizing results...")
-        state["progress_message"] = "Generating comprehensive report with insights and charts..."
+        # Step 4: Use unified node for chart, insights, and recommendations
+        logger.info("🎨 Step 4: Generating charts and insights via unified node...")
+        state["progress_message"] = "Generating visualizations and insights..."
         state["progress_percentage"] = 90.0
         state["current_stage"] = "deep_analysis_synthesis"
         if "reasoning_steps" not in state["execution_metadata"] or state["execution_metadata"]["reasoning_steps"] is None:
             state["execution_metadata"]["reasoning_steps"] = []
         reasoning_steps = state["execution_metadata"]["reasoning_steps"]
         reasoning_steps.append({
-            "step": "Result Synthesis",
-            "description": "Combining query results into comprehensive report with insights and visualizations",
+            "step": "Chart & Insights Generation",
+            "description": "Generating visualizations, insights, and recommendations using unified analysis engine",
             "status": "processing"
         })
         
-        synthesis_result = await _synthesize_results(query, profile_result, query_results, analysis_plan, model=model)
+        # Combine all query results into query_result for unified node
+        combined_data = []
+        for qr in query_results:
+            result = qr.get("result", {})
+            if result.get("success") and result.get("data"):
+                data = result.get("data", [])
+                if isinstance(data, list):
+                    combined_data.extend(data)
+        
+        # Set query_result for unified node to process
+        state["query_result"] = combined_data
+        
+        # Use unified node for chart/insights/recommendations generation
+        # This reuses the battle-tested unified node instead of custom synthesis logic
+        from app.modules.ai.nodes.unified_node import unified_chart_insights_node
+        state = await unified_chart_insights_node(state)
+        
+        # Store generated chart in deep_analysis_charts for carousel display
+        if state.get("echarts_config"):
+            if "execution_metadata" not in state:
+                state["execution_metadata"] = {}
+            state["execution_metadata"]["deep_analysis_charts"] = [state["echarts_config"]]
+        
         if reasoning_steps and len(reasoning_steps) > 0:
             reasoning_steps[-1]["status"] = "complete"
         state["progress_message"] = "Deep analysis complete"
         state["progress_percentage"] = 100.0
-        
-        # Update state with results
-        state["query_result"] = synthesis_result.get("combined_data", [])
-        state["insights"] = synthesis_result.get("insights", [])
-        state["recommendations"] = synthesis_result.get("recommendations", [])
-        # Use executive_summary field (which exists in AiserWorkflowState)
-        state["executive_summary"] = synthesis_result.get("executive_summary", "")
-        
-        # Store multiple charts if generated
-        if synthesis_result.get("charts"):
-            # Store as list in execution_metadata
-            if "execution_metadata" not in state:
-                state["execution_metadata"] = {}
-            state["execution_metadata"]["deep_analysis_charts"] = synthesis_result["charts"]
-            # Set primary chart (first one)
-            if synthesis_result["charts"]:
-                state["echarts_config"] = synthesis_result["charts"][0]
-        
         state["current_stage"] = "deep_analysis_complete"
-        logger.info("✅ Deep file analysis complete")
+        logger.info("✅ Deep file analysis complete with unified node")
         
         return state
         
@@ -535,169 +540,6 @@ async def _execute_analysis_queries(plan: Dict[str, Any], data_source: Dict[str,
     except Exception as e:
         logger.error(f"❌ Query execution failed: {e}", exc_info=True)
         return []
-
-
-async def _synthesize_results(
-    query: str,
-    profile: Dict[str, Any],
-    query_results: List[Dict[str, Any]],
-    plan: Dict[str, Any],
-    model: Optional[str] = None
-) -> Dict[str, Any]:
-    """
-    Synthesize all query results into a comprehensive report with insights, recommendations, and charts.
-    """
-    try:
-        from app.modules.ai.services.litellm_service import LiteLLMService
-        from app.modules.ai.agents.chart_generation_agent import IntelligentChartGenerationAgent
-        
-        litellm_service = LiteLLMService()
-        
-        # Use model from parameter, or get default from litellm_service
-        if not model:
-            model = getattr(litellm_service, 'active_model', None) or getattr(litellm_service, 'default_model', None)
-            if not model:
-                import os
-                model = os.getenv('DEFAULT_LLM_MODEL', None)
-        
-        # Build summary of query results
-        results_summary = []
-        for qr in query_results:
-            if qr["result"].get("success"):
-                data = qr["result"].get("data", [])
-                results_summary.append({
-                    "question": qr["question"],
-                    "row_count": len(data),
-                    "sample": data[:3] if data else []
-                })
-        
-        # Generate executive summary using LLM
-        prompt = f"""You are a data analyst. Synthesize the following analysis results into a comprehensive report.
-
-User Query: {query}
-
-Data Profile:
-- Total Rows: {profile.get('row_count', 0)}
-- Columns: {len(profile.get('columns', []))}
-
-Analysis Results:
-{json.dumps(results_summary, indent=2)}
-
-Create a comprehensive report with:
-1. Executive Summary (2-3 paragraphs)
-2. Key Insights (3-5 bullet points)
-3. Recommendations (3-5 actionable recommendations)
-
-Return JSON:
-{{
-    "executive_summary": "...",
-    "insights": [
-        {{"title": "...", "description": "...", "confidence": 0.9}}
-    ],
-    "recommendations": [
-        {{"title": "...", "description": "...", "priority": "high|medium|low"}}
-    ]
-}}"""
-
-        # Call generate_completion without model if None (will use service default)
-        call_kwargs = {
-            "prompt": prompt,
-            "temperature": 0.3,
-            "max_tokens": 1500
-        }
-        if model:
-            call_kwargs["model"] = model
-        
-        response = await litellm_service.generate_completion(**call_kwargs)
-        
-        synthesis = {
-            "combined_data": [],
-            "insights": [],
-            "recommendations": [],
-            "executive_summary": "",
-            "charts": []
-        }
-        
-        if response.get("success") and response.get("content"):
-            try:
-                content = response["content"]
-                if "```json" in content:
-                    content = content.split("```json")[1].split("```")[0].strip()
-                elif "```" in content:
-                    content = content.split("```")[1].split("```")[0].strip()
-                
-                llm_result = json.loads(content)
-                synthesis["executive_summary"] = llm_result.get("executive_summary", "")
-                synthesis["insights"] = llm_result.get("insights", [])
-                synthesis["recommendations"] = llm_result.get("recommendations", [])
-            except Exception as e:
-                logger.warning(f"⚠️ Failed to parse synthesis JSON: {e}")
-                synthesis["executive_summary"] = response["content"][:500]
-        
-        # Generate charts for successful query results via MultiEngineQueryService
-        for qr in query_results:
-            try:
-                # Handle result structure from MultiEngineQueryService
-                result = qr.get("result", {})
-                if not result or result.get("success") is False:
-                    logger.debug(f"⏭️ Skipping chart for failed query: {result.get('error', 'Unknown error')}")
-                    continue
-                
-                # Extract data from result (MultiEngineQueryService returns {"success": True, "data": [...], ...})
-                chart_data = result.get("data", [])
-                if not chart_data or len(chart_data) == 0:
-                    logger.debug(f"⏭️ Skipping chart - no data returned for: {qr.get('question', 'Unknown')}")
-                    continue
-                
-                chart_type = qr.get("output_type", "bar")
-                question = qr.get("question", "Analysis Result")
-                
-                # Convert output_type to ECharts type
-                if "line" in chart_type.lower():
-                    preferred_type = "line"
-                elif "scatter" in chart_type.lower():
-                    preferred_type = "scatter"
-                else:
-                    preferred_type = "bar"
-                
-                # Generate basic chart config using the data
-                logger.debug(f"📊 Generating {preferred_type} chart for: {question}")
-                chart_config = _generate_basic_chart_config(
-                    data=chart_data,
-                    title=question,
-                    chart_type=preferred_type
-                )
-                
-                if chart_config and isinstance(chart_config, dict) and chart_config.get("option"):
-                    synthesis["charts"].append(chart_config)
-                    logger.info(f"✅ Generated chart for: {question}")
-                else:
-                    logger.warning(f"⚠️ Invalid chart config generated for: {question}")
-                    
-            except Exception as e:
-                logger.error(f"❌ Failed to generate chart for '{qr.get('question', 'Unknown')}': {e}", exc_info=True)
-        
-        # Combine all data from successful queries
-        for qr in query_results:
-            result = qr.get("result", {})
-            if result.get("success") and result.get("data"):
-                data = result.get("data", [])
-                if isinstance(data, list):
-                    synthesis["combined_data"].extend(data)
-        
-        logger.info(f"✅ Synthesis complete: {len(synthesis['insights'])} insights, {len(synthesis['charts'])} charts")
-        
-        return synthesis
-        
-    except Exception as e:
-        logger.error(f"❌ Result synthesis failed: {e}", exc_info=True)
-        return {
-            "combined_data": [],
-            "insights": [],
-            "recommendations": [],
-            "executive_summary": f"Analysis complete. Error during synthesis: {str(e)}",
-            "charts": []
-        }
 
 
 def _generate_basic_chart_config(data: List[Dict[str, Any]], title: str, chart_type: str) -> Dict[str, Any]:
