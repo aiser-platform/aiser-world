@@ -119,56 +119,56 @@ async def upload_avatar(
             # Generate URL (in production, use CDN URL)
             avatar_url = f"/uploads/avatars/{filename}"
             
-                # Update user profile with avatar URL
-                # Use direct SQL update with proper async session handling
+            # Update user profile with avatar URL
+            # Use direct SQL update with proper async session handling
+            try:
+                from app.db.session import get_async_session
+                from sqlalchemy import text
+                
+                # Use async session factory properly
+                async_gen = get_async_session()
+                db = await async_gen.__anext__()
                 try:
-                    from app.db.session import get_async_session
-                    from sqlalchemy import text
-                    
-                    # Use async session factory properly
-                    async_gen = get_async_session()
-                    db = await async_gen.__anext__()
-                    try:
-                        # Use raw SQL for reliable update
-                        await db.execute(
-                            text("""
-                                UPDATE users 
-                                SET avatar_url = :avatar_url, updated_at = NOW()
-                                WHERE id = :user_id
-                            """),
-                            {
-                                "avatar_url": avatar_url,
-                                "user_id": str(user_id)
-                            }
-                        )
-                        await db.commit()
-                        logger.info(f"✅ Updated avatar_url for user {user_id}: {avatar_url}")
-                    except Exception as db_error:
-                        await db.rollback()
-                        logger.error(f"❌ Failed to update avatar_url: {db_error}", exc_info=True)
-                        # Try user_settings as fallback
-                        try:
-                            from app.modules.user.user_setting_repository import UserSettingRepository
-                            repo = UserSettingRepository()
-                            await repo.set_setting(str(user_id), "avatar_url", avatar_url)
-                            logger.info(f"✅ Stored avatar_url in user_settings (fallback) for user {user_id}")
-                        except Exception as settings_error:
-                            logger.error(f"❌ Failed to store avatar_url in user_settings: {settings_error}")
-                    finally:
-                        try:
-                            await async_gen.__anext__()  # Close the generator
-                        except StopAsyncIteration:
-                            pass
-                except Exception as e:
-                    logger.error(f"❌ Failed to update avatar_url in database: {e}", exc_info=True)
-                    # Try user_settings as last resort
+                    # Use raw SQL for reliable update
+                    await db.execute(
+                        text("""
+                            UPDATE users 
+                            SET avatar_url = :avatar_url, updated_at = NOW()
+                            WHERE id = :user_id
+                        """),
+                        {
+                            "avatar_url": avatar_url,
+                            "user_id": str(user_id)
+                        }
+                    )
+                    await db.commit()
+                    logger.info(f"✅ Updated avatar_url for user {user_id}: {avatar_url}")
+                except Exception as db_error:
+                    await db.rollback()
+                    logger.error(f"❌ Failed to update avatar_url: {db_error}", exc_info=True)
+                    # Try user_settings as fallback
                     try:
                         from app.modules.user.user_setting_repository import UserSettingRepository
                         repo = UserSettingRepository()
                         await repo.set_setting(str(user_id), "avatar_url", avatar_url)
-                        logger.info(f"✅ Stored avatar_url in user_settings (last resort) for user {user_id}")
+                        logger.info(f"✅ Stored avatar_url in user_settings (fallback) for user {user_id}")
                     except Exception as settings_error:
-                        logger.error(f"❌ All avatar_url update methods failed: {settings_error}")
+                        logger.error(f"❌ Failed to store avatar_url in user_settings: {settings_error}")
+                finally:
+                    try:
+                        await async_gen.__anext__()  # Close the generator
+                    except StopAsyncIteration:
+                        pass
+            except Exception as e:
+                logger.error(f"❌ Failed to update avatar_url in database: {e}", exc_info=True)
+                # Try user_settings as last resort
+                try:
+                    from app.modules.user.user_setting_repository import UserSettingRepository
+                    repo = UserSettingRepository()
+                    await repo.set_setting(str(user_id), "avatar_url", avatar_url)
+                    logger.info(f"✅ Stored avatar_url in user_settings (last resort) for user {user_id}")
+                except Exception as settings_error:
+                    logger.error(f"❌ All avatar_url update methods failed: {settings_error}")
             
             return JSONResponse(content={
                 "success": True,

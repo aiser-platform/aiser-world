@@ -1090,7 +1090,24 @@ Return ONLY the JSON object, no other text. The sql_query field must contain act
                     schem_info = schem_info_result.get('schema', {})
                     logger.info(f"✅ Fetched schema: {len(schem_info)} tables/objects")
             
-            if not schem_info:
+            # CRITICAL FIX FOR FILE DATA SOURCES:
+            # If schema is just columns/row_count (file format), wrap it in a 'data' table entry
+            # This ensures file data sources are treated as tables named 'data' in DuckDB
+            if schem_info and 'columns' in schem_info and 'tables' not in schem_info and 'tables' not in schem_info:
+                # This is a basic schema from a file - normalize it to table format
+                logger.info("🔧 Normalizing file schema: wrapping columns into 'data' table")
+                schem_info = {
+                    'tables': [{
+                        'name': 'data',  # CRITICAL: File data sources use 'data' as table name in DuckDB
+                        'columns': schem_info.get('columns', []),
+                        'row_count': schem_info.get('row_count', 0),
+                        'description': f'File data source with {len(schem_info.get("columns", []))} columns'
+                    }],
+                    **{k: v for k, v in schem_info.items() if k not in ['columns', 'row_count']}
+                }
+                logger.info(f"✅ File schema normalized: created 'data' table with {len(schem_info['tables'][0]['columns'])} columns")
+            
+            if not schem_info or (not isinstance(schem_info, dict) or (schem_info.get('tables') is None and not any(k in schem_info for k in ['columns', 'tables']))):
                 # Handle case when no data source is connected
                 return {
                     "success": True,
