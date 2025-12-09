@@ -1091,21 +1091,28 @@ Return ONLY the JSON object, no other text. The sql_query field must contain act
                     logger.info(f"✅ Fetched schema: {len(schem_info)} tables/objects")
             
             # CRITICAL FIX FOR FILE DATA SOURCES:
-            # If schema is just columns/row_count (file format), wrap it in a 'data' table entry
-            # This ensures file data sources are treated as tables named 'data' in DuckDB
-            if schem_info and 'columns' in schem_info and 'tables' not in schem_info and 'tables' not in schem_info:
+            # If schema is just columns/row_count (file format), wrap it in table entries
+            # This ensures file data sources are treated as proper tables in DuckDB
+            # Support BOTH 'data' (backward compat) and file_id (multi-file support)
+            if schem_info and 'columns' in schem_info and 'tables' not in schem_info:
                 # This is a basic schema from a file - normalize it to table format
-                logger.info("🔧 Normalizing file schema: wrapping columns into 'data' table")
+                logger.info("🔧 Normalizing file schema: wrapping columns into table entries")
+                
+                # Use file ID as table name if available, otherwise use 'data' for backward compatibility
+                file_id = data_source_id if data_source_id and data_source_id.startswith('file_') else 'data'
+                table_name = file_id or 'data'
+                
                 schem_info = {
                     'tables': [{
-                        'name': 'data',  # CRITICAL: File data sources use 'data' as table name in DuckDB
+                        'name': table_name,  # Use file_id or 'data' as table name
                         'columns': schem_info.get('columns', []),
                         'row_count': schem_info.get('row_count', 0),
-                        'description': f'File data source with {len(schem_info.get("columns", []))} columns'
+                        'description': f'File data source ({file_id}) with {len(schem_info.get("columns", []))} columns',
+                        'file_id': file_id  # Store file_id for reference
                     }],
                     **{k: v for k, v in schem_info.items() if k not in ['columns', 'row_count']}
                 }
-                logger.info(f"✅ File schema normalized: created 'data' table with {len(schem_info['tables'][0]['columns'])} columns")
+                logger.info(f"✅ File schema normalized: created '{table_name}' table with {len(schem_info['tables'][0]['columns'])} columns")
             
             if not schem_info or (not isinstance(schem_info, dict) or (schem_info.get('tables') is None and not any(k in schem_info for k in ['columns', 'tables']))):
                 # Handle case when no data source is connected
@@ -1432,9 +1439,11 @@ Map natural language patterns to SQL constructs:
    - Check schema_info keys for available table names
    - Use unqualified name (e.g., 'sales') or qualified name (e.g., 'aiser_warehouse.sales')
    - NEVER use schema name alone (e.g., 'aiser_warehouse' is NOT a table)
-   - **CRITICAL FOR FILE DATA SOURCES**: If the data source type is 'file', ALWAYS use table name 'data' (not the file ID)
-     - File data sources are loaded into DuckDB with table name 'data'
-     - Example: FROM "data" (not FROM "file_1234567890")
+   - **CRITICAL FOR FILE DATA SOURCES**: File data sources can be referenced by table name or file ID
+     - Single file: Use table name 'data' (backward compatible) OR the file_id (e.g., 'file_1234567890')
+     - Multiple files in one query: Use file_ids and JOIN them together
+     - Example single file: FROM "data" or FROM "file_1234567890"
+     - Example multi-file: FROM "file_1234567890" f1 JOIN "file_9876543210" f2 ON f1.id = f2.id
 3. **Column Names**: Use exact column names from schema, respecting case sensitivity
    - Check 'columns' array in table_info for available column names
    - Use exact column name as shown in schema (case-sensitive)
@@ -1456,7 +1465,8 @@ Map natural language patterns to SQL constructs:
   - Unique count: `COUNT(DISTINCT column)` NOT `uniqExact(column)`
   - Empty string check: `column IS NOT NULL AND column != ''` or `TRIM(column) != ''` NOT `column != ''` (which can cause unterminated string errors)
 - **String literals**: Always use proper quotes: `'value'` not `''` (empty string check should be `column IS NOT NULL AND column != ''`)
-- **Table name**: Always use `"data"` as table name for file sources
+- **Table name (Single File)**: Use `"data"` as table name for backward compatibility OR use file_id like `"file_1234567890"`
+- **Table name (Multiple Files)**: Use file_ids and JOIN them: `FROM "file_1" f1 JOIN "file_2" f2 ON f1.key = f2.key`
 
 ## VALIDATION REQUIREMENTS
 When using the validate_sql tool, provide:

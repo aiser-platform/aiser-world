@@ -148,9 +148,11 @@ class MultiEngineQueryService:
             # Analyze query and data source
             query_analysis = self._analyze_query(query, data_source)
 
-            # CRITICAL: For file data sources, ALWAYS rewrite table names to 'data' BEFORE execution
-            # Each file is loaded as 'data' table in DuckDB when executed
-            # This ensures generated SQL always uses the correct table name for file sources
+            # CRITICAL: For file data sources, validate and optionally rewrite table names
+            # Support THREE naming conventions:
+            # 1. 'data' - backward compatible, single file
+            # 2. 'file_XXXXX' - multi-file support, each file as separate table
+            # 3. Unrelated tables - rewrite to 'data' for backward compat (fallback)
             if data_source.get('type') == 'file':
                 import re
                 # Pattern to match: FROM "table" or FROM table or FROM "schema"."table"
@@ -162,8 +164,16 @@ class MultiEngineQueryService:
                     # match.group(1) = FROM/JOIN keyword, match.group(2) = double-quoted, match.group(3) = backtick-quoted, match.group(4) = unquoted
                     table_name = match.group(2) or match.group(3) or match.group(4)
                     keyword = match.group(1).upper()
-                    # Rewrite ANY table name that's not 'data' or '_aiser_inline_df' for file sources
-                    if table_name and table_name.lower() not in ("data", "_aiser_inline_df"):
+                    # Only rewrite if table name is NOT one of:
+                    # - 'data' (backward compatible)
+                    # - 'file_*' (file ID for multi-file support)
+                    # - '_aiser_inline_df' (inline data)
+                    is_valid_file_table = (
+                        table_name.lower() in ("data", "_aiser_inline_df") or
+                        table_name.lower().startswith("file_")
+                    )
+                    if table_name and not is_valid_file_table:
+                        # This is an invalid table name - needs rewriting to 'data' or appropriate file_id
                         table_names_found.append((table_name, keyword, match.start(), match.end()))
                 
                 if table_names_found:
@@ -436,7 +446,21 @@ class DuckDBEngine(BaseQueryEngine):
 
             # Load data into DuckDB
             if data_source["type"] == "file":
+                # NEW: Load the current file as 'data' AND its ID as alternate table name
+                # This allows queries to reference either "data" (backward compat) or file_XXXXX (multi-file)
                 await self._load_file_data(conn, data_source)
+                
+                # IMPORTANT: Create an alias for multi-file support
+                # Allow queries to reference table by file_id (e.g., file_1765031881)
+                file_id = data_source.get('id', 'data')
+                if file_id and file_id != 'data':
+                    try:
+                        # Create a view with the file_id as table name (for multi-file queries)
+                        conn.execute(f'CREATE OR REPLACE VIEW "{file_id}" AS SELECT * FROM "data"')
+                        logger.info(f"✅ Created table alias '{file_id}' pointing to 'data' table")
+                    except Exception as e:
+                        logger.warning(f"⚠️ Could not create file_id alias: {e}")
+                
                 # Verify table exists and has data
                 try:
                     test_result = conn.execute("SELECT COUNT(*) as count FROM data LIMIT 1").fetchone()
