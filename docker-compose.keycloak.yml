@@ -1,0 +1,101 @@
+# Keycloak Docker Compose Configuration for On-Premise Deployment
+# Usage: docker-compose -f docker-compose.dev.yml -f docker-compose.keycloak.yml up
+
+version: '3.8'
+
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    container_name: aiser-keycloak
+    environment:
+      # Keycloak Admin Credentials
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      
+      # Database Configuration (using PostgreSQL)
+      DB_VENDOR: postgres
+      DB_ADDR: postgres
+      DB_DATABASE: keycloak
+      DB_USER: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      DB_SCHEMA: public
+      
+      # Keycloak Configuration
+      KC_HOSTNAME: ${KEYCLOAK_HOSTNAME:-localhost}
+      KC_HOSTNAME_PORT: ${KEYCLOAK_PORT:-8080}
+      KC_HTTP_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
+      
+      # Proxy Settings (if behind reverse proxy)
+      KC_PROXY: edge
+      KC_HTTP_RELATIVE_PATH: /
+      
+      # Features (disable features not needed for on-premise)
+      KC_FEATURES: preview
+      
+    ports:
+      - "${KEYCLOAK_PORT:-8080}:8080"
+      - "8443:8443"  # HTTPS (if configured)
+    
+    command:
+      - start-dev
+      - --import-realm
+      # Optional: Import realm configuration on startup
+      # - --import-realm=/opt/keycloak/data/import/aiser-realm.json
+    
+    volumes:
+      # Persist Keycloak data
+      - keycloak_data:/opt/keycloak/data
+      # Optional: Import realm configuration
+      # - ./keycloak/realms:/opt/keycloak/data/import
+    
+    depends_on:
+      postgres:
+        condition: service_healthy
+    
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ready || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    
+    networks:
+      - aiser-network
+    
+    restart: unless-stopped
+
+  # PostgreSQL for Keycloak (if not using existing postgres service)
+  # Uncomment if you need a separate database for Keycloak
+  # postgres-keycloak:
+  #   image: postgres:15-alpine
+  #   container_name: aiser-keycloak-db
+  #   environment:
+  #     POSTGRES_USER: ${POSTGRES_USER:-postgres}
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+  #     POSTGRES_DB: keycloak
+  #   volumes:
+  #     - keycloak_db_data:/var/lib/postgresql/data
+  #   ports:
+  #     - "5433:5432"  # Use different port to avoid conflict
+  #   networks:
+  #     - aiser-network
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U postgres"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
+volumes:
+  keycloak_data:
+    driver: local
+  # keycloak_db_data:
+  #   driver: local
+
+networks:
+  aiser-network:
+    external: true
+    name: aiser-world_default
+
+
+

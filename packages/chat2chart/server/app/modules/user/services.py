@@ -15,7 +15,7 @@ from app.modules.authentication.schemas import (
 from app.modules.user.models import User
 from app.modules.user.repository import UserRepository
 from app.modules.user.schemas import UserCreate, UserResponse, UserUpdate
-from fastapi import HTTPException, Request, Response
+from fastapi import HTTPException, Response
 from app.modules.authentication.services import AuthService
 
 logger = logging.getLogger(__name__)
@@ -87,7 +87,7 @@ class UserService(BaseService[User, UserCreate, UserUpdate, UserResponse]):
                     eng = get_sync_engine()
                     with eng.connect() as conn:
                         q = sa.text(
-                            "SELECT id, legacy_id, username, email, first_name, last_name, phone, bio, avatar, website, location, timezone, onboarding_data, onboarding_completed_at, password, is_active, created_at, updated_at, deleted_at, is_deleted FROM users WHERE legacy_id = :legacy LIMIT 1"
+                            "SELECT id, legacy_id, username, email, first_name, last_name, phone, bio, avatar_url, avatar, website, location, timezone, onboarding_data, onboarding_completed_at, password, is_active, created_at, updated_at, last_login_at, deleted_at, is_deleted FROM users WHERE legacy_id = :legacy LIMIT 1"
                         )
                         res = conn.execute(q, {"legacy": normalized_id})
                         row = res.fetchone()

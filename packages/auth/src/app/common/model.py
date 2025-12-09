@@ -1,9 +1,13 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, Column, DateTime, Integer
+from sqlalchemy import Boolean, Column, DateTime, Integer, MetaData
 from sqlalchemy.ext.declarative import declarative_base
 
-Base = declarative_base()
+# Define a custom MetaData object for the auth-service
+# This prevents Alembic from detecting models from other services in a monorepo setup
+auth_metadata = MetaData()
+
+Base = declarative_base(metadata=auth_metadata)
 
 
 class BaseModel(Base):

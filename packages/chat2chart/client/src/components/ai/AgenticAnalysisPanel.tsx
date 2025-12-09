@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Input, Button, Select, Space, Divider, Typography, Alert, Spin, Tag, Progress, Collapse } from 'antd';
-import { RobotOutlined, BulbOutlined, CheckCircleOutlined, ClockCircleOutlined } from '@ant-design/icons';
+import { BulbOutlined, CheckCircleOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import { unifiedAIService } from '@/services/unifiedAIService';
+import AiserAIIcon from '@/app/components/AiserAIIcon/AiserAIIcon';
 
 const { TextArea } = Input;
 const { Title, Text, Paragraph } = Typography;
@@ -345,7 +346,7 @@ const AgenticAnalysisPanel: React.FC = () => {
     <div className="max-w-6xl mx-auto p-6 space-y-6">
       <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-0">
         <div className="text-center">
-          <RobotOutlined className="text-4xl text-blue-600 mb-4" />
+          <AiserAIIcon size={48} className="mb-4" withGlow />
           <Title level={2} className="text-blue-800 mb-2">
             Agentic AI Analysis
           </Title>

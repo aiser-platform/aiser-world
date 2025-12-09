@@ -11,8 +11,23 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Import our comprehensive design system LAST for highest priority */
-@import '../styles/design-system.css';
+/* ========================================
+   DESIGN SYSTEM IMPORTS
+   Clean, minimal, single source of truth
+   ======================================== */
+
+/* Layout system: positioning, spacing, layout rules */
+@import '../styles/layout-system.css';
+/* Simplified color system: 5 colors per mode for clear hierarchy (loads first) */
+@import '../styles/aiser-color-system.css';
+/* Navigation system: header, sidebar, menu (brand blue) */
+@import '../styles/aiser-navigation-unified.css';
+/* Component separation: fixes color overlaps and ensures clear distinction */
+@import '../styles/aiser-component-separation.css';
+/* Unified design system: all components, consistent styling */
+@import '../styles/aiser-unified-design-system.css';
+/* Aesthetic enhancements: premium polish, depth, animations (highest priority) */
+@import '../styles/aiser-aesthetic-enhancements.css';
 
 /* ========================================
    GLOBAL RESET AND BASE STYLES
@@ -22,19 +37,58 @@
   box-sizing: border-box;
 }
 
-html, body, #__next {
-  height: 100%;
-  width: 100%;
-  margin: 0;
-  padding: 0;
-  overflow: hidden; /* Prevent double scrollbars */
+:root {
+  --ant-color-bg-layout: var(--color-bg-base, #ffffff);
+}
+
+html.dark,
+html[data-theme='dark'] {
+  --ant-color-bg-layout: var(--color-bg-base, #0d1117);
+}
+
+/* CRITICAL: Root elements must have no margins/padding and proper background */
+html {
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  background: var(--ant-color-bg-layout, var(--color-bg-base)) !important;
+  background-color: var(--ant-color-bg-layout, var(--color-bg-base)) !important;
+  box-sizing: border-box !important;
 }
 
 body {
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  background: var(--ant-color-bg-layout, var(--color-bg-base)) !important;
+  background-color: var(--ant-color-bg-layout, var(--color-bg-base)) !important;
+  color: var(--ant-color-text) !important;
+  box-sizing: border-box !important;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
+
+#__next {
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100vh !important;
+  overflow-x: hidden !important;
+  background: var(--ant-color-bg-layout, var(--color-bg-base)) !important;
+  background-color: var(--ant-color-bg-layout, var(--color-bg-base)) !important;
+  color: var(--ant-color-text) !important;
+  box-sizing: border-box !important;
+}
+
+/* Body font styling moved to body selector above */
 
 /* Ensure images are responsive */
 img {
@@ -42,6 +96,12 @@ img {
   height: auto;
   display: block;
 }
+
+/* Query History Table and Tabs styling moved to aiser-unified-design-system.css */
+
+/* NOTE: All layout-specific rules moved to layout-system.css */
+/* This file now only contains global resets and base styles */
+/* Layout positioning, spacing, and scrollbar styling are in layout-system.css */
 
 /* Basic link styling */
 a {
@@ -53,189 +113,49 @@ a:hover {
   text-decoration: underline;
 }
 
-/* Remove default button styles */
-button {
-  border: none;
-  background: none;
-  cursor: pointer;
+/* ========================================
+   Ant Design Token Bridge → Color System
+   Ensures every surface uses the same base colors,
+   eliminating light strips at viewport edges (especially in dark mode)
+   ======================================== */
+:root {
+  --ant-color-bg-layout: var(--color-bg-base);
+  --ant-color-bg-container: var(--color-bg-container);
+  --ant-color-bg-elevated: var(--color-bg-elevated);
+  --ant-color-bg-base: var(--color-bg-base);
+  --ant-color-border: var(--color-border);
+  --ant-color-text: var(--color-text-primary);
+  --ant-color-text-secondary: var(--color-text-secondary);
 }
 
-/* Remove default input styles */
-input, textarea, select {
-  font-family: inherit;
+[data-theme='dark'],
+html.dark {
+  --ant-color-bg-layout: var(--color-bg-base);
+  --ant-color-bg-container: var(--color-bg-container);
+  --ant-color-bg-elevated: var(--color-bg-elevated);
+  --ant-color-bg-base: var(--color-bg-base);
+  --ant-color-border: var(--color-border);
+  --ant-color-text: var(--color-text-primary);
+  --ant-color-text-secondary: var(--color-text-secondary);
 }
 
 /* ========================================
-   LAYOUT COMPONENTS
+   FOCUS AND ACCESSIBILITY
    ======================================== */
 
-/* Demo logo for sidebar */
-.demo-logo-vertical {
-  height: 32px;
-  margin: 16px;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 6px;
-}
-
-/* Layout content adjustments */
-.ant-layout-content {
-  margin: 0;
-  min-height: 280px;
-  position: relative;
-}
-
-/* Sidebar transitions */
-.ant-layout-sider {
-  transition: all 0.2s ease-in-out;
-}
-
-/* ========================================
-   RESPONSIVE LAYOUT
-   ======================================== */
-
-@media screen and (max-width: 992px) {
-  aside.ant-layout-sider {
-    position: absolute;
-    height: 100vh;
-    z-index: 999;
-    transform: translateX(0);
-    transition: all 0.2s ease-in-out;
-  }
-
-  .ant-layout-sider-collapsed {
-    opacity: 0;
-    visibility: hidden;
-    transform: translateX(-100%);
-    transition:
-      opacity 0.2s ease-in-out,
-      visibility 0.2s ease-in-out,
-      transform 0.2s ease-in-out;
-  }
-}
-
-/* ========================================
-   COMPONENT STYLES
-   ======================================== */
-
-/* Chat to Chart component */
-.ChatToChart {
-  position: absolute;
-  inset: 0;
-  background-color: transparent;
-}
-
-.ChatToChart .ant-col {
-  max-height: 100%;
-  overflow: hidden;
-}
-
-/* Custom spinner */
-.CustomSpinner {
-  color: inherit;
-}
-
-.CustomSpinner :where(.ant-spin-dot-item) {
-  color: var(--color-brand-primary);
-}
-
-/* Upload section */
-.UploadSection {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  height: 100%;
-  color: var(--color-brand-primary);
-}
-
-/* ========================================
-   HEADER STYLES
-   ======================================== */
-
-/* Header layout tweaks for consistent alignment */
-.ant-layout-header {
-  height: 56px !important;
-  padding: 0 12px !important;
-  display: flex !important;
-  align-items: center !important;
-  flex-wrap: nowrap !important;
-}
-
-.header-left, .header-right {
-  white-space: nowrap;
-}
-
-.header-right > * {
-  flex: 0 0 auto;
-}
-
-.header-left { 
-  display: flex; 
-  align-items: center; 
-  gap: 10px; 
-}
-
-.header-right { 
-  display: flex; 
-  align-items: center; 
-  gap: 6px; 
-}
-
-.header-title { 
-  font-size: 17px; 
-  font-weight: 600; 
-  color: var(--color-text-primary); 
-  margin-left: 10px; 
-}
-
-.logo-compact { 
-  width: 32px; 
-  height: 32px; 
-}
-
-/* Micro spacing adjustments for compact header */
-.ant-layout-header { 
-  padding: 0 10px !important; 
-}
-
-/* ========================================
-   TAILWIND UTILITIES
-   ======================================== */
-
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
-}
-
-/* ========================================
-   ACCESSIBILITY
-   ======================================== */
-
-/* Focus indicators */
+/* Focus indicators - Use Ant Design primary color */
 *:focus {
-  outline: 2px solid var(--color-brand-primary);
+  outline: 2px solid var(--ant-color-primary);
   outline-offset: 2px;
 }
 
-/* Remove focus outline for mouse users */
 *:focus:not(:focus-visible) {
   outline: none;
 }
 
-/* Sidebar toggle focus */
-.sidebar-toggle:focus {
-  outline: 2px solid var(--color-brand-primary);
-  outline-offset: 2px;
-}
+/* Utility classes moved to aiser-unified-design-system.css */
 
-/* ========================================
-   SMOOTH TRANSITIONS
-   ======================================== */
-
-/* Smooth theme transitions */
-* {
-  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease !important;
-}
+/* Smooth theme transitions handled by aiser-unified-design-system.css */
 
 /* ========================================
    MODEL SELECTOR

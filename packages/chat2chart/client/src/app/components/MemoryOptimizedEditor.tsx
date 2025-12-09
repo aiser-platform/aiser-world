@@ -108,33 +108,70 @@ const MemoryOptimizedEditor = memo(({
     }
   }, [value]);
 
-  // Optimized editor options
+  // Language-specific formatting options
+  const getLanguageOptions = (lang: string) => {
+    const baseOptions = {
+      minimap: { enabled: false },
+      fontSize: 14,
+      lineNumbers: 'on',
+      roundedSelection: false,
+      scrollBeyondLastLine: false,
+      automaticLayout: true,
+      wordWrap: 'on',
+      folding: true,
+      foldingStrategy: 'indentation' as const,
+      showFoldingControls: 'always' as const,
+      // Memory optimizations
+      renderWhitespace: 'none' as const,
+      renderControlCharacters: false,
+      guides: { indentation: false, highlightActiveIndentation: false },
+      renderLineHighlight: 'line' as const,
+      occurrencesHighlight: 'off' as const,
+      selectionHighlight: false,
+      codeLens: false,
+      quickSuggestions: false,
+      suggestOnTriggerCharacters: false,
+      acceptSuggestionOnEnter: 'off' as const,
+      tabCompletion: 'off' as const,
+      wordBasedSuggestions: 'off' as const,
+      parameterHints: { enabled: false },
+      hover: { enabled: false },
+    };
+
+    // Language-specific formatting
+    if (lang === 'python') {
+      return {
+        ...baseOptions,
+        tabSize: 4,
+        insertSpaces: true,
+        detectIndentation: false,
+        trimAutoWhitespace: true,
+        formatOnPaste: true,
+        formatOnType: true,
+      };
+    } else if (lang === 'sql') {
+      return {
+        ...baseOptions,
+        tabSize: 2,
+        insertSpaces: true,
+        detectIndentation: false,
+        trimAutoWhitespace: true,
+        formatOnPaste: true,
+        formatOnType: true,
+      };
+    }
+    
+    return {
+      ...baseOptions,
+      tabSize: 2,
+      insertSpaces: true,
+      detectIndentation: false,
+    };
+  };
+
+  // Optimized editor options with language-specific formatting
   const optimizedOptions = {
-    minimap: { enabled: false },
-    fontSize: 14,
-    lineNumbers: 'on',
-    roundedSelection: false,
-    scrollBeyondLastLine: false,
-    automaticLayout: true,
-    wordWrap: 'on',
-    folding: true,
-    foldingStrategy: 'indentation',
-    showFoldingControls: 'always',
-    // Memory optimizations
-    renderWhitespace: 'none',
-    renderControlCharacters: false,
-    guides: { indentation: false, highlightActiveIndentation: false },
-    renderLineHighlight: 'line',
-    occurrencesHighlight: 'off',
-    selectionHighlight: false,
-    codeLens: false,
-    quickSuggestions: false,
-    suggestOnTriggerCharacters: false,
-    acceptSuggestionOnEnter: 'off',
-    tabCompletion: 'off',
-    wordBasedSuggestions: 'off',
-    parameterHints: { enabled: false },
-    hover: { enabled: false },
+    ...getLanguageOptions(language),
     ...options
   };
 

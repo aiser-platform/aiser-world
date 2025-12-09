@@ -1,58 +1,50 @@
-from app.common.model import BaseModel
-from sqlalchemy import Column, String, Text, UUID, Boolean, Integer, ForeignKey, DateTime, JSON, Float
-from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
-import uuid
+"""Dashboards models — consolidated dashboard models to avoid mapper conflicts.
 
-# Import models from other modules
-from app.modules.user.models import User
-from app.modules.projects.models import Project, Organization
+All dashboard-related models are defined here to ensure single source of truth
+and avoid duplicate mapper registration conflicts.
+"""
+
+from app.common.model import BaseModel
+from sqlalchemy import Column, String, Text, Boolean, Integer, DateTime, JSON, ForeignKey, UUID, Float
+from sqlalchemy.orm import relationship
+from sqlalchemy import func, Table, MetaData
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+import uuid
 
 
 class Dashboard(BaseModel):
-    """Dashboard model for organizing widgets and visualizations"""
+    """Dashboard model - single canonical definition"""
     __tablename__ = "dashboards"
-
+    __table_args__ = {'extend_existing': True}
+    
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
-    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
-    # created_by stored as UUID to match `users.id` primary key
-    from sqlalchemy.dialects.postgresql import UUID as PG_UUID
-    # Allow nullable so dashboards can be created before we resolve legacy user mapping
-    created_by = Column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    config = Column(JSON, nullable=True)
     
-    # Dashboard settings
-    layout_config = Column(JSON, nullable=True)  # Grid layout configuration
-    theme_config = Column(JSON, nullable=True)   # Theme and styling
-    global_filters = Column(JSON, nullable=True) # Global filter configuration
-    refresh_interval = Column(Integer, default=300)  # Auto-refresh interval in seconds
-    
-    # Access control
-    is_public = Column(Boolean, default=False)
-    is_active = Column(Boolean, default=True)
-    is_template = Column(Boolean, default=False)
-    
-    # Plan-based restrictions
-    max_widgets = Column(Integer, default=10)  # Based on plan
-    max_pages = Column(Integer, default=5)     # Based on plan
-    
-    # Timestamps
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    last_viewed_at = Column(DateTime(timezone=True), nullable=True)
-    
-    # Relationships
-    project = relationship("Project")
-    creator = relationship("User")
-    widgets = relationship("DashboardWidget", back_populates="dashboard", cascade="all, delete-orphan")
-    pages = relationship("DashboardPage", back_populates="dashboard", cascade="all, delete-orphan")
-    shares = relationship("DashboardShare", back_populates="dashboard", cascade="all, delete-orphan")
+    # Add relationships - use lazy loading to defer mapper initialization
+    # Use fully qualified names to avoid conflicts
+    embeds = relationship(
+        "app.modules.charts.models.DashboardEmbed", 
+        back_populates="dashboard", 
+        lazy='select'
+    )
+    pages = relationship(
+        "app.modules.dashboards.models.DashboardPage", 
+        back_populates="dashboard", 
+        lazy='select'
+    )
+    shares = relationship(
+        "app.modules.dashboards.models.DashboardShare", 
+        back_populates="dashboard", 
+        lazy='select'
+    )
 
 
 class DashboardPage(BaseModel):
     """Dashboard page model for multi-page dashboards"""
     __tablename__ = "dashboard_pages"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     dashboard_id = Column(UUID(as_uuid=True), ForeignKey("dashboards.id"), nullable=False)
@@ -68,63 +60,53 @@ class DashboardPage(BaseModel):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
-    # Relationships
-    dashboard = relationship("Dashboard", back_populates="pages")
-    widgets = relationship("DashboardWidget", back_populates="page", cascade="all, delete-orphan")
+    # Relationships - use lazy loading to defer mapper initialization
+    # Use fully qualified names to avoid conflicts
+    dashboard = relationship(
+        "app.modules.dashboards.models.Dashboard", 
+        back_populates="pages", 
+        lazy='select'
+    )
 
 
-class DashboardWidget(BaseModel):
-    """Widget model for dashboard components"""
-    __tablename__ = "dashboard_widgets"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    dashboard_id = Column(UUID(as_uuid=True), ForeignKey("dashboards.id"), nullable=False)
-    page_id = Column(UUID(as_uuid=True), ForeignKey("dashboard_pages.id"), nullable=True)
-    
-    # Widget identification
-    name = Column(String(255), nullable=False)
-    widget_type = Column(String(50), nullable=False)  # chart, table, text, image, etc.
-    chart_type = Column(String(50), nullable=True)    # bar, line, pie, etc.
-    
-    # Widget configuration
-    config = Column(JSON, nullable=True)        # Widget-specific configuration
-    data_config = Column(JSON, nullable=True)   # Data source and query configuration
-    style_config = Column(JSON, nullable=True)  # Styling and appearance
-    
-    # Layout and positioning
-    x = Column(Integer, default=0)
-    y = Column(Integer, default=0)
-    width = Column(Integer, default=4)
-    height = Column(Integer, default=3)
-    z_index = Column(Integer, default=0)
-    
-    # Widget state
-    is_visible = Column(Boolean, default=True)
-    is_locked = Column(Boolean, default=False)
-    is_resizable = Column(Boolean, default=True)
-    is_draggable = Column(Boolean, default=True)
-    
-    # Data and performance
-    last_data_refresh = Column(DateTime(timezone=True), nullable=True)
-    data_cache_ttl = Column(Integer, default=300)  # Cache TTL in seconds
-    query_execution_time = Column(Float, nullable=True)  # Last query execution time
-    
-    # Timestamps
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
-    # Relationships
-    dashboard = relationship("Dashboard", back_populates="widgets")
-    page = relationship("DashboardPage", back_populates="widgets")
-
+# Standalone Table definition for dashboard_widgets (not an ORM class)
+# This is used for raw SQL operations, bypassing SQLAlchemy's ORM mapper.
+metadata_obj = MetaData()
+dashboard_widgets_table = Table(
+    "dashboard_widgets",
+    metadata_obj,
+    Column("id", UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
+    Column("dashboard_id", UUID(as_uuid=True), ForeignKey("dashboards.id"), nullable=False),
+    Column("page_id", UUID(as_uuid=True), ForeignKey("dashboard_pages.id"), nullable=True),
+    Column("name", String(255), nullable=False),
+    Column("widget_type", String(50), nullable=False),
+    Column("chart_type", String(50), nullable=True),
+    Column("config", JSON, nullable=True),
+    Column("data_config", JSON, nullable=True),
+    Column("style_config", JSON, nullable=True),
+    Column("x", Integer, default=0),
+    Column("y", Integer, default=0),
+    Column("width", Integer, default=4),
+    Column("height", Integer, default=3),
+    Column("z_index", Integer, default=0),
+    Column("is_visible", Boolean, default=True),
+    Column("is_locked", Boolean, default=False),
+    Column("is_resizable", Boolean, default=True),
+    Column("is_draggable", Boolean, default=True),
+    Column("last_data_refresh", DateTime(timezone=True), nullable=True),
+    Column("data_cache_ttl", Integer, default=300),
+    Column("query_execution_time", Float, nullable=True),
+    Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    Column("updated_at", DateTime(timezone=True), onupdate=func.now()),
+)
 
 class DashboardShare(BaseModel):
     """Dashboard sharing model for collaboration"""
     __tablename__ = "dashboard_shares"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     dashboard_id = Column(UUID(as_uuid=True), ForeignKey("dashboards.id"), nullable=False)
-    from sqlalchemy.dialects.postgresql import UUID as PG_UUID
     shared_by = Column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     shared_with = Column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
@@ -143,8 +125,13 @@ class DashboardShare(BaseModel):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
-    # Relationships
-    dashboard = relationship("Dashboard", back_populates="shares")
+    # Relationships - use lazy loading to defer mapper initialization
+    # Use fully qualified names to avoid conflicts
+    dashboard = relationship(
+        "app.modules.dashboards.models.Dashboard", 
+        back_populates="shares", 
+        lazy='select'
+    )
     sharer = relationship("User", foreign_keys=[shared_by])
     sharee = relationship("User", foreign_keys=[shared_with])
     organization = relationship("Organization")
@@ -203,7 +190,7 @@ class DashboardAnalytics(BaseModel):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     # Relationships
-    dashboard = relationship("Dashboard")
+    dashboard = relationship("app.modules.dashboards.models.Dashboard")
     user = relationship("User")
 
 
@@ -270,4 +257,3 @@ PLAN_LIMITS = {
         "priority_support": True
     }
 }
-

@@ -167,7 +167,7 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({
     width: '100%',
     // Ensure proper styling with dark mode awareness
     padding: typeof widget.style?.padding === 'number' ? widget.style.padding : 16,
-    backgroundColor: widget.style?.backgroundColor || 'var(--color-surface-base)',
+    backgroundColor: widget.style?.backgroundColor || 'var(--ant-color-bg-container)',
     // Remove default border - only show if explicitly set
     borderColor: widget.style?.borderColor || 'transparent',
     borderWidth: widget.style?.borderWidth || 0,
@@ -180,7 +180,7 @@ export const WidgetRenderer: React.FC<WidgetRendererProps> = ({
     // Apply other style properties with dark mode defaults
     fontSize: widget.style?.fontSize,
     fontWeight: widget.style?.fontWeight,
-    color: widget.style?.color || 'var(--color-text-primary)',
+    color: widget.style?.color || 'var(--ant-color-text)',
     fontFamily: widget.style?.fontFamily,
     textAlign: widget.style?.textAlign,
     lineHeight: widget.style?.lineHeight

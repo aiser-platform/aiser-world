@@ -123,16 +123,25 @@ class ErrorBoundary extends Component<Props, State> {
         return this.props.fallback;
       }
 
-      // Default error UI
+      // Default error UI - Render without layout/header
       return (
-        <div style={{
-          minHeight: '100vh', 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'center',
-          padding: '20px',
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-        }}>
+        <div 
+          data-error-boundary="true"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            minHeight: '100vh', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            padding: '20px',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            zIndex: 10000, // Above header
+          }}
+        >
         <Card 
             style={{ 
               maxWidth: '600px', 
@@ -157,7 +166,7 @@ class ErrorBoundary extends Component<Props, State> {
                           <Text code>{this.state.error?.message}</Text>
                           <details style={{ marginTop: '10px' }}>
                             <summary>Stack Trace</summary>
-                            <pre style={{ 
+                            <pre className="data-content" style={{ 
                               fontSize: '12px', 
                               background: '#f5f5f5', 
                               padding: '10px',

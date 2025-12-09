@@ -1,8 +1,7 @@
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from fastapi.responses import JSONResponse, Response, PlainTextResponse
-import json
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -12,10 +11,9 @@ from app.modules.authentication import (
     RefreshTokenResponse,
     SignInRequest,
     SignInResponse,
-    SignUpResponse,
 )
 from app.modules.authentication.decoractors.auth_cookies import handle_auth_cookies
-from app.modules.authentication.deps.auth_bearer import TokenDep, JWTCookie, CookieTokenDep
+from app.modules.authentication.deps.auth_bearer import TokenDep, CookieTokenDep
 from app.modules.authentication.schemas import (
     ForgotPasswordRequest,
     ForgotPasswordResponse,
@@ -28,10 +26,8 @@ from app.modules.authentication.schemas import (
     VerifyEmailResponse,
 )
 from app.modules.device_session.schemas import DeviceInfo
-from app.modules.user.deps import CurrentUser
-from unittest.mock import Mock
 import inspect
-from app.modules.user.schemas import UserCreate, UserResponse, UserUpdate
+from app.modules.user.schemas import UserCreate, UserUpdate
 from app.modules.user.services import UserService
 from app.modules.authentication.utils.cookie_manager import manage_auth_cookies
 
@@ -154,12 +150,13 @@ async def delete_user(user_id: str):
 @router.post("/signin")
 @handle_auth_cookies()
 async def sign_in(
-    credentials: dict,
+    credentials: SignInRequest,
     request: Request,
     response: Response,
     db: Session = Depends(get_db),
 ) -> SignInResponse:
     """Sign in user and set auth cookies"""
+    logger.info(f"Sign-in request received for identifier: {credentials.identifier}")
     # Get device info
     device_info = DeviceInfo(
         device_type=request.headers.get("sec-ch-ua-platform", "unknown"),
@@ -168,19 +165,25 @@ async def sign_in(
         ip_address=request.client.host,
     )
 
-    # Normalize legacy payloads that send { email, password }
-    identifier = credentials.get("identifier") or credentials.get("email") or credentials.get("username")
-    password = credentials.get("password")
-    signin_payload = SignInRequest(identifier=identifier, password=password, fallback_url=credentials.get("fallback_url"))
+    # The service layer expects a SignInRequest with an 'identifier' and 'password'
+    # Directly use the identifier from the credentials
+    identifier_to_authenticate = credentials.identifier
+
+    # Create a simplified payload for the service layer
+    service_payload = SignInRequest(
+        identifier=identifier_to_authenticate, 
+        password=credentials.password, 
+        fallback_url=credentials.fallback_url
+    )
 
     result = None
     # Support both async and sync implementations
     # Prefer the synchronous `sign_in` name used by tests/mocks, fall back
     # to `signin` used by some implementations.
     if hasattr(service, "sign_in"):
-        result = service.sign_in(signin_payload, device_info, db)
+        result = service.sign_in(service_payload, device_info, db)
     elif hasattr(service, "signin"):
-        result = service.signin(signin_payload, device_info, db)
+        result = service.signin(service_payload, device_info, db)
     else:
         raise HTTPException(status_code=500, detail="Sign-in service not available")
 
@@ -251,9 +254,11 @@ async def sign_up(user_in: SignUpRequest, db: Session = Depends(get_db)):
             result = await result
         return result
     except ValueError as e:
-        raise e
+        logger.error(f"Signup validation error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise e
+        logger.exception(f"Unexpected signup error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error during signup")
 
 
 @router.post("/refresh-token", response_model=RefreshTokenResponse)

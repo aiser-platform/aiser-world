@@ -10,7 +10,6 @@ from sqlalchemy import (
     ForeignKey,
 )
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
-import uuid
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 

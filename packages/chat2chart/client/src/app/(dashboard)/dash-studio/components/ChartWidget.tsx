@@ -14,11 +14,14 @@ echarts.use([
   CanvasRenderer
 ]);
 
-import { Button, Dropdown, Menu, Input, Typography, Space, message } from 'antd';
+import { Button, Dropdown, Menu, Input, Typography, Space, message, Modal } from 'antd';
 import { 
   SettingOutlined, ShareAltOutlined, DeleteOutlined,
-  MoreOutlined, LockOutlined, UnlockOutlined, CloseOutlined, CopyOutlined
+  MoreOutlined, LockOutlined, UnlockOutlined, CloseOutlined, CopyOutlined,
+  DownloadOutlined, SaveOutlined, BarChartOutlined
 } from '@ant-design/icons';
+import { useOrganization } from '@/context/OrganizationContext';
+import { addWatermarkToChart } from '@/utils/watermark';
 
 const { Title } = Typography;
 
@@ -135,6 +138,7 @@ interface ChartWidgetProps {
   isDarkMode?: boolean;
   showEditableTitle?: boolean;
   onTitleChange?: (newTitle: string) => void;
+  onChartCreate?: (chartData: any) => void;
 }
 
 const ChartWidget: React.FC<ChartWidgetProps> = ({
@@ -151,8 +155,10 @@ const ChartWidget: React.FC<ChartWidgetProps> = ({
   isSelected = false,
   isDarkMode = false,
   showEditableTitle = false,
-  onTitleChange
+  onTitleChange,
+  onChartCreate
 }) => {
+  const { currentOrganization } = useOrganization();
 
   // Ensure optional callbacks have safe defaults to simplify callers
   const _onConfigUpdate = onConfigUpdate ?? (() => {});
@@ -426,10 +432,10 @@ const colorPalettes = {
         }
       },
       grid: {
-        top: 40,
+        top: 20,
         left: 8,
         right: 8,
-        bottom: 40,
+        bottom: 20,
         containLabel: true
       }
     };
@@ -714,9 +720,7 @@ const colorPalettes = {
         // debug logs removed for build/lint
         chartInstance.current = echarts.init(chartRef.current, isDarkMode ? 'dark' : undefined, {
           renderer: 'canvas',
-          useDirtyRect: true,
-          width: 'auto',
-          height: 'auto'
+          useDirtyRect: true
         });
         // debug logs removed for build/lint
         
@@ -726,29 +730,36 @@ const colorPalettes = {
           const effectiveData = (data && Object.keys(data).length > 0)
             ? data
             : getSampleDataForChartType(chartType);
-          const options = generateChartOptions(chartType, config, effectiveData);
+          let options = generateChartOptions(chartType, config, effectiveData);
+          
+          // Apply watermark for free plan users
+          const planType = currentOrganization?.plan_type || 'free';
+          options = addWatermarkToChart(options, planType);
             
             if (options && typeof options === 'object' && options.series && Array.isArray(options.series)) {
               // chart options being set
               chartInstance.current?.setOption(options, true);
+              // Ensure chart resizes to fill container after render
+              setTimeout(() => {
+                chartInstance.current?.resize();
+              }, 100);
               // chart options set successfully
             } else {
               console.warn('ChartWidget useEffect: Invalid options structure:', options);
             }
         });
 
-        // Observe size changes for responsiveness
-        const parentEl = chartRef.current?.parentElement;
-        if (parentEl) {
+        // Observe size changes for responsiveness - observe the chartRef itself
+        if (chartRef.current) {
           const debouncedResize = debounce(() => {
-      if (chartInstance.current) {
-        chartInstance.current.resize();
-      }
+            if (chartInstance.current) {
+              chartInstance.current.resize();
+            }
           }, 50);
           const ro = new ResizeObserver(() => {
             debouncedResize();
           });
-          ro.observe(parentEl);
+          ro.observe(chartRef.current);
           resizeObserverRef.current = ro;
         }
       } catch (err) {
@@ -830,7 +841,11 @@ const colorPalettes = {
           const effectiveData = (data && Object.keys(data).length > 0)
             ? data
             : getSampleDataForChartType(chartType);
-          const options = generateChartOptions(chartType, config, effectiveData);
+          let options = generateChartOptions(chartType, config, effectiveData);
+          
+          // Apply watermark for free plan users
+          const planType = currentOrganization?.plan_type || 'free';
+          options = addWatermarkToChart(options, planType);
           
           if (options && typeof options === 'object' && options.series && Array.isArray(options.series)) {
             chartInstance.current?.setOption(options, true);
@@ -852,10 +867,30 @@ const colorPalettes = {
   }, [config, data, isDarkMode, widget.type, handlePropertyUpdate]);
 
   const getWidgetTitle = () => {
-    return config?.title || 'Untitled Chart';
+    // Handle both string and object formats for title
+    if (!config?.title) {
+      return widget?.title || 'Untitled Chart';
+    }
+    if (typeof config.title === 'string') {
+      return config.title;
+    }
+    if (typeof config.title === 'object' && config.title?.text) {
+      return config.title.text;
+    }
+    return widget?.title || 'Untitled Chart';
   };
   const getWidgetSubtitle = () => {
-    return config?.subtitle || '';
+    // Handle both string and object formats for subtitle
+    if (!config?.subtitle) {
+      return widget?.subtitle || '';
+    }
+    if (typeof config.subtitle === 'string') {
+      return config.subtitle;
+    }
+    if (typeof config.subtitle === 'object' && config.subtitle?.text) {
+      return config.subtitle.text;
+    }
+    return widget?.subtitle || '';
   };
 
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -935,15 +970,17 @@ const colorPalettes = {
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
+        minHeight: 0,
         overflow: 'hidden',
         backgroundColor: config?.backgroundColor || 'transparent',
-        borderColor: config?.borderColor || (isSelected ? 'var(--color-brand-primary)' : 'var(--color-border-primary)'),
-        borderRadius: '6px',
-        border: isSelected ? '2px solid var(--color-brand-primary)' : '1px solid var(--color-border-primary)',
+        borderColor: config?.borderColor || (isSelected ? 'var(--ant-color-primary)' : 'var(--ant-color-border)'),
+        borderRadius: '0',
+        border: 'none',
         padding: config?.padding ? `${config.padding}px` : '0',
-        margin: config?.margin ? `${config.margin}px` : '0',
+        margin: '0',
         cursor: isPreviewMode ? 'default' : 'pointer',
         transition: 'all 0.2s ease',
+        boxSizing: 'border-box'
       }}
       onClick={(e) => {
         e.stopPropagation();
@@ -957,8 +994,8 @@ const colorPalettes = {
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: '8px 12px',
-        borderBottom: '1px solid var(--color-border-primary)',
+        padding: '4px 8px',
+        borderBottom: '1px solid var(--ant-color-border)',
         flexShrink: 0,
         background: config?.headerBackground || 'transparent',
         zIndex: 2,
@@ -996,13 +1033,16 @@ const colorPalettes = {
               level={5}
               style={{
                 margin: 0,
+                marginBottom: 0,
                 color: config?.titleColor || (isDarkMode ? '#ffffff' : '#000000'),
                 cursor: (isEditing || isSelected) && showEditableTitle ? 'text' : 'default',
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
-                padding: '2px 4px',
+                padding: '0 4px',
                 borderRadius: '2px',
+                fontSize: '13px',
+                lineHeight: '1.2',
                 transition: 'background-color 0.2s ease',
                 backgroundColor: (isEditing || isSelected) && showEditableTitle ? 'rgba(0,0,0,0.05)' : 'transparent'
               }}
@@ -1029,11 +1069,13 @@ const colorPalettes = {
                 border: 'none',
                 boxShadow: 'none',
                 background: 'transparent',
-                padding: '2px 4px',
+                padding: '0 4px',
+                marginTop: '2px',
                 width: 'fit-content',
                 minWidth: '60px',
                 maxWidth: '400px',
-                fontSize: '12px',
+                fontSize: '11px',
+                lineHeight: '1.1',
                 color: isDarkMode ? '#bfbfbf' : '#595959',
                 outline: 'none',
                 borderRadius: '2px'
@@ -1045,11 +1087,13 @@ const colorPalettes = {
               <span 
                 style={{
                   color: isDarkMode ? '#bfbfbf' : '#595959',
-                  fontSize: 12,
+                  fontSize: 11,
+                  lineHeight: '1.1',
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
-                  padding: '2px 4px',
+                  padding: '0 4px',
+                  marginTop: '2px',
                   borderRadius: '2px',
                   transition: 'background-color 0.2s ease',
                   backgroundColor: (isEditing || isSelected) && showEditableTitle ? 'rgba(0,0,0,0.05)' : 'transparent',
@@ -1074,14 +1118,207 @@ const colorPalettes = {
           menu={{
             items: [
               {
-                  key: 'view-config',
-                  icon: <SettingOutlined />,
-                  label: 'View ECharts Config',
-                  onClick: () => {
-                    message.info('ECharts config logged to console');
-                    // removed debug output
+                key: 'export-png',
+                icon: <DownloadOutlined />,
+                label: 'Export as PNG',
+                onClick: () => {
+                  if (chartInstance.current) {
+                    try {
+                      const url = chartInstance.current.getDataURL({
+                        type: 'png',
+                        backgroundColor: '#fff',
+                        pixelRatio: 2
+                      });
+                      const link = document.createElement('a');
+                      link.download = `${(widget.name || widget.title || 'chart').replace(/[^a-z0-9]/gi, '_')}.png`;
+                      link.href = url;
+                      link.click();
+                      message.success('Chart exported as PNG');
+                    } catch (error) {
+                      message.error('Failed to export chart as PNG');
+                    }
+                  } else {
+                    message.warning('Chart not ready for export. Please wait a moment and try again.');
                   }
-                },
+                }
+              },
+              {
+                key: 'export-svg',
+                icon: <DownloadOutlined />,
+                label: 'Export as SVG',
+                onClick: () => {
+                  if (chartInstance.current) {
+                    try {
+                      const url = chartInstance.current.getDataURL({
+                        type: 'svg',
+                        backgroundColor: '#fff'
+                      });
+                      const link = document.createElement('a');
+                      link.download = `${(widget.name || widget.title || 'chart').replace(/[^a-z0-9]/gi, '_')}.svg`;
+                      link.href = url;
+                      link.click();
+                      message.success('Chart exported as SVG');
+                    } catch (error) {
+                      message.error('Failed to export chart as SVG');
+                    }
+                  } else {
+                    message.warning('Chart not ready for export. Please wait a moment and try again.');
+                  }
+                }
+              },
+              { type: 'divider' as const },
+              {
+                key: 'copy-data',
+                icon: <CopyOutlined />,
+                label: 'Copy Data',
+                onClick: () => {
+                  if (chartInstance.current) {
+                    try {
+                      const option = chartInstance.current.getOption();
+                      // Extract data from ECharts option - get series data
+                      const seriesData = option.series && Array.isArray(option.series) 
+                        ? option.series.map((s: any) => ({
+                            name: s.name,
+                            type: s.type,
+                            data: s.data
+                          }))
+                        : [];
+                      // Also get xAxis data if available
+                      const xAxisData = option.xAxis && Array.isArray(option.xAxis) && option.xAxis[0]?.data
+                        ? option.xAxis[0].data
+                        : null;
+                      
+                      const dataToCopy = {
+                        series: seriesData,
+                        xAxis: xAxisData,
+                        rawData: data || {}
+                      };
+                      
+                      const dataStr = JSON.stringify(dataToCopy, null, 2);
+                      navigator.clipboard.writeText(dataStr);
+                      message.success('Chart data copied to clipboard');
+                    } catch (error) {
+                      message.error('Failed to copy data');
+                    }
+                  } else {
+                    message.warning('Chart not ready. Please wait a moment and try again.');
+                  }
+                }
+              },
+              {
+                key: 'view-config',
+                icon: <SettingOutlined />,
+                label: 'View Config (Copyable)',
+                onClick: () => {
+                  if (chartInstance.current) {
+                    try {
+                      const option = chartInstance.current.getOption();
+                      const optionStr = JSON.stringify(option, null, 2);
+                      // Show in modal for easy copying
+                      Modal.info({
+                        title: 'ECharts Configuration',
+                        width: 800,
+                        content: (
+                          <div style={{ maxHeight: '60vh', overflow: 'auto' }}>
+                            <pre style={{ 
+                              background: isDarkMode ? '#1e1e1e' : '#f5f5f5',
+                              padding: '12px',
+                              borderRadius: '4px',
+                              fontSize: '12px',
+                              whiteSpace: 'pre-wrap',
+                              wordBreak: 'break-word'
+                            }}>
+                              {optionStr}
+                            </pre>
+                            <Button 
+                              type="primary" 
+                              icon={<CopyOutlined />}
+                              onClick={() => {
+                                navigator.clipboard.writeText(optionStr);
+                                message.success('Config copied to clipboard!');
+                              }}
+                              style={{ marginTop: '12px' }}
+                            >
+                              Copy to Clipboard
+                            </Button>
+                          </div>
+                        )
+                      });
+                    } catch (error) {
+                      message.error('Failed to get chart config');
+                    }
+                  } else {
+                    message.warning('Chart not ready');
+                  }
+                }
+              },
+              { type: 'divider' as const },
+              {
+                key: 'save-to-library',
+                icon: <SaveOutlined />,
+                label: 'Save to Library',
+                onClick: async () => {
+                  try {
+                    const chartTitle = widget.title || widget.name || 'Untitled Chart';
+                    const assetData = {
+                      asset_type: 'chart',
+                      title: chartTitle,
+                      content: {
+                        type: config?.chartType || 'bar',
+                        config: config || {},
+                        data: data || {}
+                      },
+                      data_source_id: widget?.dataSourceId || widget?.data_source_id || null,
+                      metadata: {
+                        chartType: config?.chartType || 'bar',
+                        widgetId: widget.id,
+                        name: chartTitle,
+                        description: `Chart: ${chartTitle}`
+                      }
+                    };
+                    
+                    const response = await fetch('/api/assets', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      credentials: 'include',
+                      body: JSON.stringify(assetData)
+                    });
+                    
+                    if (!response.ok) {
+                      const errorText = await response.text().catch(() => '');
+                      throw new Error(`HTTP error! status: ${response.status}${errorText ? `: ${errorText}` : ''}`);
+                    }
+                    
+                    const result = await response.json();
+                    if (result) {
+                      message.success('Chart saved to library successfully!');
+                    } else {
+                      throw new Error('No result from save operation');
+                    }
+                  } catch (error: any) {
+                    console.error('Failed to save chart:', error);
+                    message.error(`Failed to save chart: ${error.message || 'Please try again.'}`);
+                  }
+                }
+              },
+              {
+                key: 'save-to-dashboard',
+                icon: <BarChartOutlined />,
+                label: 'Add to Dashboard',
+                onClick: () => {
+                  if (onChartCreate) {
+                    try {
+                      onChartCreate(widget);
+                      message.success('Chart added to dashboard!');
+                    } catch (error: any) {
+                      message.error(`Failed to add chart: ${error.message || 'Unknown error'}`);
+                    }
+                  } else {
+                    message.info('Navigate to Dashboard Studio to add this chart');
+                  }
+                }
+              },
+              ...(isPreviewMode ? [] : [
                 { type: 'divider' as const },
                 {
                   key: 'duplicate',
@@ -1097,12 +1334,13 @@ const colorPalettes = {
                 },
                 { type: 'divider' as const },
                 {
-                key: 'delete',
-                icon: <DeleteOutlined />,
+                  key: 'delete',
+                  icon: <DeleteOutlined />,
                   label: 'Delete',
-                danger: true,
+                  danger: true,
                   onClick: () => onDelete?.(widget.id)
                 }
+              ])
             ]
           }}
           trigger={['click']}
@@ -1127,16 +1365,21 @@ const colorPalettes = {
         position: 'relative', 
         width: '100%', 
         height: '100%', 
-        minHeight: '160px',
+        minHeight: 0,
         flex: 1,
-        overflow: 'hidden'
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column'
       }}>
         <div 
           ref={chartRef} 
           style={{
             width: '100%',
             height: '100%',
-            minHeight: '160px'
+            minHeight: '300px',
+            flex: 1,
+            position: 'relative',
+            overflow: 'hidden'
           }}
         />
         

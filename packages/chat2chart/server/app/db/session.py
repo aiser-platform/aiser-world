@@ -1,7 +1,5 @@
 from typing import AsyncGenerator
-from contextlib import asynccontextmanager
 
-from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import sessionmaker
@@ -27,7 +25,7 @@ async_engine = create_async_engine(
     connect_args={"server_settings": {"application_name": "chat2chart_async"}}
 )
 
-# Create async session factory
+# The original async_sessionmaker (without custom error suppression logic)
 async_session = async_sessionmaker(
     bind=async_engine,
     class_=AsyncSession,
@@ -73,15 +71,8 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
     """
     async with async_session() as session:
         try:
-            # attach a per-session lock to serialize operations on this
-            # session when needed to avoid asyncpg "another operation in
-            # progress" errors caused by overlapping awaits on the same
-            # connection.
-            try:
-                import asyncio as _asyncio
-                session._op_lock = _asyncio.Lock()
-            except Exception:
-                session._op_lock = None
+            import asyncio as _asyncio
+            session._op_lock = _asyncio.Lock() # Ensure the lock is set
             yield session
         except Exception:
             await session.rollback()

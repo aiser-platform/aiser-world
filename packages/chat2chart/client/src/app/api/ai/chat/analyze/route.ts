@@ -1,23 +1,61 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getBackendUrlForApi } from '@/utils/backendUrl';
+import { extractAccessToken } from '@/utils/cookieParser';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     // Forward the request to the backend using dynamic backend URL
     const backendBase = getBackendUrlForApi();
+    
+    // Extract auth cookie using reliable cookie parser
+    const accessToken = extractAccessToken({
+      cookies: request.cookies,
+      headers: request.headers
+    });
+    
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+    
+    // Check if streaming is requested
+    const isStreaming = body.stream === true || (body.user_context && body.user_context.stream === true);
+    if (isStreaming) {
+      headers['Accept'] = 'text/event-stream';
+    }
+    
+    // Forward to the correct backend endpoint: /ai/chat/analyze
     const response = await fetch(`${backendBase}/ai/chat/analyze`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify(body),
     });
 
     if (!response.ok) {
-      throw new Error(`Backend error: ${response.status}`);
+      const errorText = await response.text().catch(() => 'Unknown error');
+      throw new Error(`Backend error: ${response.status} - ${errorText}`);
     }
 
+    // Check if response is streaming (SSE)
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('text/event-stream') || isStreaming) {
+      // Return streaming response - pass through the stream
+      return new NextResponse(response.body, {
+        status: response.status,
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+          'X-Accel-Buffering': 'no',
+        },
+      });
+    }
+
+    // Non-streaming response - parse as JSON
     const result = await response.json();
     
     return NextResponse.json(result);

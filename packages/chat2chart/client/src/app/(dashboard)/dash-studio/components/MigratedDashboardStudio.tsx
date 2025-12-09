@@ -877,7 +877,7 @@ const getDefaultConfigForWidgetType = (widgetType: string) => {
           backgroundColor: 'transparent',
       borderColor: '#d9d9d9',
       textColor: '#000000',
-      background: '#ffffff',
+      background: 'var(--ant-color-bg-container)',
           borderRadius: 8,
       border: '1px solid #d9d9d9'
     },
@@ -1100,16 +1100,29 @@ function InternalMigratedDashboardStudio() {
   const [isEditing, setIsEditing] = useState(true);
   const [activeTab, setActiveTab] = useState(initialTab);
   
-  // Sync activeTab with URL changes
+  // Sync activeTab with URL changes and redirect query-editor tab to dedicated page
   useEffect(() => {
     const currentTab = searchParams?.get('tab') || 'dashboard';
+    
+    // Redirect if query-editor tab is accessed via URL
+    if (currentTab === 'query-editor') {
+      router.push('/query-editor');
+      return;
+    }
+    
     if (currentTab !== activeTab) {
       setActiveTab(currentTab);
     }
-  }, [searchParams, activeTab]);
+  }, [searchParams, activeTab, router]);
 
   // Update URL when tab changes internally
   const handleTabChange = useCallback((key: string) => {
+    // Redirect query-editor to dedicated page
+    if (key === 'query-editor') {
+      router.push('/query-editor');
+      return;
+    }
+    
     setActiveTab(key);
     try {
       const qp = new URLSearchParams();
@@ -1127,8 +1140,6 @@ function InternalMigratedDashboardStudio() {
   useEffect(() => {
     if (activeTab === 'dashboard' || activeTab === 'chart-designer') {
       setShowProperties(true);
-    } else if (activeTab === 'query-editor') {
-      setShowProperties(false);
     }
   }, [activeTab]);
   const [dashboardTitle, setDashboardTitle] = useState('My Dashboard');
@@ -1372,14 +1383,14 @@ function InternalMigratedDashboardStudio() {
     return (
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
         <Card style={{ 
-          background: 'var(--color-surface-raised)', 
-          borderColor: 'var(--color-border-primary)',
+          background: 'var(--ant-color-bg-elevated)', 
+          borderColor: 'var(--ant-color-border)',
           flex: 1,
           display: 'flex',
           flexDirection: 'column'
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexShrink: 0 }}>
-            <Typography.Title level={4} style={{ margin: 0, color: 'var(--color-text-primary)' }}>
+            <Typography.Title level={4} style={{ margin: 0, color: 'var(--ant-color-text)' }}>
               Dashboard Canvas
             </Typography.Title>
             <Space>
@@ -1402,8 +1413,8 @@ function InternalMigratedDashboardStudio() {
           
           <div 
             style={{ 
-              background: 'var(--color-surface-primary)', 
-          border: '1px solid var(--color-border-primary)',
+              background: 'var(--ant-color-bg-container)', 
+          border: '1px solid var(--ant-color-border)',
               borderRadius: '6px',
           flex: 1,
           position: 'relative',
@@ -1421,7 +1432,7 @@ function InternalMigratedDashboardStudio() {
                 zIndex: 10,
                 pointerEvents: isDragging ? 'auto' : 'none', // Only capture events when dragging
                 background: isDragging ? 'rgba(24, 144, 255, 0.1)' : 'transparent',
-                border: isDragging ? '2px dashed var(--color-brand-primary)' : 'none',
+                border: isDragging ? '2px dashed var(--ant-color-primary)' : 'none',
                 borderRadius: '6px'
               }}
               onDragOver={(e) => {
@@ -1430,16 +1441,16 @@ function InternalMigratedDashboardStudio() {
                 // Add visual feedback for drag over
                 const canvas = e.currentTarget.parentElement;
                 if (canvas) {
-                  canvas.style.borderColor = 'var(--color-brand-primary)';
-                  canvas.style.backgroundColor = 'var(--color-brand-primary-light)';
+                  canvas.style.borderColor = 'var(--ant-color-primary)';
+                  canvas.style.backgroundColor = 'var(--ant-color-primary-bg)';
                 }
               }}
               onDragLeave={(e) => {
                 // Remove visual feedback when drag leaves
                 const canvas = e.currentTarget.parentElement;
                 if (canvas) {
-                  canvas.style.borderColor = 'var(--color-border-primary)';
-                  canvas.style.backgroundColor = 'var(--color-surface-primary)';
+                  canvas.style.borderColor = 'var(--ant-color-border)';
+                  canvas.style.backgroundColor = 'var(--ant-color-bg-container)';
                 }
               }}
               onDrop={(e) => {
@@ -1449,8 +1460,8 @@ function InternalMigratedDashboardStudio() {
                 // Reset visual feedback
                 const canvas = e.currentTarget.parentElement;
                 if (canvas) {
-                  canvas.style.borderColor = 'var(--color-border-primary)';
-                  canvas.style.backgroundColor = 'var(--color-surface-primary)';
+                  canvas.style.borderColor = 'var(--ant-color-border)';
+                  canvas.style.backgroundColor = 'var(--ant-color-bg-container)';
                 }
                 
                 try {
@@ -1518,8 +1529,8 @@ function InternalMigratedDashboardStudio() {
                 const widgetData = widget.config?.data || widget.data || {};
     return (
                 <div key={widget.id} style={{ 
-              background: 'var(--color-surface-raised)', 
-                  border: selectedWidgetIds.includes(widget.id) ? '2px solid var(--color-brand-primary)' : '1px solid var(--color-border-primary)',
+              background: 'var(--ant-color-bg-elevated)', 
+                  border: selectedWidgetIds.includes(widget.id) ? '2px solid var(--ant-color-primary)' : '1px solid var(--ant-color-border)',
                   borderRadius: '6px',
                   padding: '12px',
                   position: 'relative',
@@ -1696,21 +1707,21 @@ function InternalMigratedDashboardStudio() {
                 left: '50%',
                 transform: 'translate(-50%, -50%)',
           textAlign: 'center',
-                color: 'var(--color-text-secondary)',
+                color: 'var(--ant-color-text-secondary)',
                 pointerEvents: 'none',
-                border: '2px dashed var(--color-border-primary)',
+                border: '2px dashed var(--ant-color-border)',
                 borderRadius: '8px',
                 padding: '40px',
-                background: 'var(--color-surface-raised)'
+                background: 'var(--ant-color-bg-elevated)'
               }}>
-                <DashboardOutlined style={{ fontSize: '48px', marginBottom: '16px', color: 'var(--color-brand-primary)' }} />
-                <Typography.Title level={4} style={{ color: 'var(--color-text-secondary)' }}>
+                <DashboardOutlined style={{ fontSize: '48px', marginBottom: '16px', color: 'var(--ant-color-primary)' }} />
+                <Typography.Title level={4} style={{ color: 'var(--ant-color-text-secondary)' }}>
                   Drop widgets here
                 </Typography.Title>
-          <Typography.Text style={{ color: 'var(--color-text-secondary)' }}>
+          <Typography.Text style={{ color: 'var(--ant-color-text-secondary)' }}>
                   Drag widgets from the design panel to start building your dashboard
           </Typography.Text>
-                <div style={{ marginTop: '16px', fontSize: '12px', color: 'var(--color-text-tertiary)' }}>
+                <div style={{ marginTop: '16px', fontSize: '12px', color: 'var(--ant-color-text-tertiary)' }}>
                   💡 Tip: Open the design panel (⚙️) to access the widget library
                 </div>
               </div>
@@ -1741,7 +1752,7 @@ function InternalMigratedDashboardStudio() {
         flexDirection: 'column',
         gap: '16px'
       }}>
-        <Typography.Title level={3} style={{ color: 'var(--color-text-primary)' }}>
+        <Typography.Title level={3} style={{ color: 'var(--ant-color-text)' }}>
           Dashboard Error
         </Typography.Title>
         <Typography.Text style={{ color: 'var(--color-text-secondary)' }}>
@@ -1770,12 +1781,14 @@ function InternalMigratedDashboardStudio() {
       
       {/* Header */}
       <Header style={{ 
-        background: 'var(--layout-header-background)', 
-        borderBottom: '1px solid var(--color-border-primary)',
+        background: 'var(--ant-color-bg-header, var(--layout-header-background))', 
+        borderBottom: '1px solid var(--ant-color-border, var(--color-border-primary))',
         padding: '0 24px',
         height: '64px',
         lineHeight: '64px',
-        flexShrink: 0
+        flexShrink: 0,
+        color: 'var(--ant-color-text)',
+        transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
@@ -1912,39 +1925,6 @@ function InternalMigratedDashboardStudio() {
                 children: renderDashboardTab()
               },
               {
-                key: 'query-editor',
-                label: (
-                  <span>
-                    <DatabaseOutlined /> Query Editor
-                  </span>
-                ),
-                children: (
-                  <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                    <Card style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                      <div style={{ marginBottom: '16px', flexShrink: 0 }}>
-                        <Typography.Title level={4} style={{ margin: 0, color: 'var(--color-text-primary)' }}>
-                          SQL Query Editor
-                        </Typography.Title>
-                        <Typography.Text style={{ color: 'var(--color-text-secondary)' }}>
-                          Write and execute SQL queries for your dashboard data
-                        </Typography.Text>
-                      </div>
-                      <div style={{ flex: 1, minHeight: '400px' }}>
-                        <MonacoSQLEditor
-                          value="-- Write your SQL query here\nSELECT * FROM your_table LIMIT 100;"
-                                  onChange={(value: any) => console.log('SQL changed:', value)}
-                                  onExecute={(query: any) => {
-                            console.log('Executing query:', query);
-                            message.info('Query execution will be implemented');
-                          }}
-                          isDarkMode={isDarkMode}
-                        />
-                      </div>
-                    </Card>
-                  </div>
-                )
-              },
-              {
                 key: 'chart-designer',
                 label: (
                   <span>
@@ -1987,11 +1967,12 @@ function InternalMigratedDashboardStudio() {
         </Content>
       </Layout>
 
-      {/* Status Bar */}
-      <div style={{
+      {/* Status Bar - Only show in dashboard-studio, scoped to this component */}
+      {activeTab === 'dashboard' && (
+      <div className="dash-studio-status-bar" style={{
         position: 'fixed',
         bottom: 0,
-        left: 0,
+        left: 'var(--sidebar-width, 256px)', // Start after sidebar (responsive to collapse state)
         right: 0,
         height: '32px',
         background: 'var(--color-surface-raised)',
@@ -2002,7 +1983,8 @@ function InternalMigratedDashboardStudio() {
         padding: '0 16px',
         fontSize: '12px',
         color: 'var(--color-text-secondary)',
-        zIndex: 1000
+        zIndex: 999,
+        boxSizing: 'border-box',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <span>Widgets: {widgets.length}</span>
@@ -2017,6 +1999,7 @@ function InternalMigratedDashboardStudio() {
           <span>Esc: Deselect</span>
         </div>
       </div>
+      )}
     </div>
   );
 }

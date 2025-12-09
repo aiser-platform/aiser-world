@@ -6,28 +6,20 @@ Creates production-ready organizations, users, and initial data
 
 import os
 import sys
-import asyncio
 import secrets
-import hashlib
 from datetime import datetime, timezone
-from typing import Dict, Any, Optional
 import json
 
 # Add the server package to the path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'packages', 'chat2chart', 'server'))
 
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy import select, text
+from sqlalchemy.ext.asyncio import AsyncSession
 from passlib.context import CryptContext
 
-from app.core.database import get_async_session
 from app.models.user import User
 from app.models.organization import Organization, OrganizationUser
 from app.models.project import Project, ProjectUser
 from app.models.data import DataSource
-from app.models.charts import Dashboard
-from app.core.config import settings
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -178,7 +170,7 @@ class RealOrganizationSetup:
             json.dump(passwords, f, indent=2)
         
         print(f"✅ Created {len(self.users)} real users")
-        print(f"📝 Passwords saved to generated_passwords.json")
+        print("📝 Passwords saved to generated_passwords.json")
     
     async def create_organization_users(self, session: AsyncSession):
         """Create organization-user relationships"""

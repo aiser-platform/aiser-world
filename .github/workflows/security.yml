@@ -1,0 +1,220 @@
+name: Security Scanning
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run weekly on Sundays at midnight
+    - cron: '0 0 * * 0'
+
+jobs:
+  secret-scan:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for better secret detection
+      
+      - name: Run TruffleHog
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --only-verified
+
+  dependency-scan:
+    name: Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install Safety
+        run: pip install safety
+      
+      - name: Scan Python Dependencies (Chat2Chart)
+        working-directory: packages/chat2chart/server
+        run: |
+          pip install poetry
+          poetry export -f requirements.txt --output requirements.txt
+          safety check --file requirements.txt --json || true
+      
+      - name: Scan Python Dependencies (Auth)
+        working-directory: packages/auth
+        run: |
+          pip install poetry
+          poetry export -f requirements.txt --output requirements.txt
+          safety check --file requirements.txt --json || true
+      
+      - name: npm audit
+        run: |
+          npm audit --audit-level=high || true
+
+  container-scan:
+    name: Container Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run Trivy vulnerability scanner (Chat2Chart)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: './packages/chat2chart/server'
+          format: 'sarif'
+          output: 'trivy-chat2chart.sarif'
+          severity: 'CRITICAL,HIGH'
+      
+      - name: Run Trivy vulnerability scanner (Auth)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: './packages/auth'
+          format: 'sarif'
+          output: 'trivy-auth.sarif'
+          severity: 'CRITICAL,HIGH'
+      
+      - name: Upload Trivy results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: '.'
+
+  code-scanning:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'python', 'javascript' ]
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v2
+        with:
+          languages: ${{ matrix.language }}
+      
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v2
+      
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v2
+        with:
+          category: "/language:${{matrix.language}}"
+
+  sast-python:
+    name: Python SAST (Bandit)
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install Bandit
+        run: pip install bandit[toml]
+      
+      - name: Run Bandit on Chat2Chart
+        run: |
+          bandit -r packages/chat2chart/server/app \
+            -f json \
+            -o bandit-chat2chart.json \
+            -ll || true
+      
+      - name: Run Bandit on Auth
+        run: |
+          bandit -r packages/auth/src \
+            -f json \
+            -o bandit-auth.json \
+            -ll || true
+      
+      - name: Upload Bandit results
+        uses: actions/upload-artifact@v3
+        with:
+          name: bandit-results
+          path: bandit-*.json
+
+  license-check:
+    name: License Compliance Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install license checker
+        run: npm install -g license-checker
+      
+      - name: Check npm licenses
+        run: |
+          license-checker --json --out npm-licenses.json || true
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install pip-licenses
+        run: pip install pip-licenses
+      
+      - name: Check Python licenses (Chat2Chart)
+        working-directory: packages/chat2chart/server
+        run: |
+          pip install poetry
+          poetry export -f requirements.txt --output requirements.txt
+          pip install -r requirements.txt
+          pip-licenses --format=json --output-file=../../python-licenses-chat2chart.json || true
+      
+      - name: Upload license reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: license-reports
+          path: |
+            npm-licenses.json
+            python-licenses-*.json
+
+  security-summary:
+    name: Security Summary
+    runs-on: ubuntu-latest
+    needs: [secret-scan, dependency-scan, container-scan, code-scanning, sast-python, license-check]
+    if: always()
+    
+    steps:
+      - name: Summary
+        run: |
+          echo "## Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "All security scans completed. Check individual job results for details." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Secret Scanning: ${{ needs.secret-scan.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Dependency Scanning: ${{ needs.dependency-scan.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Container Scanning: ${{ needs.container-scan.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Code Scanning (CodeQL): ${{ needs.code-scanning.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- SAST (Bandit): ${{ needs.sast-python.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- License Compliance: ${{ needs.license-check.result }}" >> $GITHUB_STEP_SUMMARY
+

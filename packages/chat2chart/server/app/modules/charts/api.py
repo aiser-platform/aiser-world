@@ -1,7 +1,6 @@
-from typing import Annotated, List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional
 from app.modules.charts.schemas import (
     ChartConfiguration,
-    ChatVisualizationResponseSchema,
     DashboardCreateSchema,
     DashboardUpdateSchema,
     DashboardResponseSchema,
@@ -26,11 +25,12 @@ from sqlalchemy import select
 from app.modules.authentication.deps.auth_bearer import JWTCookieBearer
 from app.modules.authentication.auth import Auth
 from app.core.config import settings
-from fastapi import APIRouter, Depends, HTTPException, Body, UploadFile, File, Request
+from fastapi import APIRouter, Depends, HTTPException, Body, UploadFile, File, Request, status
+from typing import Union
 import os
-from typing import Optional
 from app.db.session import async_session
 from contextlib import asynccontextmanager
+from sqlalchemy import text
 
 
 @asynccontextmanager
@@ -46,7 +46,11 @@ async def use_session(db: AsyncSession | None):
         async with async_session() as s:
             yield s
 from app.modules.user.models import User
-from app.modules.authentication.rbac import has_dashboard_access, is_project_owner, has_org_role
+from app.modules.authentication.rbac import has_dashboard_access
+from app.modules.authentication.rbac.decorators import require_permission
+from app.modules.authentication.rbac.permissions import Permission
+from app.modules.pricing.feature_gate import require_feature, check_feature_for_org
+from app.modules.pricing.rate_limiter import RateLimiter
 
 
 async def _optional_token(request: Request) -> Optional[str]:
@@ -67,7 +71,6 @@ async def _optional_token(request: Request) -> Optional[str]:
     return token
 from pydantic import BaseModel
 import logging
-import json
 
 logger = logging.getLogger(__name__)
 
@@ -175,9 +178,52 @@ async def generate_mcp_chart(request: MCPChartRequest):
 
 
 @router.post("/generate")
-async def generate_chart(request: ChartGenerationRequest):
-    """Generate chart from query results and analysis"""
+async def generate_chart(
+    request: ChartGenerationRequest,
+    current_token: Union[str, dict] = Depends(JWTCookieBearer())
+):
+    """Generate chart from query results and analysis - All plans can use AI (with credit limits)"""
     try:
+        # Get user and organization info for credit checking and watermark
+        if isinstance(current_token, dict):
+            user_payload = current_token
+        else:
+            user_payload = Auth().decodeJWT(current_token) or {}
+        
+        user_id = str(user_payload.get('id') or user_payload.get('user_id') or user_payload.get('sub') or '')
+        plan_type = None
+        org_id = None
+        
+        # Check credits before generation (all plans have credits, free plan has 10/month)
+        if user_id:
+            async with async_session() as db:
+                # Get user's organization
+                result = await db.execute(
+                    text("""
+                        SELECT o.id, o.plan_type 
+                        FROM organizations o
+                        JOIN user_organizations uo ON o.id = uo.organization_id
+                        WHERE uo.user_id = :user_id
+                        LIMIT 1
+                    """),
+                    {"user_id": user_id}
+                )
+                org = result.fetchone()
+                if org:
+                    org_id = org.id
+                    plan_type = org.plan_type
+                    
+                    # Check AI credits (all plans have credits, free plan has 10/month)
+                    from app.modules.pricing.rate_limiter import RateLimiter
+                    rate_limiter = RateLimiter(db)
+                    # Estimate 1 credit per chart generation
+                    has_credits, credit_message = await rate_limiter.check_ai_credits(org_id, 1)
+                    if not has_credits:
+                        raise HTTPException(
+                            status_code=status.HTTP_403_FORBIDDEN,
+                            detail=f"Insufficient AI credits. {credit_message} Please upgrade to get more credits."
+                        )
+        
         logger.info(f"🎨 Chart generation request: {request.natural_language_query}")
         
         # If no query analysis provided, create basic one
@@ -194,10 +240,40 @@ async def generate_chart(request: ChartGenerationRequest):
             options=request.options
         )
         
+        # Consume credits after successful generation
+        if result.get('success') and org_id and user_id:
+            async with async_session() as db:
+                from app.modules.pricing.rate_limiter import RateLimiter
+                rate_limiter = RateLimiter(db)
+                # Consume 1 credit per chart generation
+                await rate_limiter.consume_credits(
+                    org_id,
+                    1,
+                    user_id,
+                    metadata={'action': 'chart_generation', 'query': request.natural_language_query[:100]}
+                )
+        
+        # Apply watermark based on plan type (free plan gets watermark)
+        if result.get('success') and result.get('chart_config'):
+            from app.modules.charts.utils.watermark import add_watermark_to_chart_config
+            result['chart_config'] = add_watermark_to_chart_config(
+                result['chart_config'],
+                plan_type
+            )
+        
+        # Also check echarts_config
+        if result.get('success') and result.get('echarts_config'):
+            from app.modules.charts.utils.watermark import add_watermark_to_chart_config
+            result['echarts_config'] = add_watermark_to_chart_config(
+                result['echarts_config'],
+                plan_type
+            )
+        
         return {
             "success": result.get('success', False),
             "chart_type": result.get('chart_type'),
             "chart_config": result.get('chart_config'),
+            "echarts_config": result.get('echarts_config'),
             "data_analysis": result.get('data_analysis'),
             "generation_metadata": result.get('generation_metadata'),
             "error": result.get('error')
@@ -493,12 +569,13 @@ async def share_chart(chart_data: Dict[str, Any]):
 # 🏗️ PROJECT-SCOPED DASHBOARD ENDPOINTS
 
 @router.get("/api/organizations/{organization_id}/projects/{project_id}/dashboards")
+@require_permission(Permission.DASHBOARD_VIEW, resource_type="project", resource_id_param="project_id")
 async def get_project_dashboards(
     organization_id: str,
     project_id: str,
     limit: int = 50,
     offset: int = 0,
-    current_token: str = Depends(JWTCookieBearer()),
+    current_token: dict = Depends(JWTCookieBearer()),
     db: AsyncSession = Depends(get_async_session)
 ):
     """Get dashboards for a specific project (project-scoped) - DB backed."""
@@ -527,11 +604,12 @@ async def get_project_dashboards(
 
 
 @router.post("/api/organizations/{organization_id}/projects/{project_id}/dashboards")
+@require_permission(Permission.DASHBOARD_EDIT, resource_type="project", resource_id_param="project_id")
 async def create_project_dashboard(
     organization_id: str,
     project_id: str,
     dashboard: DashboardCreateSchema,
-    current_token: str = Depends(JWTCookieBearer()),
+    current_token: dict = Depends(JWTCookieBearer()),
     db: AsyncSession = Depends(get_async_session)
 ):
     """Create a new dashboard for a specific project - DB backed and ownership checked."""
@@ -631,6 +709,7 @@ async def update_project_dashboard(
 
 
 @router.delete("/api/organizations/{organization_id}/projects/{project_id}/dashboards/{dashboard_id}")
+@require_permission(Permission.DASHBOARD_DELETE, resource_type="project", resource_id_param="project_id")
 async def delete_project_dashboard(
     organization_id: str,
     project_id: str,
@@ -1124,7 +1203,7 @@ async def update_dashboard(
                     except Exception:
                         upd = dashboard.dict(exclude_unset=True)
                     from sqlalchemy import select
-                    from app.modules.charts.models import Dashboard as _Dash
+                    from app.modules.dashboards.models import Dashboard as _Dash
                     res = await db.execute(select(_Dash).where(_Dash.id == dashboard_id))
                     drow = res.scalar_one_or_none()
                     if not drow:
@@ -1170,7 +1249,7 @@ async def update_dashboard(
                     except Exception:
                         upd = dashboard.dict(exclude_unset=True)
                     from sqlalchemy import select
-                    from app.modules.charts.models import Dashboard as _Dash
+                    from app.modules.dashboards.models import Dashboard as _Dash
                     res = await db.execute(select(_Dash).where(_Dash.id == dashboard_id))
                     drow = res.scalar_one_or_none()
                     if not drow:
@@ -1255,7 +1334,7 @@ async def update_dashboard(
                     except Exception:
                         upd = dashboard.dict(exclude_unset=True)
                     from sqlalchemy import select
-                    from app.modules.charts.models import Dashboard as _Dash
+                    from app.modules.dashboards.models import Dashboard as _Dash
                     res = await db.execute(select(_Dash).where(_Dash.id == dashboard_id))
                     drow = res.scalar_one_or_none()
                     if drow is None:
@@ -1335,7 +1414,8 @@ async def delete_dashboard(
         try:
             auth_hdr_val = request.headers.get('Authorization') or request.headers.get('authorization')
             token_present_quick = bool(auth_hdr_val or request.cookies.get('c2c_access_token') or request.cookies.get('access_token'))
-            logger.info(f"delete_dashboard top bypass: token_present_quick={token_present_quick} auth_hdr_masked={(auth_hdr_val[:12] + '...') if auth_hdr_val else None}")
+            # Only log presence, never actual token values
+            logger.debug(f"delete_dashboard top bypass: token_present_quick={token_present_quick} auth_hdr_present={bool(auth_hdr_val)}")
         except Exception as e:
             logger.exception(f"delete_dashboard top bypass: failed to inspect headers: {e}")
             token_present_quick = False
@@ -1700,7 +1780,7 @@ async def share_dashboard(dashboard_id: str, share_request: DashboardShareCreate
         except Exception:
             user_id = 0
 
-        from app.modules.charts.models import DashboardShare, Dashboard
+        from app.modules.dashboards.models import DashboardShare, Dashboard
         from app.db.session import async_session
         async with async_session() as db:
             # Basic permission: only owner/org_admin can share
@@ -1718,8 +1798,8 @@ async def share_dashboard(dashboard_id: str, share_request: DashboardShareCreate
                     if proj:
                         org_id = proj.organization_id
                 if org_id:
-                    from app.modules.projects.models import OrganizationUser
-                    our = await db.execute(select(OrganizationUser).where(OrganizationUser.user_id == user_id, OrganizationUser.organization_id == org_id))
+                    from app.modules.projects.models import UserOrganization
+                    our = await db.execute(select(UserOrganization).where(UserOrganization.user_id == user_id, UserOrganization.organization_id == org_id))
                     our_row = our.scalar_one_or_none()
                     if not our_row or our_row.role not in ('owner', 'admin'):
                         raise HTTPException(status_code=403, detail="Insufficient permissions to share dashboard")
@@ -1766,7 +1846,7 @@ async def publish_dashboard(dashboard_id: str, make_public: bool = True, current
 
         # Load dashboard and enforce RBAC via central helper
         from app.db.session import async_session
-        from app.modules.charts.models import Dashboard
+        from app.modules.dashboards.models import Dashboard
         from app.modules.authentication.rbac import has_dashboard_access
         async with async_session() as sdb:
             res = await sdb.execute(select(Dashboard).where(Dashboard.id == dashboard_id))
@@ -1806,7 +1886,7 @@ async def create_dashboard_embed(dashboard_id: str, options: Dict[str, Any] = Bo
         user_payload = current_token if isinstance(current_token, dict) else (Auth().decodeJWT(current_token) or {})
 
         # Permission: only users with dashboard access can create embed
-        from app.modules.charts.models import DashboardEmbed, Dashboard
+        from app.modules.dashboards.models import DashboardEmbed, Dashboard
         from app.db.session import async_session
         from app.modules.authentication.rbac import has_dashboard_access
         async with async_session() as sdb:
@@ -1846,7 +1926,7 @@ async def serve_embedded_dashboard(dashboard_id: str, token: Optional[str] = Non
         if not token:
             raise HTTPException(status_code=401, detail="Embed token required")
 
-        from app.modules.charts.models import DashboardEmbed, Dashboard
+        from app.modules.dashboards.models import DashboardEmbed, Dashboard
         from app.db.session import async_session
         async with async_session() as sdb:
             res = await sdb.execute(select(DashboardEmbed).where(DashboardEmbed.embed_token == token, DashboardEmbed.dashboard_id == dashboard_id, DashboardEmbed.is_active == True))

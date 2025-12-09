@@ -1,0 +1,100 @@
+/* Deep Analysis Report Styles */
+
+.deep-analysis-report {
+    width: 100%;
+    padding: 0;
+}
+
+.deep-analysis-report.dark {
+    background-color: transparent;
+    color: #ffffff;
+}
+
+.deep-analysis-report.light {
+    background-color: transparent;
+    color: #000000;
+}
+
+.section-title {
+    margin-bottom: 16px !important;
+    font-weight: 600;
+    color: var(--ant-color-text);
+}
+
+.deep-analysis-report.dark .section-title {
+    color: #ffffff;
+}
+
+.deep-analysis-report.light .section-title {
+    color: #000000;
+}
+
+.executive-summary-card,
+.charts-section-card,
+.insights-section-card,
+.recommendations-section-card {
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.deep-analysis-report.dark .executive-summary-card,
+.deep-analysis-report.dark .charts-section-card,
+.deep-analysis-report.dark .insights-section-card,
+.deep-analysis-report.dark .recommendations-section-card {
+    background-color: #1f1f1f;
+    border-color: #434343;
+}
+
+.deep-analysis-report.light .executive-summary-card,
+.deep-analysis-report.light .charts-section-card,
+.deep-analysis-report.light .insights-section-card,
+.deep-analysis-report.light .recommendations-section-card {
+    background-color: #ffffff;
+    border-color: #d9d9d9;
+}
+
+.executive-summary-text {
+    color: var(--ant-color-text);
+    line-height: 1.8;
+    font-size: 14px;
+    margin-bottom: 0;
+}
+
+.deep-analysis-report.dark .executive-summary-text {
+    color: #d9d9d9;
+}
+
+.deep-analysis-report.light .executive-summary-text {
+    color: #595959;
+}
+
+.chart-carousel {
+    width: 100%;
+}
+
+.chart-slide {
+    padding: 8px;
+    min-height: 400px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.insights-list,
+.recommendations-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .chart-slide {
+        min-height: 300px;
+    }
+    
+    .section-title {
+        font-size: 16px !important;
+    }
+}
+

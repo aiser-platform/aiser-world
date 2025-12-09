@@ -2,36 +2,44 @@
 .dashboard-studio {
   height: 100vh;
   overflow: hidden;
-  background: var(--layout-background);
-  color: var(--color-text-primary);
+  background: var(--ant-color-bg-layout);
+  color: var(--ant-color-text);
 }
 
-/* Enhanced Dashboard Tab Container */
+/* Enhanced Dashboard Tab Container - Uses modern design system */
 .dashboard-tab-container {
-  background: var(--layout-background);
-  border-radius: 12px;
-  padding: 24px;
+  background: var(--ant-color-bg-container);
+  border: var(--border-width-thin) solid var(--ant-color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-xl);
   min-height: 600px;
+  box-shadow: var(--shadow-sm);
+  margin: var(--spacing-md);
 }
 
-/* Enhanced Dashboard Header */
+/* Enhanced Dashboard Header - Uses modern design system */
 .dashboard-header {
-  background: var(--layout-panel-background);
-  border: 1px solid var(--color-border-primary);
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 24px;
+  background: var(--ant-color-bg-container);
+  border: var(--border-width-thin) solid var(--ant-color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  margin-bottom: var(--spacing-lg);
   box-shadow: var(--shadow-sm);
+  transition: all var(--transition-base);
+}
+
+.dashboard-header:hover {
+  box-shadow: var(--shadow-md);
 }
 
 .dashboard-header h3 {
-  color: var(--color-text-primary);
+  color: var(--ant-color-text);
   font-weight: 600;
   margin: 0;
 }
 
 .dashboard-header .ant-typography {
-  color: var(--color-text-secondary);
+  color: var(--ant-color-text-secondary);
   font-size: var(--font-size-base);
 }
 
@@ -45,13 +53,14 @@
   overflow: hidden;
 }
 
-/* Modern Header Styles */
+/* Modern Header Styles - Uses modern design system */
 .modern-dashboard-header {
   position: relative;
   z-index: 100;
   backdrop-filter: blur(8px);
-  background: var(--layout-header-background) !important;
-  border-bottom: 1px solid var(--color-border-primary) !important;
+  background: var(--ant-color-bg-container) !important;
+  border-bottom: var(--border-width-thin) solid var(--ant-color-border) !important;
+  box-shadow: var(--shadow-sm) !important;
 }
 
 .header-left, .header-center, .header-right {
@@ -64,10 +73,11 @@
   justify-content: center;
 }
 
-/* Modern Sidebar Styles */
+/* Modern Sidebar Styles - Uses modern design system */
 .modern-sidebar {
-  border-right: 1px solid var(--color-border-primary) !important;
-  background: var(--layout-sidebar-background) !important;
+  border-right: var(--border-width-thin) solid var(--ant-color-border) !important;
+  background: var(--ant-color-bg-container) !important;
+  box-shadow: var(--shadow-sm) !important;
 }
 
 .sidebar-content {
@@ -94,7 +104,7 @@
 
 .dashboard-canvas.drag-over {
   background: rgba(24, 144, 255, 0.1) !important;
-  border-color: var(--color-brand-primary) !important;
+  border-color: var(--ant-color-primary) !important;
   box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
 }
 
@@ -147,7 +157,7 @@
 
 .dashboard-canvas.drag-over {
   background: rgba(24, 144, 255, 0.1) !important;
-  border-color: var(--color-brand-primary) !important;
+  border-color: var(--ant-color-primary) !important;
   box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
 }
 
@@ -172,32 +182,37 @@
   transform: rotate(5deg);
 }
 
+/* Dashboard Widgets - Modern design with clear separation */
 .dashboard-widget {
-  transition: all 0.2s ease;
-  border: none !important; /* Clean design - no borders */
-  background: transparent !important; /* Clean design - transparent background */
+  transition: all var(--transition-base);
+  border: var(--border-width-thin) solid var(--ant-color-border) !important;
+  background: var(--ant-color-bg-container) !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-sm) !important;
 }
 
 .dashboard-widget:hover {
-  transform: translateY(-1px); /* Subtle hover effect */
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md) !important;
+  border-color: var(--ant-color-primary) !important;
 }
 
 .dashboard-widget .ant-card {
   height: 100%;
-  transition: all 0.2s ease;
-  border: none !important; /* Clean design - no card borders */
-  background: transparent !important; /* Clean design - transparent card background */
-  box-shadow: none !important; /* Clean design - no card shadows */
+  transition: all var(--transition-base);
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: var(--radius-lg) !important;
 }
 
 .dashboard-widget .ant-card:hover {
-  border: none !important; /* Clean design - no hover borders */
+  border: none !important;
 }
 
 .dashboard-widget.selected .ant-card {
-  border-color: var(--color-brand-primary);
-  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+  border: var(--border-width-medium) solid var(--ant-color-primary) !important;
+  box-shadow: 0 0 0 2px var(--ant-color-primary-bg) !important;
 }
 
 /* Grid Layout Customization */
@@ -229,7 +244,7 @@
 }
 
 .react-grid-item.react-grid-placeholder {
-  background: var(--color-brand-primary);
+  background: var(--ant-color-primary);
   opacity: 0.2;
   transition-duration: 100ms;
   z-index: 2;

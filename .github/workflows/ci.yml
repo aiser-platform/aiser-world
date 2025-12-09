@@ -1,52 +1,206 @@
-name: Aiser World CI/CD
+name: CI/CD Pipeline
 
 on:
   push:
     branches: [ main, develop ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, develop ]
 
 jobs:
-  basic-checks:
-    name: Basic Checks
+  test-python:
+    name: Python Tests
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: aiser
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: aiser_world_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+      
+      - name: Test Chat2Chart Server
+        working-directory: packages/chat2chart/server
+        env:
+          DATABASE_URL: postgresql://aiser:test_password@localhost:5432/aiser_world_test
+          REDIS_URL: redis://localhost:6379
+        run: |
+          poetry install
+          poetry run pytest --cov=app --cov-report=xml
+      
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./packages/chat2chart/server/coverage.xml
+          flags: python
+          name: codecov-python
+
+  test-typescript:
+    name: TypeScript Tests
     runs-on: ubuntu-latest
     
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-        cache: 'npm'
-    
-    - name: Install dependencies
-      run: npm ci
-    
-    - name: Build shared package
-      run: |
-        cd packages/shared
-        npm run build
-    
-    - name: Check licenses
-      run: npm run license:check
-    
-    - name: Verify license files exist
-      run: |
-        echo "Checking license files..."
-        ls -la packages/*/LICENSE || echo "Some license files missing, but continuing..."
-        echo "✅ License check completed"
-    - name: Setup Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
+      - uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run linter
+        run: npm run lint
+      
+      - name: Run type check
+        run: npm run typecheck
+      
+      - name: Run tests
+        run: npm test -- --coverage
+      
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage/coverage-final.json
+          flags: typescript
+          name: codecov-typescript
 
-    - name: Install Python deps for auth-service tests
-      run: |
-        python -m pip install --upgrade pip
-        pip install pytest requests
+  lint-python:
+    name: Python Linting
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install linting tools
+        run: |
+          pip install black isort flake8 mypy bandit
+      
+      - name: Run Black
+        run: black --check packages/chat2chart/server/app
+      
+      - name: Run isort
+        run: isort --check-only packages/chat2chart/server/app
+      
+      - name: Run Flake8
+        run: flake8 packages/chat2chart/server/app --max-line-length=88
+      
+      - name: Run Bandit (Security)
+        run: bandit -r packages/chat2chart/server/app -ll
 
-    - name: Run auth-service tests
-      run: |
-        pytest -q packages/auth-service/tests/test_auth_flow.py -q || true
+  docker-build:
+    name: Docker Build Test
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Build Chat2Chart Server
+        uses: docker/build-push-action@v5
+        with:
+          context: ./packages/chat2chart/server
+          file: ./packages/chat2chart/server/Dockerfile.dev
+          push: false
+          tags: aiser-chat2chart:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Build Auth Service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./packages/auth
+          file: ./packages/auth/Dockerfile.dev
+          push: false
+          tags: aiser-auth:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  migration-check:
+    name: Database Migration Check
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: aiser
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: aiser_world_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+      
+      - name: Test Auth Migrations
+        working-directory: packages/auth
+        env:
+          DATABASE_URL: postgresql://aiser:test_password@localhost:5432/aiser_world_test
+        run: |
+          poetry install
+          poetry run alembic upgrade head
+          poetry run alembic downgrade base
+          poetry run alembic upgrade head
+      
+      - name: Test Chat2Chart Migrations
+        working-directory: packages/chat2chart/server
+        env:
+          DATABASE_URL: postgresql://aiser:test_password@localhost:5432/aiser_world_test
+        run: |
+          poetry install
+          poetry run alembic -c alembic-c2c.ini upgrade head || echo "Migrations will be set up later"

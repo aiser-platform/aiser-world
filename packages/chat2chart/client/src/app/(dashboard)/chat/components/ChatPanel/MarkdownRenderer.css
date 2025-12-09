@@ -1,0 +1,308 @@
+/* Markdown Renderer Styles - Inspired by Claude/OpenAI Chat Interfaces */
+
+.markdown-content {
+    line-height: 1.75;
+    color: var(--text-color, #374151);
+    font-size: 14px;
+    word-wrap: break-word;
+    white-space: normal; /* Prevent weird newlines */
+}
+
+/* Headings */
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+    font-weight: 600;
+    margin-top: 1.5em;
+    margin-bottom: 0.75em;
+    line-height: 1.3;
+}
+
+.markdown-content h1 {
+    font-size: 1.75em;
+    border-bottom: 1px solid var(--border-color, #e5e7eb);
+    padding-bottom: 0.3em;
+}
+
+.markdown-content h2 {
+    font-size: 1.5em;
+    border-bottom: 1px solid var(--border-color, #e5e7eb);
+    padding-bottom: 0.3em;
+}
+
+.markdown-content h3 {
+    font-size: 1.25em;
+}
+
+.markdown-content h4 {
+    font-size: 1.1em;
+}
+
+/* Paragraphs */
+.markdown-content p {
+    margin: 1em 0;
+    line-height: 1.75;
+}
+
+.markdown-content p:first-child {
+    margin-top: 0;
+}
+
+.markdown-content p:last-child {
+    margin-bottom: 0;
+}
+
+/* Lists */
+.markdown-content ul,
+.markdown-content ol {
+    margin: 1em 0;
+    padding-left: 2em;
+}
+
+.markdown-content li {
+    margin: 0.5em 0;
+    line-height: 1.75;
+}
+
+.markdown-content li > p {
+    margin: 0.5em 0;
+}
+
+.markdown-content ul {
+    list-style-type: disc;
+}
+
+.markdown-content ol {
+    list-style-type: decimal;
+}
+
+.markdown-content ul ul,
+.markdown-content ol ol,
+.markdown-content ul ol,
+.markdown-content ol ul {
+    margin: 0.5em 0;
+}
+
+/* Code Blocks - Claude/OpenAI Style */
+.code-block-wrapper {
+    position: relative;
+    margin: 1.5em 0;
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--code-bg, #1e1e1e);
+    border: 1px solid var(--border-color, #2d2d2d);
+}
+
+.code-block-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5em 1em;
+    background: var(--code-header-bg, #2d2d2d);
+    border-bottom: 1px solid var(--border-color, #3d3d3d);
+}
+
+.code-language {
+    font-size: 0.75em;
+    color: var(--text-muted, #9ca3af);
+    text-transform: uppercase;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+}
+
+.code-block {
+    margin: 0;
+    padding: 1em 1.25em;
+    overflow-x: auto;
+    background: var(--code-bg, #1e1e1e);
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Droid Sans Mono', 'Source Code Pro', monospace;
+    font-size: 0.875em;
+    line-height: 1.6;
+    color: var(--code-text, #d4d4d4);
+}
+
+.code-block code {
+    background: transparent;
+    padding: 0;
+    border: none;
+    color: inherit;
+    font-size: inherit;
+    font-family: inherit;
+}
+
+/* Inline Code */
+.inline-code {
+    background: var(--inline-code-bg, rgba(0, 0, 0, 0.1));
+    padding: 0.2em 0.4em;
+    border-radius: 4px;
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace;
+    font-size: 0.9em;
+    color: var(--inline-code-text, #e83e8c);
+    border: 1px solid var(--border-color, rgba(0, 0, 0, 0.1));
+}
+
+/* Tables */
+.table-wrapper {
+    overflow-x: auto;
+    margin: 1.5em 0;
+    border-radius: 8px;
+    border: 1px solid var(--border-color, #e5e7eb);
+}
+
+.markdown-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9em;
+}
+
+.markdown-table th,
+.markdown-table td {
+    padding: 0.75em 1em;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color, #e5e7eb);
+}
+
+.markdown-table th {
+    background: var(--table-header-bg, #f9fafb);
+    font-weight: 600;
+    color: var(--text-color, #111827);
+}
+
+.markdown-table tr:last-child td {
+    border-bottom: none;
+}
+
+.markdown-table tr:hover {
+    background: var(--table-hover-bg, #f9fafb);
+}
+
+/* Blockquotes */
+.markdown-blockquote {
+    margin: 1.5em 0;
+    padding: 0.75em 1em;
+    padding-left: 1.5em;
+    border-left: 4px solid var(--primary-color, #3b82f6);
+    background: var(--blockquote-bg, rgba(59, 130, 246, 0.05));
+    border-radius: 0 4px 4px 0;
+    color: var(--text-color, #4b5563);
+    font-style: italic;
+}
+
+.markdown-blockquote p {
+    margin: 0.5em 0;
+}
+
+.markdown-blockquote p:first-child {
+    margin-top: 0;
+}
+
+.markdown-blockquote p:last-child {
+    margin-bottom: 0;
+}
+
+/* Links */
+.markdown-link {
+    color: var(--link-color, #3b82f6);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.2s;
+}
+
+.markdown-link:hover {
+    border-bottom-color: var(--link-color, #3b82f6);
+    text-decoration: none;
+}
+
+/* Strong/Bold */
+.markdown-strong {
+    font-weight: 600;
+    color: var(--text-color, #111827);
+}
+
+/* Emphasis/Italic */
+.markdown-em {
+    font-style: italic;
+    color: var(--text-color, #4b5563);
+}
+
+/* Horizontal Rules */
+.markdown-content hr {
+    margin: 2em 0;
+    border: none;
+    border-top: 1px solid var(--border-color, #e5e7eb);
+}
+
+/* Images */
+.markdown-content img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    margin: 1.5em 0;
+}
+
+/* Task Lists (GitHub Flavored Markdown) */
+.markdown-content input[type="checkbox"] {
+    margin-right: 0.5em;
+    cursor: pointer;
+}
+
+/* Math (KaTeX) */
+.markdown-content .katex {
+    font-size: 1.1em;
+}
+
+.markdown-content .katex-display {
+    margin: 1.5em 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .markdown-content {
+        font-size: 13px;
+    }
+    
+    .code-block {
+        font-size: 0.8em;
+        padding: 0.75em 1em;
+    }
+    
+    .table-wrapper {
+        font-size: 0.85em;
+    }
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+    .markdown-content {
+        color: var(--text-color-dark, #e5e7eb);
+    }
+    
+    .code-block-wrapper {
+        background: var(--code-bg-dark, #1e1e1e);
+        border-color: var(--border-color-dark, #2d2d2d);
+    }
+    
+    .code-block-header {
+        background: var(--code-header-bg-dark, #2d2d2d);
+    }
+    
+    .inline-code {
+        background: var(--inline-code-bg-dark, rgba(255, 255, 255, 0.1));
+        color: var(--inline-code-text-dark, #f472b6);
+    }
+    
+    .markdown-table th {
+        background: var(--table-header-bg-dark, #2d2d2d);
+        color: var(--text-color-dark, #e5e7eb);
+    }
+    
+    .markdown-blockquote {
+        background: var(--blockquote-bg-dark, rgba(59, 130, 246, 0.1));
+        color: var(--text-color-dark, #d1d5db);
+    }
+}

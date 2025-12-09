@@ -20,7 +20,7 @@ export default function LoginPage() {
     const [isSignUp, setIsSignUp] = useState(false);
     const [loading, setLoading] = useState(false);
     const [showForgotPassword, setShowForgotPassword] = useState(false);
-    const { login, signup } = useAuth();
+    const { login, signup, verifyAuth } = useAuth();
     const router = useRouter();
 
     const onFinish = async (values: FormValues) => {
@@ -38,14 +38,37 @@ export default function LoginPage() {
                     setLoading(false);
                     return;
                 }
-                await signup(values.identifier, values.username, values.password);
-                message.success('Account created successfully!');
+                const signupResult = await signup(values.identifier, values.username, values.password);
+                
+                // Handle signup result based on verification status
+                if (signupResult?.is_verified) {
+                    // User is verified - auto-login and redirect to chat
+                    message.success('Account created successfully! Logging you in...');
+                    await verifyAuth();
+                    router.push('/chat');
+                } else {
+                    // User needs email verification - redirect to login with message
+                    message.success(signupResult?.message || 'Account created successfully! Please check your email to verify your account.');
+                    // Switch to login mode and clear form
+                    setIsSignUp(false);
+                    // Don't redirect - stay on login page for user to sign in after verification
+                }
             } else {
                 // Login flow
-                await login(values.identifier, values.password);
-                message.success('Login successful!');
+                try {
+                    await login(values.identifier, values.password);
+                    // Only show success if login actually succeeded (no exception thrown)
+                    message.success('Login successful!');
+                    // Small delay to ensure state is updated
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    router.push('/chat');
+                } catch (error) {
+                    // Error is already handled in login() function and setLoginError
+                    // Don't show success message if login failed
+                    // The error message will be shown by the login function
+                    throw error; // Re-throw to be caught by outer catch
+                }
             }
-            router.push('/chat');
         } catch (error) {
             console.error('Authentication error:', error);
             const errorMessage = error instanceof Error ? error.message : 'Authentication failed';
@@ -89,7 +112,15 @@ export default function LoginPage() {
                     min-height: 100vh;
                     display: flex;
                     flex-direction: column;
-                    background: #f8fafc;
+                    background: var(--layout-background, #f8fafc);
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    width: 100%;
+                    height: 100%;
+                    overflow: hidden;
                 }
                 
                 .login-form-section {
@@ -98,7 +129,7 @@ export default function LoginPage() {
                     align-items: center;
                     justify-content: center;
                     padding: 2rem;
-                    background: white;
+                    background: var(--ant-color-bg-container, #ffffff);
                 }
                 
                 .login-branding-section {
@@ -153,11 +184,11 @@ export default function LoginPage() {
                 }
                 
                 .form-card {
-                    background: white;
+                    background: var(--ant-color-bg-container, #ffffff);
                     border-radius: 12px;
                     padding: 2.5rem; /* Increased padding */
                     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-                    border: 1px solid #e5e7eb;
+                    border: 1px solid var(--ant-color-border, #e5e7eb);
                     margin-top: 1rem; /* Add space from logo */
                 }
                 
@@ -172,7 +203,7 @@ export default function LoginPage() {
                 }
                 
                 .form-input:focus {
-                    border-color: var(--color-brand-primary, #2563eb);
+                    border-color: var(--color-brand-primary, #00c2cb);
                     box-shadow: 0 0 0 3px var(--color-brand-primary-light, rgba(37, 99, 235, 0.1));
                 }
                 
@@ -195,6 +226,10 @@ export default function LoginPage() {
                     margin-top: 2rem; /* Increased spacing */
                     padding-top: 1.5rem;
                     border-top: 1px solid #e5e7eb;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    gap: 0.75rem;
                 }
                 
                 .footer {
@@ -263,7 +298,7 @@ export default function LoginPage() {
                 
                 .demo-image {
                     width: 100%;
-                    max-width: 400px;
+                    max-width: 360px;
                     height: auto;
                     border-radius: 12px;
                     box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.3);
@@ -339,11 +374,12 @@ export default function LoginPage() {
                         <div className="logo-section">
                         <Image
                             src="/aiser-logo.png"
-                            alt="Aiser Logo"
-                                width={48}
-                                height={48}
-                            />
-                            <h1>Aiser</h1>
+                            alt="Aicser Logo"
+                            width={48}
+                            height={48}
+                            priority
+                        />
+                            <h1>Aicser</h1>
                         </div>
                         
                         <div className="form-card">
@@ -352,7 +388,7 @@ export default function LoginPage() {
                             </h1>
                             <p className="form-subtitle">
                                 {isSignUp 
-                                    ? 'Sign up to get started with Aiser' 
+                                    ? 'Sign up to get started with Aicser' 
                                     : 'Sign in to your account to continue'
                                 }
                             </p>
@@ -446,9 +482,9 @@ export default function LoginPage() {
                             <div className="toggle-section">
                                 <Switch
                                     checked={isSignUp}
-                                    onChange={setIsSignUp}
-                                    checkedChildren="Sign Up"
-                                    unCheckedChildren="Sign In"
+                                    onChange={(checked) => setIsSignUp(checked)}
+                                    checkedChildren="Sign In"
+                                    unCheckedChildren="Sign Up"
                                 />
                                 <p style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: '#6b7280' }}>
                                     {isSignUp ? 'Already have an account?' : "Don't have an account?"}
@@ -493,12 +529,13 @@ export default function LoginPage() {
                                 zIndex: 1000
                             }}>
                                 <div style={{
-                                    backgroundColor: 'white',
+                                    backgroundColor: 'var(--ant-color-bg-container, #ffffff)',
                                     padding: '2rem',
                                     borderRadius: '12px',
                                     maxWidth: '400px',
                                     width: '90%',
-                                    boxShadow: '0 20px 40px rgba(0, 0, 0, 0.1)'
+                                    boxShadow: '0 20px 40px rgba(0, 0, 0, 0.1)',
+                                    border: '1px solid var(--ant-color-border, #e5e7eb)'
                                 }}>
                                     <h3 style={{ marginBottom: '1rem', textAlign: 'center' }}>Reset Password</h3>
                                     <p style={{ marginBottom: '1.5rem', color: '#6b7280', textAlign: 'center' }}>
@@ -539,16 +576,17 @@ export default function LoginPage() {
                 {/* Branding Section */}
                 <div className="login-branding-section">
                     <div className="branding-content">
-                        <h1 className="branding-title">Welcome to Aiser</h1>
+                        <h1 className="branding-title">Welcome to Aicser</h1>
                         <p className="branding-subtitle">
-                            AI-powered data visualization platform
+                            Your AI-native business intelligence platform (Chat2Chart) for everyone.
                         </p>
                         <Image
                             src="/Aiser Demo Gif.gif"
-                            alt="Aiser Platform Demo"
-                            width={450}
+                            alt="Aicser Platform Demo"
+                            width={360}
                             height={300}
                             className="demo-image"
+                            priority
                             unoptimized
                         />
                         <h2 className="branding-secondary-title">

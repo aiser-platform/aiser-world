@@ -5,7 +5,6 @@ from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
 
-
 class BaseModel(Base):
     """
     Abstract base model that provides common fields for all database models.

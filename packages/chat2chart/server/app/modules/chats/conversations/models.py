@@ -1,5 +1,6 @@
 from app.common.model import BaseModel
-from sqlalchemy import Column, String, Text, UUID
+from sqlalchemy import Column, String, Text, UUID as SQLAlchemyUUID, Boolean
+from sqlalchemy.dialects.postgresql import UUID as PostgreSQLUUID
 import uuid
 
 
@@ -7,11 +8,19 @@ class ChatConversation(BaseModel):
     __tablename__ = "conversation"
 
     # Override the ID field to use UUID
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(PostgreSQLUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    
+    # CRITICAL: user_id column for tenant isolation
+    user_id = Column(PostgreSQLUUID(as_uuid=True), nullable=False, index=True)
+    
+    # tenant_id for additional isolation layer
+    tenant_id = Column(String(50), nullable=True, index=True)
 
     # Basic information
     title = Column(String, nullable=False)
-    description = Column(String, nullable=True)
+    description = Column(Text, nullable=True)
+    status = Column(String(20), nullable=True)
+    type = Column(String(20), nullable=True)
 
     # Metadata
     json_metadata = Column(Text, nullable=True)

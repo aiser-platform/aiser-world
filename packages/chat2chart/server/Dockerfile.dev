@@ -2,23 +2,40 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
+    libsnappy-dev \
     unixodbc-dev \
-    unixodbc \
+    curl \
+    netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy and install python deps if present
-COPY requirements.txt ./
-# Install Python dependencies at build time to avoid long installs on container start
-RUN if [ -f requirements.txt ]; then pip install --no-cache-dir -r requirements.txt; fi
+COPY pyproject.toml ./
+RUN pip install --no-cache-dir poetry && poetry self update
+RUN poetry cache clear --all pypi -n && poetry lock && poetry install --no-root --no-interaction --no-ansi
+RUN poetry run pip install alembic  # Ensure alembic is installed within the Poetry venv
+RUN poetry run pip install asyncpg sqlalchemy psycopg2-binary # Explicitly install asyncpg, sqlalchemy, and psycopg2-binary
+RUN poetry run pip install python-socketio python-engineio # Explicitly install socketio and engineio
+RUN poetry run python -c "import duckdb; print('DuckDB imported successfully')" || (echo 'ERROR: DuckDB import failed' && exit 1)
 
-# Copy source
-COPY . .
+# Copy the pre-configured Alembic environment
+COPY alembic-c2c.ini /app/alembic.ini
+COPY alembic_c2c /app/alembic_c2c
 
-# Default command (docker-compose can override with a command)
-CMD ["bash", "-lc", "python scripts/setup_database.py && uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-level info"]
+COPY start-server.sh /app/start-server.sh
+RUN chmod +x /app/start-server.sh
 
+# Copy application code
+COPY app ./app
+
+# Remove __pycache__ directories to ensure clean imports
+RUN find . -type d -name "__pycache__" -exec rm -r {} +
+
+ENV PYTHONPATH=/app
+
+EXPOSE 8000
+
+ENTRYPOINT ["/app/start-server.sh"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "debug"]
 

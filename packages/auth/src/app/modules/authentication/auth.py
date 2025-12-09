@@ -21,7 +21,10 @@ class Auth:
     JWT_EMAIL_EXP_TIME_MINUTES = settings.JWT_EMAIL_EXP_TIME_MINUTES
 
     def hash_password(self, password):
-        return pbkdf2_sha256.hash(password, salt=self.SECRET.encode("utf-8"))
+        # Use passlib's pbkdf2_sha256 default salt handling to produce a
+        # standard, verifiable hash string. Avoid passing raw bytes as salt
+        # which can create invalid formatted hashes.
+        return pbkdf2_sha256.hash(password)
 
     def verify_password(self, password, hashed_password):
         try:
@@ -130,7 +133,7 @@ class Auth:
                 token, self.SECRET, algorithms=[self.JWT_ALGORITHM]
             )
             return decoded_token if decoded_token["exp"] >= time.time() else None
-        except:
+        except Exception:
             return {}
 
     def decodeRefreshJWE(self, token: str) -> dict:
@@ -139,7 +142,7 @@ class Auth:
             secret_bytes = bytes.fromhex(self.SECRET)
             decoded_token = jwe.decrypt(token, secret_bytes)
             return decoded_token
-        except:
+        except Exception:
             logger.error("Error decoding JWE token")
             return {}
 
@@ -151,7 +154,7 @@ class Auth:
             expired = decoded_token["exp"] >= time.time()
 
             return decoded_token if expired else None
-        except:
+        except Exception:
             logger.error("Error decoding JWT token")
             return {}
 

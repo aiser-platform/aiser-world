@@ -3,9 +3,19 @@
  * Single source of truth for all global styling
  */
 
+/* ⚠️ DEPRECATED FILE - NOT USED
+ * This file is kept for reference only
+ * All functionality has been moved to:
+ * - app/globals.css (main entry point)
+ * - aiser-unified-design-system.css (component styles)
+ * - layout-system.css (layout positioning)
+ * 
+ * DO NOT IMPORT THIS FILE
+ */
+
 /* Import Ant Design reset and our comprehensive design system */
 @import 'antd/dist/reset.css';
-@import './design-system.css';
+/* @import './design-system.css'; */ /* DEPRECATED - Use aiser-unified-design-system.css instead */
 
 /* Import Tailwind CSS */
 @tailwind base;

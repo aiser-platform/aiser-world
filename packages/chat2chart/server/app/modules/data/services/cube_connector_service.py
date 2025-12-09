@@ -53,6 +53,11 @@ class CubeConnectorService:
                 "port": 5439,
                 "ssl_support": True,
             },
+            "clickhouse": {
+                "driver": "@cubejs-backend/clickhouse-driver",
+                "port": 8123,
+                "ssl_support": True,
+            },
         }
 
     async def create_cube_data_source(
@@ -337,6 +342,234 @@ class CubeConnectorService:
                 return {}
         except:
             return {}
+
+    async def get_database_schema(self, connection_config: Dict[str, Any]) -> Dict[str, Any]:
+        """Get database schema information"""
+        try:
+            logger.info(f"🔍 Getting database schema for: {connection_config.get('type')}")
+            
+            # Use the real cube integration service to get schema
+            from app.modules.data.services.real_cube_integration_service import RealCubeIntegrationService
+            real_cube_service = RealCubeIntegrationService()
+            
+            # Create a temporary connection to get schema
+            # First test the connection
+            test_result = await self.test_connection(connection_config)
+            if not test_result.get('success'):
+                return {
+                    'success': False,
+                    'error': f"Connection test failed: {test_result.get('error')}"
+                }
+            
+            # Get schema using SQLAlchemy directly
+            db_type = connection_config.get('type', '').lower()
+            if db_type not in self.supported_databases:
+                return {
+                    'success': False,
+                    'error': f'Unsupported database type: {db_type}'
+                }
+            
+            # Use real_cube_integration_service to get schema
+            # We need to create a connection and get schema
+            try:
+                from sqlalchemy import create_engine, inspect
+                from sqlalchemy.engine import URL
+                
+                # Build connection URL
+                host = connection_config.get('host', 'localhost')
+                port = connection_config.get('port', self.supported_databases[db_type].get('port', 5432))
+                database = connection_config.get('database') or connection_config.get('db')
+                username = connection_config.get('username') or connection_config.get('user')
+                password = connection_config.get('password') or connection_config.get('pass')
+                
+                if not database:
+                    return {
+                        'success': False,
+                        'error': 'Database name is required'
+                    }
+                
+                # Create SQLAlchemy URL
+                if db_type == 'postgresql':
+                    url = URL.create(
+                        'postgresql',
+                        username=username,
+                        password=password,
+                        host=host,
+                        port=port,
+                        database=database
+                    )
+                elif db_type == 'mysql':
+                    url = URL.create(
+                        'mysql+pymysql',
+                        username=username,
+                        password=password,
+                        host=host,
+                        port=port,
+                        database=database
+                    )
+                elif db_type == 'clickhouse':
+                    # ClickHouse uses HTTP interface - use HTTP API instead of SQLAlchemy
+                    try:
+                        import aiohttp
+                        http_url = f"http://{host}:{port}"
+                        query = f"SELECT name, engine FROM system.tables WHERE database = '{database}' FORMAT JSON"
+                        
+                        async with aiohttp.ClientSession() as session:
+                            auth = aiohttp.BasicAuth(username, password)
+                            async with session.post(f"{http_url}/", data=query, auth=auth) as resp:
+                                if resp.status == 200:
+                                    data = await resp.json()
+                                    tables = []
+                                    schemas = set()
+                                    
+                                    for table in data.get('data', []):
+                                        table_name = table.get('name')
+                                        
+                                        # Skip internal ClickHouse tables (materialized view inner tables)
+                                        if table_name.startswith('.inner_id.') or table_name.startswith('.'):
+                                            continue
+                                        
+                                        # Get columns for each table
+                                        cols_query = f"DESCRIBE TABLE {database}.{table_name} FORMAT JSON"
+                                        async with session.post(f"{http_url}/", data=cols_query, auth=auth) as cols_resp:
+                                            if cols_resp.status == 200:
+                                                cols_data = await cols_resp.json()
+                                                columns = []
+                                                for col in cols_data.get('data', []):
+                                                    columns.append({
+                                                        'name': col.get('name', ''),
+                                                        'type': str(col.get('type', '')),
+                                                        'nullable': col.get('default_kind') != 'DEFAULT'
+                                                    })
+                                                
+                                                # Get row count for table
+                                                count_query = f"SELECT count() as row_count FROM {database}.{table_name} FORMAT JSON"
+                                                row_count = 0
+                                                try:
+                                                    async with session.post(f"{http_url}/", data=count_query, auth=auth) as count_resp:
+                                                        if count_resp.status == 200:
+                                                            count_data = await count_resp.json()
+                                                            if count_data.get('data') and len(count_data['data']) > 0:
+                                                                # ClickHouse returns row_count as string, convert to int
+                                                                row_count_val = count_data['data'][0].get('row_count', 0)
+                                                                row_count = int(row_count_val) if row_count_val is not None else 0
+                                                except Exception as count_error:
+                                                    logger.debug(f"Row count fetch failed for {table_name}: {count_error}")
+                                                    pass  # Row count is optional
+                                                
+                                                tables.append({
+                                                    'schema': database,
+                                                    'name': table_name,
+                                                    'columns': columns,
+                                                    'rowCount': int(row_count)  # Ensure it's an int
+                                                })
+                                                schemas.add(database)
+                                    
+                                    # Calculate total_rows, ensuring all values are ints
+                                    total_rows = sum(int(t.get('rowCount', 0)) for t in tables)
+                                    
+                                    return {
+                                        'success': True,
+                                        'tables': tables,
+                                        'schemas': list(schemas),
+                                        'total_rows': total_rows
+                                    }
+                                else:
+                                    error_text = await resp.text()
+                                    return {
+                                        'success': False,
+                                        'error': f'ClickHouse HTTP error {resp.status}: {error_text}'
+                                    }
+                    except ImportError:
+                        logger.error("aiohttp not available for ClickHouse schema fetching")
+                        return {
+                            'success': False,
+                            'error': 'aiohttp package required for ClickHouse schema fetching'
+                        }
+                    except Exception as clickhouse_error:
+                        logger.error(f"❌ ClickHouse schema fetch failed: {str(clickhouse_error)}")
+                        return {
+                            'success': False,
+                            'error': f"ClickHouse schema retrieval failed: {str(clickhouse_error)}"
+                        }
+                else:
+                    # For other database types (postgresql, mysql, sqlserver, etc.), use SQLAlchemy
+                    if db_type not in ['postgresql', 'mysql', 'sqlserver', 'redshift']:
+                        return {
+                            'success': False,
+                            'error': f'Schema retrieval not yet implemented for {db_type}'
+                        }
+                    
+                    # Create engine and inspect schema
+                    try:
+                        engine = create_engine(str(url), pool_pre_ping=True, echo=False)
+                        inspector = inspect(engine)
+                        
+                        tables = []
+                        schemas_list = inspector.get_schema_names()
+                        
+                        # Filter out system schemas based on database type
+                        system_schemas = {
+                            'postgresql': ['information_schema', 'pg_catalog', 'pg_toast'],
+                            'mysql': ['information_schema', 'performance_schema', 'mysql', 'sys'],
+                            'sqlserver': ['information_schema', 'sys'],
+                            'redshift': ['information_schema', 'pg_catalog', 'pg_toast']
+                        }
+                        excluded_schemas = system_schemas.get(db_type, ['information_schema', 'sys'])
+                        
+                        for schema_name in schemas_list:
+                            if schema_name.lower() not in [s.lower() for s in excluded_schemas]:
+                                try:
+                                    table_names = inspector.get_table_names(schema=schema_name)
+                                    for table_name in table_names:
+                                        columns = []
+                                        try:
+                                            for col in inspector.get_columns(table_name, schema=schema_name):
+                                                columns.append({
+                                                    'name': col['name'],
+                                                    'type': str(col['type']),
+                                                    'nullable': col.get('nullable', True)
+                                                })
+                                        except Exception as col_error:
+                                            logger.warning(f"Failed to get columns for {schema_name}.{table_name}: {col_error}")
+                                            columns = []
+                                        
+                                        tables.append({
+                                            'schema': schema_name,
+                                            'name': table_name,
+                                            'columns': columns,
+                                            'rowCount': 0  # Would need to query each table
+                                        })
+                                except Exception as table_error:
+                                    logger.warning(f"Failed to get tables for schema {schema_name}: {table_error}")
+                                    continue
+                        
+                        engine.dispose()
+                        
+                        return {
+                            'success': True,
+                            'tables': tables,
+                            'schemas': list(set(s['schema'] for s in tables)),
+                            'total_rows': 0  # Would need to query each table
+                        }
+                    except Exception as sqlalchemy_error:
+                        logger.error(f"❌ SQLAlchemy schema fetch failed for {db_type}: {str(sqlalchemy_error)}")
+                        return {
+                            'success': False,
+                            'error': f"Schema retrieval failed: {str(sqlalchemy_error)}"
+                        }
+            except Exception as schema_error:
+                logger.error(f"❌ Schema retrieval failed: {str(schema_error)}")
+                return {
+                    'success': False,
+                    'error': f"Schema retrieval failed: {str(schema_error)}"
+                }
+        except Exception as e:
+            logger.error(f"❌ Failed to get database schema: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
 
     async def _make_test_query(self, cube_env: Dict[str, str], tenant_id: str):
         """Make a test query to validate connection"""

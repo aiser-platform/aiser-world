@@ -1,0 +1,856 @@
+/**
+ * PricingModal - Theme-Aware Design System Integration
+ * Follows Aiser design patterns with proper theme adaptation
+ */
+
+/* ========================================
+   MODAL CONTAINER
+   ======================================== */
+
+.pricing-modal .ant-modal-content {
+  background: var(--layout-content-background, #ffffff);
+  border-radius: 12px;
+  box-shadow: var(--shadow-xl, 0 20px 25px rgba(0, 0, 0, 0.1));
+  border: 1px solid var(--color-border-primary, #e8e8e8);
+}
+
+.pricing-modal .ant-modal-header {
+  background: var(--layout-content-background, #ffffff);
+  border-bottom: 1px solid var(--color-border-primary, #e8e8e8);
+  border-radius: 12px 12px 0 0;
+  padding: 24px 24px 16px;
+}
+
+.pricing-modal .ant-modal-body {
+  padding: 0 24px 24px;
+  background: var(--layout-content-background, #ffffff);
+}
+
+.pricing-modal .ant-modal-close {
+  color: var(--color-text-secondary, #8c8c8c);
+  transition: color 0.3s ease;
+}
+
+.pricing-modal .ant-modal-close:hover {
+  color: var(--color-text-primary, #262626);
+}
+
+/* ========================================
+   MODAL HEADER
+   ======================================== */
+
+.pricing-modal-header {
+  text-align: center;
+}
+
+.pricing-modal-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--color-text-primary, #262626);
+  margin: 0 0 8px 0;
+  transition: color 0.3s ease;
+}
+
+.pricing-modal-subtitle {
+  font-size: 16px;
+  color: var(--color-text-secondary, #8c8c8c);
+  margin: 0;
+  transition: color 0.3s ease;
+}
+
+/* ========================================
+   BILLING TOGGLE
+   ======================================== */
+
+.pricing-toggle-container {
+  margin-bottom: 32px;
+  text-align: center;
+}
+
+.pricing-toggle {
+  display: inline-flex;
+  align-items: center;
+  background: var(--layout-panel-background, #f1f3f4);
+  border-radius: 8px;
+  padding: 4px;
+  border: 1px solid var(--color-border-primary, #e8e8e8);
+  transition: all 0.3s ease;
+}
+
+.pricing-toggle-label {
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-secondary, #8c8c8c);
+  transition: all 0.3s ease;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.pricing-toggle-label.pricing-toggle-active {
+  color: var(--color-text-primary, #262626);
+  background: var(--layout-content-background, #ffffff);
+  box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.1));
+}
+
+.pricing-toggle-switch {
+  margin: 0 8px;
+}
+
+.pricing-savings-tag {
+  margin-left: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.pricing-value-proposition {
+  margin-top: 16px;
+  padding: 12px;
+  background: var(--layout-panel-background, #f1f3f4);
+  border-radius: 6px;
+  border: 1px solid var(--color-border-primary, #e8e8e8);
+}
+
+.pricing-value-text {
+  font-size: 13px;
+  color: var(--color-text-secondary, #8c8c8c);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.pricing-value-text strong {
+  color: var(--color-text-primary, #262626);
+  font-weight: 600;
+}
+
+.pricing-card-seats-info {
+  margin-top: 4px;
+}
+
+.pricing-seats-text {
+  font-size: 11px;
+  color: var(--color-text-secondary, #8c8c8c);
+  font-weight: 500;
+}
+
+/* ========================================
+   PRICING CARDS GRID
+   ======================================== */
+
+.pricing-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+/* ========================================
+   PRICING CARD
+   ======================================== */
+
+.pricing-card {
+  position: relative;
+  background: var(--layout-content-background, #ffffff);
+  border: 1px solid var(--color-border-primary, #e8e8e8);
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  height: 100%;
+  overflow: hidden;
+}
+
+.pricing-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg, 0 10px 15px rgba(0, 0, 0, 0.1));
+  border-color: var(--color-brand-primary, #00c2cb);
+}
+
+.pricing-card-popular {
+  border-color: var(--color-brand-primary, #00c2cb);
+  box-shadow: var(--shadow-md, 0 4px 6px rgba(37, 99, 235, 0.1));
+}
+
+.pricing-card-popular:hover {
+  box-shadow: var(--shadow-lg, 0 10px 15px rgba(37, 99, 235, 0.2));
+}
+
+.pricing-card-current {
+  border-color: var(--color-functional-success, #52c41a);
+  background: var(--color-functional-success-light, #f6ffed);
+}
+
+.pricing-card-current:hover {
+  border-color: var(--color-functional-success, #52c41a);
+  transform: none;
+  box-shadow: var(--shadow-sm, 0 1px 3px rgba(82, 196, 26, 0.1));
+}
+
+/* ========================================
+   PRICING BADGES
+   ======================================== */
+
+.pricing-badge {
+  position: absolute;
+  top: -8px;
+  z-index: 10;
+}
+
+.pricing-badge-popular {
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.pricing-badge-current {
+  right: 16px;
+}
+
+.pricing-badge-tag {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 6px;
+}
+
+/* ========================================
+   CARD HEADER
+   ======================================== */
+
+.pricing-card-header {
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.pricing-card-icon {
+  font-size: 24px;
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.plan-icon {
+  transition: all 0.3s ease;
+}
+
+.plan-icon-free {
+  color: var(--color-text-secondary, #8c8c8c);
+}
+
+.plan-icon-pro {
+  color: var(--color-brand-primary, #00c2cb);
+}
+
+.plan-icon-team {
+  color: var(--color-brand-primary, #00c2cb);
+}
+
+.plan-icon-enterprise {
+  color: var(--color-functional-warning, #faad14);
+}
+
+.pricing-card-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-text-primary, #262626);
+  margin: 0 0 8px 0;
+  transition: color 0.3s ease;
+}
+
+.pricing-card-price {
+  margin-bottom: 6px;
+}
+
+.pricing-price-amount {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--color-text-primary, #262626);
+  transition: color 0.3s ease;
+}
+
+.pricing-price-period {
+  font-size: 14px;
+  color: var(--color-text-secondary, #8c8c8c);
+  margin-left: 4px;
+  transition: color 0.3s ease;
+}
+
+.pricing-savings {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-functional-success, #52c41a);
+  transition: color 0.3s ease;
+  margin-bottom: 4px;
+}
+
+/* ========================================
+   CARD META SECTION
+   ======================================== */
+
+.pricing-card-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.pricing-card-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+  gap: 6px;
+  width: 100%;
+}
+
+.pricing-stat {
+  background: var(--layout-panel-background, #f5f7fb);
+  border-radius: 6px;
+  padding: 6px 8px;
+  text-align: center;
+}
+
+.pricing-stat-label {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-secondary, #8c8c8c);
+}
+
+.pricing-stat-value {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-primary, #262626);
+}
+
+.pricing-card-footnote {
+  font-size: 11px;
+  color: var(--color-text-secondary, #8c8c8c);
+  text-align: center;
+}
+
+/* ========================================
+   COMPACT CREDITS SECTION
+   ======================================== */
+
+.pricing-card-credits-compact {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pricing-credits-amount {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text-primary, #262626);
+  transition: color 0.3s ease;
+}
+
+.pricing-credits-label {
+  font-size: 11px;
+  color: var(--color-text-secondary, #8c8c8c);
+  transition: color 0.3s ease;
+}
+
+.pricing-trial-compact {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-brand-primary, #00c2cb);
+  transition: color 0.3s ease;
+}
+
+/* ========================================
+   DIVIDER
+   ======================================== */
+
+.pricing-divider {
+  margin: 12px 0;
+  border-color: var(--color-border-primary, #e8e8e8);
+  transition: border-color 0.3s ease;
+}
+
+/* ========================================
+   FEATURES LIST
+   ======================================== */
+
+.pricing-feature-item {
+  border: none !important;
+  padding: 4px 0 !important;
+}
+
+.pricing-feature {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.pricing-feature-icon {
+  color: var(--color-functional-success, #52c41a);
+  font-size: 11px;
+  margin-top: 1px;
+  flex-shrink: 0;
+  transition: color 0.3s ease;
+}
+
+.pricing-feature-text {
+  font-size: 12px;
+  color: var(--color-text-primary, #262626);
+  line-height: 1.3;
+  transition: color 0.3s ease;
+}
+
+/* ========================================
+   ACTION BUTTON
+   ======================================== */
+
+.pricing-card-action {
+  margin-top: 12px;
+}
+
+.pricing-button {
+  height: 36px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+}
+
+.pricing-button-popular {
+  background: var(--color-brand-primary, #00c2cb);
+  border-color: var(--color-brand-primary, #00c2cb);
+  color: #ffffff;
+}
+
+.pricing-button-popular:hover {
+  background: var(--color-brand-primary-hover, #1d4ed8);
+  border-color: var(--color-brand-primary-hover, #1d4ed8);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(37, 99, 235, 0.3);
+}
+
+.pricing-button-current {
+  background: var(--color-functional-success, #52c41a);
+  border-color: var(--color-functional-success, #52c41a);
+  color: #ffffff;
+  cursor: not-allowed;
+}
+
+.pricing-button-current:hover {
+  background: var(--color-functional-success, #52c41a);
+  border-color: var(--color-functional-success, #52c41a);
+  transform: none;
+  box-shadow: none;
+}
+
+/* ========================================
+   ADDONS SECTION
+   ======================================== */
+
+.pricing-addons {
+  margin: 16px 0;
+}
+
+.pricing-addons-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--layout-panel-background, #f1f3f4);
+  border: 1px dashed var(--color-border-primary, #e8e8e8);
+  border-radius: 8px;
+  padding: 10px 16px;
+  gap: 12px;
+}
+
+.pricing-addons-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pricing-addons-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-primary, #262626);
+  margin: 0;
+}
+
+.pricing-addons-description {
+  font-size: 11px;
+  color: var(--color-text-secondary, #8c8c8c);
+  margin: 0;
+  line-height: 1.3;
+}
+
+.credit-pack-grid {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.credit-pack-card {
+  position: relative;
+  background: var(--layout-content-background, #fff);
+  border: 1px solid var(--color-border-primary, #e8e8e8);
+  border-radius: 6px;
+  padding: 8px 10px;
+  min-width: 110px;
+  text-align: center;
+  cursor: default;
+  transition: all 0.2s ease;
+}
+
+.credit-pack-price {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text-primary, #262626);
+}
+
+.credit-pack-label {
+  font-size: 11px;
+  color: var(--color-text-secondary, #8c8c8c);
+  margin-bottom: 2px;
+}
+
+.credit-pack-credits {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-brand-primary, #00c2cb);
+}
+
+.credit-pack-meta {
+  font-size: 10px;
+  color: var(--color-text-tertiary, #bfbfbf);
+}
+
+.pricing-addons-description strong {
+  color: var(--color-text-primary, #262626);
+  font-weight: 600;
+}
+
+.pricing-footnote-text {
+  font-size: 10px;
+  color: var(--color-text-tertiary, #8c8c8c);
+  text-align: right;
+  margin-top: 4px;
+}
+
+/* ========================================
+   FOOTER
+   ======================================== */
+
+.pricing-footer {
+  text-align: center;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border-primary, #e8e8e8);
+}
+
+.pricing-footer-benefits {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.pricing-footer-benefit {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-text-secondary, #8c8c8c);
+  font-weight: 500;
+}
+
+.pricing-footer-benefit .anticon {
+  color: var(--color-functional-success, #52c41a);
+  font-size: 14px;
+}
+
+.pricing-footer-text {
+  font-size: 10px;
+  color: var(--color-text-tertiary, #8c8c8c);
+  margin: 1px 0;
+  transition: color 0.3s ease;
+}
+
+/* ========================================
+   DARK MODE OVERRIDES
+   ======================================== */
+
+[data-theme='dark'] .pricing-modal .ant-modal-content {
+  background: var(--layout-content-background, #161b22);
+  border-color: var(--color-border-primary, #404040);
+}
+
+[data-theme='dark'] .pricing-modal .ant-modal-header {
+  background: var(--layout-content-background, #161b22);
+  border-color: var(--color-border-primary, #404040);
+}
+
+[data-theme='dark'] .pricing-modal .ant-modal-body {
+  background: var(--layout-content-background, #161b22);
+}
+
+[data-theme='dark'] .pricing-modal .ant-modal-close {
+  color: var(--color-text-secondary, #bfbfbf);
+}
+
+[data-theme='dark'] .pricing-modal .ant-modal-close:hover {
+  color: var(--color-text-primary, #ffffff);
+}
+
+[data-theme='dark'] .pricing-modal-title {
+  color: var(--color-text-primary, #ffffff);
+}
+
+[data-theme='dark'] .pricing-modal-subtitle {
+  color: var(--color-text-secondary, #bfbfbf);
+}
+
+[data-theme='dark'] .pricing-card {
+  background: var(--layout-content-background, #161b22);
+  border-color: var(--color-border-primary, #404040);
+}
+
+[data-theme='dark'] .pricing-card:hover {
+  border-color: var(--color-brand-primary, #3b82f6);
+}
+
+[data-theme='dark'] .pricing-card-popular {
+  border-color: var(--color-brand-primary, #3b82f6);
+}
+
+[data-theme='dark'] .pricing-card-current {
+  background: var(--color-functional-success-light, #162312);
+  border-color: var(--color-functional-success, #52c41a);
+}
+
+[data-theme='dark'] .pricing-card-title {
+  color: var(--color-text-primary, #ffffff);
+}
+
+[data-theme='dark'] .pricing-price-amount {
+  color: var(--color-text-primary, #ffffff);
+}
+
+[data-theme='dark'] .pricing-price-period {
+  color: var(--color-text-secondary, #bfbfbf);
+}
+
+[data-theme='dark'] .pricing-credits-amount {
+  color: var(--color-text-primary, #ffffff);
+}
+
+[data-theme='dark'] .pricing-credits-label {
+  color: var(--color-text-secondary, #bfbfbf);
+}
+
+[data-theme='dark'] .pricing-feature-text {
+  color: var(--color-text-primary, #ffffff);
+}
+
+[data-theme='dark'] .pricing-toggle {
+  background: var(--layout-panel-background, #1a1a1a);
+  border-color: var(--color-border-primary, #404040);
+}
+
+[data-theme='dark'] .pricing-toggle-label {
+  color: var(--color-text-secondary, #bfbfbf);
+}
+
+[data-theme='dark'] .pricing-toggle-label.pricing-toggle-active {
+  background: var(--layout-content-background, #161b22);
+  color: var(--color-text-primary, #ffffff);
+}
+
+[data-theme='dark'] .pricing-addons-card {
+  background: var(--layout-panel-background, #1a1a1a);
+  border-color: var(--color-border-primary, #404040);
+}
+
+[data-theme='dark'] .pricing-addons-title {
+  color: var(--color-text-primary, #ffffff);
+}
+
+[data-theme='dark'] .pricing-addons-description {
+  color: var(--color-text-secondary, #bfbfbf);
+}
+
+[data-theme='dark'] .pricing-addons-description strong {
+  color: var(--color-text-primary, #ffffff);
+}
+
+[data-theme='dark'] .pricing-card-stats .pricing-stat {
+  background: var(--layout-panel-background, #1a1a1a);
+}
+
+[data-theme='dark'] .credit-pack-card {
+  background: var(--layout-content-background, #161b22);
+  border-color: var(--color-border-primary, #404040);
+}
+
+[data-theme='dark'] .credit-pack-price {
+  color: var(--color-text-primary, #ffffff);
+}
+
+[data-theme='dark'] .credit-pack-label {
+  color: var(--color-text-secondary, #c0c0c0);
+}
+
+[data-theme='dark'] .credit-pack-credits {
+  color: var(--color-brand-primary, #00c2cb);
+}
+
+[data-theme='dark'] .credit-pack-meta {
+  color: var(--color-text-secondary, #9ca3af);
+}
+
+[data-theme='dark'] .pricing-footnote-text {
+  color: var(--color-text-secondary, #9ca3af);
+}
+
+[data-theme='dark'] .pricing-footer-text {
+  color: var(--color-text-tertiary, #8c8c8c);
+}
+
+[data-theme='dark'] .pricing-card-meta {
+  color: var(--color-text-secondary, #bfbfbf);
+}
+
+[data-theme='dark'] .pricing-trial-compact {
+  color: var(--color-brand-primary, #3b82f6);
+}
+
+/* ========================================
+   RESPONSIVE DESIGN
+   ======================================== */
+
+@media (max-width: 768px) {
+  .pricing-cards-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
+  .pricing-modal .ant-modal-body {
+    padding: 0 12px 12px;
+  }
+  
+  .pricing-card {
+    margin: 0 6px;
+  }
+  
+  .pricing-card-header {
+    margin-bottom: 12px;
+  }
+  
+  .pricing-card-icon {
+    font-size: 20px;
+    margin-bottom: 6px;
+  }
+  
+  .pricing-card-title {
+    font-size: 16px;
+    margin-bottom: 6px;
+  }
+  
+  .pricing-price-amount {
+    font-size: 24px;
+  }
+  
+  .pricing-price-period {
+    font-size: 12px;
+  }
+  
+  .pricing-card-meta {
+    margin-top: 6px;
+    gap: 3px;
+  }
+  
+  .pricing-credits-amount {
+    font-size: 12px;
+  }
+  
+  .pricing-credits-label {
+    font-size: 10px;
+  }
+  
+  .pricing-trial-compact {
+    font-size: 10px;
+  }
+  
+  .pricing-feature-text {
+    font-size: 11px;
+  }
+  
+  .pricing-button {
+    height: 32px;
+    font-size: 12px;
+  }
+  
+  .pricing-toggle {
+    flex-direction: column;
+    gap: 6px;
+    padding: 6px;
+  }
+  
+  .pricing-toggle-switch {
+    margin: 0;
+  }
+  
+  .pricing-savings-tag {
+    margin-left: 0;
+    margin-top: 6px;
+  }
+}
+
+@media (max-width: 480px) {
+  .pricing-modal-title {
+    font-size: 18px;
+  }
+  
+  .pricing-modal-subtitle {
+    font-size: 12px;
+  }
+  
+  .pricing-price-amount {
+    font-size: 22px;
+  }
+  
+  .pricing-card-icon {
+    font-size: 18px;
+  }
+  
+  .pricing-card-title {
+    font-size: 14px;
+  }
+  
+  .pricing-credits-amount {
+    font-size: 11px;
+  }
+  
+  .pricing-credits-label {
+    font-size: 9px;
+  }
+  
+  .pricing-feature-text {
+    font-size: 10px;
+  }
+  
+  .pricing-button {
+    height: 30px;
+    font-size: 11px;
+  }
+  
+  .pricing-addons-card {
+    padding: 8px;
+  }
+  
+  .pricing-addons-title {
+    font-size: 11px;
+  }
+  
+  .pricing-addons-description {
+    font-size: 9px;
+  }
+}

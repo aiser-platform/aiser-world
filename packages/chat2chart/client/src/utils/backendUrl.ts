@@ -43,8 +43,6 @@ export const getBackendUrlForApi = (): string => {
   if (typeof window !== 'undefined') {
     return getBackendUrl();
   }
-  // Use service DNS on server (SSR)
-  const env = process.env.NEXT_PUBLIC_BACKEND_URL;
-  if (env && /localhost|127\.0\.0\.1/.test(env)) return 'http://chat2chart-server:8000';
-  return env || 'http://chat2chart-server:8000';
+  // Use Docker service name for server-side requests
+  return 'http://chat2chart-server:8000';
 };

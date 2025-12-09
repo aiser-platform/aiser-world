@@ -4,8 +4,6 @@ Wrapper copy of project root setup-real-organization.py so backend container can
 This file is a thin proxy that imports and runs the real setup script from the repository root.
 """
 import os
-import sys
-import asyncio
 
 # Ensure repo root is on path
 # Try multiple possible locations for the real setup script (works for mounted volumes or image layouts)

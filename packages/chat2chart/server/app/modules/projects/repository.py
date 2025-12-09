@@ -8,7 +8,7 @@ from app.modules.projects.models import (
     Project,
     Organization,
     ProjectDataSource,
-    OrganizationUser,
+    UserOrganization,
 )
 from app.modules.projects.schemas import (
     ProjectCreate,
@@ -410,9 +410,9 @@ class OrganizationRepository(
             projects = project_result.scalars().all()
 
             # Get user count
-            user_query = select(OrganizationUser).where(
-                OrganizationUser.organization_id == organization_id,
-                OrganizationUser.is_active,
+            user_query = select(UserOrganization).where(
+                UserOrganization.organization_id == organization_id,
+                UserOrganization.is_active,
             )
             user_result = await db.execute(user_query)
             users = user_result.scalars().all()

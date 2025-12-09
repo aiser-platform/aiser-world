@@ -1,4 +1,3 @@
-from app.common.schemas import BaseSchema
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 
@@ -18,6 +17,14 @@ class UserUpdate(UserBase):
     password: str = Field(None, min_length=8, max_length=128)
     # Allow `name` updates in tests and external callers
     name: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+    phone: Optional[str] = None
+    bio: Optional[str] = None
+    website: Optional[str] = None
+    location: Optional[str] = None
+    timezone: Optional[str] = None
 
 
 class UserResponse(UserBase):
@@ -25,6 +32,16 @@ class UserResponse(UserBase):
     # Make `username` optional here and accept `name` to remain compatible.
     username: Optional[str] = None
     name: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+    phone: Optional[str] = None
+    bio: Optional[str] = None
+    website: Optional[str] = None
+    location: Optional[str] = None
+    timezone: Optional[str] = None
+    created_at: Optional[str] = None
+    last_login_at: Optional[str] = None
 
 
 class SignInRequest(BaseModel):

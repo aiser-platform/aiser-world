@@ -31,9 +31,12 @@ class DeviceSessionRepository(
             # revoke refresh token too
             session.refresh_token_revoked = True
             try:
-                await self.db._session.commit()
+                self.db._session.commit()
             except Exception:
-                await self.db._session.rollback()
+                try:
+                    self.db._session.rollback()
+                except Exception:
+                    pass
                 raise
             return True
         return False
@@ -46,9 +49,12 @@ class DeviceSessionRepository(
             session.refresh_token_revoked = True
             session.is_active = False
             try:
-                await self.db._session.commit()
+                self.db._session.commit()
             except Exception:
-                await self.db._session.rollback()
+                try:
+                    self.db._session.rollback()
+                except Exception:
+                    pass
                 raise
             return True
         return False
@@ -59,9 +65,12 @@ class DeviceSessionRepository(
         if session:
             session.last_active = datetime.utcnow()
             try:
-                await self.db._session.commit()
+                self.db._session.commit()
             except Exception:
-                await self.db._session.rollback()
+                try:
+                    self.db._session.rollback()
+                except Exception:
+                    pass
                 raise
 
     async def get_by_device_id(self, device_id: str) -> Optional[DeviceSession]:

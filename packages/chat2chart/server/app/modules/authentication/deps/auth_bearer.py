@@ -87,29 +87,31 @@ class JWTBearer(HTTPBearer):
             raise HTTPException(status_code=403, detail="Invalid authorization code.")
 
     def verify_jwt(self, jwtoken: str) -> bool:
-        print(f"🔍 verify_jwt: METHOD CALLED with token: {jwtoken[:20]}...")
-        print(f"🔍 verify_jwt: checking token: {jwtoken[:20]}...")
+        # Security: Only log masked token prefix, never full token
+        masked_token = (jwtoken[:8] + '...') if isinstance(jwtoken, str) and len(jwtoken) > 8 else '[token]'
+        logger.debug(f"🔍 verify_jwt: METHOD CALLED with token: {masked_token}")
+        logger.debug(f"🔍 verify_jwt: checking token: {masked_token}")
         isTokenValid: bool = False
 
         try:
             # Allow test-suite token shortcut
             if jwtoken == 'test-token':
-                print("🔍 verify_jwt: test-token detected, returning True")
+                logger.debug("🔍 verify_jwt: test-token detected, returning True")
                 return True
 
             # Handle demo tokens from auth service
             if isinstance(jwtoken, str) and jwtoken.startswith('demo_token_'):
-                print("🔍 verify_jwt: demo_token detected, returning True")
+                logger.debug("🔍 verify_jwt: demo_token detected, returning True")
                 return True
 
             payload = Auth().decodeJWT(jwtoken)
-            print(f"🔍 verify_jwt: decodeJWT result: {payload}")
+            logger.debug(f"🔍 verify_jwt: decodeJWT result: {'success' if payload else 'failed'}")
         except Exception as e:
-            print(f"🔍 verify_jwt: decodeJWT failed: {e}")
+            logger.debug(f"🔍 verify_jwt: decodeJWT failed: {e}")
             payload = None
         if payload:
             isTokenValid = True
-        print(f"🔍 verify_jwt: final result: {isTokenValid}")
+        logger.debug(f"🔍 verify_jwt: final result: {isTokenValid}")
         return isTokenValid
 
 
@@ -132,23 +134,100 @@ class JWTCookieBearer(HTTPBearer):
             if isinstance(jwtoken, str) and jwtoken.startswith('demo_token_'):
                 return True
 
+            # Try provider-based verification first (if available)
+            try:
+                from app.modules.authentication.providers.factory import get_auth_provider
+                import asyncio
+                
+                # Check if we're in an async context
+                try:
+                    loop = asyncio.get_event_loop()
+                    if loop.is_running():
+                        # In async context, but verify_jwt is sync, so we'll use legacy method
+                        # Provider verification will happen in async __call__ method
+                        pass
+                    else:
+                        # Not in async context, try sync verification
+                        provider = get_auth_provider()
+                        # For sync verification, use legacy method
+                        pass
+                except RuntimeError:
+                    # No event loop, use legacy method
+                    pass
+            except Exception:
+                # Provider not available or error, fall back to legacy
+                pass
+
+            # Try to decode JWT (legacy method - works for all providers)
             payload = Auth().decodeJWT(jwtoken)
-        except Exception as e:
+            if payload:
+                isTokenValid = True
+                # Log success (without token content)
+                user_id = payload.get('id') or payload.get('user_id') or payload.get('sub')
+                logger.debug(f"JWTCookieBearer: Token verified successfully, user_id: {user_id}")
+            else:
+                logger.warning(f"JWTCookieBearer: Token decode returned None/empty payload")
+        except Exception as decode_error:
+            logger.error(f"JWTCookieBearer: Token decode failed: {str(decode_error)}")
             payload = None
-        if payload:
-            isTokenValid = True
+        
         return isTokenValid
 
     async def __call__(self, request: Request):
         # Prefer namespaced cookies to avoid collisions with other services
-        token = request.cookies.get("c2c_access_token") or request.cookies.get("access_token")
+        c2c_token = request.cookies.get("c2c_access_token")
+        access_token = request.cookies.get("access_token")
+        token = c2c_token or access_token
         
-        try:
-            auth_header = await super().__call__(request)
-            if auth_header and auth_header.credentials:
-                token = auth_header.credentials
-        except HTTPException:
-            pass
+        # Log cookie presence and values (masked) for debugging
+        def mask_token(t: str) -> str:
+            if not t or len(t) < 8:
+                return f"[{len(t)} chars]"
+            return f"{t[:8]}...{t[-4:]}"
+        
+        logger.debug(f"JWTCookieBearer: Checking cookies - c2c_access_token: {bool(c2c_token)} ({mask_token(c2c_token) if c2c_token else 'None'}), access_token: {bool(access_token)} ({mask_token(access_token) if access_token else 'None'}), token found: {bool(token)} ({mask_token(token) if token else 'None'})")
+        
+        # Check Authorization header first (takes precedence over cookies)
+        auth_header_val = request.headers.get('Authorization', '')
+        if auth_header_val:
+            # Extract token from "Bearer <token>" format
+            if auth_header_val.startswith('Bearer '):
+                token_from_header = auth_header_val[7:].strip()
+                # CRITICAL: Reject "null" tokens and validate JWT format from Authorization header
+                # JWT tokens should be at least 50 characters and have 3 parts (header.payload.signature)
+                is_valid_jwt = (
+                    token_from_header and 
+                    token_from_header != 'null' and 
+                    len(token_from_header) >= 50 and
+                    len(token_from_header.split('.')) == 3  # JWT has 3 parts
+                )
+                if is_valid_jwt:
+                    token = token_from_header
+                    logger.debug(f"JWTCookieBearer: Using valid token from Authorization header: {mask_token(token) if token else 'None'}")
+                else:
+                    # Invalid token in Authorization header - ignore it and use cookies instead
+                    logger.warning(f"JWTCookieBearer: Invalid token in Authorization header (length: {len(token_from_header) if token_from_header else 0}, parts: {len(token_from_header.split('.')) if token_from_header else 0}), falling back to cookies")
+                    # Re-read cookies since we're falling back
+                    token = c2c_token or access_token
+            else:
+                # Authorization header without "Bearer " prefix - use as-is if valid
+                if auth_header_val.strip() and auth_header_val.strip() != 'null' and len(auth_header_val.strip()) > 50:
+                    token = auth_header_val.strip()
+                    logger.debug(f"JWTCookieBearer: Using token from Authorization header (no Bearer prefix): {mask_token(token) if token else 'None'}")
+                else:
+                    # Re-read cookies since header is invalid
+                    token = c2c_token or access_token
+        
+        # CRITICAL: Strip "Bearer " prefix if still present (defensive check)
+        if isinstance(token, str) and token.startswith('Bearer '):
+            token = token[7:].strip()
+            logger.debug(f"JWTCookieBearer: Stripped 'Bearer ' prefix from token (defensive)")
+        
+        # If token is "null" or invalid, fall back to cookies
+        if token == 'null' or (isinstance(token, str) and len(token) < 50):
+            logger.warning(f"JWTCookieBearer: Token is invalid (value: {repr(token[:20]) if token else 'None'}, length: {len(token) if token else 0}), falling back to cookies")
+            # Re-read cookies as fallback
+            token = c2c_token or access_token
 
         # Accept test-token shortcut used in many tests (returns permissive payload)
         if token == 'test-token':
@@ -173,51 +252,84 @@ class JWTCookieBearer(HTTPBearer):
             # Last-resort fallback
             return {'id': '6', 'user_id': '6', 'sub': '6'}
 
-        # In development, tolerate missing tokens for test paths by returning a
-        # minimal payload only when explicitly allowed via settings.ALLOW_DEV_AUTH_BYPASS.
+        # SECURITY: No token means no authentication - reject immediately
         if not token:
-            try:
-                from app.core.config import settings
-                _env = str(getattr(settings, 'ENVIRONMENT', os.getenv('ENVIRONMENT', 'development'))).strip().lower()
-                allow_bypass = bool(getattr(settings, 'ALLOW_DEV_AUTH_BYPASS', False)) or os.getenv('ALLOW_DEV_AUTH_BYPASS', '').lower() == 'true'
-                if _env in ('development', 'dev', 'local', 'test') and allow_bypass:
-                    logger.warning("JWTCookieBearer: returning minimal payload due to ALLOW_DEV_AUTH_BYPASS=true")
-                    return {'id': 1}
-            except Exception:
-                pass
+            logger.warning("JWTCookieBearer: No token found in cookies or Authorization header")
+            logger.warning(f"JWTCookieBearer: Available cookies: {list(request.cookies.keys())}")
+            logger.warning(f"JWTCookieBearer: Authorization header present: {bool(request.headers.get('Authorization'))}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required. Please log in."
+            )
 
         if not self.verify_jwt(token):
             # Log token debug info (mask token) to help diagnose client issues
             try:
-                masked = (token[:8] + '...') if isinstance(token, str) and len(token) > 8 else token
-                logger.info(f"JWTCookieBearer rejected token: {masked}; Authorization header present: {bool(request.headers.get('Authorization'))}; cookies: {list(request.cookies.keys())}")
-            except Exception:
-                logger.info("JWTCookieBearer rejected token and failed to read request details")
-            # Development convenience: return a default test payload when running
-            # in development so tests that override the dependency or expect a
-            # permissive auth path don't fail due to strict token checks.
+                # Only log masked token prefix for debugging, never full token
+                def safe_mask(t: str) -> str:
+                    if not t or len(t) < 8:
+                        return f"[{len(t)} chars: {repr(t[:20]) if len(t) <= 20 else t[:8] + '...'}]"
+                    return f"{t[:8]}...{t[-4:]}"
+                
+                masked = safe_mask(token) if isinstance(token, str) else '[not a string]'
+                logger.error(f"JWTCookieBearer rejected token: {masked}")
+                logger.error(f"  - Authorization header present: {bool(request.headers.get('Authorization'))}")
+                auth_header_val = request.headers.get('Authorization', '')
+                if auth_header_val:
+                    logger.error(f"  - Authorization header value (masked): {safe_mask(auth_header_val)}")
+                logger.error(f"  - Available cookies: {list(request.cookies.keys())}")
+                logger.error(f"  - Cookie values (masked): c2c_access_token={safe_mask(c2c_token) if c2c_token else 'None'}, access_token={safe_mask(access_token) if access_token else 'None'}")
+                logger.error(f"  - Token type: {type(token)}")
+                logger.error(f"  - Token length: {len(token) if isinstance(token, str) else 'N/A'}")
+                logger.error(f"  - Token starts with 'Bearer ': {token.startswith('Bearer ') if isinstance(token, str) else False}")
+                if isinstance(token, str) and token.startswith('Bearer '):
+                    logger.error(f"  - WARNING: Token has 'Bearer ' prefix, stripping it")
+                    token = token[7:].strip()
+            except Exception as log_error:
+                logger.error(f"JWTCookieBearer rejected token and failed to log details: {log_error}")
+            
+            # SECURITY: Only allow unverified claims in development if explicitly enabled
+            # This is for development/testing only when JWT secrets differ between services
             try:
                 from app.core.config import settings
-                _env = str(getattr(settings, 'ENVIRONMENT', os.getenv('ENVIRONMENT', 'development'))).strip().lower()
+                _env = str(getattr(settings, 'ENVIRONMENT', os.getenv('ENVIRONMENT', 'production'))).strip().lower()
                 allow_unverified = bool(getattr(settings, 'ALLOW_UNVERIFIED_JWT_IN_DEV', False)) or os.getenv('ALLOW_UNVERIFIED_JWT_IN_DEV', '').lower() == 'true'
+                
+                # Only in development and only if explicitly enabled
                 if _env in ('development', 'dev', 'local', 'test') and isinstance(token, str) and allow_unverified:
-                    # Try returning unverified claims so dev tokens from auth-service
-                    # are usable even when secrets differ between services.
+                    logger.warning("JWTCookieBearer: Using unverified claims (development mode with ALLOW_UNVERIFIED_JWT_IN_DEV=true)")
                     try:
                         from jose import jwt as jose_jwt
                         u = jose_jwt.get_unverified_claims(token)
-                        if isinstance(u, dict) and u:
+                        if isinstance(u, dict) and u and (u.get('id') or u.get('user_id') or u.get('sub')):
+                            user_id = u.get('id') or u.get('user_id') or u.get('sub')
+                            logger.warning(f"JWTCookieBearer: returning unverified claims with user_id: {user_id}")
+                            # CRITICAL: Verify user exists in database before allowing
                             try:
-                                logger.info(f"JWTCookieBearer: returning unverified claims keys={list(u.keys())}")
-                            except Exception:
-                                pass
-                            return u
-                    except Exception:
-                        return {'id': 1}
+                                async def _verify_user_exists(uid: str):
+                                    async with get_async_session() as session:
+                                        result = await session.execute(sa.text("SELECT id FROM users WHERE id = :uid LIMIT 1"), {"uid": str(uid)})
+                                        return result.scalar_one_or_none() is not None
+                                
+                                user_exists = await _verify_user_exists(user_id)
+                                if user_exists:
+                                    logger.warning(f"JWTCookieBearer: User {user_id} verified in database, allowing unverified token")
+                                    return u
+                                else:
+                                    logger.error(f"JWTCookieBearer: User {user_id} from unverified token does not exist in database - rejecting")
+                            except Exception as verify_error:
+                                logger.error(f"JWTCookieBearer: Failed to verify user existence: {verify_error}")
+                                # Don't allow if we can't verify
+                    except Exception as unverified_error:
+                        logger.error(f"JWTCookieBearer: Failed to extract unverified claims: {unverified_error}")
+            
             except Exception:
                 pass
+            
+            # SECURITY: Reject invalid tokens - user must be properly authenticated
             raise HTTPException(
-                status_code=403, detail="Invalid token or expired token."
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or expired authentication token. Please log in again."
             )
         # Prefer returning a normalized payload dict to callers so they can
         # consistently resolve user identity (supports tests returning dicts
@@ -303,8 +415,9 @@ async def current_user_payload(request: Request) -> dict:
         try:
             # Log masked token for debugging cross-service decoding issues
             try:
-                masked = (token[:8] + '...') if isinstance(token, str) and len(token) > 12 else token
-                logger.info(f"current_user_payload: attempting decodeJWT for token={masked}")
+                # Only log masked token prefix for debugging, never full token
+                masked = (token[:8] + '...') if isinstance(token, str) and len(token) > 12 else '[token]'
+                logger.debug(f"current_user_payload: attempting decodeJWT for token={masked}")
             except Exception:
                 pass
             payload = Auth().decodeJWT(token) or {}

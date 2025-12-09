@@ -106,8 +106,9 @@ class ConversationService {
    * Add message to current conversation in memory
    */
   addMessage(content: string, role: 'user' | 'assistant', metadata?: any): Message {
+    // Create a conversation if none exists
     if (!this.currentConversationId) {
-      throw new Error('No active conversation');
+      this.createConversation(`Chat ${new Date().toLocaleString()}`);
     }
 
     const id = crypto.randomUUID();
@@ -115,7 +116,7 @@ class ConversationService {
     
     const message: Message = {
       id,
-      conversation_id: this.currentConversationId,
+      conversation_id: this.currentConversationId!,
       query: role === 'user' ? content : undefined,
       answer: role === 'assistant' ? content : undefined,
       role,
@@ -123,12 +124,12 @@ class ConversationService {
       metadata
     };
 
-    const messages = this.memoryMessages.get(this.currentConversationId) || [];
+    const messages = this.memoryMessages.get(this.currentConversationId!) || [];
     messages.push(message);
-    this.memoryMessages.set(this.currentConversationId, messages);
+    this.memoryMessages.set(this.currentConversationId!, messages);
 
     // Update conversation metadata
-    const conversation = this.memoryConversations.get(this.currentConversationId);
+    const conversation = this.currentConversationId ? this.memoryConversations.get(this.currentConversationId) : null;
     if (conversation) {
       conversation.message_count = messages.length;
       conversation.updated_at = now;

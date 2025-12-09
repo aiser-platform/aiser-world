@@ -1,7 +1,9 @@
-from typing import Annotated, List, Optional, Dict, Any
+from typing import Annotated, List, Union
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.common.schemas import ListResponseSchema, PaginationSchema
 from app.common.utils.query_params import BaseFilterParams
+from app.modules.authentication.auth import Auth
 
 from .schemas import (
     ProjectCreate,
@@ -21,6 +23,11 @@ from .schemas import (
 from .services import ProjectService, OrganizationService
 from app.modules.authentication.deps.auth_bearer import JWTCookieBearer
 from app.modules.authentication.auth import Auth
+from app.core.deps import get_current_user
+from app.modules.user.models import User
+from app.modules.authentication.rbac.decorators import require_permission
+from app.modules.authentication.rbac.permissions import Permission
+from app.db.session import get_async_session
 import logging
 
 logger = logging.getLogger(__name__)
@@ -32,13 +39,42 @@ organization_service = OrganizationService()
 
 # Organization endpoints
 @router.get("/organizations", response_model=List[OrganizationResponse])
-async def get_organizations():
-    """Get all organizations"""
+async def get_organizations(
+    current_token: dict = Depends(JWTCookieBearer()),
+):
+    """Get all organizations for the authenticated user"""
     try:
-        # Get real organizations from database
-        result = await organization_service.get_all()
+        # Extract user_id from token
+        from app.modules.authentication.auth import Auth
+        user_id = ''
+        try:
+            if isinstance(current_token, dict):
+                user_payload = current_token
+            else:
+                user_payload = Auth().decodeJWT(current_token) or {}
+            user_id = str(user_payload.get('id') or user_payload.get('user_id') or user_payload.get('sub') or '')
+        except Exception as e:
+            logger.warning(f"Failed to extract user info from token: {e}")
+        
+        if user_id:
+            # Get organizations for this specific user
+            result = await organization_service.get_user_organizations(user_id)
+        else:
+            # Fallback: get all organizations (for backwards compatibility)
+            result = await organization_service.get_all()
+        
+        # Ensure all organizations have plan_type set (double-check)
+        # CRITICAL: Only set default if plan_type is truly missing - don't override valid values
+        for org in result:
+            if not hasattr(org, 'plan_type') or org.plan_type is None or (isinstance(org.plan_type, str) and org.plan_type.strip() == ''):
+                logger.warning(f"Organization {org.id} missing plan_type, defaulting to 'free'")
+                org.plan_type = 'free'
+        
+        # Log the organizations being returned for debugging
+        logger.info(f"Returning {len(result)} organizations for user {user_id}: {[(o.id, o.name, o.plan_type) for o in result]}")
         return result
     except Exception as e:
+        logger.error(f"Failed to get organizations: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
         )
@@ -87,12 +123,61 @@ async def get_organization_summary(organization_id: str):
 
 
 @router.put("/organizations/{organization_id}", response_model=OrganizationResponse)
-async def update_organization(organization_id: str, organization: OrganizationUpdate):
-    """Update organization"""
+async def update_organization(
+    organization_id: str, 
+    organization: OrganizationUpdate,
+    current_token: dict = Depends(JWTCookieBearer()),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """Update organization - only if user is a member"""
     try:
+        # Extract user_id from token
+        from app.modules.authentication.auth import Auth
+        user_id = ''
+        try:
+            if isinstance(current_token, dict):
+                user_payload = current_token
+            else:
+                user_payload = Auth().decodeJWT(current_token) or {}
+            user_id = str(user_payload.get('id') or user_payload.get('user_id') or user_payload.get('sub') or '')
+        except Exception as e:
+            logger.warning(f"Failed to extract user info from token: {e}")
+        
+        if not user_id:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User ID not found in token")
+        
+        # Verify user is a member of this organization
+        from sqlalchemy import text
+        result = await db.execute(
+            text("""
+                SELECT uo.role, uo.is_active
+                FROM user_organizations uo
+                WHERE uo.organization_id = :org_id
+                AND uo.user_id::text = :user_id
+            """),
+            {"org_id": int(organization_id), "user_id": user_id}
+        )
+        membership = result.fetchone()
+        
+        if not membership:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, 
+                detail="You do not have permission to update this organization"
+            )
+        
+        # Only owners can update organization settings
+        if membership.role != 'owner':
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only organization owners can update organization settings"
+            )
+        
         result = await organization_service.update(organization_id, organization)
         return result
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.error(f"Failed to update organization: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
         )
@@ -100,7 +185,12 @@ async def update_organization(organization_id: str, organization: OrganizationUp
 
 # Project endpoints
 @router.post("/projects", response_model=ProjectResponse)
-async def create_project(project: ProjectCreate, request: Request, current_token: str = Depends(JWTCookieBearer())):
+async def create_project(
+    project: ProjectCreate, 
+    request: Request, 
+    current_token: dict = Depends(JWTCookieBearer()),
+    db: AsyncSession = Depends(get_async_session)
+):
     """Create a new project deriving user from JWT cookie"""
     try:
         try:
@@ -353,30 +443,73 @@ async def get_user_project_access(user_id: str):
 
 # Team management endpoints
 @router.get("/organizations/{organization_id}/members")
-async def get_organization_members(organization_id: str):
+async def get_organization_members(
+    organization_id: str,
+    current_token: Union[str, dict] = Depends(JWTCookieBearer())
+):
     """Get all members of an organization"""
     try:
-        # For now, return sample data. In production, this would query the database
-        sample_members = [
-            {
-                "id": "1",
-                "name": "John Doe",
-                "email": "john@example.com",
-                "role": "owner",
-                "status": "active",
-                "joinDate": "2024-01-01T00:00:00Z",
-            },
-            {
-                "id": "2",
-                "name": "Jane Smith",
-                "email": "jane@example.com",
-                "role": "admin",
-                "status": "active",
-                "joinDate": "2024-01-15T00:00:00Z",
-            },
-        ]
-        return sample_members
+        from app.db.session import async_session
+        from app.modules.projects.models import UserOrganization
+        from app.modules.user.models import User
+        from sqlalchemy import select
+        
+        # Extract user ID from token for access control
+        try:
+            user_payload = current_token if isinstance(current_token, dict) else Auth().decodeJWT(current_token) or {}
+            user_id = str(user_payload.get('id') or user_payload.get('user_id') or user_payload.get('sub') or '')
+        except Exception:
+            user_id = ''
+        
+        async with async_session() as db:
+            try:
+                org_id_int = int(organization_id)
+            except (ValueError, TypeError):
+                raise HTTPException(status_code=400, detail="Invalid organization ID")
+            
+            # Verify user has access to this organization
+            if user_id:
+                org_user = await db.execute(
+                    select(UserOrganization).where(
+                        UserOrganization.user_id == user_id,
+                        UserOrganization.organization_id == org_id_int
+                    )
+                )
+                if not org_user.scalar_one_or_none():
+                    raise HTTPException(status_code=403, detail="Access denied to this organization")
+            
+            # Query UserOrganization joined with User to get member details
+            query = (
+                select(UserOrganization, User)
+                .join(User, UserOrganization.user_id == User.id)
+                .where(
+                    UserOrganization.organization_id == org_id_int,
+                    UserOrganization.is_active == True
+                )
+            )
+            result = await db.execute(query)
+            rows = result.all()
+            
+            members = []
+            for uo, user in rows:
+                members.append({
+                    "id": str(user.id),
+                    "user_id": str(user.id),
+                    "username": user.username or (user.email.split('@')[0] if user.email else 'user'),
+                    "name": f"{user.first_name or ''} {user.last_name or ''}".strip() or user.username or (user.email.split('@')[0] if user.email else 'User'),
+                    "email": user.email or '',
+                    "role": uo.role or 'member',
+                    "status": "active" if uo.is_active else "inactive",
+                    "joined_at": uo.created_at.isoformat() if uo.created_at else None,
+                    "joinDate": uo.created_at.isoformat() if uo.created_at else None,
+                    "avatar_url": getattr(user, 'avatar_url', None)
+                })
+            
+            return members
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.error(f"Failed to get organization members: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
         )
@@ -386,9 +519,76 @@ async def get_organization_members(organization_id: str):
 async def add_organization_member(organization_id: str, member_data: dict):
     """Add a new member to an organization"""
     try:
-        # For now, return success. In production, this would add to database
-        return {"success": True, "message": "Member added successfully"}
+        from app.db.session import async_session
+        from app.modules.projects.models import UserOrganization
+        from app.modules.user.models import User
+        from sqlalchemy import select
+        
+        email = member_data.get('email')
+        role = member_data.get('role', 'member')
+        
+        if not email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email is required"
+            )
+        
+        async with async_session() as db:
+            # Find user by email
+            user_query = select(User).where(User.email == email)
+            user_result = await db.execute(user_query)
+            user = user_result.scalar_one_or_none()
+            
+            if not user:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"User with email {email} not found. They must sign up first."
+                )
+            
+            # Check if user is already a member
+            existing_query = select(UserOrganization).where(
+                UserOrganization.organization_id == int(organization_id),
+                UserOrganization.user_id == user.id,
+                UserOrganization.is_active == True
+            )
+            existing_result = await db.execute(existing_query)
+            existing = existing_result.scalar_one_or_none()
+            
+            if existing:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="User is already a member of this organization"
+                )
+            
+            # Create new UserOrganization entry
+            new_member = UserOrganization(
+                organization_id=int(organization_id),
+                user_id=user.id,
+                role=role,
+                is_active=True
+            )
+            db.add(new_member)
+            await db.commit()
+            await db.refresh(new_member)
+            
+            return {
+                "success": True,
+                "message": "Member added successfully",
+                "member": {
+                    "id": str(user.id),
+                    "user_id": str(user.id),
+                    "username": user.username or user.email.split('@')[0] if user.email else 'user',
+                    "name": f"{user.first_name or ''} {user.last_name or ''}".strip() or user.username or user.email.split('@')[0] if user.email else 'User',
+                    "email": user.email or '',
+                    "role": role,
+                    "status": "active",
+                    "joined_at": new_member.created_at.isoformat() if new_member.created_at else None
+                }
+            }
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.error(f"Failed to add organization member: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
         )
@@ -422,26 +622,170 @@ async def remove_organization_member(organization_id: str, member_id: str):
 
 # Usage and billing endpoints
 @router.get("/organizations/{organization_id}/usage")
-async def get_organization_usage(organization_id: str):
+async def get_organization_usage(
+    organization_id: str,
+    current_token: Union[str, dict] = Depends(JWTCookieBearer())
+):
     """Get organization usage statistics"""
     try:
-        # For now, return sample data. In production, this would query the database
-        sample_usage = {
-            "totals": {
-                "tokens_used": 15000,
-                "cost_dollars": 45.50,
-                "total_requests": 1250,
-            },
-            "limits": {
-                "ai_credits_used": 15000,
-                "ai_credits_limit": 10000,
-                "max_projects": 50,
-                "max_users": 100,
-            },
-            "period": "current_month",
-        }
-        return sample_usage
+        from app.modules.organization.api import get_organization_usage as get_real_usage
+        from app.modules.organization.services import OrganizationService
+        from app.db.session import async_session
+        
+        # Get the real usage from organization service
+        async with async_session() as session:
+            org_service = OrganizationService()
+            # Get organization to verify access
+            try:
+                org_id_int = int(organization_id)
+            except (ValueError, TypeError):
+                raise HTTPException(status_code=400, detail="Invalid organization ID")
+            
+            # Use the real implementation from organization/api.py
+            from app.modules.organization.api import get_organization_usage
+            # This requires a different signature, so we'll implement it here
+            from app.modules.pricing.plans import get_plan_config
+            from app.modules.projects.models import Organization, UserOrganization
+            from sqlalchemy import select, func
+            
+            # Extract user ID from token
+            try:
+                user_payload = current_token if isinstance(current_token, dict) else Auth().decodeJWT(current_token) or {}
+                user_id = str(user_payload.get('id') or user_payload.get('user_id') or user_payload.get('sub') or '')
+            except Exception:
+                user_id = ''
+            
+            if not user_id:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Authentication required')
+            
+            # Convert user_id to UUID for comparison (user_id column is UUID type)
+            import uuid as uuid_lib
+            
+            try:
+                # Convert string user_id to UUID object for proper comparison
+                user_uuid = uuid_lib.UUID(user_id) if isinstance(user_id, str) else user_id
+            except (ValueError, TypeError):
+                logger.error(f"Invalid user_id format: {user_id}")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid user ID format"
+                )
+            
+            # Get user's organization membership
+            # user_id is UUID type in database, so use UUID object for comparison
+            org_user = await session.execute(
+                select(UserOrganization).where(
+                    UserOrganization.organization_id == org_id_int,
+                    UserOrganization.user_id == user_uuid,
+                    UserOrganization.is_active == True
+                )
+            )
+            org_user = org_user.scalar_one_or_none()
+            
+            if not org_user:
+                logger.warning(f"User {user_id} attempted to access organization {org_id_int} without membership")
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Access denied: You do not have permission to access this organization"
+                )
+            
+            # Get organization
+            org = await session.execute(
+                select(Organization).where(Organization.id == org_id_int)
+            )
+            organization = org.scalar_one_or_none()
+            
+            if not organization:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Organization not found"
+                )
+            
+            plan_config = get_plan_config(organization.plan_type or "free")
+            
+            # Get actual usage stats
+            from app.modules.data.models import DataSource
+            from app.modules.projects.models import Project
+            
+            # Count data sources for this organization
+            data_sources_count = await session.execute(
+                select(func.count(DataSource.id)).where(
+                    DataSource.tenant_id == str(org_id_int),
+                    DataSource.is_active == True
+                )
+            )
+            data_sources_used = data_sources_count.scalar() or 0
+            
+            # Count projects
+            projects_count = await session.execute(
+                select(func.count(Project.id)).where(
+                    Project.organization_id == org_id_int
+                )
+            )
+            projects_used = projects_count.scalar() or 0
+            
+            # Count active users
+            active_users_count = await session.execute(
+                select(func.count(UserOrganization.user_id)).where(
+                    UserOrganization.organization_id == org_id_int,
+                    UserOrganization.is_active == True
+                )
+            )
+            active_users = active_users_count.scalar() or 0
+            
+            limits_payload = {
+                "plan_type": organization.plan_type,
+                "plan_name": plan_config["name"],
+                "ai_credits_limit": plan_config["ai_credits_limit"],
+                "storage_limit_gb": plan_config["storage_limit_gb"],
+                "max_storage_gb": plan_config["storage_limit_gb"],
+                "max_projects": plan_config["max_projects"],
+                "max_users": plan_config["max_users"],
+                "max_data_sources": plan_config["max_data_sources"],
+                "data_history_days": plan_config.get("data_history_days"),
+                "included_seats": plan_config.get("included_seats"),
+                "additional_seat_price": plan_config.get("additional_seat_price"),
+            }
+            
+            ai_limit = plan_config["ai_credits_limit"]
+            ai_used = organization.ai_credits_used or 0  # Handle None
+            
+            # Calculate remaining credits
+            if ai_limit in (-1, None):
+                remaining = -1  # Unlimited
+            else:
+                remaining = max(0, ai_limit - ai_used)
+            
+            # Calculate percentage used
+            if ai_limit in (-1, None) or ai_limit == 0:
+                percentage = 0
+            else:
+                percentage = min(100, (ai_used / ai_limit) * 100)
+            
+            usage_payload = {
+                "ai_credits_used": ai_used,
+                "data_sources_used": data_sources_used,
+                "projects_used": projects_used,
+                "storage_used_gb": 0,  # TODO: Calculate actual storage
+                "active_users": active_users,
+            }
+            
+            limits_payload["ai_credits_remaining"] = remaining
+            limits_payload["usage_percentage"] = percentage
+            
+            return {
+                "plan_type": organization.plan_type,
+                "limits": limits_payload,
+                "usage": usage_payload,
+                "ai_credits_used": organization.ai_credits_used,
+                "ai_credits_limit": limits_payload["ai_credits_limit"],
+                "ai_credits_remaining": remaining,
+            }
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.error(f"Error getting organization usage: {e}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get organization usage"
         )

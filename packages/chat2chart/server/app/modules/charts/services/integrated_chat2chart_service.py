@@ -65,7 +65,7 @@ class IntegratedChat2ChartService:
             start_time = datetime.now()
             self.performance_metrics['total_requests'] += 1
             
-            logger.info(f"🚀 Starting integrated chat2chart workflow")
+            logger.info("🚀 Starting integrated chat2chart workflow")
             logger.info(f"📝 Query: {natural_language_query[:100]}...")
             logger.info(f"📊 Data Source: {data_source_id}")
             

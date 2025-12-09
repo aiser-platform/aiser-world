@@ -4,7 +4,7 @@ import { getBackendUrl } from './backendUrl';
 // When running in the browser prefer same-origin proxy so all frontend calls
 // go through `/api/...` and benefit from cookie forwarding and CORS handling.
 export const API_URL = ((): string => {
-    if (typeof window !== 'undefined') return '';
+    if (typeof window !== 'undefined') return '/api';
     return getBackendUrl();
 })();
 
@@ -48,19 +48,26 @@ export const fetchApi = async (
     // Prefer server-set HttpOnly cookie token; avoid injecting Authorization header from client-side stored token
     // For enterprise flows where Authorization header is required, callers may set it explicitly.
 
+    // Normalize endpoint: remove leading/trailing slashes and handle double 'api/' prefix
+    let normalizedEndpoint = endpoint.replace(/^\/+/, '').replace(/\/+$/, '');
+    // If endpoint already starts with 'api/', remove it to avoid double prefix when API_URL is '/api'
+    if (normalizedEndpoint.startsWith('api/') && API_URL === '/api') {
+        normalizedEndpoint = normalizedEndpoint.substring(4); // Remove 'api/' prefix
+    }
+
     // Determine which base URL to use based on the endpoint
-    const isAuthEndpoint = endpoint.startsWith('api/v1/enterprise/auth/') ||
-                          endpoint.startsWith('enterprise/auth/') ||
-                          endpoint.startsWith('api/v1/organizations/') ||
-                          endpoint.startsWith('api/v1/projects/') ||
-                          endpoint.startsWith('api/v1/pricing') ||
-                          endpoint.startsWith('api/v1/ai-usage/');
+    const isAuthEndpoint = normalizedEndpoint.startsWith('v1/enterprise/auth/') ||
+                          normalizedEndpoint.startsWith('enterprise/auth/') ||
+                          normalizedEndpoint.startsWith('v1/organizations/') ||
+                          normalizedEndpoint.startsWith('v1/projects/') ||
+                          normalizedEndpoint.startsWith('v1/pricing') ||
+                          normalizedEndpoint.startsWith('v1/ai-usage/');
     
     const baseUrl = isAuthEndpoint ? (typeof window !== 'undefined' ? '' : AUTH_URL) : API_URL;
 
     // When calling auth endpoints from the browser, use the same-origin proxy
     // at `/api/auth/...` to ensure cookies are attached by the browser.
-    const url = isAuthEndpoint && typeof window !== 'undefined' ? `/api/auth/${endpoint.replace(/^\/+/, '')}` : `${baseUrl}/${endpoint}`;
+    const url = isAuthEndpoint && typeof window !== 'undefined' ? `/api/auth/${normalizedEndpoint}` : `${baseUrl}/${normalizedEndpoint}`;
 
     // Debugging aid: when running in the browser, log outgoing auth requests and
     // current document.cookie to the debug endpoint so we can trace missing cookies

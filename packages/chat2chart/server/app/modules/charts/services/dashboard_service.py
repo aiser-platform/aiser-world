@@ -8,22 +8,17 @@ from typing import Dict, List, Any, Optional
 import asyncio
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete, and_, or_, insert
+from sqlalchemy import select, and_, or_, insert
 from sqlalchemy.orm import selectinload
 
-from app.modules.charts.models import Dashboard, DashboardWidget
-from app.modules.user.models import User
+from app.modules.dashboards.models import Dashboard, dashboard_widgets_table
 import uuid
 from sqlalchemy import func
 from app.modules.charts.schemas import (
     DashboardCreateSchema,
     DashboardUpdateSchema,
-    DashboardResponseSchema,
     DashboardWidgetCreateSchema as WidgetCreateSchema,
-    DashboardWidgetResponseSchema as WidgetResponseSchema,
 )
-from app.modules.projects.services import ProjectService
-from app.modules.projects.schemas import ProjectCreate
 from fastapi import HTTPException
 
 logger = logging.getLogger(__name__)
@@ -181,19 +176,43 @@ class DashboardService:
                 "widgets": []
             }
             
-            # Add widgets
-            for widget in dashboard.widgets:
-                widget_data = {
-                    "id": str(widget.id),
-                    "title": widget.title,
-                    "type": widget.type,
-                    "config": widget.config or {},
-                    "position": widget.position or {},
-                    "size": widget.size or {},
-                    "created_at": widget.created_at.isoformat() if widget.created_at else None,
-                    "updated_at": widget.updated_at.isoformat() if widget.updated_at else None
+            # Add widgets (using raw SQL because DashboardWidget is unmapped)
+            from sqlalchemy import text
+            widgets_query = text("""
+                SELECT id, name, widget_type, chart_type, config, data_config, style_config,
+                       x, y, width, height, z_index, is_visible, is_locked, is_resizable, is_draggable,
+                       created_at, updated_at
+                FROM dashboard_widgets
+                WHERE dashboard_id = :dashboard_id AND is_deleted = FALSE
+                ORDER BY z_index ASC, created_at ASC
+            """).bindparams(dashboard_id=uuid.UUID(dashboard_id))
+            
+            async with sess_lock:
+                widgets_result = await self.db.execute(widgets_query)
+                widgets_rows = widgets_result.fetchall()
+            
+            for w in widgets_rows:
+                widget_dat_item = {
+                    "id": str(w.id),
+                    "name": w.name,
+                    "widget_type": w.widget_type,
+                    "chart_type": w.chart_type,
+                    "config": w.config,
+                    "data_config": w.data_config,
+                    "style_config": w.style_config,
+                    "x": w.x,
+                    "y": w.y,
+                    "width": w.width,
+                    "height": w.height,
+                    "z_index": w.z_index,
+                    "is_visible": w.is_visible,
+                    "is_locked": w.is_locked,
+                    "is_resizable": w.is_resizable,
+                    "is_draggable": w.is_draggable,
+                    "created_at": w.created_at.isoformat() if w.created_at else None,
+                    "updated_at": w.updated_at.isoformat() if w.updated_at else None,
                 }
-                dashboard_data["widgets"].append(widget_data)
+                dashboard_data["widgets"].append(widget_dat_item)
             
             return dashboard_data
             
@@ -213,10 +232,6 @@ class DashboardService:
             logger.info(f"📊 Creating dashboard: {dashboard_data.name}")
 
             # local imports to avoid circular/top-level entanglement
-            from app.modules.projects.repository import ProjectRepository, OrganizationRepository
-            from app.modules.projects.models import OrganizationUser, Project
-            from datetime import datetime as _dt
-            from sqlalchemy import text
 
             # Begin a transaction on the provided session
             # Try to resolve the created_by user BEFORE starting the transaction
@@ -667,8 +682,24 @@ class DashboardService:
             except Exception:
                 raise HTTPException(status_code=403, detail="Access denied to add widget")
 
-            widget = DashboardWidget(
-                dashboard_id=dashboard_id,
+            # Use raw SQL to insert the widget
+            widget_id = uuid.uuid4()
+            from sqlalchemy import text
+            insert_query = text(f"""
+                INSERT INTO {dashboard_widgets_table.name} (
+                    id, dashboard_id, name, widget_type, chart_type,
+                    config, data_config, style_config, x, y, width, height, z_index,
+                    is_visible, is_locked, is_resizable, is_draggable,
+                    created_at, updated_at
+                ) VALUES (
+                    :id, :dashboard_id, :name, :widget_type, :chart_type,
+                    :config, :data_config, :style_config, :x, :y, :width, :height, :z_index,
+                    :is_visible, :is_locked, :is_resizable, :is_draggable,
+                    :created_at, :updated_at
+                ) RETURNING id, dashboard_id, name, widget_type, chart_type, config, data_config, style_config, x, y, width, height, z_index, is_visible, is_locked, is_resizable, is_draggable, created_at, updated_at
+            """).bindparams(
+                id=widget_id,
+                dashboard_id=uuid.UUID(dashboard_id),
                 name=widget_data.name,
                 widget_type=widget_data.widget_type,
                 chart_type=widget_data.chart_type,
@@ -684,32 +715,40 @@ class DashboardService:
                 is_locked=widget_data.is_locked if widget_data.is_locked is not None else False,
                 is_resizable=widget_data.is_resizable if widget_data.is_resizable is not None else True,
                 is_draggable=widget_data.is_draggable if widget_data.is_draggable is not None else True,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow()
             )
 
-            self.db.add(widget)
-            await self.db.commit()
-            await self.db.refresh(widget)
+            sess_lock = getattr(self.db, '_op_lock', None) or self._op_lock
+            async with sess_lock:
+                result = await self.db.execute(insert_query)
+                new_widget = result.fetchone()
+                await self.db.commit()
 
+            if not new_widget:
+                raise HTTPException(status_code=500, detail="Failed to create widget")
+
+            # Construct response from raw SQL result
             return {
-                "id": str(widget.id),
-                "dashboard_id": str(widget.dashboard_id),
-                "name": widget.name,
-                "widget_type": widget.widget_type,
-                "chart_type": widget.chart_type,
-                "config": widget.config,
-                "data_config": widget.data_config,
-                "style_config": widget.style_config,
-                "x": widget.x,
-                "y": widget.y,
-                "width": widget.width,
-                "height": widget.height,
-                "z_index": widget.z_index,
-                "is_visible": widget.is_visible,
-                "is_locked": widget.is_locked,
-                "is_resizable": widget.is_resizable,
-                "is_draggable": widget.is_draggable,
-                "created_at": widget.created_at.isoformat() if widget.created_at else None,
-                "updated_at": widget.updated_at.isoformat() if widget.updated_at else None,
+                "id": str(new_widget.id),
+                "dashboard_id": str(new_widget.dashboard_id),
+                "name": new_widget.name,
+                "widget_type": new_widget.widget_type,
+                "chart_type": new_widget.chart_type,
+                "config": new_widget.config,
+                "data_config": new_widget.data_config,
+                "style_config": new_widget.style_config,
+                "x": new_widget.x,
+                "y": new_widget.y,
+                "width": new_widget.width,
+                "height": new_widget.height,
+                "z_index": new_widget.z_index,
+                "is_visible": new_widget.is_visible,
+                "is_locked": new_widget.is_locked,
+                "is_resizable": new_widget.is_resizable,
+                "is_draggable": new_widget.is_draggable,
+                "created_at": new_widget.created_at.isoformat() if new_widget.created_at else None,
+                "updated_at": new_widget.updated_at.isoformat() if new_widget.updated_at else None,
             }
         except Exception as e:
             logger.error(f"❌ Failed to create widget on {dashboard_id}: {e}")
@@ -731,14 +770,24 @@ class DashboardService:
                 allowed = await has_dashboard_access(user_id, str(db_dash.id))
                 if not allowed:
                     raise HTTPException(status_code=403, detail="Access denied to list widgets")
-            except HTTPException:
-                raise
             except Exception:
                 raise HTTPException(status_code=403, detail="Access denied to list widgets")
 
-            wq = select(DashboardWidget).where(DashboardWidget.dashboard_id == dashboard_id, DashboardWidget.is_deleted == False)
-            result = await self.db.execute(wq)
-            widgets = result.scalars().all()
+            from sqlalchemy import text
+            # Use raw SQL to query widgets
+            select_query = text(f"""
+                SELECT id, dashboard_id, name, widget_type, chart_type, config, data_config, style_config,
+                       x, y, width, height, z_index, is_visible, is_locked, is_resizable, is_draggable,
+                       created_at, updated_at
+                FROM {dashboard_widgets_table.name}
+                WHERE dashboard_id = :dashboard_id AND is_deleted = FALSE
+            """).bindparams(dashboard_id=uuid.UUID(dashboard_id))
+            
+            sess_lock = getattr(self.db, '_op_lock', None) or self._op_lock
+            async with sess_lock:
+                result = await self.db.execute(select_query)
+                widgets = result.fetchall()
+            
             out = []
             for w in widgets:
                 out.append({
@@ -759,6 +808,8 @@ class DashboardService:
                     "is_locked": w.is_locked,
                     "is_resizable": w.is_resizable,
                     "is_draggable": w.is_draggable,
+                    "created_at": w.created_at.isoformat() if w.created_at else None,
+                    "updated_at": w.updated_at.isoformat() if w.updated_at else None,
                 })
             return out
         except Exception as e:
@@ -769,10 +820,18 @@ class DashboardService:
         """Update a widget"""
         try:
             logger.info(f"✏️ Updating widget {widget_id} on dashboard {dashboard_id}")
-            res = await self.db.execute(select(DashboardWidget).where(DashboardWidget.id == widget_id, DashboardWidget.dashboard_id == dashboard_id))
-            widget = res.scalar_one_or_none()
-            if not widget:
-                raise HTTPException(status_code=404, detail="Widget not found")
+            
+            from sqlalchemy import text
+            # Verify widget exists using raw SQL
+            select_widget_query = text(f"SELECT id FROM {dashboard_widgets_table.name} WHERE id = :widget_id AND dashboard_id = :dashboard_id").bindparams(
+                widget_id=uuid.UUID(widget_id),
+                dashboard_id=uuid.UUID(dashboard_id)
+            )
+            sess_lock = getattr(self.db, '_op_lock', None) or self._op_lock
+            async with sess_lock:
+                widget_exists = await self.db.execute(select_widget_query)
+                if not widget_exists.scalar_one_or_none():
+                    raise HTTPException(status_code=404, detail="Widget not found")
 
             # Permission check via central helper against parent dashboard
             dres = await self.db.execute(select(Dashboard).where(Dashboard.id == dashboard_id))
@@ -789,16 +848,44 @@ class DashboardService:
             except Exception:
                 raise HTTPException(status_code=403, detail="Access denied to update widget")
 
-            # Update allowed fields
-            update_map = widget_data.dict(exclude_unset=True)
+            # Build update query for raw SQL
+            update_map = widget_data.model_dump(exclude_unset=True) # Use model_dump for Pydantic v2
+            if not update_map:
+                return {"id": widget_id, "message": "No updates provided"}
+            
+            set_clauses = []
+            params = {
+                "widget_id": uuid.UUID(widget_id),
+                "dashboard_id": uuid.UUID(dashboard_id),
+                "updated_at": datetime.utcnow(), # type: ignore [arg-type]
+            }
             for k, v in update_map.items():
-                # Map schema keys to model fields if necessary
-                if hasattr(widget, k):
-                    setattr(widget, k, v)
+                # Sanitize keys to prevent SQL injection
+                if k in dashboard_widgets_table.columns.keys():
+                    set_clauses.append(f"{k} = :{k}")
+                    params[k] = v
+            
+            if not set_clauses:
+                return {"id": widget_id, "message": "No updatable fields provided"}
+            
+            update_query = text(f"""
+                UPDATE {dashboard_widgets_table.name}
+                SET {', '.join(set_clauses)}, updated_at = :updated_at
+                WHERE id = :widget_id AND dashboard_id = :dashboard_id
+                RETURNING id, name
+            """).bindparams(**params)
 
-            await self.db.commit()
-            await self.db.refresh(widget)
-            return {"id": str(widget.id), "name": widget.name}
+            async with sess_lock:
+                result = await self.db.execute(update_query)
+                updated_widget = result.fetchone()
+                await self.db.commit()
+            
+            if not updated_widget:
+                raise HTTPException(status_code=500, detail="Failed to update widget")
+            
+            return {"id": str(updated_widget.id), "name": updated_widget.name}
+        except HTTPException:
+            raise
         except Exception as e:
             logger.error(f"❌ Failed to update widget {widget_id}: {e}")
             await self.db.rollback()
@@ -808,10 +895,18 @@ class DashboardService:
         """Delete a widget"""
         try:
             logger.info(f"🗑️ Deleting widget {widget_id} from dashboard {dashboard_id}")
-            res = await self.db.execute(select(DashboardWidget).where(DashboardWidget.id == widget_id, DashboardWidget.dashboard_id == dashboard_id))
-            widget = res.scalar_one_or_none()
-            if not widget:
-                raise HTTPException(status_code=404, detail="Widget not found")
+            
+            from sqlalchemy import text
+            # Verify widget exists using raw SQL
+            select_widget_query = text(f"SELECT id FROM {dashboard_widgets_table.name} WHERE id = :widget_id AND dashboard_id = :dashboard_id").bindparams(
+                widget_id=uuid.UUID(widget_id),
+                dashboard_id=uuid.UUID(dashboard_id)
+            )
+            sess_lock = getattr(self.db, '_op_lock', None) or self._op_lock
+            async with sess_lock:
+                widget_exists = await self.db.execute(select_widget_query)
+                if not widget_exists.scalar_one_or_none():
+                    raise HTTPException(status_code=404, detail="Widget not found")
 
             dres = await self.db.execute(select(Dashboard).where(Dashboard.id == dashboard_id))
             db_dash = dres.scalar_one_or_none()
@@ -826,9 +921,16 @@ class DashboardService:
                 raise
             except Exception:
                 raise HTTPException(status_code=403, detail="Access denied to delete widget")
-            # Delete the widget (cascade/constraints handled by DB)
-            await self.db.delete(widget)
-            await self.db.commit()
+
+            # Use raw SQL to delete the widget
+            delete_query = text(f"DELETE FROM {dashboard_widgets_table.name} WHERE id = :widget_id AND dashboard_id = :dashboard_id").bindparams(
+                widget_id=uuid.UUID(widget_id),
+                dashboard_id=uuid.UUID(dashboard_id)
+            )
+            async with sess_lock:
+                await self.db.execute(delete_query)
+                await self.db.commit()
+            
             return True
 
         except HTTPException:

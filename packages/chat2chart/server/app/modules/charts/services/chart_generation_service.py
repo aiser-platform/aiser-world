@@ -17,7 +17,6 @@ class ChartGenerationService:
     def __init__(self):
         # Import here to avoid circular imports
         from .mcp_echarts_service import MCPEChartsService
-        from ...ai.services.litellm_service import LiteLLMService
         
         self.mcp_echarts = MCPEChartsService()
         self.litellm = LiteLLMService()

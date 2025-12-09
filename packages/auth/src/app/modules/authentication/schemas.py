@@ -19,7 +19,7 @@ class SignUpResponse(BaseModel):
 
 
 class SignInRequest(BaseModel):
-    identifier: str = Field(..., description="User email or username")
+    identifier: str = Field(..., description="User username or email address")
     password: str
     fallback_url: Optional[str] = None
 

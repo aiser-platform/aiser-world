@@ -1,24 +1,34 @@
 import logging
 import os
+import sys
 
-from app.core import g
+# Ensure project root is on sys.path so 'app' package imports work even if PYTHONPATH isn't set in container
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 from app.core.api import api_router
 from app.core.config import settings
-from app.modules.user.services import UserService
-from app.modules.user.utils import current_user_from_service
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.sql import func
 from datetime import datetime
 from app.db.session import get_async_session
 from app.core.cache import cache
 import time
-import socketio
-from app.modules.collaboration.socketio_manager import get_socketio_app, sio
+try:
+	import socketio
+	from app.modules.collaboration.socketio_manager import sio
+	_SOCKET_ENABLED = True
+except Exception as _sio_err:
+	logger = logging.getLogger(__name__)
+	logger.warning(f"Socket.IO disabled: {str(_sio_err)}")
+	socketio = None
+	sio = None
+	_SOCKET_ENABLED = False
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +92,60 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             "details": exc.errors(),
         },
     )
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Create database tables on startup if they don't exist."""
+    try:
+        logger.info("Running startup: Creating database tables if they don't exist...")
+        from app.common.model import Base
+        from app.db.session import async_engine
+        
+        # Import all models to ensure they're registered with Base.metadata
+        # Ensure user settings model is imported so its table is created
+        try:
+            import app.modules.user.models_user_setting  # noqa: F401
+        except Exception:
+            pass
+        
+        async with async_engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        
+        logger.info("Database tables created successfully")
+        
+        # Start background tasks
+        try:
+            import asyncio
+            asyncio.create_task(schedule_retention_cleanup())
+            logger.info("✅ Background retention cleanup task started")
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to start retention cleanup task: {e}")
+    except Exception as e:
+        logger.error(f"Error creating database tables: {e}")
+        # Don't fail startup - let the app try to run anyway
+
+
+async def schedule_retention_cleanup():
+    """Background task to run data retention cleanup daily"""
+    import asyncio
+    from app.db.session import get_async_session
+    from app.modules.data.services.data_retention_service import DataRetentionService
+    
+    while True:
+        try:
+            # Wait 24 hours (86400 seconds) before first run, then daily
+            await asyncio.sleep(86400)  # 24 hours
+            
+            logger.info("🧹 Starting scheduled data retention cleanup...")
+            async with get_async_session() as db:
+                retention_service = DataRetentionService(db)
+                affected = await retention_service.cleanup_expired_file_sources()
+                logger.info(f"✅ Retention cleanup completed: {affected} data sources affected")
+        except Exception as e:
+            logger.error(f"❌ Retention cleanup task failed: {e}", exc_info=True)
+            # Continue running even if one cleanup fails
+            await asyncio.sleep(3600)  # Wait 1 hour before retry on error
 
 
 @app.get("/health")
@@ -257,12 +321,12 @@ async def exception_handler(request: Request, exc: Exception):
 #             content={"error": "Internal server error in middleware"}
 #         )
 
-# Mount Socket.io for real-time collaboration
-socket_app = socketio.ASGIApp(
-    sio,
-    other_asgi_app=app,
-    socketio_path='/socket.io'
-)
-
-# Export the socket app as the main ASGI application
-# This will be used by uvicorn instead of the plain FastAPI app
+# Mount Socket.io for real-time collaboration (optional)
+if _SOCKET_ENABLED and socketio is not None and sio is not None:
+	socket_app = socketio.ASGIApp(
+		sio,
+		other_asgi_app=app,
+		socketio_path='/socket.io'
+	)
+	# Replace the exported ASGI app so existing uvicorn target works
+	app = socket_app

@@ -28,7 +28,7 @@ def manage_auth_cookies(response: Response, tokens: dict | None = None, clear: b
             cookie_settings["secure"] = True
             # log for debugging
             try:
-                print(f"cookie_manager: forcing Secure=true because SameSite=None and domain is not localhost")
+                print("cookie_manager: forcing Secure=true because SameSite=None and domain is not localhost")
             except Exception:
                 pass
 

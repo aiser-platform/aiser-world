@@ -7,8 +7,6 @@ from app.modules.charts.schemas import (
     ChatVisualizationCreateSchema,
     ChatVisualizationResponseSchema,
     ChatVisualizationUpdateSchema,
-    DashboardWidgetCreateSchema,
-    DashboardWidgetResponseSchema,
 )
 
 

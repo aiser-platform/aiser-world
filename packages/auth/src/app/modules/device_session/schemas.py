@@ -6,19 +6,21 @@ from app.common.schemas import BaseSchema
 
 
 class DeviceInfo(BaseModel):
-    device_type: str
-    device_name: str
-    user_agent: str
-    ip_address: str
+    device_id: str | None = None
+    device_type: str | None = None
+    device_name: str | None = None
+    user_agent: str | None = None
+    ip_address: str | None = None
 
 
 class DeviceSessionBase(BaseModel):
-    user_id: str | int = Field(...)  # Support both UUID (str) and integer
-    device_id: str = Field(...)  # Changed from UUID to str for flexibility
-    device_type: str = Field(None)
-    device_name: str = Field(None)
-    ip_address: str = Field(None)
-    user_agent: str = Field(None)
+    # Support string or integer ids; convert UUID to string before creating
+    user_id: str | int = Field(...)  # Support UUID-as-string, str and integer
+    device_id: str | None = Field(None)  # Changed to optional for flexibility
+    device_type: str | None = Field(None)
+    device_name: str | None = Field(None)
+    ip_address: str | None = Field(None)
+    user_agent: str | None = Field(None)
     is_active: bool = Field(default=True)
     refresh_token: str = Field(...)
     refresh_token_expires_at: datetime | None = Field(default=None)

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from typing import List, Optional
+from typing import Optional
 from app.modules.authentication.deps.auth_bearer import JWTCookieBearer
 import logging
 

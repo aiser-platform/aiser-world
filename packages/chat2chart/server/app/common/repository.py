@@ -100,12 +100,25 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
         return query
 
-    async def get(self, id: int, db: Optional[Any] = None) -> Optional[ModelType]:
+    async def get(self, id: Any, db: Optional[Any] = None) -> Optional[ModelType]:
         """Get a single record by ID.
 
         Accepts an optional AsyncSession `db` when caller manages sessions externally.
+        Supports both int and UUID types for ID.
         """
         try:
+            # Handle UUID conversion if needed
+            import uuid
+            if isinstance(id, str):
+                try:
+                    id = uuid.UUID(id)
+                except ValueError:
+                    # If it's not a valid UUID, try as int
+                    try:
+                        id = int(id)
+                    except ValueError:
+                        pass  # Let SQLAlchemy handle the error
+            
             query = self._build_base_query().where(self.model.id == id)
             # Retry on transient asyncpg "another operation in progress" errors
             import asyncio
@@ -192,37 +205,57 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
                 return db_obj
 
             # Otherwise use internal session manager
-            # self.db.get_session() may be a coroutine factory; ensure it's awaited properly
-            get_sess = self.db.get_session
-            if callable(get_sess):
-                # If get_session returns an async context manager, await it correctly
-                async with await get_sess() as session:
+            # self.db.get_session() is an async method that returns an AsyncSession
+            # We need to await it to get the session
+            session = await self.db.get_session()
+            async with session:
+                try:
                     session.add(db_obj)
                     await session.flush()
+                    await session.commit()  # Explicitly commit to ensure data is persisted
                     await session.refresh(db_obj)
                     return db_obj
-            else:
-                # Fallback: assume it's already an async context manager
-                async with get_sess as session:
-                    session.add(db_obj)
-                    await session.flush()
-                    await session.refresh(db_obj)
-                    return db_obj
+                except Exception:
+                    await session.rollback()
+                    raise
         except Exception as e:
             raise e
 
-    async def update(self, id: int, obj_in: UpdateSchemaType) -> Optional[ModelType]:
-        """Update an existing record"""
+    async def update(
+        self,
+        id: int,
+        obj_in: UpdateSchemaType,
+        db: Optional[Any] = None,
+    ) -> Optional[ModelType]:
+        """Update an existing record, optionally reusing an external session."""
         try:
-            db_obj = await self.get(id)
-            if not db_obj:
-                return None
+            if hasattr(obj_in, "model_dump"):
+                update_data = obj_in.model_dump(exclude_unset=True)
+            elif hasattr(obj_in, "dict"):
+                update_data = obj_in.dict(exclude_unset=True)
+            elif isinstance(obj_in, dict):
+                update_data = {k: v for k, v in obj_in.items() if v is not None}
+            else:
+                update_data = {}
 
-            update_data = obj_in.dict(exclude_unset=True)
-            for field, value in update_data.items():
-                setattr(db_obj, field, value)
+            async def _apply_updates(session):
+                db_obj = await session.get(self.model, id)
+                if not db_obj:
+                    return None
+                for field, value in update_data.items():
+                    if hasattr(db_obj, field):
+                        setattr(db_obj, field, value)
+                await session.commit()
+                await session.refresh(db_obj)
+                return db_obj
 
-            return await self.db.add(db_obj)
+            if db is not None:
+                return await _apply_updates(db)
+
+            # Fix: get_session is an async method, await it properly
+            session = await self.db.get_session()
+            async with session:
+                return await _apply_updates(session)
         except Exception as e:
             raise e
 

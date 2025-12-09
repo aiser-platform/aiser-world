@@ -5,7 +5,6 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
 from app.modules.authentication import Auth
-from app.core.config import settings
 
 get_bearer_token = HTTPBearer(auto_error=False)
 
@@ -73,62 +72,50 @@ class JWTCookie(HTTPBearer):
         self.payload = None
 
     async def __call__(self, request: Request):
-        print(f"DEBUG: JWTCookie called, checking cookies...")
+        # SECURITY: Do not log full tokens, only presence check
         token = request.cookies.get("access_token")
-        print(f"DEBUG: access_token from cookies: {token[:20] if token else 'None'}...")
         
         # Also check for c2c_access_token
         if not token:
             token = request.cookies.get("c2c_access_token")
-            print(f"DEBUG: c2c_access_token from cookies: {token[:20] if token else 'None'}...")
         
         try:
             auth_header = await super(JWTCookie, self).__call__(request)
             if auth_header and auth_header.credentials:
                 token = auth_header.credentials
-                print(f"DEBUG: token from auth header: {token[:20] if token else 'None'}...")
         except HTTPException:
-            print(f"DEBUG: No auth header found")
             if not token:
-                print(f"DEBUG: No token found in cookies or header, raising 403")
                 raise HTTPException(
                     status_code=403,
                     detail="Unauthorized.",
                 )
 
-        print(f"DEBUG: Final token to verify: {token[:20] if token else 'None'}...")
         if not self.verify_jwt(token):
-            print(f"DEBUG: Token verification failed")
             raise HTTPException(
                 status_code=403, detail="Invalid token or expired token."
             )
 
-        print(f"DEBUG: Token verification successful")
         request.state.jwt_payload = token
         return token
 
     def verify_jwt(self, jwtoken: str) -> bool:
-        print(f"DEBUG: Verifying token: {jwtoken[:20]}...")
+        # SECURITY: Do not log tokens
         try:
             # First try regular JWT decoding
             self.payload = Auth().decodeJWT(jwtoken)
-            print("DEBUG: Regular JWT decode successful")
             # Check if payload is empty (demo token case)
             if not self.payload and jwtoken.startswith("demo_token_"):
-                print("DEBUG: Empty payload for demo token, falling back to demo token handling")
                 return self._handle_demo_token(jwtoken)
             return bool(self.payload)
-        except Exception as e:
-            print(f"DEBUG: Regular JWT decode failed: {e}")
+        except Exception:
             # Fallback: Handle enterprise demo tokens
             if jwtoken and jwtoken.startswith("demo_token_"):
                 return self._handle_demo_token(jwtoken)
-            print("DEBUG: Token verification failed")
             return False
 
     def _handle_demo_token(self, jwtoken: str) -> bool:
         """Handle demo token processing"""
-        print("DEBUG: Handling demo token")
+        # SECURITY: Do not log tokens
         try:
             # Extract user ID from demo token format: demo_token_{user_id}_{timestamp}
             parts = jwtoken.split("_")
@@ -140,13 +127,9 @@ class JWTCookie(HTTPBearer):
                     "email": "test@dataticon.com",  # Default for demo
                     "exp": 9999999999,  # Far future expiry
                 }
-                print(
-                    f"DEBUG: Demo token processed successfully for user {user_id}"
-                )
                 return True
-        except Exception as e2:
-            print(f"DEBUG: Demo token processing failed: {e2}")
-        print("DEBUG: Token verification failed")
+        except Exception:
+            pass
         return False
 
 

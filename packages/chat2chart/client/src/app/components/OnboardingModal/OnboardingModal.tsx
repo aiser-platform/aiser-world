@@ -103,7 +103,7 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({
   const steps: OnboardingStep[] = [
     {
       key: 'welcome',
-      title: 'Welcome to Aiser',
+      title: 'Welcome to Aicser',
       description: 'Tell us about yourself',
       icon: <UserOutlined />,
       component: (

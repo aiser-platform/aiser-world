@@ -37,7 +37,7 @@ def jsonable_encoder(obj: Any) -> Any:
         # Try to convert to string as fallback
         try:
             return str(obj)
-        except:
+        except Exception:
             return None
 
 

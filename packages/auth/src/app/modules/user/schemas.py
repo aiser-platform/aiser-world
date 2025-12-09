@@ -1,11 +1,10 @@
 from typing import Optional
-from pydantic import BaseModel, EmailStr, Field
-import uuid
+from pydantic import BaseModel, Field
 
 
 class UserBase(BaseModel):
     username: str = Field(...)
-    email: EmailStr = Field(...)
+    email: str = Field(...)  # Changed from EmailStr to str to allow .local domains in dev
 
 
 class UserCreate(UserBase):
@@ -17,7 +16,7 @@ class UserCreateInternal(UserBase):
 
 
 class UserUpdate(BaseModel):
-    email: Optional[EmailStr] = Field(None)
+    email: Optional[str] = Field(None)  # Changed from EmailStr to allow .local domains
     password: Optional[str] = Field(None, min_length=8, max_length=128)
     is_verified: Optional[bool] = Field(None)
 

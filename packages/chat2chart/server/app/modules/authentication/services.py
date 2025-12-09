@@ -1,4 +1,3 @@
-from typing import Optional
 from datetime import datetime, timedelta
 import logging
 from app.modules.authentication.models import RefreshToken

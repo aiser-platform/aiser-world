@@ -59,7 +59,7 @@ class S3UploadService(BaseUploadService):
             # Cleanup S3 file if database operation fails
             try:
                 self.s3_client.delete_object(Bucket=self.bucket_name, Key=uuid_filename)
-            except:
+            except Exception:
                 pass
             raise HTTPException(status_code=500, detail=str(e))
 

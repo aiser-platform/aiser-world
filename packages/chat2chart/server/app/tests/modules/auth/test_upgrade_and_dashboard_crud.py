@@ -3,7 +3,6 @@ import urllib.parse
 from fastapi.testclient import TestClient
 from app.main import app
 import time
-import pytest
 
 
 def test_upgrade_and_dashboard_crud():

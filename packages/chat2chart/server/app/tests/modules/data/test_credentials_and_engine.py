@@ -1,5 +1,3 @@
-import os
-import pytest
 from app.modules.data.utils.credentials import encrypt_credentials, decrypt_credentials
 
 

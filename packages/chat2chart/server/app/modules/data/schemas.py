@@ -17,7 +17,7 @@ class DataSourceBase(BaseModel):
 
 
 class DataSourceCreate(DataSourceBase):
-    schema: Optional[Dict[str, Any]] = None
+    data_schema: Optional[Dict[str, Any]] = Field(None, alias="schema")
     connection_config: Optional[Dict[str, Any]] = None
     file_path: Optional[str] = None
     original_filename: Optional[str] = None
@@ -40,7 +40,7 @@ class DataSource(DataSourceBase):
     id: str
     size: Optional[int] = None
     row_count: Optional[int] = None
-    schema: Optional[Dict[str, Any]] = None
+    data_schema: Optional[Dict[str, Any]] = Field(None, alias="schema")
     original_filename: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
@@ -105,7 +105,7 @@ class DataSourceQueryResponse(BaseModel):
     total_rows: int
     offset: int
     limit: int
-    schema: Optional[Dict[str, Any]] = None
+    data_schema: Optional[Dict[str, Any]] = Field(None, alias="schema")
     error: Optional[str] = None
 
 

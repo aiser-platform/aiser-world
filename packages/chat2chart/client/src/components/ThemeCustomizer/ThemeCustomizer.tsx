@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Button, ColorPicker, Drawer, Space, Typography, message, Upload, Segmented, Input, Switch } from 'antd';
-import { UploadOutlined, BgColorsOutlined, BorderOutlined, SettingOutlined, AppstoreOutlined, LayoutOutlined, FileTextOutlined } from '@ant-design/icons';
+import { Button, ColorPicker, Drawer, Space, Typography, message, Upload, Segmented, Input, Switch, Select, Tooltip, Alert } from 'antd';
+import { UploadOutlined, BgColorsOutlined, BorderOutlined, SettingOutlined, AppstoreOutlined, LayoutOutlined, FileTextOutlined, QuestionCircleOutlined } from '@ant-design/icons';
 import { useBrandTheme, DEFAULT_BRAND_PRESETS, BrandPreset } from '../Providers/BrandThemeProvider';
+import { usePlanRestrictions } from '@/hooks/usePlanRestrictions';
+import { useRouter } from 'next/navigation';
 
 const STORAGE_KEY = 'aiser_brand_theme_vars';
 
@@ -24,10 +26,8 @@ const TOKEN_GROUPS = {
         iconName: 'LayoutOutlined',
         vars: [
             { key: '--ant-color-bg-layout', label: 'Page Background', type: 'color' as const, description: 'Main page background (lightest)' },
-            { key: '--ant-color-bg-header', label: 'Header Background', type: 'color' as const, description: 'Top navigation background (stronger than page)' },
-            { key: '--ant-color-bg-sider', label: 'Sidebar Background', type: 'color' as const, description: 'Left navigation background (same as header)' },
-            { key: '--ant-color-bg-content', label: 'Content Background', type: 'color' as const, description: 'Main content area background' },
-            { key: '--ant-color-bg-container', label: 'Panel Background', type: 'color' as const, description: 'Card and panel backgrounds (distinct from content)' },
+            { key: '--color-bg-navigation', label: 'Navigation Background', type: 'color' as const, description: 'Header & sidebar background (brand color)' },
+            { key: '--ant-color-bg-container', label: 'Panel Background', type: 'color' as const, description: 'Card and panel backgrounds' },
             { key: '--ant-color-bg-elevated', label: 'Elevated Background', type: 'color' as const, description: 'Modal and dropdown backgrounds' },
         ]
     },
@@ -71,7 +71,16 @@ const TOKEN_GROUPS = {
             { key: '--ant-font-size-lg', label: 'Large Font Size', type: 'text' as const, description: 'Large text font size' },
             { key: '--ant-font-size-sm', label: 'Small Font Size', type: 'text' as const, description: 'Small text font size' },
             { key: '--ant-line-height', label: 'Line Height', type: 'text' as const, description: 'Default line height' },
-            { key: '--ant-font-family', label: 'Font Family', type: 'text' as const, description: 'Default font family' },
+            { key: '--ant-font-family', label: 'Font Family', type: 'select' as const, description: 'Default font family', options: [
+                '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
+                'Poppins, -apple-system, BlinkMacSystemFont, sans-serif',
+                'Roboto, -apple-system, BlinkMacSystemFont, sans-serif',
+                'Open Sans, -apple-system, BlinkMacSystemFont, sans-serif',
+                'Lato, -apple-system, BlinkMacSystemFont, sans-serif',
+                'Montserrat, -apple-system, BlinkMacSystemFont, sans-serif',
+                'Source Sans Pro, -apple-system, BlinkMacSystemFont, sans-serif',
+            ]},
         ]
     },
     spacing: {
@@ -100,6 +109,8 @@ const setVar = (key: string, value: string): void => {
 
 export default function ThemeCustomizer({ open, onClose }: { open: boolean; onClose: () => void }) {
     const { brandTokens, updateBrandToken, resetBrandTheme, loadBrandPreset, exportBrandTheme, importBrandTheme, isCustomBrand } = useBrandTheme();
+    const { hasFeature, UpgradeModal, planType } = usePlanRestrictions();
+    const router = useRouter();
     const [values, setValues] = useState<Record<string, string>>({});
     const [activeGroup, setActiveGroup] = useState<string>('foundation');
     const [showAdvanced, setShowAdvanced] = useState(false);
@@ -146,7 +157,7 @@ export default function ThemeCustomizer({ open, onClose }: { open: boolean; onCl
             border: '#d9d9d9',
             text: '#262626',
             textSecondary: '#8c8c8c',
-            primary: '#2563eb',
+            primary: '#00c2cb',
             primaryLight: 'rgba(37, 99, 235, 0.1)',
             primaryBorder: 'rgba(37, 99, 235, 0.2)',
             inputBackground: '#f8f9fa',
@@ -155,6 +166,55 @@ export default function ThemeCustomizer({ open, onClose }: { open: boolean; onCl
     };
 
     const colors = getThemeColors();
+
+    const canCustomize = hasFeature('theme_customization');
+
+    // If plan doesn't allow theme customization, show upgrade prompt instead of full editor
+    if (!canCustomize) {
+        return (
+            <>
+                <Drawer
+                    title="Brand & Theme Customization"
+                    placement="right"
+                    width={420}
+                    open={open}
+                    onClose={onClose}
+                >
+                    <Space direction="vertical" style={{ width: '100%' }}>
+                        <Alert
+                            type="info"
+                            showIcon
+                            message="Upgrade required for brand customization"
+                            description={
+                                <span>
+                                    Brand and theme customization is available on <strong>Pro</strong> and higher plans.
+                                    Your current plan is <strong>{planType || 'free'}</strong>. Upgrade to unlock full control
+                                    over colors, layout, and visual identity.
+                                </span>
+                            }
+                        />
+                        <Button
+                            type="primary"
+                            block
+                            size="large"
+                            onClick={() => {
+                                onClose();
+                                router.push('/billing');
+                            }}
+                            style={{ marginTop: 16 }}
+                        >
+                            Upgrade to Pro
+                        </Button>
+                        <p style={{ marginTop: 16, marginBottom: 0, fontSize: '13px', color: colors.textSecondary }}>
+                            You can still use the default Aiser theme. To apply your own brand colors, logo, and layout,
+                            please upgrade your subscription.
+                        </p>
+                    </Space>
+                </Drawer>
+                <UpgradeModal />
+            </>
+        );
+    }
 
     useEffect(() => {
         if (!open) return;
@@ -211,33 +271,42 @@ export default function ThemeCustomizer({ open, onClose }: { open: boolean; onCl
             title={
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <BgColorsOutlined style={{ fontSize: '20px', color: colors.primary }} />
-                    <span style={{ fontSize: '18px', fontWeight: '600', color: colors.text }}>Aiser Platform Customizer</span>
-                    <div style={{
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        background: colors.success,
-                        animation: 'pulse 2s infinite',
-                        marginLeft: 'auto'
-                    }} />
+                    <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: '18px', fontWeight: '600', color: colors.text, lineHeight: '1.2' }}>
+                            Customize Brand & Theme
+                        </div>
+                    </div>
+                    {isCustomBrand && (
+                        <div style={{
+                            width: '8px',
+                            height: '8px',
+                            borderRadius: '50%',
+                            background: colors.success,
+                            animation: 'pulse 2s infinite',
+                            flexShrink: 0
+                        }} title="Custom theme active" />
+                    )}
                 </div>
             }
             open={open}
             onClose={onClose}
-            width={480}
+            width={520}
             placement="right"
             style={{ 
                 background: colors.background,
                 borderLeft: `1px solid ${colors.border}`,
                 boxShadow: isDarkMode ? '-4px 0 16px rgba(0, 0, 0, 0.3)' : '-4px 0 16px rgba(0, 0, 0, 0.1)'
             }}
-                     styles={{
-                         header: {
-                             background: colors.background,
-                             borderBottom: `1px solid ${colors.border}`,
-                             padding: '16px 24px'
-                         }
-                     }}
+            styles={{
+                header: {
+                    background: colors.background,
+                    borderBottom: `1px solid ${colors.border}`,
+                    padding: '16px 24px'
+                },
+                body: {
+                    padding: '16px 24px'
+                }
+            }}
         >
             <div style={{ 
                 height: '100%', 
@@ -246,7 +315,7 @@ export default function ThemeCustomizer({ open, onClose }: { open: boolean; onCl
                 gap: '12px',
                 padding: '0'
             }}>
-                {/* Advanced Mode Toggle */}
+                {/* Advanced Mode Toggle - Compact */}
                 <div style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -254,15 +323,16 @@ export default function ThemeCustomizer({ open, onClose }: { open: boolean; onCl
                     padding: '8px 12px',
                     background: colors.inputBackground,
                     border: `1px solid ${colors.border}`,
-                    borderRadius: '6px'
+                    borderRadius: '6px',
+                    marginBottom: '12px'
                 }}>
-                    <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <Typography.Text strong style={{ color: colors.text, fontSize: '13px' }}>
-                            Advanced Mode
+                            {showAdvanced ? '🔧 Advanced' : '✨ Essential'}
                         </Typography.Text>
-                        <Typography.Text type="secondary" style={{ fontSize: '10px', color: colors.textSecondary, display: 'block' }}>
-                            {showAdvanced ? 'All 7 customization groups' : 'Essential 4 groups'}
-                        </Typography.Text>
+                        <Tooltip title={showAdvanced ? 'All 7 customization groups available' : 'Key essentials: Foundation, Layout, Text & Borders, Functional'}>
+                            <QuestionCircleOutlined style={{ fontSize: '11px', color: colors.textSecondary, cursor: 'help' }} />
+                        </Tooltip>
                     </div>
                     <Switch 
                         checked={showAdvanced}
@@ -271,69 +341,76 @@ export default function ThemeCustomizer({ open, onClose }: { open: boolean; onCl
                     />
                 </div>
 
-                {/* Enhanced Preset Themes */}
+                {/* Brand Presets - Dropdown Selection */}
                 <div style={{ marginBottom: '12px' }}>
-                    <Typography.Text strong style={{ color: colors.text, fontSize: '14px', marginBottom: '8px', display: 'block' }}>
-                        Brand Presets ({DEFAULT_BRAND_PRESETS.length} available)
-                    </Typography.Text>
-                    <div style={{ 
-                        display: 'grid', 
-                        gridTemplateColumns: 'repeat(2, 1fr)', 
-                        gap: '8px',
-                        maxHeight: showAdvanced ? '300px' : '200px',
-                        overflowY: 'auto',
-                        paddingRight: '4px'
-                    }}>
-                        {DEFAULT_BRAND_PRESETS.map((preset) => (
-                            <Button
-                                key={preset.name}
-                                size="small"
-                                onClick={() => applyPreset(preset)}
-                                style={{
-                                    height: '36px',
-                                    padding: '4px 8px',
-                                    borderRadius: '6px',
-                                    border: `1px solid ${colors.border}`,
-                                    background: colors.cardBackground,
-                                    fontSize: '11px',
-                                    fontWeight: '500',
-                                    color: colors.text,
-                                    transition: 'all 0.2s ease',
-                                    position: 'relative',
-                                    overflow: 'hidden',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    textAlign: 'center'
-                                }}
-                                onMouseEnter={(e) => {
-                                    e.currentTarget.style.borderColor = colors.primary;
-                                    e.currentTarget.style.background = colors.primaryLight;
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.currentTarget.style.borderColor = colors.border;
-                                    e.currentTarget.style.background = colors.cardBackground;
-                                }}
-                            >
-                                {/* Mini color preview */}
-                                <div style={{
-                                    position: 'absolute',
-                                    top: 0,
-                                    left: 0,
-                                    right: 0,
-                                    height: '2px',
-                                    background: preset.light['--ant-primary-color']
-                                }} />
-                                <div style={{ fontSize: '10px', fontWeight: '600', marginBottom: '1px' }}>
-                                    {preset.name}
-                                </div>
-                                <div style={{ fontSize: '9px', opacity: 0.8 }}>
-                                    {preset.organizationType || 'General'}
-                                </div>
-                            </Button>
-                        ))}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                        <Typography.Text strong style={{ color: colors.text, fontSize: '13px' }}>
+                            Brand Preset
+                        </Typography.Text>
+                        <Tooltip title="Select a preset theme to apply instantly">
+                            <QuestionCircleOutlined style={{ fontSize: '12px', color: colors.textSecondary, cursor: 'help' }} />
+                        </Tooltip>
                     </div>
+                    <Select
+                        placeholder="Select a preset..."
+                        style={{ width: '100%' }}
+                        size="middle"
+                        value={undefined} // Controlled by preset application
+                        onChange={(value) => {
+                            const preset = DEFAULT_BRAND_PRESETS.find(p => {
+                                const presetText = p.organizationType 
+                                    ? `${p.name} ${p.organizationType}`
+                                    : p.name;
+                                return presetText === value;
+                            });
+                            if (preset) {
+                                applyPreset(preset);
+                            }
+                        }}
+                        optionRender={(option) => {
+                            const preset = DEFAULT_BRAND_PRESETS.find(p => {
+                                const presetText = p.organizationType 
+                                    ? `${p.name} ${p.organizationType}`
+                                    : p.name;
+                                return presetText === option.value;
+                            });
+                            if (!preset) return option.label;
+                            
+                            const primaryColor = isDarkMode 
+                                ? preset.dark['--ant-primary-color'] 
+                                : preset.light['--ant-primary-color'];
+                            
+                            return (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <div style={{
+                                        width: '12px',
+                                        height: '12px',
+                                        borderRadius: '50%',
+                                        background: primaryColor,
+                                        border: `1px solid ${colors.border}`,
+                                        flexShrink: 0
+                                    }} />
+                                    <span>{option.label}</span>
+                                </div>
+                            );
+                        }}
+                    >
+                        {DEFAULT_BRAND_PRESETS.map((preset) => {
+                            const presetText = preset.organizationType 
+                                ? `${preset.name} ${preset.organizationType}`
+                                : preset.name;
+                            
+                            return (
+                                <Select.Option 
+                                    key={preset.name} 
+                                    value={presetText}
+                                    title={preset.description}
+                                >
+                                    {presetText}
+                                </Select.Option>
+                            );
+                        })}
+                    </Select>
                 </div>
 
                 {/* Compact Token Groups */}
@@ -388,34 +465,55 @@ export default function ThemeCustomizer({ open, onClose }: { open: boolean; onCl
                     <div style={{ flex: 1, overflowY: 'auto', paddingRight: '4px' }}>
                         {TOKEN_GROUPS[activeGroup as keyof typeof TOKEN_GROUPS]?.vars.map((v) => (
                             <div key={v.key} style={{ 
-                                marginBottom: 12, 
-                                padding: '8px',
+                                marginBottom: 10, 
+                                padding: '10px',
                                 background: colors.inputBackground,
                                 borderRadius: '6px',
-                                border: `1px solid ${colors.border}`
-                            }}>
-                                <div style={{ marginBottom: 6 }}>
+                                border: `1px solid ${colors.border}`,
+                                transition: 'all 0.2s ease'
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.borderColor = colors.primary;
+                                e.currentTarget.style.boxShadow = `0 2px 8px ${colors.primaryBorder}`;
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.borderColor = colors.border;
+                                e.currentTarget.style.boxShadow = 'none';
+                            }}
+                            >
+                                <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: '6px' }}>
                                     <Typography.Text strong style={{ color: colors.text, fontSize: '12px' }}>
                                         {v.label}
                                     </Typography.Text>
-                                    <Typography.Text type="secondary" style={{ fontSize: '10px', color: colors.textSecondary, display: 'block' }}>
-                                        {v.description}
-                                    </Typography.Text>
+                                    <Tooltip title={v.description}>
+                                        <QuestionCircleOutlined style={{ fontSize: '11px', color: colors.textSecondary, cursor: 'help' }} />
+                                    </Tooltip>
                                 </div>
                                 {v.type === 'color' ? (
                                     <ColorPicker
-                                        value={values[v.key] || '#000000'}
+                                        value={values[v.key] || getVar(v.key) || '#000000'}
                                         onChange={(color) => handleChange(v.key, color.toHexString())}
                                         showText
                                         size="small"
                                         style={{ width: '100%' }}
+                                        format="hex"
+                                    />
+                                ) : v.type === 'select' ? (
+                                    <Select
+                                        value={values[v.key] || getVar(v.key) || ''}
+                                        onChange={(val) => handleChange(v.key, val)}
+                                        size="small"
+                                        style={{ width: '100%' }}
+                                        placeholder="Select..."
+                                        options={v.options?.map(opt => ({ label: opt, value: opt }))}
                                     />
                                 ) : (
                                     <Input
-                                        value={values[v.key] || ''}
+                                        value={values[v.key] || getVar(v.key) || ''}
                                         onChange={(e) => handleChange(v.key, e.target.value)}
                                         size="small"
                                         style={{ width: '100%' }}
+                                        placeholder="Enter value..."
                                     />
                                 )}
                             </div>
@@ -423,54 +521,62 @@ export default function ThemeCustomizer({ open, onClose }: { open: boolean; onCl
                     </div>
                 </div>
 
-                {/* Compact Action Buttons */}
+                {/* Enhanced Action Buttons */}
                 <div style={{ 
                     display: 'flex', 
-                    gap: '6px', 
+                    flexDirection: 'column',
+                    gap: '8px', 
                     marginTop: 'auto',
-                    padding: '8px 0'
+                    padding: '16px 0 0 0',
+                    borderTop: `1px solid ${colors.border}`
                 }}>
-                    <Button 
-                        onClick={handleReset} 
-                        size="small" 
-                        style={{ flex: 1, fontSize: '11px' }}
-                        title="Reset all customizations"
-                    >
-                        Reset
-                    </Button>
-                    <Button 
-                        onClick={exportTheme} 
-                        size="small" 
-                        style={{ flex: 1, fontSize: '11px' }}
-                        title="Export theme"
-                    >
-                        Export
-                    </Button>
-                    <Upload
-                        beforeUpload={(file) => {
-                            handleImport(file);
-                            return false;
-                        }}
-                        showUploadList={false}
-                        accept="application/json"
-                    >
+                    <div style={{ display: 'flex', gap: '8px' }}>
                         <Button 
-                            size="small" 
-                            style={{ flex: 1, fontSize: '11px' }}
-                            title="Import theme"
+                            onClick={handleReset} 
+                            size="middle" 
+                            style={{ flex: 1 }}
+                            title="Reset all customizations to defaults"
                         >
-                            Import
+                            Reset
                         </Button>
-                    </Upload>
-                    <Button 
-                        type="primary" 
-                        onClick={handleSave} 
-                        size="small" 
-                        style={{ flex: 1, fontSize: '11px' }}
-                        title="Save theme"
-                    >
-                        Save
-                    </Button>
+                        <Button 
+                            type="primary" 
+                            onClick={handleSave} 
+                            size="middle" 
+                            style={{ flex: 1 }}
+                            title="Save and apply theme"
+                        >
+                            Save & Apply
+                        </Button>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                        <Button 
+                            onClick={exportTheme} 
+                            size="middle" 
+                            icon={<UploadOutlined />}
+                            style={{ flex: 1 }}
+                            title="Export theme as JSON"
+                        >
+                            Export
+                        </Button>
+                        <Upload
+                            beforeUpload={(file) => {
+                                handleImport(file);
+                                return false;
+                            }}
+                            showUploadList={false}
+                            accept="application/json"
+                        >
+                            <Button 
+                                size="middle" 
+                                icon={<UploadOutlined />}
+                                style={{ flex: 1 }}
+                                title="Import theme from JSON"
+                            >
+                                Import
+                            </Button>
+                        </Upload>
+                    </div>
                 </div>
             </div>
         </Drawer>

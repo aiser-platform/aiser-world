@@ -19,9 +19,12 @@ CREATE TABLE IF NOT EXISTS users (
     is_active BOOLEAN DEFAULT TRUE,
     is_deleted BOOLEAN DEFAULT FALSE,
     deleted_at TIMESTAMP NULL,
+    is_verified BOOLEAN DEFAULT FALSE,
+    verification_attempts INTEGER DEFAULT 0,
+    verification_sent_at TIMESTAMP NULL,
+    last_login_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    last_login_at TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Create conversations table

@@ -58,6 +58,9 @@ class Settings(BaseSettings):
     JWT_REFRESH_EXP_TIME_MINUTES: int = 7 * 24 * 60
     JWT_EMAIL_EXP_TIME_MINUTES: int = 24 * 60
 
+    # Environment (development|staging|production)
+    ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
+
     # Cookie Settings
     COOKIE_DOMAIN: str = os.getenv("COOKIE_DOMAIN", "localhost")
     COOKIE_SECURE: bool = os.getenv("COOKIE_SECURE", "False").lower() == "true"

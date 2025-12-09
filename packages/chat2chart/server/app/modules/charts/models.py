@@ -1,5 +1,5 @@
-from app.common.model import BaseModel, Base
-from sqlalchemy import UUID, Column, String, Boolean, Integer, ForeignKey, DateTime, Text
+from app.common.model import BaseModel
+from sqlalchemy import UUID, Column, String, Boolean, Integer, ForeignKey, DateTime
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -38,7 +38,7 @@ class ChatVisualization(BaseModel):
     is_deleted = Column(Boolean, default=False)
 
 
-class DashboardEmbed(Base):
+class DashboardEmbed(BaseModel):
     """Persisted embed tokens for dashboards"""
     __tablename__ = "dashboard_embeds"
 
@@ -53,116 +53,15 @@ class DashboardEmbed(Base):
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, onupdate=func.now(), nullable=True)
 
-    dashboard = relationship("Dashboard", back_populates="embeds")
+    # Use fully qualified path to avoid duplicate mapper registration
+    # Dashboard is now only defined in app.modules.dashboards.models
+    dashboard = relationship("app.modules.dashboards.models.Dashboard", back_populates="embeds")
 
 
-
-class Dashboard(BaseModel):
-    """Dashboard model for organizing widgets and visualizations"""
-    __tablename__ = "dashboards"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name = Column(String(255), nullable=False)
-    description = Column(Text, nullable=True)
-    project_id = Column(Integer, ForeignKey("projects.id"), nullable=True)
-    # created_by stored as UUID to match `users.id` primary key
-    from sqlalchemy.dialects.postgresql import UUID as PG_UUID
-    created_by = Column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
-    
-    # Dashboard settings
-    layout_config = Column(JSONB, nullable=True)  # Grid layout configuration
-    theme_config = Column(JSONB, nullable=True)   # Theme and styling
-    global_filters = Column(JSONB, nullable=True) # Global filter configuration
-    refresh_interval = Column(Integer, default=300)  # Auto-refresh interval in seconds
-    
-    # Access control
-    is_public = Column(Boolean, default=False)
-    is_active = Column(Boolean, default=True)
-    is_template = Column(Boolean, default=False)
-    
-    # Plan-based restrictions
-    max_widgets = Column(Integer, default=10)  # Based on plan
-    max_pages = Column(Integer, default=5)     # Based on plan
-    
-    # Timestamps - match existing database pattern
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, onupdate=func.now())
-    deleted_at = Column(DateTime, nullable=True)
-    is_deleted = Column(Boolean, default=False)
-    last_viewed_at = Column(DateTime, nullable=True)
-    # Relationship to widgets
-    widgets = relationship("DashboardWidget", back_populates="dashboard", cascade="all, delete-orphan")
-    embeds = relationship("DashboardEmbed", back_populates="dashboard", cascade="all, delete-orphan")
-
-
-class DashboardWidget(Base):
-    """Widget model for dashboard components"""
-    __tablename__ = "dashboard_widgets"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    dashboard_id = Column(UUID(as_uuid=True), ForeignKey("dashboards.id"), nullable=False)
-
-    # Widget identification
-    name = Column(String(255), nullable=False)
-    widget_type = Column(String(50), nullable=False)  # chart, table, text, image, etc.
-    chart_type = Column(String(50), nullable=True)    # bar, line, pie, etc.
-
-    # Widget configuration
-    config = Column(JSONB, nullable=True)        # Widget-specific configuration
-    data_config = Column(JSONB, nullable=True)   # Data source and query configuration
-    style_config = Column(JSONB, nullable=True)  # Styling and appearance
-
-    # Layout and positioning
-    x = Column(Integer, default=0)
-    y = Column(Integer, default=0)
-    width = Column(Integer, default=4)
-    height = Column(Integer, default=3)
-    z_index = Column(Integer, default=0)
-
-    # Widget state
-    is_visible = Column(Boolean, default=True)
-    is_locked = Column(Boolean, default=False)
-    is_resizable = Column(Boolean, default=True)
-    is_draggable = Column(Boolean, default=True)
-
-    # Timestamps - match existing database pattern
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, onupdate=func.now())
-    deleted_at = Column(DateTime, nullable=True)
-    is_deleted = Column(Boolean, default=False)
-
-    # Relationships
-    dashboard = relationship("Dashboard", back_populates="widgets")
-
-
-# Add widgets relationship to Dashboard for ORM bi-directional access
-setattr(Dashboard, 'widgets', relationship('DashboardWidget', back_populates='dashboard', cascade='all, delete-orphan'))
-
-
-class DashboardShare(BaseModel):
-    """Dashboard sharing model for collaboration"""
-    __tablename__ = "dashboard_shares"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    dashboard_id = Column(UUID(as_uuid=True), ForeignKey("dashboards.id"), nullable=False)
-    shared_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    shared_with = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
-    
-    # Share settings
-    permission = Column(String(20), default="view")  # view, edit, admin
-    expires_at = Column(DateTime, nullable=True)
-    is_active = Column(Boolean, default=True)
-    
-    # Share metadata
-    share_token = Column(String(255), nullable=True)  # For public shares
-    access_count = Column(Integer, default=0)
-    last_accessed_at = Column(DateTime, nullable=True)
-    
-    # Timestamps - match existing database pattern
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, onupdate=func.now())
-    deleted_at = Column(DateTime, nullable=True)
-    is_deleted = Column(Boolean, default=False)
+# Dashboard model moved to app.modules.dashboards.models to avoid duplicate mapper registration
+# DashboardWidget model moved to app.modules.dashboards.models to avoid duplicate mapper registration
+# DashboardShare model moved to app.modules.dashboards.models to avoid duplicate mapper registration
+# This file now only contains ChartVisualization and DashboardEmbed
 
 
 # Plan-based feature restrictions
@@ -174,7 +73,7 @@ PLAN_LIMITS = {
         "max_shared_dashboards": 1,
         "export_formats": ["png"],
         "refresh_interval_min": 300,  # 5 minutes
-        "data_retention_days": 30,
+        "data_retention_days": 7,
         "collaboration": False,
         "custom_themes": False,
         "advanced_filters": False,
@@ -187,26 +86,30 @@ PLAN_LIMITS = {
         "max_shared_dashboards": 10,
         "export_formats": ["png", "pdf", "html"],
         "refresh_interval_min": 60,   # 1 minute
-        "data_retention_days": 90,
+        "data_retention_days": 180,
         "collaboration": True,
         "custom_themes": True,
         "advanced_filters": True,
-        "real_time_data": False
+        "real_time_data": False,
+        "priority_support": True
     },
     "team": {
         "max_dashboards": 100,
-        "max_widgets_per_dashboard": 100,
+        "max_widgets_per_dashboard": 120,
         "max_pages_per_dashboard": 20,
         "max_shared_dashboards": 50,
         "export_formats": ["png", "pdf", "html", "excel"],
         "refresh_interval_min": 30,   # 30 seconds
-        "data_retention_days": 180,
+        "data_retention_days": 365,
         "collaboration": True,
         "custom_themes": True,
         "advanced_filters": True,
         "real_time_data": True,
         "api_access": True,
-        "webhooks": True
+        "webhooks": True,
+        "team_governance": True,
+        "priority_support": True,
+        "dedicated_support": True
     },
     "enterprise": {
         "max_dashboards": -1,  # Unlimited
@@ -215,7 +118,7 @@ PLAN_LIMITS = {
         "max_shared_dashboards": -1,      # Unlimited
         "export_formats": ["png", "pdf", "html", "excel", "csv", "json"],
         "refresh_interval_min": 10,       # 10 seconds
-        "data_retention_days": 365,
+        "data_retention_days": 730,
         "collaboration": True,
         "custom_themes": True,
         "advanced_filters": True,
@@ -225,6 +128,9 @@ PLAN_LIMITS = {
         "sso": True,
         "audit_logs": True,
         "custom_branding": True,
-        "priority_support": True
+        "priority_support": True,
+        "white_label": True,
+        "compliance": True,
+        "dedicated_success": True
     }
 }

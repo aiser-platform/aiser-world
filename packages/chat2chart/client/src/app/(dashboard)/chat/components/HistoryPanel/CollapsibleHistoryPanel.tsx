@@ -60,14 +60,14 @@ const CollapsibleHistoryPanel: React.FC<CollapsibleHistoryPanelProps> = ({
     return (
         <div className="collapsible-history-panel">
             <div className="history-panel-header">
-                <Space>
-                    <MessageOutlined />
-                    <Title level={5} style={{ margin: 0 }}>Chat History</Title>
-                </Space>
+                <div className="history-title">
+                    <MessageOutlined className="history-icon" />
+                    <span className="history-title-text">Chat History</span>
+                </div>
                 <Space>
                     <Tooltip title="New Conversation">
                         <Button
-                            type="primary"
+                            type="text"
                             size="small"
                             icon={<PlusOutlined />}
                             onClick={onNewChat}

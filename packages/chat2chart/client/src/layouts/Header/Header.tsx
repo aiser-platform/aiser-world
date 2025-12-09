@@ -7,6 +7,7 @@ import {
     SunOutlined,
     BugOutlined,
     StarOutlined,
+    BgColorsOutlined,
 } from '@ant-design/icons';
 import { Button, Layout, theme, Tooltip } from 'antd';
 import UserProfileDropdown from '@/components/UserProfileDropdown';
@@ -34,31 +35,42 @@ export const LayoutHeader: React.FC<Props> = ({
     const ThemeCustomizer = React.useMemo(() => dynamic(() => import('@/components/ThemeCustomizer/ThemeCustomizer'), { ssr: false }), []);
     const [customizerOpen, setCustomizerOpen] = React.useState(false);
 
+    const sidebarOffset = React.useMemo(
+        () => (isBreakpoint ? 0 : collapsed ? 80 : 256),
+        [collapsed, isBreakpoint]
+    );
+
+    const headerGradient = 'linear-gradient(135deg, var(--color-bg-navigation-header, var(--color-bg-navigation)) 0%, var(--color-bg-navigation-header-glow, rgba(255,255,255,0.25)) 100%)';
+
     return (
         <Layout.Header
             style={{
-                padding: '0 16px',
+                padding: '0 16px', // Ant Design: 16px horizontal (2 * 8px)
                 height: '64px',
+                minHeight: '64px',
+                maxHeight: '64px',
                 lineHeight: '64px',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
                 position: 'fixed',
                 top: 0,
-                left: collapsed ? '80px' : '256px',
+                left: `${sidebarOffset}px`,
                 right: 0,
-                zIndex: 9999, // Maximum z-index
+                zIndex: 1001, // Above sidebar (1000), below modals
                 transition: 'all 0.2s ease',
-                background: isDarkMode ? '#001529' : '#e8eaed', // Force same color as sidebar
-                borderBottom: '1px solid var(--color-border-primary)',
+                background: headerGradient,
+                borderBottom: '1px solid var(--ant-color-border)',
+                color: 'var(--ant-color-text)',
                 margin: 0,
-                marginTop: 0, // Explicitly set margin-top to 0
-                paddingTop: 0, // Explicitly set padding-top to 0
-                width: `calc(100% - ${collapsed ? '80px' : '256px'})`,
+                paddingTop: 0,
+                paddingBottom: 0,
+                width: 'auto',
                 boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-                // Debug styles to ensure full stretch
-                minWidth: `calc(100% - ${collapsed ? '80px' : '256px'})`,
-                maxWidth: `calc(100% - ${collapsed ? '80px' : '256px'})`,
+                boxSizing: 'border-box',
+                borderTop: 'none',
+                borderRight: 'none',
+                borderLeft: 'none',
             }}
         >
             <div 
@@ -66,7 +78,7 @@ export const LayoutHeader: React.FC<Props> = ({
                 style={{ 
                     display: 'flex', 
                     alignItems: 'center', 
-                    gap: 'var(--space-4)',
+                    gap: '0px', // No gap - icon background provides visual spacing
                     marginLeft: collapsed ? '0px' : '0px', // Always start from left edge
                     transition: 'margin-left 0.2s ease'
                 }}
@@ -146,15 +158,16 @@ export const LayoutHeader: React.FC<Props> = ({
                 <div style={{ 
                     width: '1px', 
                     height: '32px', 
-                    background: 'var(--color-border-primary)', 
+                    background: 'var(--ant-color-border)', 
                     margin: '0 var(--space-2)' 
                 }} />
 
                 {/* Theme Controls & Profile */}
                 <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
-                    <Tooltip title="🎨 Customize Brand & Theme">
+                    <Tooltip title="Customize Brand & Theme">
                         <Button
                             type="text"
+                            icon={<BgColorsOutlined />}
                             onClick={() => setCustomizerOpen(true)}
                             style={{ 
                                 fontSize: '18px', 
@@ -162,12 +175,11 @@ export const LayoutHeader: React.FC<Props> = ({
                                 height: 40,
                                 borderRadius: 'var(--radius-base)',
                                 transition: 'all var(--transition-fast)',
-                                background: 'var(--color-brand-primary-light)',
-                                border: '1px solid var(--color-brand-primary)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
                             }}
-                        >
-                            🎨
-                        </Button>
+                        />
                     </Tooltip>
                     
                     <Tooltip title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>

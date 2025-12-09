@@ -18,25 +18,27 @@ class UserRepository(BaseRepository[User, UserCreate | UserCreateInternal, UserU
 
     def get_by_email(self, email: str, db: Session) -> Optional[User]:
         """
-        Get a user by email address
+        Get a user by email address (case-insensitive)
 
         :param email: User's email
         :param db: Database session
         :return: User instance or None
         """
-        query = select(self.model).filter(self.model.email == email)
+        # Use case-insensitive comparison for email
+        query = select(self.model).filter(self.model.email.ilike(email))
         result = db.execute(query)
         return result.scalars().first()
 
     def get_by_username(self, username: str, db: Session) -> Optional[User]:
         """
-        Get a user by username
+        Get a user by username (case-insensitive)
 
         :param username: User's username
         :param db: Database session
         :return: User instance or None
         """
-        query = select(self.model).filter(self.model.username == username)
+        # Use case-insensitive comparison for username
+        query = select(self.model).filter(self.model.username.ilike(username))
         result = db.execute(query)
         return result.scalars().first()
 
@@ -216,7 +218,7 @@ class UserRepository(BaseRepository[User, UserCreate | UserCreateInternal, UserU
             db.commit()
             db.refresh(db_obj)
             return db_obj
-        except Exception as e:
+        except Exception:
             db.rollback()
             raise
 

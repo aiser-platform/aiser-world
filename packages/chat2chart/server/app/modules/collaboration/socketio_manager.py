@@ -1,6 +1,4 @@
-from fastapi import FastAPI
 from socketio import AsyncServer
-import json
 
 sio = AsyncServer(
     async_mode='asgi',

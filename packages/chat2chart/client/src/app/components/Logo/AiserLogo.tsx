@@ -23,7 +23,7 @@ const AiserLogo: React.FC<AiserLogoProps> = ({
         }}>
             <Image
                 src="/aiser-logo.png"
-                alt="Aiser Logo"
+                alt="Aicser Logo"
                 width={size}
                 height={size}
                 style={{ borderRadius: '8px' }}
@@ -36,7 +36,7 @@ const AiserLogo: React.FC<AiserLogoProps> = ({
                     color: 'var(--color-text-primary)', // Use design system text color
                     lineHeight: '1.2'
                 }} className="aiser-text">
-                    Aiser
+                    Aicser
                 </span>
             )}
         </div>

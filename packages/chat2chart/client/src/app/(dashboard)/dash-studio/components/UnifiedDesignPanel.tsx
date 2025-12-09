@@ -769,7 +769,7 @@ const UnifiedDesignPanel: React.FC<UnifiedDesignPanelProps> = ({
       <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
         <Button size="small" onClick={async () => {
           try {
-            const res = await fetch(`${getBackendUrlForApi()}/api/queries/snapshots`);
+            const res = await fetch('/api/queries/snapshots', { credentials: 'include' });
             if (res.status === 403) { setPermissionModalVisible(true); return; }
             if (!res.ok) throw new Error('Failed to load');
             const j = await res.json();
@@ -801,7 +801,7 @@ const UnifiedDesignPanel: React.FC<UnifiedDesignPanelProps> = ({
             });
             if (!confirmed) return;
 
-            const res = await fetch(`${getBackendUrlForApi()}/api/queries/snapshots/${selectedSnapshotId}`);
+            const res = await fetch(`/api/queries/snapshots/${selectedSnapshotId}`, { credentials: 'include' });
             if (res.status === 403) { setPermissionModalVisible(true); return; }
             if (!res.ok) throw new Error('Failed to fetch snapshot');
             const j = await res.json();
@@ -829,8 +829,10 @@ const UnifiedDesignPanel: React.FC<UnifiedDesignPanelProps> = ({
             try {
               // if widget object has an id and we're using a live dashboard, persist widget change
               if (selectedWidget && selectedWidget.dashboardId) {
-                await fetch(`${getBackendUrlForApi()}/charts/builder/widget/${selectedWidget.id}`, {
-                  method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                await fetch(`/api/charts/builder/widget/${selectedWidget.id}`, {
+                  method: 'PUT', 
+                  credentials: 'include',
+                  headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ data: { snapshotId: snap.id, rows: snap.rows, columns: snap.columns }, dataSource: snap.data_source_id, query: snap.sql })
                 });
               }
@@ -856,7 +858,7 @@ const UnifiedDesignPanel: React.FC<UnifiedDesignPanelProps> = ({
           const sid = selectedWidget.data?.snapshotId;
           if (!sid) return message.warning('Widget not bound to snapshot');
           try {
-            const res = await fetch(`${getBackendUrlForApi()}/api/queries/snapshots/${sid}`);
+            const res = await fetch(`/api/queries/snapshots/${sid}`, { credentials: 'include' });
             if (res.status === 403) { setPermissionModalVisible(true); return; }
             if (!res.ok) throw new Error('Failed to fetch snapshot');
             const j = await res.json();
@@ -3251,7 +3253,12 @@ const UnifiedDesignPanel: React.FC<UnifiedDesignPanelProps> = ({
           <Button type="primary" loading={permLoading} onClick={async () => {
             setPermLoading(true);
             try {
-              await fetch(`${getBackendUrlForApi()}/api/organization/request-access`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: permEmail }) });
+              await fetch('/api/organization/request-access', { 
+                method: 'POST', 
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify({ email: permEmail }) 
+              });
               message.success('Access request sent');
               setPermissionModalVisible(false);
             } catch {

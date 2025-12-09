@@ -25,9 +25,11 @@ class LiteLLMService:
     
     def __init__(self):
         # Azure OpenAI Configuration (Primary)
+        # Use Settings to get api_version from .env
+        from app.core.config import settings
         self.azure_api_key = os.getenv('AZURE_OPENAI_API_KEY')
         self.azure_endpoint = os.getenv('AZURE_OPENAI_ENDPOINT')
-        self.azure_api_version = os.getenv('AZURE_OPENAI_API_VERSION', '2025-01-01-preview')
+        self.azure_api_version = settings.AZURE_OPENAI_API_VERSION if hasattr(settings, 'AZURE_OPENAI_API_VERSION') else os.getenv('AZURE_OPENAI_API_VERSION', '2025-01-01-preview')
         self.azure_deployment = os.getenv('AZURE_OPENAI_DEPLOYMENT_NAME', 'gpt-4.1-mini')
         
         # OpenAI Configuration (Fallback)
@@ -112,6 +114,277 @@ class LiteLLMService:
         
         # Simple cache for responses
         self.response_cache = {}
+        
+        # Active model tracking - defaults to default_model
+        self.active_model = self.default_model
+    
+    def get_llm(self, model_id: Optional[str] = None):
+        """Get a LangChain-compatible LLM instance for agent use"""
+        try:
+            # Try to import LangChain LiteLLM integration
+            try:
+                from langchain_community.chat_models import ChatLiteLLM
+                from langchain_core.language_models import BaseChatModel
+            except ImportError:
+                # Fallback to using litellm directly with LangChain wrapper
+                try:
+                    from langchain_openai import ChatOpenAI
+                    from langchain_core.language_models import BaseChatModel
+                except ImportError:
+                    logger.error("LangChain not available for LLM creation")
+                    return None
+            
+            # Use active model or specified model
+            target_model = model_id or self.active_model or self.default_model
+            if not target_model:
+                logger.error("No model available for LLM creation")
+                return None
+            
+            model_config = self.available_models.get(target_model)
+            if not model_config:
+                logger.warning(f"Model {target_model} not found, using default")
+                model_config = self.available_models.get(self.default_model)
+            
+            if not model_config:
+                logger.error("No valid model configuration found")
+                return None
+            
+            # Create LangChain-compatible LLM using LiteLLM
+            try:
+                # Use ChatLiteLLM if available (best integration)
+                from langchain_community.chat_models import ChatLiteLLM
+                
+                # Build model string for LiteLLM
+                if model_config['provider'] == 'azure':
+                    model_string = f"azure/{model_config['model'].replace('azure/', '')}"
+                    
+                    # CRITICAL FIX for api_version error
+                    # ChatLiteLLM in some versions passes api_version to AsyncCompletions.create() which doesn't accept it
+                    # Solution: Set PERMANENT environment variables and use custom_llm_provider
+                    import os
+                    
+                    # Set Azure environment variables PERMANENTLY (not just temporarily)
+                    if model_config.get('api_version'):
+                        os.environ['AZURE_API_VERSION'] = model_config['api_version']
+                        os.environ['AZURE_OPENAI_API_VERSION'] = model_config['api_version']
+                    if model_config.get('api_base'):
+                        os.environ['AZURE_API_BASE'] = model_config['api_base']
+                        os.environ['AZURE_OPENAI_ENDPOINT'] = model_config['api_base']
+                    if model_config.get('api_key'):
+                        os.environ['AZURE_API_KEY'] = model_config['api_key']
+                        os.environ['AZURE_OPENAI_API_KEY'] = model_config['api_key']
+                    
+                    # CRITICAL FIX: ChatLiteLLM internally uses OpenAI client which doesn't accept api_version
+                    # We need to wrap ChatLiteLLM to intercept and remove api_version from kwargs
+                    # Use minimal kwargs - let LiteLLM read everything from environment
+                    llm_kwargs = {
+                        'model': model_string,
+                        'temperature': model_config.get('temperature', 0.1),
+                        'max_tokens': model_config.get('max_tokens', 4000),
+                        # CRITICAL: Use custom_llm_provider to force Azure path without api_version in kwargs
+                        'custom_llm_provider': 'azure',
+                    }
+                    
+                    # Create ChatLiteLLM instance
+                    base_llm = ChatLiteLLM(**llm_kwargs)
+                    
+                    # CRITICAL: Patch LiteLLM's AsyncCompletions.create to remove api_version
+                    # This is a deeper fix that intercepts at the LiteLLM level
+                    try:
+                        import litellm
+                        from litellm import completion, acompletion
+                        
+                        # Store original functions
+                        original_acompletion = litellm.acompletion
+                        original_completion = litellm.completion
+                        
+                        # Create patched versions that remove api_version
+                        async def patched_acompletion(*args, **kwargs):
+                            # Remove api_version from kwargs at the LiteLLM level
+                            kwargs.pop('api_version', None)
+                            # Also check in extra_headers and remove if present
+                            if 'extra_headers' in kwargs and isinstance(kwargs['extra_headers'], dict):
+                                kwargs['extra_headers'].pop('api-version', None)
+                            return await original_acompletion(*args, **kwargs)
+                        
+                        def patched_completion(*args, **kwargs):
+                            kwargs.pop('api_version', None)
+                            if 'extra_headers' in kwargs and isinstance(kwargs['extra_headers'], dict):
+                                kwargs['extra_headers'].pop('api-version', None)
+                            return original_completion(*args, **kwargs)
+                        
+                        # Patch litellm module
+                        litellm.acompletion = patched_acompletion
+                        litellm.completion = patched_completion
+                        
+                        # CRITICAL: Also patch AsyncCompletions class directly to catch all calls
+                        try:
+                            from litellm import AsyncCompletions
+                            original_create = AsyncCompletions.create
+                            
+                            @staticmethod
+                            async def patched_create(*args, **kwargs):
+                                kwargs.pop('api_version', None)
+                                if 'extra_headers' in kwargs and isinstance(kwargs['extra_headers'], dict):
+                                    kwargs['extra_headers'].pop('api-version', None)
+                                return await original_create(*args, **kwargs)
+                            
+                            AsyncCompletions.create = patched_create
+                            logger.info("✅ Patched AsyncCompletions.create to remove api_version")
+                        except Exception as async_patch_error:
+                            logger.warning(f"⚠️ Could not patch AsyncCompletions.create: {async_patch_error}")
+                        
+                        logger.info("✅ Patched LiteLLM acompletion/completion to remove api_version")
+                    except Exception as patch_error:
+                        logger.warning(f"⚠️ Could not patch LiteLLM directly: {patch_error}, using wrapper instead")
+                    
+                    # Wrap to intercept and filter api_version from any internal calls
+                    # This prevents the error when ChatLiteLLM passes api_version to AsyncCompletions.create()
+                    class ChatLiteLLMWrapper:
+                        """Wrapper to prevent api_version from being passed to AsyncCompletions"""
+                        def __init__(self, wrapped_llm):
+                            self._wrapped = wrapped_llm
+                            # Copy all attributes from wrapped LLM
+                            for attr in dir(wrapped_llm):
+                                if not attr.startswith('_') and attr not in ['astream', 'ainvoke', 'invoke', 'stream', '__call__']:
+                                    try:
+                                        setattr(self, attr, getattr(wrapped_llm, attr))
+                                    except:
+                                        pass
+                        
+                        async def astream(self, *args, **kwargs):
+                            # Remove api_version if present
+                            kwargs.pop('api_version', None)
+                            if 'extra_headers' in kwargs and isinstance(kwargs['extra_headers'], dict):
+                                kwargs['extra_headers'].pop('api-version', None)
+                            return self._wrapped.astream(*args, **kwargs)
+                        
+                        async def ainvoke(self, *args, **kwargs):
+                            kwargs.pop('api_version', None)
+                            if 'extra_headers' in kwargs and isinstance(kwargs['extra_headers'], dict):
+                                kwargs['extra_headers'].pop('api-version', None)
+                            return await self._wrapped.ainvoke(*args, **kwargs)
+                        
+                        def invoke(self, *args, **kwargs):
+                            kwargs.pop('api_version', None)
+                            if 'extra_headers' in kwargs and isinstance(kwargs['extra_headers'], dict):
+                                kwargs['extra_headers'].pop('api-version', None)
+                            return self._wrapped.invoke(*args, **kwargs)
+                        
+                        def stream(self, *args, **kwargs):
+                            kwargs.pop('api_version', None)
+                            if 'extra_headers' in kwargs and isinstance(kwargs['extra_headers'], dict):
+                                kwargs['extra_headers'].pop('api-version', None)
+                            return self._wrapped.stream(*args, **kwargs)
+                        
+                        def __call__(self, *args, **kwargs):
+                            # Intercept __call__ as well (some LangChain code uses this)
+                            kwargs.pop('api_version', None)
+                            if 'extra_headers' in kwargs and isinstance(kwargs['extra_headers'], dict):
+                                kwargs['extra_headers'].pop('api-version', None)
+                            return self._wrapped(*args, **kwargs)
+                        
+                        def __getattr__(self, name):
+                            attr = getattr(self._wrapped, name)
+                            # If it's a callable, wrap it to remove api_version
+                            if callable(attr) and name not in ['astream', 'ainvoke', 'invoke', 'stream', '__call__']:
+                                def wrapped_method(*args, **kwargs):
+                                    # CRITICAL: Remove api_version from all method calls
+                                    kwargs.pop('api_version', None)
+                                    if 'extra_headers' in kwargs and isinstance(kwargs['extra_headers'], dict):
+                                        kwargs['extra_headers'].pop('api-version', None)
+                                    # Also check args for api_version (some LangChain code passes it as positional)
+                                    if args and len(args) > 0 and isinstance(args[0], dict) and 'api_version' in args[0]:
+                                        args[0].pop('api_version', None)
+                                    try:
+                                        return attr(*args, **kwargs)
+                                    except TypeError as e:
+                                        if 'api_version' in str(e):
+                                            # Last resort: try to remove from all possible locations
+                                            logger.warning(f"⚠️ api_version error in {name}, attempting deep cleanup")
+                                            # Remove from kwargs again
+                                            kwargs.pop('api_version', None)
+                                            if 'extra_headers' in kwargs:
+                                                kwargs['extra_headers'].pop('api-version', None)
+                                            return attr(*args, **kwargs)
+                                        raise
+                                return wrapped_method
+                            return attr
+                    
+                    llm = ChatLiteLLMWrapper(base_llm)
+                else:
+                    # OpenAI or other providers
+                    llm = ChatLiteLLM(
+                        model=model_config['model'],
+                        api_key=model_config['api_key'],
+                        temperature=model_config.get('temperature', 0.1),
+                        max_tokens=model_config.get('max_tokens', 4000)
+                    )
+                
+                logger.info(f"✅ Created LangChain LLM for model: {target_model} ({model_config['name']})")
+                return llm
+            except ImportError:
+                # Fallback: Use ChatOpenAI with LiteLLM-compatible configuration
+                try:
+                    from langchain_openai import ChatOpenAI
+                    
+                    if model_config['provider'] == 'azure':
+                        # Use model_kwargs for Azure-specific parameters to avoid warnings
+                        model_kwargs = {}
+                        if model_config.get('api_version'):
+                            model_kwargs['api_version'] = model_config['api_version']
+                        deployment_name = model_config['model'].replace('azure/', '')
+                        if deployment_name:
+                            model_kwargs['deployment_name'] = deployment_name
+                        
+                        llm = ChatOpenAI(
+                            model_name=deployment_name or model_config['model'].replace('azure/', ''),
+                            openai_api_key=model_config['api_key'],
+                            openai_api_base=model_config.get('api_base'),
+                            temperature=model_config.get('temperature', 0.1),
+                            max_tokens=model_config.get('max_tokens', 4000),
+                            model_kwargs=model_kwargs if model_kwargs else None
+                        )
+                    else:
+                        llm = ChatOpenAI(
+                            model_name=model_config['model'],
+                            openai_api_key=model_config['api_key'],
+                            temperature=model_config.get('temperature', 0.1),
+                            max_tokens=model_config.get('max_tokens', 4000)
+                        )
+                    
+                    logger.info(f"✅ Created LangChain ChatOpenAI LLM for model: {target_model}")
+                    return llm
+                except Exception as e:
+                    logger.error(f"Failed to create LangChain LLM: {e}")
+                    return None
+        except Exception as e:
+            logger.error(f"Error creating LangChain LLM: {e}", exc_info=True)
+            return None
+    
+    def set_active_model(self, model_id: str) -> bool:
+        """Set the active model for AI operations"""
+        try:
+            if model_id not in self.available_models:
+                logger.warning(f"Model {model_id} not in available models, using default")
+                model_id = self.default_model
+            
+            if not model_id:
+                logger.error("Cannot set active model - no models available")
+                return False
+            
+            # Validate model config before setting
+            model_config = self.available_models.get(model_id)
+            if not model_config or not model_config.get('api_key'):
+                logger.error(f"Model {model_id} missing API key, cannot activate")
+                return False
+            
+            self.active_model = model_id
+            logger.info(f"✅ Active model set to: {model_id} ({self.available_models[model_id]['name']})")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to set active model: {e}")
+            return False
     
     async def _get_model_config(self, model_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """Get model configuration for the specified model ID"""
@@ -236,9 +509,13 @@ Return only valid JSON.
             if model_config['provider'] == 'azure':
                 litellm_params.update({
                     'api_key': model_config['api_key'],
-                    'api_base': model_config['api_base'],
-                    'api_version': model_config['api_version']
+                    'api_base': model_config['api_base']
                 })
+                # Add api_version via extra_headers for Azure
+                if model_config.get('api_version'):
+                    litellm_params['extra_headers'] = {
+                        'api-version': model_config['api_version']
+                    }
             else:
                 litellm_params['api_key'] = model_config['api_key']
             
@@ -304,17 +581,10 @@ Return only valid JSON.
             selected_model = 'azure_gpt5_mini' if self.azure_api_key else 'openai_gpt4_mini'
             model_config = self.available_models.get(selected_model, self.available_models.get(self.default_model) or {})
             
-            response = await acompletion(
-                model=model_config['model'],
-                messages=[
-                    {"role": "system", "content": "You are an expert data visualization specialist. Recommend optimal chart types based on data characteristics."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.2,
-                api_key=model_config['api_key'],
-                api_base=model_config.get('api_base'),
-                api_version=model_config.get('api_version')
-            )
+            # Build extra_headers for Azure if api_version is provided
+            extra_headers = {}
+            if model_config.get('api_version'):
+                extra_headers['api-version'] = model_config['api_version']
             
             # Use correct token parameter for GPT-5 models
             if 'gpt-5' in model_config['model']:
@@ -328,7 +598,7 @@ Return only valid JSON.
                     temperature=0.2,
                     api_key=model_config['api_key'],
                     api_base=model_config.get('api_base'),
-                    api_version=model_config.get('api_version')
+                    extra_headers=extra_headers if extra_headers else None
                 )
             else:
                 response = await acompletion(
@@ -341,7 +611,7 @@ Return only valid JSON.
                     temperature=0.2,
                     api_key=model_config['api_key'],
                     api_base=model_config.get('api_base'),
-                    api_version=model_config.get('api_version')
+                    extra_headers=extra_headers if extra_headers else None
                 )
             
             content = response.choices[0].message.content.strip()
@@ -395,6 +665,11 @@ Return only valid JSON array.
             selected_model = 'azure_gpt5_mini' if self.azure_api_key else 'openai_gpt4_mini'
             model_config = self.available_models.get(selected_model, self.available_models[self.default_model])
             
+            # Build extra_headers for Azure if api_version is provided
+            extra_headers = {}
+            if model_config.get('api_version'):
+                extra_headers['api-version'] = model_config['api_version']
+            
             response = await acompletion(
                 model=model_config['model'],
                 messages=[
@@ -405,7 +680,7 @@ Return only valid JSON array.
                 temperature=0.3,
                 api_key=model_config['api_key'],
                 api_base=model_config.get('api_base'),
-                api_version=model_config.get('api_version')
+                extra_headers=extra_headers if extra_headers else None
             )
             
             content = response.choices[0].message.content.strip()
@@ -421,65 +696,119 @@ Return only valid JSON array.
             logger.error(f"❌ Business insights generation failed: {str(error)}")
             return self._fallback_business_insights(data, query_analysis)
 
-    async def test_model_availability(self, model_id: Optional[str] = None) -> Dict[str, Any]:
-        """Test LiteLLM model availability"""
+    async def test_model_availability(self, model_id: Optional[str] = None, force_refresh: bool = False) -> Dict[str, Any]:
+        """Test LiteLLM model availability with caching to avoid repeated API calls
+        
+        Args:
+            model_id: Model to test (defaults to default_model)
+            force_refresh: Force refresh even if cached (default: False)
+        
+        Returns:
+            Dict with success status and model info
+        """
+        # Initialize cache if not exists
+        if not hasattr(self, '_model_availability_cache'):
+            self._model_availability_cache = {}
+            self._model_cache_timestamps = {}
+        
         # Initialize variables outside try block to avoid scope issues
         selected_model = model_id or self.default_model
+        
+        # Check cache first (cache for 24 hours to avoid repeated API calls)
+        cache_key = selected_model
+        cache_ttl = 24 * 60 * 60  # 24 hours in seconds
+        import time
+        current_time = time.time()
+        
+        if not force_refresh and cache_key in self._model_availability_cache:
+            cache_time = self._model_cache_timestamps.get(cache_key, 0)
+            if current_time - cache_time < cache_ttl:
+                cached_result = self._model_availability_cache[cache_key]
+                logger.debug(f"✅ Using cached model availability result for {selected_model} (cached {int((current_time - cache_time) / 60)} minutes ago)")
+                return cached_result
+        
         model_config = await self._get_model_config(selected_model)
         if not model_config:
-            return
+            return {
+                'success': False,
+                'model': selected_model,
+                'status': 'unavailable',
+                'error': 'Model configuration not found'
+            }
         
         try:
-            
             # Prepare test parameters
             test_params = {
                 'model': model_config['model'],
                 'messages': [{"role": "user", "content": "Test"}],
-                'max_tokens': 5
+                'max_tokens': 5  # Minimal tokens to reduce cost
             }
             
             if model_config['provider'] == 'azure':
                 test_params.update({
                     'api_key': model_config['api_key'],
                     'api_base': model_config['api_base'],
-                    'api_version': model_config['api_version']
                 })
+                # Add api_version via extra_headers, not directly
+                if model_config.get('api_version'):
+                    test_params['extra_headers'] = {'api-version': model_config['api_version']}
             else:
                 test_params['api_key'] = model_config['api_key']
             
             response = await acompletion(**test_params)
             
-            return {
+            result = {
                 'success': True,
                 'model': selected_model,
                 'model_name': model_config['name'],
                 'status': 'available',
-                'provider': model_config['provider']
+                'provider': model_config['provider'],
+                'cached': False
             }
+            
+            # Cache the result
+            self._model_availability_cache[cache_key] = result
+            self._model_cache_timestamps[cache_key] = current_time
+            
+            return result
             
         except Exception as error:
             logger.error(f"❌ Model availability test failed: {str(error)}")
-            return {
+            result = {
                 'success': False,
                 'model': selected_model,
                 'status': 'unavailable',
-                'error': str(error)
+                'error': str(error),
+                'cached': False
             }
+            
+            # Cache failures too (but with shorter TTL - 1 hour)
+            failure_cache_ttl = 60 * 60  # 1 hour
+            self._model_availability_cache[cache_key] = result
+            self._model_cache_timestamps[cache_key] = current_time
+            
+            return result
 
     def get_available_models(self) -> Dict[str, Any]:
-        """Get list of available models for user selection"""
+        """Get list of available models for user selection from LiteLLM integration"""
+        models_list = []
+        for model_id, config in self.available_models.items():
+            # Check if model has required API key or Azure config
+            api_key = config.get('api_key')
+            is_available = bool(api_key) or (config.get('provider') == 'azure' and self.azure_api_key and self.azure_endpoint)
+            
+            models_list.append({
+                'id': model_id,
+                'name': config.get('name', model_id),
+                'provider': config.get('provider', 'openai'),
+                'cost_per_1k_tokens': config.get('cost_per_1k_tokens', 0),
+                'available': is_available,
+                'description': config.get('description', f"{config.get('provider', 'AI')} model")
+            })
+        
         return {
-            'models': [
-                {
-                    'id': model_id,
-                    'name': config['name'],
-                    'provider': config['provider'],
-                    'cost_per_1k_tokens': config['cost_per_1k_tokens'],
-                    'available': bool(config['api_key'])
-                }
-                for model_id, config in self.available_models.items()
-            ],
-            'default_model': self.default_model or ''
+            'models': models_list,
+            'default_model': self.default_model or self.active_model or 'azure_gpt5_mini'
         }
 
     def set_default_model(self, model_id: str) -> Dict[str, Any]:
@@ -608,18 +937,28 @@ Return only valid JSON array.
                     'model': f"azure/{os.environ['AZURE_OPENAI_DEPLOYMENT_NAME']}",
                     'messages': final_messages,
                     'api_base': os.environ["AZURE_OPENAI_ENDPOINT"],
-                    'api_key': os.environ["AZURE_OPENAI_API_KEY"],
-                    'api_version': os.environ["AZURE_OPENAI_API_VERSION"]
+                    'api_key': os.environ["AZURE_OPENAI_API_KEY"]
                 }
+                # Add api_version via extra_headers for Azure
+                if os.environ.get("AZURE_OPENAI_API_VERSION"):
+                    litellm_params['extra_headers'] = {
+                        'api-version': os.environ["AZURE_OPENAI_API_VERSION"]
+                    }
             else:
                 # Use standard format for other providers
                 litellm_params = {
                     'model': model_config['model'],
                     'messages': final_messages,
                     'api_key': model_config['api_key'],
-                    'api_base': model_config.get('api_base'),
-                    'api_version': model_config.get('api_version')
+                    'api_base': model_config.get('api_base')
                 }
+                # Add api_version via extra_headers if provided (for non-Azure providers that support it)
+                if model_config.get('api_version'):
+                    litellm_params['extra_headers'] = {
+                        'api-version': model_config['api_version']
+                    }
+                # CRITICAL: Ensure api_version is NOT passed as a direct parameter
+                litellm_params.pop('api_version', None)
             
             # Handle temperature for GPT-5 models (only supports temperature=1)
             if 'gpt-5' in model_config['model']:
@@ -653,19 +992,86 @@ Return only valid JSON array.
                 }
             
             logger.info(f"🔍 Number of choices: {len(response.choices)}")
-            logger.info(f"🔍 First choice: {response.choices[0] if response.choices else 'None'}")
+            if response.choices:
+                logger.info(f"🔍 First choice message type: {type(response.choices[0].message)}")
+                logger.info(f"🔍 First choice message attributes: {dir(response.choices[0].message)}")
             
-            content = response.choices[0].message.content
-            logger.info(f"🔍 Raw content: '{content}'")
-            logger.info(f"🔍 Content length: {len(content) if content else 0}")
-            logger.info(f"🔍 Content stripped: '{content.strip() if content else ''}'")
+            # CRITICAL: Safely extract content with proper error handling
+            content = None
+            if response.choices and len(response.choices) > 0:
+                message = response.choices[0].message
+                if hasattr(message, 'content'):
+                    content = message.content
+                elif hasattr(message, 'text'):
+                    content = message.text
+                elif hasattr(message, 'message'):
+                    content = message.message
+                else:
+                    logger.error(f"❌ Message object has no content/text/message attribute. Available: {dir(message)}")
+                    content = None
             
-            if not content or content.strip() == '':
-                logger.warning("Empty content in AI response")
+            # CRITICAL: Check if content is None or empty BEFORE logging
+            if content is None:
+                logger.error(f"❌ LLM returned None content - response structure: {response.choices[0].message if response.choices else 'No choices'}")
+                content = ""
+            elif not isinstance(content, str):
+                logger.error(f"❌ LLM returned non-string content: {type(content)} - {str(content)[:200]}")
+                content = str(content) if content else ""
+            
+            logger.info(f"🔍 Content type: {type(content)}, length: {len(content) if content else 0}")
+            if content and len(content) > 0:
+                logger.debug(f"🔍 Content preview: '{content[:200]}...'")
+                # Content exists, no need to log warning or retry
+            else:
+                # Only log warning if content is truly empty (not just whitespace that will be stripped)
+                if not content or (isinstance(content, str) and content.strip() == ''):
+                    logger.debug(f"⚠️ Empty or None content from LLM - will attempt retry (debug level to reduce noise)")
+            
+            # CRITICAL: Only retry if content is truly empty (None or empty string after strip)
+            # Don't retry if content exists but might have whitespace
+            if not content or (isinstance(content, str) and content.strip() == ''):
+                logger.debug("⚠️ Empty content in AI response - attempting retry with different parameters (debug level)")
+                # Retry with different parameters (lower temperature, more tokens)
+                try:
+                    retry_params = {**litellm_params}
+                    retry_params['temperature'] = 0.3  # Lower temperature for more deterministic output
+                    retry_params['max_tokens'] = min(max_tokens * 2, model_config['max_tokens'])  # More tokens
+                    
+                    logger.info(f"🔄 Retrying with parameters: temperature={retry_params['temperature']}, max_tokens={retry_params['max_tokens']}")
+                    retry_response = await acompletion(**retry_params)
+                    
+                    if retry_response and retry_response.choices:
+                        retry_content = retry_response.choices[0].message.content
+                        if retry_content and retry_content.strip():
+                            logger.info("✅ Retry successful - got content")
+                            cleaned_content = self._clean_ai_response(retry_content)
+                            return {
+                                'success': True,
+                                'content': cleaned_content,
+                                'model': model_config['model'],
+                                'usage': {
+                                    'prompt_tokens': getattr(retry_response.usage, 'prompt_tokens', 0),
+                                    'completion_tokens': getattr(retry_response.usage, 'completion_tokens', 0),
+                                    'total_tokens': getattr(retry_response.usage, 'total_tokens', 0)
+                                } if retry_response.usage else None,
+                                'fallback': False
+                            }
+                except Exception as retry_error:
+                    logger.error(f"❌ Retry also failed: {str(retry_error)}")
+                
+                logger.warning("⚠️ Retry also returned empty content - will use intelligent fallback")
+                # CRITICAL: Generate a meaningful fallback response instead of returning empty
+                fallback_content = self._generate_fallback_response(
+                    litellm_params.get('messages', [{}])[-1].get('content', ''),
+                    Exception("Empty content in AI response after retry")
+                )
                 return {
-                    'success': False,
-                    'error': 'Empty content in AI response',
-                    'fallback': True
+                    'success': True,  # Mark as success with fallback
+                    'content': fallback_content,
+                    'model': model_config['model'],
+                    'usage': None,
+                    'fallback': True,
+                    'error': 'Empty content in AI response - used fallback'
                 }
             
             # Clean up content - remove excessive newlines and spaces

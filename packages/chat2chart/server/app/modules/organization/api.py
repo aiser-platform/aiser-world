@@ -6,16 +6,19 @@ Complete organization settings and management endpoints
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
-from typing import List, Optional, Dict, Any
+from typing import Dict, Any
 import logging
 from datetime import datetime, timezone
 
 from app.db.session import get_async_session
 from app.core.deps import get_current_user
-from app.modules.projects.models import Organization, OrganizationUser
+from app.modules.projects.models import Organization, UserOrganization
 from app.modules.user.models import User
 from app.modules.authentication.deps.auth_bearer import JWTCookieBearer
+from app.modules.authentication.rbac.decorators import require_permission
+from app.modules.authentication.rbac.permissions import Permission
 from app.schemas.organization import OrganizationResponse, OrganizationUpdate
+from app.modules.pricing.plans import get_plan_config
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +54,7 @@ async def get_organization_settings(token: str = Depends(JWTCookieBearer())):
         )
 
 @router.put("/settings", response_model=OrganizationResponse)
+@require_permission(Permission.ORG_EDIT)
 async def update_organization_settings(
     org_update: OrganizationUpdate,
     current_user: User = Depends(get_current_user),
@@ -60,10 +64,10 @@ async def update_organization_settings(
     try:
         # Check if user has admin access to organization
         org_user = await session.execute(
-            select(OrganizationUser).where(
+            select(UserOrganization).where(
                 and_(
-                    OrganizationUser.user_id == current_user.id,
-                    OrganizationUser.role == "admin"
+                    UserOrganization.user_id == current_user.id,
+                    UserOrganization.role == "admin"
                 )
             )
         )
@@ -140,8 +144,8 @@ async def get_organization_members(
     try:
         # Get user's organization
         org_user = await session.execute(
-            select(OrganizationUser).where(
-                OrganizationUser.user_id == current_user.id
+            select(UserOrganization).where(
+                UserOrganization.user_id == current_user.id
             )
         )
         org_user = org_user.scalar_one_or_none()
@@ -154,12 +158,12 @@ async def get_organization_members(
         
         # Get all organization members
         members = await session.execute(
-            select(OrganizationUser, User).join(
-                User, OrganizationUser.user_id == User.id
+            select(UserOrganization, User).join(
+                User, UserOrganization.user_id == User.id
             ).where(
                 and_(
-                    OrganizationUser.organization_id == org_user.organization_id,
-                    OrganizationUser.is_active == True
+                    UserOrganization.organization_id == org_user.organization_id,
+                    UserOrganization.is_active == True
                 )
             )
         )
@@ -197,10 +201,10 @@ async def invite_organization_member(
     try:
         # Check if user has admin access
         org_user = await session.execute(
-            select(OrganizationUser).where(
+            select(UserOrganization).where(
                 and_(
-                    OrganizationUser.user_id == current_user.id,
-                    OrganizationUser.role == "admin"
+                    UserOrganization.user_id == current_user.id,
+                    UserOrganization.role == "admin"
                 )
             )
         )
@@ -262,8 +266,8 @@ async def get_organization_usage(
     try:
         # Get user's organization
         org_user = await session.execute(
-            select(OrganizationUser).where(
-                OrganizationUser.user_id == current_user.id
+            select(UserOrganization).where(
+                UserOrganization.user_id == current_user.id
             )
         )
         org_user = org_user.scalar_one_or_none()
@@ -288,18 +292,92 @@ async def get_organization_usage(
                 detail="Organization not found"
             )
         
-        # Mock usage statistics
-        return {
+        plan_config = get_plan_config(organization.plan_type or "free")
+
+        limits_payload = {
+            "plan_type": organization.plan_type,
+            "plan_name": plan_config["name"],
+            "ai_credits_limit": plan_config["ai_credits_limit"],
+            "storage_limit_gb": plan_config["storage_limit_gb"],
+            "max_storage_gb": plan_config["storage_limit_gb"],
+            "max_projects": plan_config["max_projects"],
+            "max_users": plan_config["max_users"],
+            "max_data_sources": plan_config["max_data_sources"],
+            "data_history_days": plan_config.get("data_history_days"),
+            "included_seats": plan_config.get("included_seats"),
+            "additional_seat_price": plan_config.get("additional_seat_price"),
+        }
+
+        ai_limit = plan_config["ai_credits_limit"]
+        remaining = (
+            ai_limit - organization.ai_credits_used
+            if ai_limit not in (-1, None)
+            else -1
+        )
+        percentage = (
+            (organization.ai_credits_used / ai_limit) * 100
+            if ai_limit not in (-1, None, 0)
+            else 0
+        )
+
+        # Count active users (seats) for the organization
+        active_users_result = await session.execute(
+            select(UserOrganization).where(
+                and_(
+                    UserOrganization.organization_id == organization.id,
+                    UserOrganization.is_active == True
+                )
+            )
+        )
+        active_users_count = len(active_users_result.scalars().all())
+        
+        # Count projects
+        from app.modules.projects.models import Project
+        projects_result = await session.execute(
+            select(Project).where(
+                and_(
+                    Project.organization_id == organization.id,
+                    Project.status == 'active'
+                )
+            )
+        )
+        projects_count = len(projects_result.scalars().all())
+        
+        # Count data sources
+        from app.modules.data.models import DataSource
+        data_sources_result = await session.execute(
+            select(DataSource).where(
+                and_(
+                    DataSource.tenant_id == str(organization.id),
+                    DataSource.is_active == True
+                )
+            )
+        )
+        data_sources_count = len(data_sources_result.scalars().all())
+        
+        # Calculate storage (simplified - TODO: implement real storage calculation)
+        storage_used_gb = 0.5  # TODO: replace with real metric from CloudStorageService
+        
+        usage_payload = {
             "ai_credits_used": organization.ai_credits_used,
-            "ai_credits_limit": organization.ai_credits_limit,
-            "ai_credits_remaining": organization.ai_credits_limit - organization.ai_credits_used,
-            "usage_percentage": (organization.ai_credits_used / organization.ai_credits_limit) * 100,
-            "current_users": 1,  # Would be calculated from actual data
-            "max_users": organization.max_users,
-            "current_projects": 1,  # Would be calculated from actual data
-            "max_projects": organization.max_projects,
-            "storage_used_gb": 0.5,  # Would be calculated from actual data
-            "max_storage_gb": organization.max_storage_gb
+            "storage_used_gb": storage_used_gb,
+            "projects_used": projects_count,
+            "data_sources_used": data_sources_count,
+            "active_users": active_users_count,
+        }
+
+        limits_payload["ai_credits_remaining"] = remaining
+        limits_payload["usage_percentage"] = percentage
+        limits_payload["storage_used_gb"] = usage_payload["storage_used_gb"]
+
+        return {
+            "plan_type": organization.plan_type,
+            "limits": limits_payload,
+            "usage": usage_payload,
+            # Backwards compatibility fields
+            "ai_credits_used": organization.ai_credits_used,
+            "ai_credits_limit": limits_payload["ai_credits_limit"],
+            "ai_credits_remaining": remaining,
         }
     except HTTPException:
         raise

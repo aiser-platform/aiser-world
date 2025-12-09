@@ -31,16 +31,15 @@ class CurrentUser:
         instance = cls()
 
         try:
-            print("token ", token)
+            # SECURITY: Do not log tokens
             # Decode token and set properties
             instance._payload = Auth().decodeJWT(token)
             if not instance._payload:
                 raise HTTPException(status_code=401, detail="Invalid token")
 
-            instance._user_id = instance._payload.get("user_id")
+            # Get user_id from payload - handle both 'id' and 'user_id' keys
+            instance._user_id = instance._payload.get("id") or instance._payload.get("user_id")
             instance._email = instance._payload.get("email")
-
-            print("instance ", instance)
 
             return instance
 

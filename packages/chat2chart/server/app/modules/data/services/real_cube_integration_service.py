@@ -83,6 +83,14 @@ class RealCubeIntegrationService:
                 "cube_driver": "@cubejs-backend/redshift-driver",
                 "default_port": 5439,
             },
+            "clickhouse": {
+                "driver": "clickhouse-driver",
+                "async_driver": "clickhouse-connect",
+                "connection_string": "clickhouse://{user}:{password}@{host}:{port}/{database}",
+                "async_connection_string": "clickhouse+asynch://{user}:{password}@{host}:{port}/{database}",
+                "cube_driver": "@cubejs-backend/clickhouse-driver",
+                "default_port": 8123,
+            },
         }
 
         # Cube.js server management

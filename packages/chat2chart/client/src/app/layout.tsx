@@ -6,7 +6,19 @@ import GlobalErrorBoundary from './components/GlobalErrorBoundary';
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html 
+      lang="en" 
+      suppressHydrationWarning
+      style={{
+        margin: 0,
+        padding: 0,
+        width: '100%',
+        height: '100%',
+        background: 'var(--ant-color-bg-layout, var(--color-bg-base))',
+        overflowX: 'hidden',
+        boxSizing: 'border-box',
+      }}
+    >
       <head>
         <script
           dangerouslySetInnerHTML={{
@@ -22,7 +34,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
       </head>
-      <body>
+      <body style={{
+        margin: 0,
+        padding: 0,
+        width: '100%',
+        height: '100%',
+        background: 'var(--ant-color-bg-layout, var(--color-bg-base))',
+        backgroundColor: 'var(--ant-color-bg-layout, var(--color-bg-base))',
+        color: 'var(--ant-color-text)',
+        overflowX: 'hidden',
+        boxSizing: 'border-box',
+      }}>
         <GlobalErrorBoundary>
           <Providers>{children}</Providers>
         </GlobalErrorBoundary>

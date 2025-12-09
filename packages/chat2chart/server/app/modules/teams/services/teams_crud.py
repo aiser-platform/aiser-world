@@ -3,22 +3,18 @@ Complete Team Management CRUD Operations
 Production-ready team management with full CRUD functionality
 """
 
-import asyncio
-from typing import Dict, List, Any, Optional, Union
-from datetime import datetime, timezone
+from typing import List, Optional
+from datetime import datetime, timezone, timedelta
 import logging
-from dataclasses import dataclass, asdict
-import json
+from dataclasses import dataclass
 import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_, update, delete, func
-from sqlalchemy.orm import selectinload
+from sqlalchemy import select, and_
 from fastapi import HTTPException, status
 
-from app.db.session import get_async_session
 from app.modules.user.models import User
-from app.modules.projects.models import Organization, OrganizationUser, Project, ProjectUser
+from app.modules.projects.models import Organization, UserOrganization, Project, ProjectUser
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +107,7 @@ class TeamsCRUD:
         self,
         member_data: TeamMemberCreate,
         invited_by_user_id: str,
-        session: AsyncSession
+        session: Optional[AsyncSession] = None
     ) -> TeamMemberResponse:
         """Add a team member to organization/project"""
         try:
@@ -141,10 +137,10 @@ class TeamsCRUD:
             
             # Check if user is already a member
             existing_member = await session.execute(
-                select(OrganizationUser).where(
+                select(UserOrganization).where(
                     and_(
-                        OrganizationUser.user_id == member_data.user_id,
-                        OrganizationUser.organization_id == member_data.organization_id
+                        UserOrganization.user_id == member_data.user_id,
+                        UserOrganization.organization_id == member_data.organization_id
                     )
                 )
             )
@@ -156,7 +152,7 @@ class TeamsCRUD:
                 )
             
             # Add to organization
-            org_user = OrganizationUser(
+            org_user = UserOrganization(
                 user_id=member_data.user_id,
                 organization_id=member_data.organization_id,
                 role=member_data.role,
@@ -217,7 +213,7 @@ class TeamsCRUD:
         self,
         organization_id: str,
         project_id: Optional[str] = None,
-        session: AsyncSession
+        session: Optional[AsyncSession] = None
     ) -> List[TeamMemberResponse]:
         """Get team members for organization/project"""
         try:
@@ -228,17 +224,17 @@ class TeamsCRUD:
                 ).where(
                     and_(
                         ProjectUser.project_id == project_id,
-                        ProjectUser.is_active == True
+                        ProjectUser.is_active
                     )
                 )
             else:
                 # Get organization team members
-                query = select(OrganizationUser, User).join(
-                    User, OrganizationUser.user_id == User.id
+                query = select(UserOrganization, User).join(
+                    User, UserOrganization.user_id == User.id
                 ).where(
                     and_(
-                        OrganizationUser.organization_id == organization_id,
-                        OrganizationUser.is_active == True
+                        UserOrganization.organization_id == organization_id,
+                        UserOrganization.is_active
                     )
                 )
             
@@ -285,16 +281,16 @@ class TeamsCRUD:
         organization_id: str,
         update_data: TeamMemberUpdate,
         updated_by_user_id: str,
-        session: AsyncSession
+        session: Optional[AsyncSession] = None
     ) -> TeamMemberResponse:
         """Update team member role or status"""
         try:
             # Get organization member
             org_member_result = await session.execute(
-                select(OrganizationUser).where(
+                select(UserOrganization).where(
                     and_(
-                        OrganizationUser.user_id == user_id,
-                        OrganizationUser.organization_id == organization_id
+                        UserOrganization.user_id == user_id,
+                        UserOrganization.organization_id == organization_id
                     )
                 )
             )
@@ -319,7 +315,7 @@ class TeamsCRUD:
                     select(ProjectUser).where(
                         and_(
                             ProjectUser.user_id == user_id,
-                            ProjectUser.is_active == True
+                            ProjectUser.is_active
                         )
                     )
                 )
@@ -366,16 +362,16 @@ class TeamsCRUD:
         user_id: str,
         organization_id: str,
         removed_by_user_id: str,
-        session: AsyncSession
+        session: Optional[AsyncSession] = None
     ) -> bool:
         """Remove team member from organization"""
         try:
             # Get organization member
             org_member_result = await session.execute(
-                select(OrganizationUser).where(
+                select(UserOrganization).where(
                     and_(
-                        OrganizationUser.user_id == user_id,
-                        OrganizationUser.organization_id == organization_id
+                        UserOrganization.user_id == user_id,
+                        UserOrganization.organization_id == organization_id
                     )
                 )
             )
@@ -395,7 +391,7 @@ class TeamsCRUD:
                 select(ProjectUser).where(
                     and_(
                         ProjectUser.user_id == user_id,
-                        ProjectUser.is_active == True
+                        ProjectUser.is_active
                     )
                 )
             )
@@ -421,7 +417,7 @@ class TeamsCRUD:
         self,
         invite_data: TeamInviteCreate,
         invited_by_user_id: str,
-        session: AsyncSession
+        session: Optional[AsyncSession] = None
     ) -> TeamInviteResponse:
         """Invite a team member via email"""
         try:
@@ -486,17 +482,17 @@ class TeamsCRUD:
         user_id: str,
         organization_id: str,
         project_id: Optional[str] = None,
-        session: AsyncSession
+        session: Optional[AsyncSession] = None
     ) -> List[str]:
         """Get user permissions for organization/project"""
         try:
             # Get user role in organization
             org_member_result = await session.execute(
-                select(OrganizationUser).where(
+                select(UserOrganization).where(
                     and_(
-                        OrganizationUser.user_id == user_id,
-                        OrganizationUser.organization_id == organization_id,
-                        OrganizationUser.is_active == True
+                        UserOrganization.user_id == user_id,
+                        UserOrganization.organization_id == organization_id,
+                        UserOrganization.is_active
                     )
                 )
             )
@@ -515,7 +511,7 @@ class TeamsCRUD:
                         and_(
                             ProjectUser.user_id == user_id,
                             ProjectUser.project_id == project_id,
-                            ProjectUser.is_active == True
+                            ProjectUser.is_active
                         )
                     )
                 )
@@ -538,7 +534,7 @@ class TeamsCRUD:
         organization_id: str,
         required_permission: str,
         project_id: Optional[str] = None,
-        session: AsyncSession
+        session: Optional[AsyncSession] = None
     ) -> bool:
         """Check if user has specific permission"""
         try:

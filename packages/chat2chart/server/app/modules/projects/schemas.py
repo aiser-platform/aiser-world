@@ -34,12 +34,12 @@ class OrganizationUpdate(BaseModel):
 
 class OrganizationResponse(OrganizationBase):
     id: int
-    is_active: bool
-    is_deleted: bool
-    ai_credits_used: int
-    ai_credits_limit: int
+    is_active: bool = True
+    is_deleted: bool = False
+    ai_credits_used: int = 0
+    ai_credits_limit: int = 0
     trial_ends_at: Optional[datetime] = None
-    is_trial_active: bool
+    is_trial_active: bool = False
     created_at: datetime
     updated_at: datetime
 
@@ -69,7 +69,7 @@ class ProjectUpdate(BaseModel):
 class ProjectResponse(ProjectBase):
     id: int
     organization_id: int
-    created_by: int
+    created_by: str  # Changed from int to str to support UUID
     is_active: bool
     created_at: datetime
     updated_at: datetime

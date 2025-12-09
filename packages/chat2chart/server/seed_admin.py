@@ -5,7 +5,6 @@ Idempotent DB seed script to create a default admin user.
 Run in the project root: python3 scripts/seed_admin.py
 This script uses the project's sync DB URL to insert an admin user if not present.
 """
-import os
 from sqlalchemy import create_engine, text
 from app.core.config import settings
 from app.modules.authentication.auth import Auth

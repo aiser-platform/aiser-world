@@ -24,17 +24,40 @@ interface UserProfileDropdownProps {
 
 const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({ className, showText = true }) => {
   const { user, logout } = useAuth();
-  const { currentOrganization, usageStats } = useOrganization();
+  const { currentOrganization, usageStats, getOrganizationUsage } = useOrganization();
   const [pricingModalVisible, setPricingModalVisible] = useState(false);
   const [upgradeLoading, setUpgradeLoading] = useState(false);
   const router = useRouter();
 
-  // Use real organization data from context
+  // Refresh usage stats when component mounts, organization changes, or dropdown opens
+  React.useEffect(() => {
+    if (currentOrganization?.id) {
+      getOrganizationUsage(currentOrganization.id);
+    }
+  }, [currentOrganization?.id]);
+
+  // Refresh usage stats when dropdown is opened (on visible change)
+  const handleDropdownVisibleChange = (visible: boolean) => {
+    if (visible && currentOrganization?.id) {
+      // Refresh usage stats when dropdown opens
+      getOrganizationUsage(currentOrganization.id);
+    }
+  };
+
+  // Use real organization data from context with updated usage stats
+  // CRITICAL: Only default to 'free' if plan_type is truly missing
+  // Log for debugging
+  console.log('[UserProfileDropdown] currentOrganization:', currentOrganization);
+  console.log('[UserProfileDropdown] usageStats:', usageStats);
+  
   const organizationData = {
     name: currentOrganization?.name || 'My Organization',
-    plan: currentOrganization?.plan_type || 'free',
-    aiCreditsUsed: usageStats?.ai_queries_used || 0,
-    aiCreditsLimit: usageStats?.ai_queries_limit || 50,
+    plan: (currentOrganization?.plan_type && currentOrganization.plan_type.trim() !== '') 
+      ? currentOrganization.plan_type 
+      : (currentOrganization ? 'free' : 'loading'), // Show 'loading' if org not loaded yet
+    // CRITICAL: Map both ai_queries_* and ai_credits_* fields correctly
+    aiCreditsUsed: usageStats?.ai_queries_used ?? usageStats?.ai_credits_used ?? 0,
+    aiCreditsLimit: usageStats?.ai_queries_limit ?? usageStats?.ai_credits_limit ?? (currentOrganization?.plan_type === 'pro' ? 1000 : 30),
     daysLeftInTrial: 0, // Not implemented yet
     isTrialActive: false // Not implemented yet
   };
@@ -83,9 +106,13 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({ className, sh
       key: 'profile',
       icon: <UserOutlined />,
       label: (
-        <div className="py-2">
-          <div className="font-medium text-gray-900 dark:text-gray-100">{user?.email || 'User'}</div>
-          <div className="text-xs text-gray-500 dark:text-gray-400">{organizationData.name}</div>
+        <div style={{ padding: '8px 0' }}>
+          <div className="font-medium text-gray-900 dark:text-gray-100" style={{ marginBottom: '4px' }}>
+            {user?.email || user?.username || user?.name || 'User'}
+          </div>
+          <div className="text-xs text-gray-500 dark:text-gray-400">
+            {organizationData.name || 'My Organization'}
+          </div>
         </div>
       ),
       onClick: () => router.push('/settings/profile'),
@@ -96,19 +123,26 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({ className, sh
     {
       key: 'plan-info',
       label: (
-        <div className="py-2">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">Current Plan</span>
+        <div style={{ padding: '12px 16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+            <span className="text-sm text-gray-900 dark:text-gray-100" style={{ fontWeight: 500 }}>
+              Current Plan:
+            </span>
             <Badge 
               color={getPlanBadgeColor(organizationData.plan)} 
               text={getPlanDisplayName(organizationData.plan)}
+              style={{ fontSize: '11px', padding: '2px 8px' }}
             />
           </div>
           
-          <div className="mb-3">
-            <div className="flex justify-between text-xs mb-1">
-              <span className="text-gray-600 dark:text-gray-300">AI Credits</span>
-              <span className="text-gray-900 dark:text-gray-100">{organizationData.aiCreditsUsed}/{organizationData.aiCreditsLimit}</span>
+          <div style={{ marginBottom: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <span className="text-sm text-gray-900 dark:text-gray-100" style={{ fontWeight: 500 }}>
+                AI Credits:
+              </span>
+              <span className="text-sm text-gray-900 dark:text-gray-100" style={{ fontWeight: 600 }}>
+                {organizationData.aiCreditsUsed}/{organizationData.aiCreditsLimit}
+              </span>
             </div>
             <Progress 
               percent={creditsPercentage} 
@@ -119,7 +153,7 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({ className, sh
           </div>
 
           {organizationData.isTrialActive && (
-            <div className="text-xs text-orange-600 dark:text-orange-400 mb-2">
+            <div className="text-xs text-orange-600 dark:text-orange-400" style={{ marginBottom: '10px', padding: '6px 8px', background: 'rgba(255, 152, 0, 0.1)', borderRadius: '4px' }}>
               Trial expires in {organizationData.daysLeftInTrial} days
             </div>
           )}
@@ -177,7 +211,29 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({ className, sh
       key: 'logout',
       icon: <LogoutOutlined />,
       label: 'Sign Out',
-      onClick: logout,
+      onClick: async () => {
+        try {
+          await logout();
+        } catch (error) {
+          console.error('Logout error:', error);
+          // Force redirect even if logout fails
+          if (typeof window !== 'undefined') {
+            window.location.replace('/login');
+          }
+        }
+      },
+    },
+    {
+      type: 'divider' as const,
+    },
+    {
+      key: 'about',
+      label: (
+        <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--ant-color-text-tertiary)' }}>
+          Powered by Aicser • v1.0.1 beta
+        </div>
+      ),
+      disabled: true,
     },
   ];
 
@@ -188,9 +244,10 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({ className, sh
         trigger={['click']}
         placement="bottomRight"
         overlayClassName="user-profile-dropdown"
-        overlayStyle={{ minWidth: 280 }}
+        overlayStyle={{ minWidth: 300, padding: '8px 0' }}
+        onOpenChange={handleDropdownVisibleChange}
       >
-        <div className={`flex items-center cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg p-2 transition-colors ${className}`} style={{ gap: 8 }}>
+        <div className={`flex items-center cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors ${className}`} style={{ gap: 10, padding: '6px 10px' }}>
           <div className="relative">
             <Avatar 
               size="default" 
@@ -203,11 +260,11 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({ className, sh
           </div>
           {/* always show username on desktop and tablet, collapse only on very small screens */}
           {showText && (
-            <div className="ml-2 block" style={{ minWidth: 140 }}>
-              <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+            <div className="block" style={{ minWidth: 140 }}>
+              <div className="text-sm font-medium text-gray-900 dark:text-gray-100" style={{ lineHeight: '1.4' }}>
                 {user?.email?.split('@')[0] || 'User'}
               </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">
+              <div className="text-xs text-gray-500 dark:text-gray-400" style={{ lineHeight: '1.3' }}>
                 {getPlanDisplayName(organizationData.plan)} Plan
               </div>
             </div>

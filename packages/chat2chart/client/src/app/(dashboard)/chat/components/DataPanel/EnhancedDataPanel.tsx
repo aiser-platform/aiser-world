@@ -142,14 +142,20 @@ interface EnhancedDataPanelProps {
     onRefresh?: () => void;
     onDataSourcesChange?: (sources: DataSource[]) => void; // New callback for selected data sources
     onCollapse?: () => void;
+    onTableClick?: (tableName: string, schemaName: string, dataSource: DataSource) => void; // Callback when table is clicked
+    onColumnClick?: (tableName: string, columnName: string, schemaName: string, dataSource: DataSource) => void; // Callback when column is clicked
+    compact?: boolean;
 }
 
 const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
     selectedDataSource,
     onDataSourceSelect,
     onRefresh,
+    onTableClick,
+    onColumnClick,
     onDataSourcesChange,
-    onCollapse
+    onCollapse,
+    compact = false
 }) => {
     const [dataSources, setDataSources] = useState<DataSource[]>([]);
     const [loading, setLoading] = useState(false);
@@ -167,14 +173,21 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
     const [selectedFileIds, setSelectedFileIds] = useState<string[]>([]);
     const [selectedSchemaName, setSelectedSchemaName] = useState<string>('public');
     const [selectedEntityKey, setSelectedEntityKey] = useState<string>('');
+    const [newlyCreatedDataSourceId, setNewlyCreatedDataSourceId] = useState<string | null>(null);
 
     const handleDeleteDataSource = useCallback(async (dataSourceId: string) => {
         try {
             setLoading(true);
-            const res = await fetch(`${getBackendUrlForApi()}/data/sources/${dataSourceId}`, { method: 'DELETE' });
-            // ignore body; reload list regardless
+            // Use API proxy for proper auth
+            const res = await fetch(`/api/data/sources/${dataSourceId}`, { 
+                method: 'DELETE',
+                credentials: 'include'
+            });
+            // reload list regardless
             try {
-                const response = await fetch(`${getBackendUrlForApi()}/data/sources`);
+                const response = await fetch('/api/data/sources', {
+                    credentials: 'include'
+                });
                 const result = await response.json();
                 if (result.success) {
                     setDataSources(result.data_sources || []);
@@ -190,22 +203,14 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
         }
     }, [onDataSourceSelect, selectedDataSource]);
 
-    // hydrate includeFiles from localStorage
-    useEffect(() => {
-        try {
-            const raw = localStorage.getItem('chat_include_files');
-            if (raw !== null) setIncludeFiles(raw === '1');
-        } catch {}
-    }, []);
-    // persist includeFiles
-    useEffect(() => {
-        try { localStorage.setItem('chat_include_files', includeFiles ? '1' : '0'); } catch {}
-    }, [includeFiles]);
-
+    // Define loadDataSources FIRST before using in useEffect
     const loadDataSources = useCallback(async () => {
         setLoading(true);
         try {
-            const response = await fetch(`${getBackendUrlForApi()}/data/sources`);
+            // Use API proxy for proper auth handling
+            const response = await fetch('/api/data/sources', {
+                credentials: 'include'
+            });
             const result = await response.json();
             
             if (result.success) {
@@ -223,47 +228,12 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
                     return true;
                 });
                 
-                // Add real Cube.js data source from actual running instance
-                    const realCubeSource = {
-                    id: 'cube_real_001',
-                    name: 'Cube.js Analytics',
-                    type: 'cube' as const,
-                    status: 'connected' as const,
-                    config: {
-                        endpoint: environment.cubejs.url,
-                        apiVersion: 'v1'
-                    },
-                    metadata: {
-                        description: 'Real-time semantic data modeling and analytics'
-                    },
-                    lastUsed: new Date().toISOString(),
-                    rowCount: 0
-                };
-                
-                // Check if Cube.js source already exists
-                if (!sources.find((s: DataSource) => s.type === 'cube')) {
-                    sources = [realCubeSource, ...sources];
-                }
-                
+                // Only use real data sources from the API - no hardcoded Cube.js
                 setDataSources(sources);
             } else {
                 console.error('Failed to load data sources:', result.error);
-                // Fallback with real Cube.js source
-                setDataSources([{
-                    id: 'cube_real_001',
-                    name: 'Cube.js Analytics',
-                    type: 'cube' as const,
-                    status: 'connected' as const,
-                    config: {
-                        endpoint: 'http://localhost:4000',
-                        apiVersion: 'v1'
-                    },
-                    metadata: {
-                        description: 'Real-time semantic data modeling and analytics'
-                    },
-                    lastUsed: new Date().toISOString(),
-                    rowCount: 0
-                }]);
+                // No fallback - only show real data sources
+                setDataSources([]);
             }
         } catch (error) {
             console.error('Failed to load data sources:', error);
@@ -272,67 +242,70 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
             if (savedSources) {
                 try {
                     let sources = JSON.parse(savedSources);
-                    // Add real Cube.js source if not present
-                    if (!sources.find((s: DataSource) => s.type === 'cube')) {
-                        sources = [{
-                            id: 'cube_real_001',
-                            name: 'Cube.js Analytics',
-                            type: 'cube',
-                            status: 'connected',
-                            config: {
-                                endpoint: 'http://localhost:4000',
-                                apiVersion: 'v1'
-                            },
-                            metadata: {
-                                description: 'Real-time semantic data modeling and analytics'
-                            },
-                            lastUsed: new Date().toISOString(),
-                            rowCount: 0
-                        }, ...sources];
-                    }
                     setDataSources(sources);
                 } catch (e) {
                     console.error('Failed to parse saved data sources:', e);
-                    // Final fallback with just Cube.js
-                    setDataSources([{
-                        id: 'cube_mock_001',
-                        name: 'Cube.js Analytics',
-                        type: 'cube' as const,
-                        status: 'connected' as const,
-                        config: {
-                            endpoint: 'http://localhost:4000',
-                            apiVersion: 'v1'
-                        },
-                        metadata: {
-                            description: 'Semantic data modeling and analytics'
-                        },
-                        lastUsed: new Date().toISOString(),
-                        rowCount: 0
-                    }]);
+                    // No fallback - only show real data sources
+                    setDataSources([]);
                 }
             } else {
-                // No saved sources, create with real Cube.js
-                setDataSources([{
-                    id: 'cube_real_001',
-                    name: 'Cube Analytics',
-                    type: 'cube' as const,
-                    status: 'connected' as const,
-                    config: {
-                        endpoint: 'http://localhost:4000',
-                        apiVersion: 'v1'
-                    },
-                    metadata: {
-                        description: 'Real-time semantic data modeling and analytics'
-                    },
-                    lastUsed: new Date().toISOString(),
-                    rowCount: 0
-                }]);
+                // No saved sources - show empty state
+                setDataSources([]);
             }
         } finally {
             setLoading(false);
         }
     }, []);
 
+    // hydrate includeFiles from localStorage
+    useEffect(() => {
+        try {
+            const raw = localStorage.getItem('chat_include_files');
+            if (raw !== null) setIncludeFiles(raw === '1');
+        } catch {}
+    }, []);
+    
+    // persist includeFiles
+    useEffect(() => {
+        try { localStorage.setItem('chat_include_files', includeFiles ? '1' : '0'); } catch {}
+    }, [includeFiles]);
+    
+    // Listen for datasource-created events to auto-refresh and auto-select
+    useEffect(() => {
+        const handleDataSourceCreated = (event: any) => {
+            console.log('📡 Data source created event received:', event.detail);
+            const newDataSource = event.detail?.data_source;
+            const dataSourceId = event.detail?.data_source_id || newDataSource?.id;
+            
+            // Refresh data sources first
+            loadDataSources().then(() => {
+                // Auto-select the newly created data source
+                if (dataSourceId && onDataSourceSelect) {
+                    // Wait a bit for data sources to load, then select
+                    setTimeout(() => {
+                        // Get all data sources (including files)
+                        const allSources = dataSources || [];
+                        const foundSource = allSources.find(ds => ds.id === dataSourceId);
+                        if (foundSource) {
+                            console.log('✅ Auto-selecting newly created data source:', foundSource.name);
+                            onDataSourceSelect(foundSource);
+                        } else if (newDataSource) {
+                            // Use the data source from the event if not found in list
+                            console.log('✅ Auto-selecting data source from event:', newDataSource.name);
+                            onDataSourceSelect(newDataSource);
+                        }
+                    }, 300);
+                }
+            });
+        };
+        
+        window.addEventListener('datasource-created', handleDataSourceCreated);
+        
+        return () => {
+            window.removeEventListener('datasource-created', handleDataSourceCreated);
+        };
+    }, [loadDataSources, onDataSourceSelect, dataSources]);
+    
     // Load data sources on component mount
     useEffect(() => {
         loadDataSources();
@@ -354,34 +327,87 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
 
 
     const loadSchemaInfo = async (dataSourceId: string, dataSource: DataSource) => {
-        if (schemas[dataSourceId]) return; // Already loaded
+        // Always load schema (even if cached) when called from useEffect
+        // This ensures schema is loaded when data source is restored from localStorage
+        // Only skip if currently loading the same source
+        if (schemaLoading === dataSourceId) {
+            console.log('⏭️ Schema already loading for:', dataSourceId);
+            return;
+        }
         
         setSchemaLoading(dataSourceId);
         try {
             if (dataSource.type === 'file') {
-                // For file sources, get metadata from the data endpoint
-                const response = await fetch(`${getBackendUrlForApi()}/data/sources/${dataSourceId}/data`);
+                // For file sources, get schema from the schema endpoint (uses 'data' table name)
+                const response = await fetch(`/api/data/sources/${dataSourceId}/schema`, {
+                    credentials: 'include'
+                });
                 const result = await response.json();
                 
-                if (result.success) {
+                if (result.success && result.schema) {
+                    const schemaData = result.schema;
+                    // File sources use 'data' as table name in DuckDB
+                    const fileTable = schemaData.tables?.[0] || {
+                        name: 'data', // CRITICAL: Use 'data' as table name for file sources
+                        columns: (Array.isArray(dataSource.columns) ? dataSource.columns : []).map((col: any) => ({
+                            name: typeof col === 'string' ? col : (col.name || col.column_name),
+                            type: typeof col === 'string' ? 'string' : (col.type || 'string'),
+                            nullable: true
+                        })),
+                        rowCount: dataSource.rowCount || schemaData.row_count || 0
+                    };
+                    
+                    setSchemas(prev => ({
+                        ...prev,
+                        [dataSourceId]: {
+                            tables: [fileTable],
+                            schemas: ['file']
+                        }
+                    }));
+                } else {
+                    // Fallback: use metadata from data source
                     setSchemas(prev => ({
                         ...prev,
                         [dataSourceId]: {
                             tables: [{
-                                name: dataSource.name,
-                                columns: result.metadata.columns || [],
-                                rowCount: result.metadata.row_count
-                            }]
+                                name: 'data', // CRITICAL: Use 'data' as table name
+                                columns: (Array.isArray(dataSource.columns) ? dataSource.columns : []).map((col: any) => ({
+                                    name: typeof col === 'string' ? col : (col.name || col.column_name),
+                                    type: typeof col === 'string' ? 'string' : (col.type || 'string'),
+                                    nullable: true
+                                })),
+                                rowCount: dataSource.rowCount || 0
+                            }],
+                            schemas: ['file']
                         }
                     }));
                 }
-            } else if (dataSource.type === 'database') {
-                // For database sources, get real schema information
-                const response = await fetch(`${getBackendUrlForApi()}/data/sources/${dataSourceId}/schema`);
+            } else if (dataSource.type === 'database' || dataSource.type === 'warehouse') {
+                // For database and warehouse sources, get real schema information
+                const response = await fetch(`/api/data/sources/${dataSourceId}/schema`, {
+                    credentials: 'include'
+                });
                 const result = await response.json();
+                
+                console.log(`📊 Schema response for ${dataSourceId}:`, {
+                    success: result.success,
+                    hasSchema: !!result.schema,
+                    tablesCount: result.schema?.tables?.length || 0,
+                    schemasCount: result.schema?.schemas?.length || 0,
+                    schema: result.schema
+                });
                 
                 if (result.success) {
                     const baseSchema: SchemaInfo = result.schema;
+                    
+                    // Ensure schema has proper structure
+                    if (!baseSchema.tables) {
+                        baseSchema.tables = [];
+                    }
+                    if (!baseSchema.schemas) {
+                        baseSchema.schemas = [];
+                    }
+                    
                     // Fetch views
                     try {
                         const vres = await fetch(`${getBackendUrlForApi()}/data/sources/${dataSourceId}/views`);
@@ -394,12 +420,18 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
                             }));
                         }
                     } catch {}
+                    
+                    console.log(`✅ Setting schema for ${dataSourceId}:`, {
+                        tables: baseSchema.tables?.length || 0,
+                        schemas: baseSchema.schemas?.length || 0
+                    });
+                    
                     setSchemas(prev => ({
                         ...prev,
                         [dataSourceId]: baseSchema
                     }));
                 } else {
-                    console.error('Failed to load database schema:', result.error);
+                    console.error(`Failed to load ${dataSource.type} schema:`, result.error);
                     // Fallback to basic schema info
                     setSchemas(prev => ({
                         ...prev,
@@ -475,13 +507,30 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
     };
 
     const handleDataSourceSelect = (dataSource: DataSource) => {
-        console.log('🎯 Data source selected:', dataSource);
+        console.log('🎯 Data source selected via click:', dataSource);
+        
+        // Clear loading state for previous source
+        setSchemaLoading(null);
+        
+        // Notify parent of selection change
         onDataSourceSelect?.(dataSource);
-        // Load schema if not already loaded
+        
+        // Always load schema for newly selected source (even if cached)
+        // This ensures fresh data and proper UI update
         if (!schemas[dataSource.id]) {
             loadSchemaInfo(dataSource.id, dataSource);
         }
     };
+
+    // CRITICAL: Load schema when selectedDataSource prop changes (e.g., from localStorage restore)
+    useEffect(() => {
+        if (selectedDataSource && selectedDataSource.id) {
+            console.log('🔄 Selected data source prop changed, loading schema:', selectedDataSource.name, 'ID:', selectedDataSource.id);
+            // Always reload schema when data source changes (ensures fresh data after page restore)
+            // This handles the case when page is restored from localStorage
+            loadSchemaInfo(selectedDataSource.id, selectedDataSource);
+        }
+    }, [selectedDataSource?.id]); // Only depend on ID to avoid unnecessary reloads
 
     const getDataSourceIcon = (type: string) => {
         switch (type) {
@@ -585,14 +634,23 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
                         ...tables.map((table) => ({
                         key: `${dataSource.id}_${schemaName}_${table.name}`,
                         title: (
-                            <div style={{ 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                justifyContent: 'space-between',
-                                width: '100%',
-                                minWidth: 0,
-                                paddingLeft: '0'
-                            }}>
+                            <div 
+                                style={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'space-between',
+                                    width: '100%',
+                                    minWidth: 0,
+                                    paddingLeft: '0',
+                                    cursor: onTableClick ? 'pointer' : 'default'
+                                }}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (onTableClick) {
+                                        onTableClick(table.name, schemaName, dataSource);
+                                    }
+                                }}
+                            >
                                 <div style={{ 
                                     display: 'flex', 
                                     alignItems: 'center', 
@@ -637,17 +695,26 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
                                 </Tag>
                             </div>
                         ),
-                                                 children: table.columns.map((col) => ({
+                                                 children: (Array.isArray(table.columns) ? table.columns : []).map((col) => ({
                              key: `${dataSource.id}_${schemaName}_${table.name}_${col.name}`,
                              title: (
-                                 <div style={{ 
-                                     display: 'flex', 
-                                     alignItems: 'center', 
-                                     justifyContent: 'space-between',
-                                     width: '100%',
-                                     minWidth: 0,
-                                     paddingLeft: '0'
-                                 }}>
+                                 <div 
+                                     style={{ 
+                                         display: 'flex', 
+                                         alignItems: 'center', 
+                                         justifyContent: 'space-between',
+                                         width: '100%',
+                                         minWidth: 0,
+                                         paddingLeft: '0',
+                                         cursor: onColumnClick ? 'pointer' : 'default'
+                                     }}
+                                     onClick={(e) => {
+                                         e.stopPropagation();
+                                         if (onColumnClick) {
+                                             onColumnClick(table.name, col.name, schemaName, dataSource);
+                                         }
+                                     }}
+                                 >
                                      <div style={{ 
                                          display: 'flex', 
                                          alignItems: 'center', 
@@ -794,7 +861,7 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
                             <Tag color="green">{table.rowCount || 'N/A'} rows</Tag>
                         </Space>
                     ),
-                                         children: table.columns.map((col: any) => ({
+                                         children: (Array.isArray(table.columns) ? table.columns : []).map((col: any) => ({
                          key: `${dataSource.id}_${table.name}_${col.name}`,
                          title: (
                              <Space>
@@ -944,27 +1011,56 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
                 children: schema.tables.map((table: any) => ({
                     key: `${dataSource.id}_table_${table.name}`,
                     title: (
-                        <Space>
-                            <TableOutlined />
-                            <Text strong>{table.name}</Text>
-                            <Tag color="green">{table.rowCount || 'N/A'} rows</Tag>
-                        </Space>
+                        <div 
+                            style={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'space-between',
+                                width: '100%',
+                                cursor: onTableClick ? 'pointer' : 'default'
+                            }}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (onTableClick) {
+                                    // For file sources, table name is always 'data'
+                                    onTableClick('data', 'file', dataSource);
+                                }
+                            }}
+                        >
+                            <Space>
+                                <TableOutlined />
+                                <Text strong>{table.name}</Text>
+                                <Tag color="green">{table.rowCount || 'N/A'} rows</Tag>
+                            </Space>
+                        </div>
                     ),
-                                         children: table.columns.map((col: any) => ({
-                         key: `${dataSource.id}_${table.name}_${col.name}`,
-                         title: (
-                             <Space>
-                                 <Text code>{col.name}</Text>
-                                 <Tag color="purple">{col.type}</Tag>
-                                 {!col.nullable && <Tag color="red">NOT NULL</Tag>}
-                                 {col.statistics && (
-                                     <Tooltip title={`Min: ${col.statistics.min}, Max: ${col.statistics.max}, Mean: ${col.statistics.mean}`}>
-                                         <Tag color="geekblue">Stats</Tag>
-                                     </Tooltip>
-                                 )}
-                             </Space>
-                         )
-                     }))
+                    children: (Array.isArray(table.columns) ? table.columns : []).map((col: any) => ({
+                        key: `${dataSource.id}_${table.name}_${col.name}`,
+                        title: (
+                            <div 
+                                style={{ 
+                                    cursor: onColumnClick ? 'pointer' : 'default'
+                                }}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (onColumnClick) {
+                                        onColumnClick('data', col.name, 'file', dataSource);
+                                    }
+                                }}
+                            >
+                                <Space>
+                                    <Text code>{col.name}</Text>
+                                    <Tag color="purple">{col.type}</Tag>
+                                    {!col.nullable && <Tag color="red">NOT NULL</Tag>}
+                                    {col.statistics && (
+                                        <Tooltip title={`Min: ${col.statistics.min}, Max: ${col.statistics.max}, Mean: ${col.statistics.mean}`}>
+                                            <Tag color="geekblue">Stats</Tag>
+                                        </Tooltip>
+                                    )}
+                                </Space>
+                            </div>
+                        )
+                    }))
                 }))
             });
         }
@@ -982,8 +1078,9 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
     };
 
     const renderDataSourceCard = (dataSource: DataSource) => {
-        // Skip file data sources - they're only shown in the dropdown
-        if (dataSource.type === 'file') return null;
+        // CRITICAL: Show file data sources as cards too (not just in dropdown)
+        // This allows users to click on them and see schema
+        // if (dataSource.type === 'file') return null; // REMOVED: Allow file sources to be displayed
         
         const isSelected = selectedDataSource?.id === dataSource.id;
         const schema = schemas[dataSource.id];
@@ -992,12 +1089,17 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
             <Card
                 key={dataSource.id}
                 size="small"
+                className={newlyCreatedDataSourceId === dataSource.id ? 'newly-created-data-source' : ''}
                 style={{
                     marginBottom: '8px',
-                    border: isSelected ? '2px solid var(--ant-color-primary, var(--color-brand-primary))' : '1px solid var(--ant-color-border, #d9d9d9)',
+                    border: isSelected ? '2px solid var(--ant-color-primary)' : '1px solid var(--ant-color-border)',
                     cursor: 'pointer',
-                    background: 'var(--ant-color-bg-container, #ffffff)',
-                    color: 'var(--ant-color-text, #141414)'
+                    background: 'var(--ant-color-bg-container)',
+                    color: 'var(--ant-color-text)',
+                    ...(newlyCreatedDataSourceId === dataSource.id ? {
+                        animation: 'highlightPulse 2s ease-in-out',
+                        boxShadow: '0 0 0 2px rgba(24, 144, 255, 0.2)'
+                    } : {})
                 }}
                 onClick={() => handleDataSourceSelect(dataSource)}
                 hoverable
@@ -1056,15 +1158,16 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
                         {/* Render appropriate schema tree based on type */}
                         {dataSource.type === 'database' && renderSchemaTree(dataSource)}
                         {dataSource.type === 'cube' && renderSchemaTree(dataSource)}
+                        {dataSource.type === 'file' && renderFileSchemaTree(dataSource)}
                         
                         {/* File dropdown below database schema */}
                         {dataSource.type === 'database' && (
                             <div className="file-dropdown-container" style={{
                                 marginTop: '12px',
                                 padding: '8px',
-                                background: 'var(--ant-color-bg-container, rgba(255,255,255,0.02))',
+                                background: 'var(--layout-panel-background-subtle, rgba(255,255,255,0.02))',
                                 borderRadius: '6px',
-                                border: '1px solid var(--ant-color-border, #f0f0f0)'
+                                border: '1px solid var(--color-border-secondary, #f0f0f0)'
                             }}>
                                 <Text strong style={{ display: 'block', marginBottom: '8px', fontSize: 'var(--font-size-sm)' }}>
                                     📁 Available Files for Analysis
@@ -1080,31 +1183,30 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
         );
     };
 
+    const rootStyle: React.CSSProperties = (typeof compact !== 'undefined' && compact)
+        ? { height: '380px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }
+        : { height: '100%', display: 'flex', flexDirection: 'column' };
+
     return (
-        <div className="EnhancedDataPanel" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-            <div className="history-panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div className="DataTitle" style={{ 
-                    display: 'flex',
-                    alignItems: 'center',
-                    fontSize: 'var(--font-size-md)',
-                    fontWeight: '600'
-                }}>
-                    <DatabaseOutlined />
-                    <span style={{ marginLeft: '8px' }}>Sources</span>
+        <div className="data-panel" style={rootStyle}>
+            <div className="data-header">
+                <div className="data-title">
+                    <DatabaseOutlined className="data-source-icon" />
+                    <span className="data-title-text">Sources</span>
                     {dataSources.filter(ds => ds.type === 'file').length > 0 && (
                         <Badge 
                             count={dataSources.filter(ds => ds.type === 'file').length} 
                             size="small" 
-                            style={{ marginLeft: '8px' }}
+                            className="data-source-badge"
                             title="Total uploaded files"
                         />
                     )}
-                    <Tooltip title="Click a source to view schema and use it for AI analysis.">
-                        <InfoCircleOutlined style={{ marginLeft: '8px', cursor: 'help' }} />
+                    <Tooltip title="Click a source to view schema and use it for AI analysis." placement="bottom">
+                        <InfoCircleOutlined className="data-info-icon" />
                     </Tooltip>
                 </div>
                 <Space>
-                    <Tooltip title="Add Source">
+                    <Tooltip title="Add Source" placement="bottom">
                         <Button
                             type="text"
                             size="small"
@@ -1112,27 +1214,57 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
                             onClick={() => setModalVisible(true)}
                         />
                     </Tooltip>
-                    <Tooltip title="Collapse">
-                        <Button
-                            type="text"
-                            size="small"
-                            icon={<CompressOutlined />}
-                            onClick={() => onCollapse?.()}
-                        />
-                    </Tooltip>
+                    {onCollapse && (
+                        <Tooltip title="Collapse" placement="left">
+                            <div
+                                onClick={() => {
+                                    onCollapse?.();
+                                    // Broadcast collapse state so other components can sync
+                                    try {
+                                        window.dispatchEvent(new CustomEvent('sidebar-collapse-changed', { detail: { collapsed: true } }));
+                                    } catch (e) {
+                                        // ignore in non-browser environments
+                                    }
+                                }}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    width: '32px',
+                                    height: '32px',
+                                    cursor: 'pointer',
+                                    color: 'var(--ant-color-text-secondary)',
+                                    borderRadius: '6px',
+                                    transition: 'all 0.2s ease',
+                                    marginRight: '-8px', // Move closer to sidebar border
+                                    paddingRight: '8px'
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.color = 'var(--ant-color-primary)';
+                                    e.currentTarget.style.background = 'var(--ant-color-fill-tertiary)';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.color = 'var(--ant-color-text-secondary)';
+                                    e.currentTarget.style.background = 'transparent';
+                                }}
+                            >
+                                <CompressOutlined style={{ fontSize: '16px' }} />
+                            </div>
+                        </Tooltip>
+                    )}
                 </Space>
             </div>
             
 
 
-            <div className="history-panel-content DataContent" style={{ flex: 1, padding: '12px 12px', overflowY: 'auto' }}>
+            <div className="data-content" style={{ flex: 1, padding: '12px 12px', overflowY: 'auto' }}>
                 {/* Unified Dropdown Controls */}
                 <div style={{ marginBottom: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                     {/* Data Source Select (full width to match selection summary) */}
                     <div style={{ gridColumn: '1 / span 2' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                             <Text strong style={{ fontSize: 14 }}>Data Source</Text>
-                            <Tooltip title="Refresh">
+                            <Tooltip title="Refresh" placement="bottom">
                                 <Button
                                     type="text"
                                     size="small"
@@ -1148,7 +1280,17 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
                                 const ds = dataSources.find(d => d.id === val) || null;
                                 if (ds) handleDataSourceSelect(ds);
                             }}
-                            style={{ width: '100%', marginTop: 8, height: 40, fontSize: 14 }}
+                            style={{ 
+                                width: '100%', 
+                                marginTop: 8, 
+                                height: 40, 
+                                fontSize: 14,
+                                ...(newlyCreatedDataSourceId && selectedDataSource?.id === newlyCreatedDataSourceId ? {
+                                    animation: 'highlightPulse 2s ease-in-out',
+                                    boxShadow: '0 0 0 2px rgba(24, 144, 255, 0.2)'
+                                } : {})
+                            }}
+                            className={newlyCreatedDataSourceId && selectedDataSource?.id === newlyCreatedDataSourceId ? 'newly-created-data-source' : ''}
                             placeholder="Select data source"
                             size="middle"
                             showSearch
@@ -1156,7 +1298,16 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
                             optionLabelProp="label"
                         >
                             {dataSources.map(ds => (
-                                <Select.Option key={ds.id} value={ds.id} label={ds.name}>
+                                <Select.Option 
+                                    key={ds.id} 
+                                    value={ds.id} 
+                                    label={ds.name}
+                                    className={newlyCreatedDataSourceId === ds.id ? 'newly-created-data-source-option' : ''}
+                                    style={newlyCreatedDataSourceId === ds.id ? {
+                                        animation: 'highlightPulse 2s ease-in-out',
+                                        backgroundColor: 'rgba(24, 144, 255, 0.1)'
+                                    } : {}}
+                                >
                                     <span title={ds.name} style={{ display: 'inline-block', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', verticalAlign: 'bottom' }}>{ds.name}</span>
                                 </Select.Option>
                             ))}
@@ -1211,40 +1362,7 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
                         </div>
                     )}
                 </div>
-                {/* Selection Summary for AI Analysis */}
-                {selectedDataSource && (
-                    <div style={{
-                        padding: '12px 16px',
-                        background: 'linear-gradient(135deg, var(--color-brand-primary)20, var(--color-functional-success)20)',
-                        border: '1px solid var(--color-brand-primary)',
-                        borderRadius: '8px',
-                        marginBottom: '16px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between'
-                    }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{ fontSize: 'var(--font-size-md)' }}>🎯</span>
-                            <Text strong>
-                                For AI: {selectedDataSource.name}
-                            </Text>
-                            <Tag color="blue">{selectedDataSource.type}</Tag>
-                            {selectedDataSource.rowCount && (
-                                <Tag color="green">{selectedDataSource.rowCount.toLocaleString()} rows</Tag>
-                            )}
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Button 
-                                size="small" 
-                                type="text" 
-                                icon={<CloseOutlined />}
-                                onClick={() => onDataSourceSelect?.(null)}
-                                style={{ color: 'var(--ant-color-text, #141414)' }}
-                                title="Clear Selection"
-                            />
-                        </div>
-                    </div>
-                )}
+                {/* Selection Summary removed - now shown in ChatPanel next to streaming toggle as "AI Connected To:" */}
 
 
 
@@ -1277,9 +1395,23 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
                 isChatIntegration={true}
                 onDataSourceCreated={(dataSource) => {
                     setModalVisible(false);
-                    loadDataSources();
                     if (dataSource) {
+                        // Mark as newly created for highlighting
+                        setNewlyCreatedDataSourceId(dataSource.id);
+                        // Clear highlight after 3 seconds
+                        setTimeout(() => {
+                            setNewlyCreatedDataSourceId(null);
+                        }, 3000);
+                        
+                        // Auto-select and highlight the newly created data source
                         handleDataSourceSelect(dataSource);
+                        // Trigger schema refresh for the new data source
+                        setTimeout(() => {
+                            loadDataSources();
+                            loadSchemaInfo(dataSource.id, dataSource);
+                        }, 500); // Small delay to ensure data source is loaded
+                    } else {
+                        loadDataSources();
                     }
                 }}
             />

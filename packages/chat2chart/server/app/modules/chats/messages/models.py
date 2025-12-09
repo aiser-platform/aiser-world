@@ -1,5 +1,6 @@
 from app.common.model import BaseModel
 from sqlalchemy import UUID, Column, ForeignKey, String, Text
+from sqlalchemy.dialects.postgresql import JSONB
 import uuid
 
 
@@ -13,7 +14,8 @@ class ChatMessage(BaseModel):
         answer (Text): The response/answer to the query
         error (String): Error message if any
         status (String): Current status of the message
-        message (JSON): Additional message data in JSON format
+        ai_metadata (JSONB): AI response metadata (chart config, insights, recommendations)
+        metadata (JSONB): Additional message metadata in JSON format
     """
 
     __tablename__ = "message"
@@ -28,6 +30,10 @@ class ChatMessage(BaseModel):
     # Status and metadata
     error = Column(String, nullable=True)
     status = Column(String, nullable=True)
+    
+    # CRITICAL: AI metadata for preserving chart config, insights, recommendations
+    ai_metadata = Column(JSONB, nullable=True)
+    message_metadata = Column("metadata", JSONB, nullable=True)  # Use column name override
 
     # Foreign Key relationship
     conversation_id = Column(UUID, ForeignKey("conversation.id"), nullable=False)

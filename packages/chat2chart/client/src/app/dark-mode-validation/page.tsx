@@ -14,7 +14,7 @@ export default function DarkModeValidationPage() {
       theme={{
         algorithm: isDarkMode ? theme.darkAlgorithm : theme.defaultAlgorithm,
         token: {
-          colorPrimary: '#2563eb',
+          colorPrimary: '#00c2cb',
         },
       }}
     >

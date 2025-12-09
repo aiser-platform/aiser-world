@@ -1,0 +1,11 @@
+{
+  "connection_config": {
+    "type": "clickhouse",
+    "name": "Test Warehouse Debug",
+    "host": "clickhouse",
+    "port": 8123,
+    "database": "aiser_warehouse",
+    "username": "aiser",
+    "password": "aiser_warehouse_password"
+  }
+}

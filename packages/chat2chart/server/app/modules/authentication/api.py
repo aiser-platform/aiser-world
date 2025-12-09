@@ -9,12 +9,8 @@ from urllib.parse import unquote
 from fastapi import Header
 import os
 from app.db.session import async_session
-from datetime import datetime
 import sqlalchemy as sa
 from sqlalchemy import select
-from app.modules.user.models import User as ChatUser
-from sqlalchemy import select
-from app.db.session import async_session
 from app.modules.user.models import User
 
 router = APIRouter()
@@ -88,6 +84,30 @@ async def whoami_raw(request: Request):
 async def auth_echo(payload: dict | None = Body(None)):
     """Dev helper: echo back the received JSON body to validate POST handling."""
     return {"received": payload}
+
+
+@router.post("/auth/login")
+async def login(request: Request, response: Response):
+    """
+    DEPRECATED: This endpoint is deprecated and will be removed in a future version.
+    
+    Please use auth-service for all authentication:
+    - Frontend: Use /api/auth/users/signin (proxies to auth-service)
+    - Direct: Use http://auth-service:5000/api/v1/auth/login
+    
+    This endpoint will return 410 Gone status.
+    """
+    from fastapi import status
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail={
+            "error": "This endpoint is deprecated",
+            "message": "Please use auth-service for authentication",
+            "frontend_endpoint": "/api/auth/users/signin",
+            "direct_endpoint": "http://auth-service:5000/api/v1/auth/login",
+            "migration_guide": "See AUTH_INTEGRATION_GUIDE.md for details"
+        }
+    )
 
 
 @router.post("/auth/upgrade-demo")
@@ -449,6 +469,64 @@ def provision_user(payload: dict = Body(...), x_internal_auth: str | None = Head
             except Exception:
                 pass
 
+        # If create_defaults is True, create default organization and add user as owner
+        create_defaults = payload.get('create_defaults', False)
+        default_org = payload.get('default_org', {})
+        
+        if create_defaults and created_id:
+            try:
+                with sync_engine.connect() as conn_org:
+                    with conn_org.begin():
+                        # Check if user already has an organization
+                        q_check_org = sa.text("""
+                            SELECT o.id FROM organizations o
+                            JOIN user_organizations uo ON o.id = uo.organization_id
+                            WHERE uo.user_id = :uid AND uo.role = 'owner'
+                            LIMIT 1
+                        """)
+                        r_check = conn_org.execute(q_check_org, {"uid": created_id})
+                        existing_org = r_check.fetchone()
+                        
+                        if not existing_org:
+                            # Create default organization
+                            org_name = default_org.get('name', f"{username or email.split('@')[0]}'s Organization")
+                            org_slug = default_org.get('slug', f"default-org-{str(created_id)[:8]}")
+                            org_plan = default_org.get('plan_type', 'free')
+                            org_max_projects = default_org.get('max_projects', 1)
+                            
+                            # Insert organization
+                            ins_org = sa.text("""
+                                INSERT INTO organizations (name, slug, description, plan_type, ai_credits_limit, max_users, max_projects, max_storage_gb, is_active, is_deleted, created_at, updated_at)
+                                VALUES (:name, :slug, :desc, :plan, :credits, :max_users, :max_projects, :storage, TRUE, FALSE, NOW(), NOW())
+                                ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name
+                                RETURNING id
+                            """)
+                            org_params = {
+                                "name": org_name,
+                                "slug": org_slug,
+                                "desc": f"Default organization for {email}",
+                                "plan": org_plan,
+                                "credits": 30 if org_plan == 'free' else 300,
+                                "max_users": 1 if org_plan == 'free' else 10,
+                                "max_projects": org_max_projects,
+                                "storage": 5 if org_plan == 'free' else 100
+                            }
+                            r_org = conn_org.execute(ins_org, org_params)
+                            org_row = r_org.fetchone()
+                            org_id = org_row[0] if org_row else None
+                            
+                            if org_id:
+                                # Add user as owner to organization
+                                ins_membership = sa.text("""
+                                    INSERT INTO user_organizations (id, user_id, organization_id, role, is_active, created_at, updated_at)
+                                    VALUES (gen_random_uuid(), :uid, :oid, 'owner', TRUE, NOW(), NOW())
+                                    ON CONFLICT DO NOTHING
+                                """)
+                                conn_org.execute(ins_membership, {"uid": created_id, "oid": org_id})
+                                logger.info(f"Created default organization {org_id} for user {created_id}")
+            except Exception as e:
+                logger.exception(f"Failed to create default organization (non-fatal): {e}")
+        
         return {"created": True, "id": str(created_id or new_uuid)}
     except Exception as e:
         logger.exception('Failed to provision user (non-fatal): %s', e)
@@ -504,30 +582,100 @@ def provision_user(payload: dict = Body(...), x_internal_auth: str | None = Head
 async def logout(request: Request, response: Response, current_token: str = Depends(JWTCookieBearer())):
     """Logout user: revoke refresh token and clear cookies"""
     try:
-        # Attempt to revoke persisted refresh token (if present)
-        auth_service = AuthService()
-        # Try cookie first
-        refresh_token = request.cookies.get('refresh_token')
-        # Fallback: Authorization header may contain bearer refresh token (rare)
-        if not refresh_token:
-            auth_header = request.headers.get('Authorization') or request.headers.get('authorization')
-            if auth_header and auth_header.lower().startswith('bearer '):
-                refresh_token = auth_header.split(None, 1)[1].strip()
+        # Get token from cookie or header
+        token = request.cookies.get('c2c_access_token') or request.cookies.get('access_token')
+        refresh_token = request.cookies.get('refresh_token') or request.cookies.get('c2c_refresh_token')
+        auth_header = request.headers.get('Authorization') or request.headers.get('authorization')
+        if not token and auth_header:
+            if auth_header.lower().startswith('bearer '):
+                token = auth_header.split(None, 1)[1].strip()
+            else:
+                token = auth_header
+        
+        # Use auth provider for logout (if available)
+        try:
+            from app.modules.authentication.providers.factory import get_auth_provider
+            provider = get_auth_provider()
+            if token:
+                try:
+                    await provider.logout(token)
+                except Exception as e:
+                    logger.warning(f"Provider logout failed: {e}, trying with refresh token")
+                    # Try with refresh token if access token fails
+                    if refresh_token:
+                        try:
+                            await provider.logout(refresh_token)
+                        except Exception:
+                            logger.warning("Provider logout with refresh token also failed")
+        except Exception as e:
+            logger.warning(f"Provider logout failed, falling back to legacy: {e}")
+            # Fallback to legacy auth service
+            auth_service = AuthService()
+            if refresh_token:
+                try:
+                    await auth_service.revoke_refresh_token(refresh_token)
+                except Exception:
+                    logger.exception('Failed to revoke refresh token during logout')
 
-        if refresh_token:
-            try:
-                await auth_service.revoke_refresh_token(refresh_token)
-            except Exception:
-                logger.exception('Failed to revoke refresh token during logout')
+        # CRITICAL: Clear ALL cookies with all possible configurations
+        hostname = request.url.hostname or ""
+        secure_flag = False if (settings.ENVIRONMENT == 'development' or hostname.startswith('localhost') or hostname.startswith('127.')) else True
+        samesite_setting = 'none' if secure_flag else 'lax'
+        
+        # Delete cookies with all possible configurations
+        cookies_to_clear = ['c2c_access_token', 'access_token', 'refresh_token', 'c2c_refresh_token']
+        for cookie_name in cookies_to_clear:
+            # Delete with path=/
+            response.delete_cookie(
+                key=cookie_name,
+                path='/',
+                domain=None,
+                secure=secure_flag,
+                httponly=True,
+                samesite=samesite_setting
+            )
+            # Try with domain if available
+            if hostname and not hostname.startswith('localhost'):
+                response.delete_cookie(
+                    key=cookie_name,
+                    path='/',
+                    domain=hostname,
+                    secure=secure_flag,
+                    httponly=True,
+                    samesite=samesite_setting
+                )
+                # Try with .domain (subdomain support)
+                response.delete_cookie(
+                    key=cookie_name,
+                    path='/',
+                    domain=f'.{hostname}',
+                    secure=secure_flag,
+                    httponly=True,
+                    samesite=samesite_setting
+                )
 
-        # Clear cookies
-        response.delete_cookie('c2c_access_token', path='/')
-        response.delete_cookie('refresh_token', path='/')
-
+        return {"success": True, "message": "Logged out successfully"}
+    except HTTPException:
+        # Even if logout fails, clear cookies and return success
+        # Logout should be idempotent
+        try:
+            cookies_to_clear = ['c2c_access_token', 'access_token', 'refresh_token', 'c2c_refresh_token']
+            for cookie_name in cookies_to_clear:
+                response.delete_cookie(key=cookie_name, path='/')
+        except:
+            pass
         return {"success": True, "message": "Logged out"}
     except Exception as e:
         logger.error(f"Logout failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        # Even on error, try to clear cookies
+        try:
+            cookies_to_clear = ['c2c_access_token', 'access_token', 'refresh_token', 'c2c_refresh_token']
+            for cookie_name in cookies_to_clear:
+                response.delete_cookie(key=cookie_name, path='/')
+        except:
+            pass
+        # Return success anyway - logout should be idempotent
+        return {"success": True, "message": "Logged out"}
 
 
 @router.post("/auth/refresh")

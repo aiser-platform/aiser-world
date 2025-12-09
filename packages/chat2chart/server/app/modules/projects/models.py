@@ -1,12 +1,10 @@
-from app.common.model import BaseModel, Base
+from app.common.model import BaseModel
 from sqlalchemy import Column, String, Text, UUID, Boolean, Integer, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import uuid
 
 # Import models from other modules to avoid circular imports
-from app.modules.chats.conversations.models import ChatConversation
-from app.modules.user.models import User
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 
 
@@ -38,22 +36,7 @@ class Organization(BaseModel):
     
     # Relationships
     projects = relationship("Project", back_populates="organization", cascade="all, delete-orphan")
-    users = relationship("OrganizationUser", back_populates="organization", cascade="all, delete-orphan")
-
-
-class OrganizationUser(Base):
-    """Many-to-many relationship between organizations and users"""
-    __tablename__ = "user_organizations"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
-    user_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    role = Column(String(50), default="member")  # owner, admin, member
-    is_active = Column(Boolean, default=True)
-
-    # Relationships
-    organization = relationship("Organization", back_populates="users")
-    user = relationship("User", back_populates="organizations")
+    user_organizations = relationship("UserOrganization", back_populates="organization", cascade="all, delete-orphan")
 
 
 class Project(BaseModel):
@@ -116,6 +99,23 @@ class ProjectConversation(BaseModel):
     # Relationships
     project = relationship("Project", back_populates="conversations")
     conversation = relationship("ChatConversation")
+
+
+class UserOrganization(BaseModel):
+    """Many-to-many relationship between users and organizations with roles"""
+    __tablename__ = "user_organizations"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    role = Column(String(50), default="member")  # member, admin, owner
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    organization = relationship("Organization", back_populates="user_organizations")
+    user = relationship("User", back_populates="user_organizations")
 
 
 # Note: User and ChatConversation models are defined in their respective modules

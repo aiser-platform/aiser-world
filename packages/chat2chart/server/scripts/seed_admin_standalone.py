@@ -19,7 +19,8 @@ def hash_password_simple(password: str) -> str:
     implementation is intentionally minimal so the script has no project
     import dependencies.
     """
-    import hashlib, binascii, os
+    import binascii
+    import os
     salt = os.urandom(16)
     dk = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 100000)
     return binascii.hexlify(salt).decode() + '$' + binascii.hexlify(dk).decode()

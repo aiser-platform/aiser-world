@@ -21,6 +21,11 @@ const CustomLayout: React.FC<CustomLayoutProps> = React.memo(({ children }) => {
         setCollapsed(!screens.lg);
     }, [screens]);
 
+    const sidebarOffset = React.useMemo(
+        () => (isBreakpoint ? 0 : collapsed ? 80 : 256),
+        [collapsed, isBreakpoint]
+    );
+
     return (
         <Layout 
             className="h-screen overflow-hidden" 
@@ -28,7 +33,7 @@ const CustomLayout: React.FC<CustomLayoutProps> = React.memo(({ children }) => {
                 height: '100vh',
                 margin: 0,
                 padding: 0,
-                background: 'var(--layout-background)',
+                background: 'var(--ant-color-bg-layout)',
             }} 
             hasSider
         >
@@ -40,16 +45,17 @@ const CustomLayout: React.FC<CustomLayoutProps> = React.memo(({ children }) => {
             />
 
             <Layout
-                className={`${
-                    isBreakpoint && !collapsed ? 'filter brightness-25' : ''
-                } transition-all min-h-0`}
+                className={isBreakpoint && !collapsed ? 'filter brightness-25' : ''}
                 style={{ 
-                    height: '100vh',
+                    minHeight: '100vh',
                     display: 'flex',
                     flexDirection: 'column',
-                    transition: 'all 0.2s ease',
-                    marginLeft: 0, // Remove margin since header is now positioned correctly
-                    width: '100%',
+                    transition: 'margin-left 0.2s ease',
+                    marginLeft: sidebarOffset,
+                    width: `calc(100% - ${sidebarOffset}px)`,
+                    marginTop: 0,
+                    padding: 0,
+                    background: 'var(--ant-color-bg-layout)',
                 }}
             >
                 <LayoutHeader
@@ -58,30 +64,28 @@ const CustomLayout: React.FC<CustomLayoutProps> = React.memo(({ children }) => {
                     setCollapsed={setCollapsed}
                 />
                 <Content
+                    className="dashboard-content-override"
                     style={{
                         flex: 1,
+                        height: 'calc(100vh - 64px)',
+                        minHeight: 'calc(100vh - 64px)',
+                        maxHeight: 'calc(100vh - 64px)',
                         margin: 0,
-                        marginLeft: collapsed ? '80px' : '256px', // Account for fixed sidebar
-                        marginTop: '64px', // Account for fixed header height
+                        marginTop: '64px', /* Account for fixed header */
                         padding: 0,
-                        minHeight: 0,
-                        overflow: 'auto',
+                        paddingTop: 0,
+                        background: 'var(--ant-color-bg-layout)',
+                        display: 'flex',
+                        flexDirection: 'column',
                         position: 'relative',
-                        background: 'var(--layout-background)',
-                        width: `calc(100% - ${collapsed ? '80px' : '256px'})`, // Adjust width for sidebar
-                        height: '100%',
-                        transition: 'all 0.2s ease', // Smooth transition
+                        boxSizing: 'border-box',
+                        border: 'none',
+                        outline: 'none',
+                        width: '100%',
+                        overflow: 'hidden',
                     }}
                 >
-                    <div className="page-content" style={{ 
-                        width: '100%',
-                        height: '100%',
-                        padding: '0', // Removed padding to eliminate white edges
-                        background: 'var(--layout-background)',
-                        margin: 0,
-                    }}>
-                        {children}
-                    </div>
+                    <div className="page-content">{children}</div>
                 </Content>
             </Layout>
         </Layout>

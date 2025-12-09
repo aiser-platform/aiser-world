@@ -36,6 +36,8 @@ import {
 import { dashboardAPIService } from '../dash-studio/services/DashboardAPIService';
 import { useRouter } from 'next/navigation';
 import LoadingStates from '@/app/components/LoadingStates';
+import { usePermissions, Permission } from '@/hooks/usePermissions';
+import { PermissionGuard } from '@/components/PermissionGuard';
 
 const { Title, Text } = Typography;
 const { Search } = Input;
@@ -63,6 +65,7 @@ const DashboardsPage: React.FC = () => {
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const router = useRouter();
     const { user, isAuthenticated } = useAuth();
+    const { hasPermission } = usePermissions();
 
     // Redirect to login if not authenticated
     useEffect(() => {
@@ -238,48 +241,58 @@ const DashboardsPage: React.FC = () => {
             key: 'actions',
             render: (_: any, record: Dashboard) => (
                 <Space>
-                    <Tooltip title="View Dashboard">
-                        <Button
-                            size="small"
-                            icon={<EyeOutlined />}
-                            onClick={() => handleViewDashboard(record)}
-                        />
-                    </Tooltip>
-                    <Tooltip title="Edit Dashboard">
-                        <Button
-                            size="small"
-                            icon={<EditOutlined />}
-                            onClick={() => handleEditDashboard(record)}
-                        />
-                    </Tooltip>
-                    <Tooltip title="Share Dashboard">
-                        <Button
-                            size="small"
-                            icon={<ShareAltOutlined />}
-                            onClick={() => handleShareDashboard(record)}
-                        />
-                    </Tooltip>
-                    <Tooltip title="Export Dashboard">
-                        <Button
-                            size="small"
-                            icon={<DownloadOutlined />}
-                            onClick={() => handleExportDashboard(record)}
-                        />
-                    </Tooltip>
-                    <Popconfirm
-                        title="Are you sure you want to delete this dashboard?"
-                        onConfirm={() => handleDeleteDashboard(record.id)}
-                        okText="Yes"
-                        cancelText="No"
-                    >
-                        <Tooltip title="Delete Dashboard">
+                    <PermissionGuard permission={Permission.DASHBOARD_VIEW}>
+                        <Tooltip title="View Dashboard">
                             <Button
                                 size="small"
-                                icon={<DeleteOutlined />}
-                                danger
+                                icon={<EyeOutlined />}
+                                onClick={() => handleViewDashboard(record)}
                             />
                         </Tooltip>
-                    </Popconfirm>
+                    </PermissionGuard>
+                    <PermissionGuard permission={Permission.DASHBOARD_EDIT}>
+                        <Tooltip title="Edit Dashboard">
+                            <Button
+                                size="small"
+                                icon={<EditOutlined />}
+                                onClick={() => handleEditDashboard(record)}
+                            />
+                        </Tooltip>
+                    </PermissionGuard>
+                    <PermissionGuard permission={Permission.DASHBOARD_EDIT}>
+                        <Tooltip title="Share Dashboard">
+                            <Button
+                                size="small"
+                                icon={<ShareAltOutlined />}
+                                onClick={() => handleShareDashboard(record)}
+                            />
+                        </Tooltip>
+                    </PermissionGuard>
+                    <PermissionGuard permission={Permission.DASHBOARD_VIEW}>
+                        <Tooltip title="Export Dashboard">
+                            <Button
+                                size="small"
+                                icon={<DownloadOutlined />}
+                                onClick={() => handleExportDashboard(record)}
+                            />
+                        </Tooltip>
+                    </PermissionGuard>
+                    <PermissionGuard permission={Permission.DASHBOARD_DELETE}>
+                        <Popconfirm
+                            title="Are you sure you want to delete this dashboard?"
+                            onConfirm={() => handleDeleteDashboard(record.id)}
+                            okText="Yes"
+                            cancelText="No"
+                        >
+                            <Tooltip title="Delete Dashboard">
+                                <Button
+                                    size="small"
+                                    icon={<DeleteOutlined />}
+                                    danger
+                                />
+                            </Tooltip>
+                        </Popconfirm>
+                    </PermissionGuard>
                 </Space>
             ),
         },
@@ -311,7 +324,7 @@ const DashboardsPage: React.FC = () => {
             </div>
 
             {/* Statistics Cards */}
-            <Row gutter={[16, 16]} style={{ marginBottom: 'var(--space-6)' }}>
+            <Row gutter={[16, 16]} style={{ marginTop: 16, marginBottom: 'var(--space-6)' }}>
                 <Col xs={24} sm={12} md={6}>
                     <Card className="stat-card">
                         <Statistic
@@ -356,14 +369,16 @@ const DashboardsPage: React.FC = () => {
             {/* Actions and Filters */}
             <div className="page-toolbar">
                 <div className="toolbar-left">
-                    <Button
-                        type="primary"
-                        icon={<PlusOutlined />}
-                        onClick={handleCreateDashboard}
-                        className="action-button-primary"
-                    >
-                        Create Dashboard
-                    </Button>
+                    <PermissionGuard permission={Permission.DASHBOARD_EDIT}>
+                        <Button
+                            type="primary"
+                            icon={<PlusOutlined />}
+                            onClick={handleCreateDashboard}
+                            className="action-button-primary"
+                        >
+                            Create Dashboard
+                        </Button>
+                    </PermissionGuard>
                     <Button
                         icon={<ReloadOutlined />}
                         onClick={loadDashboards}

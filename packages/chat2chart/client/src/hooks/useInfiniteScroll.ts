@@ -27,13 +27,12 @@ export const useInfiniteScroll = <T>({
     };
 
     useEffect(() => {
-        if (containerRef.current) {
-            const { scrollHeight, clientHeight } = containerRef.current;
-            if (!loading && hasMore && scrollHeight <= clientHeight) {
-                onFetch(currentItems.length);
-            }
+        // Only fetch if hasMore and we are not loading AND currentItems is empty
+        // This prevents immediate re-fetching if the initial load already populated some items
+        if (!loading && hasMore && currentItems.length === 0) {
+            onFetch(0); // Fetch from the beginning if no items are loaded yet
         }
-    }, [currentItems, loading, hasMore, onFetch]);
+    }, [loading, hasMore, onFetch, currentItems.length]); // Depend on currentItems.length
 
     return { containerRef, handleScroll };
 };

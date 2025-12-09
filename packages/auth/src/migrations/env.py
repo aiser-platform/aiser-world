@@ -1,67 +1,47 @@
-from logging.config import fileConfig
-
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
-from alembic import context
-
-# ---------------- added code here -------------------------#
 import os
 import sys
+from logging.config import fileConfig
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(BASE_DIR)
+from sqlalchemy import create_engine
 
-# Add the src directory to the path
-SRC_DIR = os.path.join(BASE_DIR, "src")
-sys.path.append(SRC_DIR)
+from alembic import context
 
-# Now we can import from app
-from app.core.config import settings
-
-# ------------------------------------------------------------#
 # this is the Alembic Config object, which provides
-# access to the values within the .ini file in use.
+# access to values within the .ini file in use.
 config = context.config
-# ---------------- added code here -------------------------#
-# this will overwrite the ini-file sqlalchemy.url path
-# with the path given in the config of the main code
-config.set_main_option("sqlalchemy.url", settings.SQLALCHEMY_DATABASE_URI)
-# ------------------------------------------------------------#
+
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
-fileConfig(config.config_file_name)
+if config.config_file_name is not None:
+    fileConfig(config.config_file_name)
 
 # add your model's MetaData object here
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
-# ---------------- added code here -------------------------#
-# Import Base from common model first
-from app.common.model import Base
 
-# Import all models to ensure they are registered with SQLAlchemy
-try:
-    # Import modules that declare SQLAlchemy models so mappers are configured.
-    # Add explicit imports here to avoid missing-name errors during alembic
-    # autogeneration or when running migrations in CI/dev environments.
-    import app.modules.user.models as _um
-    import app.modules.organizations.models as _om
-    import app.modules.device_session.models as _dm
-    import app.modules.temporary_token.models as _tm
-    import app.modules.authentication.models as _am
-    import app.modules.roles.models as _rm
-    print("All expected models imported successfully")
-except Exception as e:
-    # Continue even if some optional modules fail to import; alembic
-    # autogeneration may still work for available models.
-    print(f"Warning: Some models could not be imported: {e}")
+# Ensure src directory is on sys.path so imports like `from app.modules...` work
+# when env.py is loaded by Alembic (which may change cwd or sys.path).
+script_dir = os.path.dirname(__file__)
+src_dir = os.path.abspath(os.path.join(script_dir, '..'))
+if src_dir not in sys.path:
+    sys.path.insert(0, src_dir)
 
-# ------------------------------------------------------------#
-# ---------------- changed code here -------------------------#
-# here target_metadata was equal to None
-target_metadata = [Base.metadata]
-# ------------------------------------------------------------#
+# Set up local MetaData and Base for auth-service models
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import MetaData
 
+auth_metadata = MetaData()
+AuthBase = declarative_base(metadata=auth_metadata)
+
+# Import all models for auth-service to be included in migrations
+
+target_metadata = auth_metadata
+
+# other values from the config, defined by the needs of env.py,
+# can be acquired herein and passed to the MigrationContext.
+# for example, my_important_option = config.get_main_option("my_important_option")
+# ... etc.
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
@@ -69,7 +49,7 @@ def run_migrations_offline() -> None:
     This configures the context with just a URL
     and not an Engine, though an Engine is acceptable
     here as well.  By skipping the Engine creation
-    we don't even need a DBAPI to be available.
+    we don't even need a database to begin with.
 
     Calls to context.execute() here emit the given string to the
     script output.
@@ -87,6 +67,13 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
+def do_run_migrations(connection) -> None:
+    context.configure(connection=connection, target_metadata=target_metadata)
+
+    with context.begin_transaction():
+        context.run_migrations()
+
+
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode.
 
@@ -94,25 +81,18 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
-    # Override sqlalchemy.url with sync PostgreSQL URL
-    async_url = settings.SQLALCHEMY_DATABASE_URI
-    sync_url = async_url.replace("postgresql+asyncpg://", "postgresql://")
+    connectable = config.get_section(config.config_ini_section, {})
+    database_url = os.environ.get("DATABASE_URL")
+    if database_url is None:
+        raise Exception("DATABASE_URL environment variable is not set.")
+    connectable['sqlalchemy.url'] = database_url  # Ensure DATABASE_URL is read from environment
 
-    configuration = config.get_section(config.config_ini_section)
-    configuration["sqlalchemy.url"] = sync_url
+    # Use synchronous engine with psycopg2 (not asyncpg) for Alembic
+    engine = create_engine(connectable['sqlalchemy.url'].replace('+asyncpg', ''))
 
-    connectable = engine_from_config(
-        configuration,
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
-
-    with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
-
-        with context.begin_transaction():
-            context.run_migrations()
-
+    with engine.connect() as connection:
+        do_run_migrations(connection)
+        connection.commit()
 
 if context.is_offline_mode():
     run_migrations_offline()

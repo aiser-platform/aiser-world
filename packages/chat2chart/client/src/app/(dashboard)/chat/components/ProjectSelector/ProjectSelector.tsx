@@ -27,7 +27,7 @@ interface Project {
 interface Organization {
     id: number;
     name: string;
-    plan_type: 'free' | 'pro' | 'enterprise';
+    plan_type: 'free' | 'pro' | 'team' | 'enterprise';
     max_projects: number;
     max_users: number;
     max_storage_gb: number;

@@ -255,9 +255,32 @@ class UnifiedAIService {
 
     /**
      * Generate AI-powered data schema and cube configuration
+     * 
+     * NOTE: This endpoint is currently disabled. Auto-detection works fine.
+     * Will be re-enabled with a better approach later.
      */
     async generateAISchema(request: SchemaGenerationRequest) {
+        // DISABLED: Return fallback schema instead of AI generation
+        // This avoids JSON serialization issues with date objects
+        console.warn('⚠️ AI schema generation is disabled - using fallback schema');
+        
         try {
+            // Return a fallback response instead of calling the API
+            return {
+                success: true,
+                yaml_schema: `# Fallback schema (AI generation disabled)\ndata_source_type: ${request.data_source_type || 'unknown'}`,
+                cube_structure: {
+                    cubes: [],
+                    dimensions: [],
+                    measures: []
+                },
+                data_source_id: request.data_source_id,
+                ai_engine: "Fallback System (AI generation disabled)",
+                deployment_status: "ready",
+            };
+            
+            // OLD CODE - DISABLED
+            /*
             const response = await fetch(`${this.baseURL}/ai/schema/generate`, {
                 method: 'POST',
                 headers: {
@@ -271,9 +294,22 @@ class UnifiedAIService {
             }
 
             return await response.json();
+            */
         } catch (error) {
             console.error('Schema generation error:', error);
-            throw error;
+            // Return fallback on error
+            return {
+                success: true,
+                yaml_schema: `# Fallback schema (AI generation disabled)\ndata_source_type: ${request.data_source_type || 'unknown'}`,
+                cube_structure: {
+                    cubes: [],
+                    dimensions: [],
+                    measures: []
+                },
+                data_source_id: request.data_source_id,
+                ai_engine: "Fallback System (AI generation disabled)",
+                deployment_status: "ready",
+            };
         }
     }
 

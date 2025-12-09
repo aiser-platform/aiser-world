@@ -36,9 +36,46 @@ services:
       timeout: 5s
       retries: 5
 
+  # ClickHouse Data Warehouse
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8-alpine
+    container_name: aiser-clickhouse-dev
+    ports:
+      - "8123:8123"  # HTTP interface
+      - "9000:9000"  # Native interface
+    environment:
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-aiser_warehouse}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-aiser}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-aiser_warehouse_password}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    volumes:
+      - clickhouse_dev_data:/var/lib/clickhouse
+      - ./scripts/clickhouse-init:/docker-entrypoint-initdb.d
+      - ./clickhouse-config/users.xml:/etc/clickhouse-server/users.d/custom-users.xml:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        /entrypoint.sh &
+        sleep 5
+        /docker-entrypoint-initdb.d/02-insert-data.sh || true
+        wait
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8123/ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    networks:
+      - default
+
   # Authentication Service
   auth-service:
-    image: python:3.11-slim
+    build:
+      context: ./packages/auth
+      dockerfile: Dockerfile.dev
     container_name: aiser-auth-dev
     working_dir: /app
     env_file: .env  # Moved here
@@ -50,19 +87,39 @@ services:
       - POSTGRES_USER=${POSTGRES_USER:-aiser}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-aiser_password}
       - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-aiser}:${POSTGRES_PASSWORD:-aiser_password}@postgres:${POSTGRES_PORT:-5432}/aiser_world
       - SECRET_KEY=${SECRET_KEY:-dev-secret-key}
       - DEBUG=${DEBUG:-True}
       - ENVIRONMENT=${ENVIRONMENT:-development}
       - CHAT2CHART_PROVISION_URL=http://chat2chart-server:8000/internal/provision-user
       - INTERNAL_PROVISION_SECRET=dev-internal-secret
+      - PYTHONPATH=/app/src
+    networks:
+      - default
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     volumes:
-      - ./packages/auth:/app
-      - ./scripts/start-auth.sh:/start.sh
-      - auth_poetry_cache:/root/.cache/pypoetry
-    command: ["bash", "/start.sh"]
+      - ./packages/auth/src:/app/src
+      - ./packages/auth/alembic.ini:/app/alembic.ini
+      - auth_poetry_cache:/root/.cache/poetry
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -ex;
+        echo 'Waiting for PostgreSQL to be ready...';
+        until nc -z postgres 5432; do echo "PostgreSQL is unavailable - sleeping"; sleep 2; done;
+        
+        echo 'PostgreSQL is up. Starting auth service...';
+        # Note: Database schema is now managed by SQLAlchemy create_all() on startup
+        # Migrations can be run manually when needed with: poetry run alembic upgrade head
+        poetry run uvicorn app.main:app --host 0.0.0.0 --port 5000;
     restart: unless-stopped
 
   # Chat2Chart Server
@@ -71,122 +128,162 @@ services:
       context: ./packages/chat2chart/server
       dockerfile: Dockerfile.dev
     container_name: aiser-chat2chart-dev
-    working_dir: /app
-    env_file: .env  # Moved here
+    env_file:
+      - .env
     ports:
       - "8000:8000"
+    volumes:
+      - ./packages/chat2chart/server:/app
+      - chat2chart_poetry_cache:/root/.cache/poetry
     environment:
       - POSTGRES_SERVER=postgres
-      - POSTGRES_DB=${POSTGRES_DB:-aiser_chat2chart}
+      - POSTGRES_DB=${POSTGRES_DB:-aiser_world} # Unified database
       - POSTGRES_USER=${POSTGRES_USER:-aiser}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-aiser_password}
       - POSTGRES_PORT=${POSTGRES_PORT:-5432}
-      # Force chat2chart to use the dedicated chat2chart DB to avoid cross-DB FK type mismatches
-      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-aiser}:${POSTGRES_PASSWORD:-aiser_password}@postgres:${POSTGRES_PORT:-5432}/aiser_chat2chart
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-aiser}:${POSTGRES_PASSWORD:-aiser_password}@postgres:${POSTGRES_PORT:-5432}/aiser_world
       - SECRET_KEY=${SECRET_KEY:-dev-secret-key}
       - ENVIRONMENT=${ENVIRONMENT:-development}
       - DEBUG=${DEBUG:-True}
+      - ALLOW_UNVERIFIED_JWT_IN_DEV=${ALLOW_UNVERIFIED_JWT_IN_DEV:-true}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - REDIS_DB=0
-      - REDIS_URL=redis://redis:6379/0
       - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY}
       - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
-      - AZURE_OPENAI_API_VERSION=${AZURE_OPENAI_API_VERSION:-2025-04-01-preview}
+      - AZURE_OPENAI_API_VERSION=${AZURE_OPENAI_API_VERSION}
       - AZURE_OPENAI_DEPLOYMENT_NAME=${AZURE_OPENAI_DEPLOYMENT_NAME:-gpt-5-mini}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - OPENAI_MODEL_ID=${OPENAI_MODEL_ID:-gpt-4o-mini}
-      - INTERNAL_PROVISION_SECRET=${INTERNAL_PROVISION_SECRET:-dev-internal-secret}
+      - AZURE_OPENAI_GPT41_API_KEY=${AZURE_OPENAI_GPT41_API_KEY}
+      - AZURE_OPENAI_GPT41_ENDPOINT=${AZURE_OPENAI_GPT41_ENDPOINT}
+      - AZURE_OPENAI_GPT41_API_VERSION=${AZURE_OPENAI_GPT41_API_VERSION}
+      - AZURE_OPENAI_GPT41_DEPLOYMENT_NAME=${AZURE_OPENAI_GPT41_DEPLOYMENT_NAME:-gpt-4.1-mini}
+      - AZURE_API_KEY=${AZURE_OPENAI_API_KEY}
+      - AZURE_API_BASE=${AZURE_OPENAI_ENDPOINT}
+      - AZURE_API_VERSION=${AZURE_OPENAI_API_VERSION}
+      - CLICKHOUSE_USER=${CLICKHOUSE_USER:-aiser}
+      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:-aiser_warehouse_password}
+      - CLICKHOUSE_HOST=${CLICKHOUSE_HOST:-clickhouse}
+      - CLICKHOUSE_PORT=${CLICKHOUSE_PORT:-8123}
+      - CLICKHOUSE_DB=${CLICKHOUSE_DB:-aiser_warehouse}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-eswk8A65hCHznUBX4uiXHJihI8CldBQ9noFDVOjLFj0=}
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1 # Ensure Python output is unbuffered
+    networks:
+      - default
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-      cube-server:
-        condition: service_started
-    volumes:
-      - ./packages/chat2chart/server:/app
-      - ./scripts/start-chat2chart.sh:/start.sh
-      - chat2chart_poetry_cache:/root/.cache/pypoetry
-    command: ["bash", "/start.sh"]
+    # Overwrite the default command with our entrypoint script for migrations
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -ex;
+        echo "Waiting for PostgreSQL to be ready...";
+        until nc -z postgres 5432; do
+            echo "PostgreSQL is unavailable - sleeping";
+            sleep 2;
+        done;
+        
+        echo "PostgreSQL is up - starting chat2chart-server...";
+        echo "Note: Database schema will be auto-created by SQLAlchemy on first use";
+        /root/.cache/pypoetry/virtualenvs/aiser-world-chat2chart-9TtSrW0h-py3.11/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000;
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     restart: unless-stopped
 
-  # Cube.js Universal Semantic Layer
-  cube-server:
-    image: node:18-alpine
-    container_name: aiser-cube-dev
-    working_dir: /app
-    env_file: .env  # Moved here
-    ports:
-      - "4000:4000"
-    environment:
-      - NODE_ENV=${NODE_ENV:-development}
-      - CUBE_DB_TYPE=${CUBE_DB_TYPE:-postgres}
-      - CUBE_DB_HOST=${CUBE_DB_HOST:-postgres}
-      - CUBE_DB_PORT=${CUBE_DB_PORT:-5432}
-      - CUBE_DB_NAME=${POSTGRES_DB:-aiser_world}
-      - CUBE_DB_USER=${POSTGRES_USER:-aiser}
-      - CUBE_DB_PASS=${POSTGRES_PASSWORD:-aiser_password}
-      - CUBE_DB_SCHEMA=${CUBE_DB_SCHEMA:-public}
-      - CUBE_DB_SSL=${CUBE_DB_SSL:-false}
-      - CUBE_DB_POOL_MIN=${CUBE_DB_POOL_MIN:-2}
-      - CUBE_DB_POOL_MAX=${CUBE_DB_POOL_MAX:-10}
-      - CUBE_REDIS_URL=${CUBE_REDIS_URL:-redis://redis:6379}
-      - CUBE_API_SECRET=${CUBE_API_SECRET:-dev-cube-secret-key}
-      - CUBE_DEV_MODE=${CUBE_DEV_MODE:-true}
-      - CUBE_LOG_LEVEL=${CUBE_LOG_LEVEL:-info}
-      - CUBEJS_EXTERNAL_DEFAULT=${CUBEJS_EXTERNAL_DEFAULT:-true}
-      - CUBEJS_SCHEDULED_REFRESH_DEFAULT=${CUBEJS_SCHEDULED_REFRESH_DEFAULT:-true}
-      - CUBEJS_SKIP_NATIVE_EXTENSIONS=${CUBEJS_SKIP_NATIVE_EXTENSIONS:-true}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    volumes:
-      - ./packages/cube:/app
-      - cube_node_modules:/app/node_modules
-    command: >
-      sh -c "
-        npm install &&
-        npm run dev
-      "
-    restart: unless-stopped
-
-  # Chat2Chart Client (Next.js)
   chat2chart-client:
-    image: node:18-alpine
+    build:
+      context: ./packages/chat2chart/client
+      dockerfile: Dockerfile.dev
     container_name: aiser-client-dev
     working_dir: /app
-    env_file: .env  # Moved here
     ports:
       - "3000:3000"
     environment:
-      - NODE_ENV=${NODE_ENV:-development}
-      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://chat2chart-server:8000}
-      - NEXT_PUBLIC_AUTH_URL=${NEXT_PUBLIC_AUTH_URL:-http://auth-service:5000}
-      - NEXT_PUBLIC_CUBE_URL=${NEXT_PUBLIC_CUBE_URL:-http://cube-server:4000}
-      - NEXT_PUBLIC_BACKEND_URL=${NEXT_PUBLIC_BACKEND_URL:-http://chat2chart-server:8000}
+      - NEXT_PUBLIC_API_URL=http://chat2chart-server:8000
+      - NEXT_PUBLIC_AUTH_URL=http://auth-service:5000
+      - NEXT_PUBLIC_BACKEND_URL=http://chat2chart-server:8000
+      - NODE_ENV=development
+      - AUTH_TARGET=http://auth-service:5000
+      - API_TARGET=http://chat2chart-server:8000
     volumes:
       - ./packages/chat2chart/client:/app
-      - ./packages/shared:/shared
-      - ./scripts/start-client.sh:/start.sh
-      - /app/node_modules
-      - /app/.next
+      - client_node_modules:/app/node_modules # Use named volume for node_modules to avoid conflicts
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        echo "Starting client container..."
+        echo "Waiting for volume mount to be ready..."
+        # Wait for package.json to appear (volume mount might take a moment)
+        # The bind mount should mount the source directory, but node_modules volume might interfere
+        max_attempts=10
+        attempt=1
+        while [ "$attempt" -le "$max_attempts" ]; do
+          if [ -f /app/package.json ]; then
+            echo "✅ package.json found!"
+            break
+          fi
+          echo "Waiting for package.json... (attempt $attempt/$max_attempts)"
+          sleep 2
+          attempt=$((attempt + 1))
+        done
+        if [ ! -f /app/package.json ]; then
+          echo "❌ ERROR: package.json not found in /app after waiting"
+          echo "Listing /app contents:"
+          ls -la /app/ || true
+          echo "Checking if /app exists:"
+          test -d /app && echo "/app directory exists" || echo "/app directory does not exist"
+          echo "Checking volume mounts:"
+          mount | grep /app || true
+          echo "Trying to access package.json directly:"
+          cat /app/package.json 2>&1 || echo "Cannot read package.json"
+          exit 1
+        fi
+        echo "package.json found. Waiting for dependencies..."
+        until nc -z chat2chart-server 8000; do
+          echo "Waiting for chat2chart-server..."
+          sleep 5
+        done
+        until nc -z auth-service 5000; do
+          echo "Waiting for auth-service..."
+          sleep 5
+        done
+        echo "Dependencies ready. Installing npm packages..."
+        cd /app
+        npm install
+        echo "Starting Next.js dev server..."
+        npm run dev
+    networks:
+      - default
     depends_on:
-      - chat2chart-server
-      - auth-service
-      - cube-server
-    command: ["sh", "/start.sh"]
+      chat2chart-server:
+        condition: service_started
+      auth-service:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:
   postgres_dev_data:
   redis_dev_data:
+  clickhouse_dev_data:
   auth_poetry_cache:
   chat2chart_poetry_cache:
-  cube_node_modules:
+  aiser-world_chat2chart_poetry_cache:
+  client_node_modules:
 
 networks:
   default:
     name: aiser-dev-network
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+          gateway: 172.20.0.1

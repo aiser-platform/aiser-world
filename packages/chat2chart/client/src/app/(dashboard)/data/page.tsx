@@ -2,8 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import React, { useState, useEffect } from 'react';
-import { getBackendUrl } from '@/utils/backendUrl';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     Card,
     Button,
@@ -18,6 +17,11 @@ import {
     Typography,
     Divider,
     Tooltip,
+    Input,
+    Segmented,
+    Empty,
+    Alert,
+    Progress,
 } from 'antd';
 import {
     PlusOutlined,
@@ -29,15 +33,22 @@ import {
     EditOutlined,
     DeleteOutlined,
     ReloadOutlined,
+    SearchOutlined,
+    FilterOutlined,
+    ArrowUpOutlined,
 } from '@ant-design/icons';
 import UniversalDataSourceModal from '@/app/components/UniversalDataSourceModal/UniversalDataSourceModal';
+import { useOrganization } from '@/context/OrganizationContext';
+import { usePlanRestrictions } from '@/hooks/usePlanRestrictions';
+import { usePermissions, Permission } from '@/hooks/usePermissions';
+import { PermissionGuard } from '@/components/PermissionGuard';
 
 const { Title, Text } = Typography;
 
 interface DataSource {
     id: string;
     name: string;
-    type: 'file' | 'database' | 'warehouse' | 'api';
+    type: 'file' | 'database' | 'warehouse' | 'api' | 'cube';
     status: 'connected' | 'disconnected' | 'error' | 'testing';
     connection_info?: any;
     lastUsed?: string;
@@ -48,10 +59,18 @@ interface DataSource {
 }
 
 const DataSourcesPage: React.FC = () => {
+    const { currentOrganization, usageStats, getOrganizationUsage } = useOrganization();
+    const { showUpgradePrompt, UpgradeModal } = usePlanRestrictions();
+    const { hasPermission } = usePermissions({
+        organizationId: currentOrganization?.id,
+    });
     const [dataSources, setDataSources] = useState<DataSource[]>([]);
     const [loading, setLoading] = useState(false);
     const [modalVisible, setModalVisible] = useState(false);
     const [selectedDataSource, setSelectedDataSource] = useState<DataSource | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState<'all' | DataSource['status']>('all');
+    const [typeFilter, setTypeFilter] = useState<'all' | DataSource['type']>('all');
 
     useEffect(() => {
         loadDataSources();
@@ -60,13 +79,20 @@ const DataSourcesPage: React.FC = () => {
     const loadDataSources = async () => {
         setLoading(true);
         try {
-            const response = await fetch(`${getBackendUrl()}/data/sources`);
+            // Use API proxy for proper auth handling
+            const response = await fetch('/api/data/sources', {
+                credentials: 'include'
+            });
             const result = await response.json();
             
-            if (result.success) {
-                setDataSources(result.data_sources || []);
+            if (result.success || Array.isArray(result)) {
+                // API returns { success, data_sources } but fallback handles direct arrays
+                setDataSources(result.data_sources || result.data || result || []);
+                if (currentOrganization?.id) {
+                    await getOrganizationUsage(currentOrganization.id);
+                }
             } else {
-                message.error(`Failed to load data sources: ${result.error}`);
+                message.error(`Failed to load data sources: ${result.error || 'Unknown error'}`);
             }
         } catch (error) {
             message.error('Failed to load data sources');
@@ -77,6 +103,11 @@ const DataSourcesPage: React.FC = () => {
     };
 
     const handleAddDataSource = () => {
+        if (!canAddDataSource) {
+            const limitText = dataSourcesLimit > -1 ? `${dataSourcesLimit} data source${dataSourcesLimit === 1 ? '' : 's'}` : 'your current plan limits';
+            showUpgradePrompt('data_sources_limit', `You've reached ${limitText}. Upgrade to connect more sources.`);
+            return;
+        }
         setSelectedDataSource(null);
         setModalVisible(true);
     };
@@ -90,18 +121,51 @@ const DataSourcesPage: React.FC = () => {
         setModalVisible(false);
         setSelectedDataSource(null);
         loadDataSources(); // Refresh the list
+        if (currentOrganization?.id) {
+            getOrganizationUsage(currentOrganization.id);
+        }
+    };
+
+    const handleDeleteDataSource = async (dataSource: DataSource) => {
+        Modal.confirm({
+            title: 'Delete Data Source',
+            content: `Are you sure you want to delete "${dataSource.name}"? This action cannot be undone.`,
+            okText: 'Delete',
+            okType: 'danger',
+            cancelText: 'Cancel',
+            onOk: async () => {
+                try {
+                    // Use API proxy with proper auth
+                    const response = await fetch(`/api/data/sources/${dataSource.id}`, {
+                        method: 'DELETE',
+                        credentials: 'include'
+                    });
+                    
+                    if (response.ok) {
+                        message.success('Data source deleted successfully');
+                        loadDataSources(); // Refresh the list
+                    } else {
+                        const result = await response.json();
+                        message.error(`Failed to delete data source: ${result.detail || result.error || 'Unknown error'}`);
+                    }
+                } catch (error) {
+                    message.error('Failed to delete data source');
+                    console.error('Error deleting data source:', error);
+                }
+            },
+        });
     };
 
     const getDataSourceIcon = (type: string) => {
         switch (type) {
             case 'database':
-                return <DatabaseOutlined style={{ color: 'var(--color-brand-primary)' }} />;
+                return <DatabaseOutlined style={{ color: 'var(--ant-color-primary)' }} />;
             case 'file':
-                return <FileOutlined style={{ color: 'var(--color-functional-success)' }} />;
+                return <FileOutlined style={{ color: 'var(--ant-color-success)' }} />;
             case 'api':
-                return <ApiOutlined style={{ color: 'var(--color-functional-info)' }} />;
+                return <ApiOutlined style={{ color: 'var(--ant-color-info)' }} />;
             case 'warehouse':
-                return <CloudOutlined style={{ color: 'var(--color-functional-warning)' }} />;
+                return <CloudOutlined style={{ color: 'var(--ant-color-warning)' }} />;
             default:
                 return <DatabaseOutlined />;
         }
@@ -175,130 +239,229 @@ const DataSourcesPage: React.FC = () => {
             key: 'actions',
             render: (_: any, record: DataSource) => (
                 <Space>
-                    <Tooltip title="View Details">
-                        <Button
-                            size="small"
-                            icon={<EyeOutlined />}
-                            onClick={() => handleEditDataSource(record)}
-                        />
-                    </Tooltip>
-                    <Tooltip title="Edit">
-                        <Button
-                            size="small"
-                            icon={<EditOutlined />}
-                            onClick={() => handleEditDataSource(record)}
-                        />
-                    </Tooltip>
-                    <Tooltip title="Delete">
-                        <Button
-                            size="small"
-                            icon={<DeleteOutlined />}
-                            danger
-                        />
-                    </Tooltip>
+                    <PermissionGuard permission={Permission.DATA_VIEW}>
+                        <Tooltip title="View Details">
+                            <Button
+                                size="small"
+                                icon={<EyeOutlined />}
+                                onClick={() => handleEditDataSource(record)}
+                            />
+                        </Tooltip>
+                    </PermissionGuard>
+                    <PermissionGuard permission={Permission.DATA_EDIT}>
+                        <Tooltip title="Edit">
+                            <Button
+                                size="small"
+                                icon={<EditOutlined />}
+                                onClick={() => handleEditDataSource(record)}
+                            />
+                        </Tooltip>
+                    </PermissionGuard>
+                    <PermissionGuard permission={Permission.DATA_DELETE}>
+                        <Tooltip title="Delete">
+                            <Button
+                                size="small"
+                                icon={<DeleteOutlined />}
+                                danger
+                                onClick={() => handleDeleteDataSource(record)}
+                            />
+                        </Tooltip>
+                    </PermissionGuard>
                 </Space>
             ),
         },
     ];
+
+    const filteredDataSources = useMemo(() => {
+        return dataSources.filter((ds) => {
+            const matchesSearch = ds.name.toLowerCase().includes(searchTerm.toLowerCase());
+            const matchesStatus = statusFilter === 'all' || ds.status === statusFilter;
+            const matchesType = typeFilter === 'all' || ds.type === typeFilter;
+            return matchesSearch && matchesStatus && matchesType;
+        });
+    }, [dataSources, searchTerm, statusFilter, typeFilter]);
 
     const stats = {
         total: dataSources.length,
         connected: dataSources.filter(ds => ds.status === 'connected').length,
         databases: dataSources.filter(ds => ds.type === 'database').length,
         files: dataSources.filter(ds => ds.type === 'file').length,
+        apis: dataSources.filter(ds => ds.type === 'api').length,
+        warehouses: dataSources.filter(ds => ds.type === 'warehouse' || ds.type === 'cube').length,
     };
 
+    const dataSourcesLimit = usageStats?.data_sources_limit ?? -1;
+    const dataSourcesUsedCount = usageStats?.data_sources_count ?? stats.total;
+    const dataSourcesPercent = dataSourcesLimit > 0 ? Math.min(100, (dataSourcesUsedCount / dataSourcesLimit) * 100) : 0;
+    const canAddDataSource = dataSourcesLimit < 0 || dataSourcesUsedCount < dataSourcesLimit;
+
     return (
-        <div className="page-wrapper">
-            <div className="page-header">
-                <Title level={2} className="page-title">Data Sources</Title>
-                <Text type="secondary" className="page-description">
+        <div className="page-wrapper" style={{ paddingLeft: '24px', paddingRight: '24px', paddingTop: '24px', paddingBottom: '24px' }}>
+            <div className="page-header" style={{ marginBottom: '24px' }}>
+                <Title level={2} className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                    <DatabaseOutlined style={{ color: 'var(--ant-color-primary)', fontSize: '24px' }} />
+                    Data Sources
+                </Title>
+                <Text type="secondary" className="page-description" style={{ marginTop: '4px', marginBottom: '0' }}>
                     Connect and manage your data sources for analytics and visualization
                 </Text>
             </div>
-
-            {/* Statistics Cards */}
-            <Row gutter={[16, 16]} style={{ marginBottom: 'var(--space-6)' }}>
-                <Col xs={24} sm={12} md={6}>
-                    <Card className="stat-card">
-                        <Statistic
-                            title="Total Sources"
-                            value={stats.total}
-                            prefix={<DatabaseOutlined style={{ color: 'var(--color-brand-primary)' }} />}
-                        />
+            <div className="page-body">
+            {/* Statistics & quick actions */}
+            <Row gutter={[24, 24]} style={{ marginBottom: '24px' }}>
+                <Col xs={24} lg={6}>
+                    <Card className="stat-card" bodyStyle={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <Statistic title="Total Sources" value={stats.total} prefix={<DatabaseOutlined />} />
+                        <Text type="secondary">Across all types</Text>
                     </Card>
                 </Col>
-                <Col xs={24} sm={12} md={6}>
+                <Col xs={24} lg={6}>
                     <Card className="stat-card">
-                        <Statistic
-                            title="Connected"
-                            value={stats.connected}
-                            valueStyle={{ color: 'var(--color-functional-success)' }}
-                            prefix={<DatabaseOutlined style={{ color: 'var(--color-functional-success)' }} />}
-                        />
+                        <Statistic title="Connected" value={stats.connected} valueStyle={{ color: 'var(--ant-color-success)' }} />
+                        <Text type="secondary">Healthy connections</Text>
                     </Card>
                 </Col>
-                <Col xs={24} sm={12} md={6}>
+                <Col xs={24} lg={6}>
                     <Card className="stat-card">
-                        <Statistic
-                            title="Databases"
-                            value={stats.databases}
-                            prefix={<DatabaseOutlined style={{ color: 'var(--color-brand-primary)' }} />}
-                        />
+                        <Statistic title="Databases" value={stats.databases} />
+                        <Text type="secondary">SQL & transactional</Text>
                     </Card>
                 </Col>
-                <Col xs={24} sm={12} md={6}>
+                <Col xs={24} lg={6}>
                     <Card className="stat-card">
-                        <Statistic
-                            title="Files"
-                            value={stats.files}
-                            prefix={<FileOutlined style={{ color: 'var(--color-brand-primary)' }} />}
-                        />
+                        <Statistic title="Files & APIs" value={stats.files + stats.apis} />
+                        <Text type="secondary">Flat files & services</Text>
                     </Card>
                 </Col>
             </Row>
 
-            {/* Actions */}
-            <div className="page-toolbar">
-                <div className="toolbar-left">
-                    <Button
-                        type="primary"
-                        icon={<PlusOutlined />}
-                        onClick={handleAddDataSource}
-                        className="action-button-primary"
-                    >
-                        Add Data Source
-                    </Button>
-                    <Button
-                        icon={<ReloadOutlined />}
-                        onClick={loadDataSources}
-                        loading={loading}
-                        className="action-button-secondary"
-                    >
-                        Refresh
-                    </Button>
+            <Card className="content-card" style={{ marginTop: 24, marginBottom: 24 }}>
+                <Row gutter={[16, 16]} align="middle">
+                    <Col xs={24} md={18}>
+                        <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                            <Text type="secondary">Connected data sources</Text>
+                            <Progress
+                                percent={dataSourcesPercent}
+                                status={dataSourcesPercent >= 90 ? 'exception' : 'active'}
+                                strokeColor={dataSourcesPercent >= 90 ? '#ff7875' : 'var(--ant-color-primary)'}
+                                format={() =>
+                                    dataSourcesLimit < 0
+                                        ? `${dataSourcesUsedCount} connected`
+                                        : `${dataSourcesUsedCount} / ${dataSourcesLimit}`
+                                }
+                            />
+                            <Text>
+                                {dataSourcesLimit < 0
+                                    ? 'Unlimited source connections on this plan'
+                                    : `${Math.max(dataSourcesLimit - dataSourcesUsedCount, 0)} connection${dataSourcesLimit - dataSourcesUsedCount === 1 ? '' : 's'} remaining`}
+                            </Text>
+                        </Space>
+                    </Col>
+                    <Col xs={24} md={6} style={{ textAlign: 'right' }}>
+                        <Button
+                            icon={<ArrowUpOutlined />}
+                            onClick={() => showUpgradePrompt('data_sources_limit', 'Upgrade to connect more databases and APIs.')}
+                            block
+                        >
+                            View Plans
+                        </Button>
+                    </Col>
+                </Row>
+                {!canAddDataSource && (
+                    <Alert
+                        type="warning"
+                        showIcon
+                        style={{ marginTop: 16 }}
+                        message="You've reached your data source limit. Upgrade to connect more sources."
+                    />
+                )}
+            </Card>
+
+            <Card className="content-card" style={{ marginTop: 24 }}>
+                <div className="page-toolbar" style={{ flexWrap: 'wrap', gap: 12 }}>
+                    <Space size={12} wrap>
+                        <PermissionGuard permission={Permission.DATA_EDIT}>
+                            <Tooltip
+                                title={
+                                    canAddDataSource
+                                        ? 'Connect a new database, file, or API'
+                                        : `Reached your plan limit of ${dataSourcesLimit > -1 ? dataSourcesLimit : 1} data source${dataSourcesLimit === 1 ? '' : 's'}`
+                                }
+                            >
+                                <Button
+                                    type="primary"
+                                    icon={<PlusOutlined />}
+                                    onClick={handleAddDataSource}
+                                    disabled={!canAddDataSource}
+                                >
+                                    Add Data Source
+                                </Button>
+                            </Tooltip>
+                        </PermissionGuard>
+                        <Button icon={<ReloadOutlined />} onClick={loadDataSources} loading={loading}>
+                            Refresh
+                        </Button>
+                    </Space>
+                    <Space size={12} wrap style={{ marginLeft: 'auto' }}>
+                        <Input
+                            allowClear
+                            prefix={<SearchOutlined />}
+                            placeholder="Search sources"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            style={{ width: 220 }}
+                        />
+                        <Segmented
+                            value={statusFilter}
+                            onChange={(value) => setStatusFilter(value as typeof statusFilter)}
+                            options={[
+                                { label: 'All Statuses', value: 'all' },
+                                { label: 'Connected', value: 'connected' },
+                                { label: 'Disconnected', value: 'disconnected' },
+                                { label: 'Error', value: 'error' },
+                            ]}
+                        />
+                        <Segmented
+                            value={typeFilter}
+                            onChange={(value) => setTypeFilter(value as typeof typeFilter)}
+                            options={[
+                                { label: 'All Types', value: 'all' },
+                                { label: 'Databases', value: 'database' },
+                                { label: 'Files', value: 'file' },
+                                { label: 'Warehouse', value: 'warehouse' },
+                                { label: 'APIs', value: 'api' },
+                            ]}
+                        />
+                    </Space>
                 </div>
-            </div>
-
-            <Divider className="page-divider" />
-
-            {/* Data Sources Table */}
-            <Card className="content-card">
-                <div style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+                <Divider className="page-divider" />
+                <div style={{ minHeight: '50vh' }}>
                     <Table
-                    className="data-table"
-                    columns={columns}
-                    dataSource={dataSources}
-                    rowKey="id"
-                    loading={loading}
-                    scroll={{ y: 520 }}
-                    pagination={{
-                        pageSize: 10,
-                        showSizeChanger: true,
-                        showQuickJumper: true,
-                        showTotal: (total, range) =>
-                            `${range[0]}-${range[1]} of ${total} data sources`,
-                    }}
+                        className="data-table"
+                        columns={columns}
+                        dataSource={filteredDataSources}
+                        rowKey="id"
+                        loading={loading}
+                        locale={{
+                            emptyText: (
+                                <Empty
+                                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+                                    description={
+                                        searchTerm || statusFilter !== 'all' || typeFilter !== 'all'
+                                            ? 'No data sources match your filters'
+                                            : 'No data sources yet'
+                                    }
+                                />
+                            ),
+                        }}
+                        pagination={{
+                            pageSize: 10,
+                            showSizeChanger: true,
+                            showQuickJumper: true,
+                            showTotal: (total, range) =>
+                                `${range[0]}-${range[1]} of ${total} data sources`,
+                        }}
+                        scroll={{ x: true }}
                     />
                 </div>
             </Card>
@@ -307,11 +470,10 @@ const DataSourcesPage: React.FC = () => {
             <UniversalDataSourceModal
                 isOpen={modalVisible}
                 onClose={handleModalClose}
-                onDataSourceCreated={() => {
-                    handleModalClose();
-                    loadDataSources();
-                }}
+                onDataSourceCreated={handleModalClose}
             />
+            <UpgradeModal />
+            </div>
         </div>
     );
 };

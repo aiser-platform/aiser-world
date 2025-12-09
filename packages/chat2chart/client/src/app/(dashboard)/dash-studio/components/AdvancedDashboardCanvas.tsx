@@ -445,7 +445,7 @@ const AdvancedDashboardCanvas: React.FC<AdvancedDashboardCanvasProps> = ({
           container.style.boxShadow = '0 8px 24px rgba(0,0,0,0.15)';
           container.style.transform = 'scale(1.02)';
           container.style.transition = 'none'; // Disable transitions during drag
-          container.style.borderColor = 'var(--color-brand-primary)';
+          container.style.borderColor = 'var(--ant-color-primary)';
         }
       }
     } catch (err) {
@@ -598,7 +598,7 @@ const AdvancedDashboardCanvas: React.FC<AdvancedDashboardCanvasProps> = ({
             container.style.transition = 'none'; // Disable transitions during drag
             container.style.transform = 'scale(1.02)';
             container.style.boxShadow = '0 8px 24px rgba(0,0,0,0.15)';
-            container.style.borderColor = 'var(--color-brand-primary)';
+            container.style.borderColor = 'var(--ant-color-primary)';
           }
         }
       }
@@ -981,12 +981,12 @@ const AdvancedDashboardCanvas: React.FC<AdvancedDashboardCanvasProps> = ({
           height: '100%',
           width: '100%',
           position: 'relative',
-          background: 'var(--layout-content-background)',
+          background: 'var(--ant-color-bg-layout)',
           overflow: 'visible',
           /* Use react-grid-layout's transformScale to handle zoom; avoid CSS wrapper transform which
              causes coordinate mismatches and layout instability during drag/resize/scroll. */
           transition: isDragging || isResizing ? 'none' : 'transform 0.2s ease',
-          border: isDragOver ? '2px dashed var(--color-brand-primary)' : 'none',
+          border: isDragOver ? '2px dashed var(--ant-color-primary)' : 'none',
           borderRadius: '8px',
           minHeight: '400px'
         }}
@@ -1043,7 +1043,7 @@ const AdvancedDashboardCanvas: React.FC<AdvancedDashboardCanvasProps> = ({
           style={{ 
             border: 'none',
             background: 'transparent',
-            color: 'var(--color-text-primary)',
+            color: 'var(--ant-color-text)',
             fontSize: '24px',
             fontWeight: 'bold',
             padding: '0',
@@ -1222,7 +1222,7 @@ const AdvancedDashboardCanvas: React.FC<AdvancedDashboardCanvasProps> = ({
        }
           
           .dashboard-visual--selected { 
-            box-shadow: 0 0 0 2px var(--color-brand-primary) !important;
+            box-shadow: 0 0 0 2px var(--ant-color-primary) !important;
           }
           
           .dashboard-visual:hover { 
@@ -1277,15 +1277,15 @@ const AdvancedDashboardCanvas: React.FC<AdvancedDashboardCanvasProps> = ({
           }
           /* Placeholder styling for smoother drag feedback */
           .dashboard-grid .react-grid-placeholder { 
-            border: 2px dashed var(--color-brand-primary) !important; 
+            border: 2px dashed var(--ant-color-primary) !important; 
             box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important; 
-            background: rgba(var(--color-brand-primary-rgb), 0.05); 
+            background: var(--ant-color-primary-bg); 
             border-radius: 8px; 
             opacity: 0.8;
           }
           /* Widget selection styling */
           .dashboard-visual--selected {
-            box-shadow: 0 0 0 2px var(--color-brand-primary) !important;
+            box-shadow: 0 0 0 2px var(--ant-color-primary) !important;
             border-radius: 4px;
           }
           /* Visual hover effects */
@@ -1342,7 +1342,7 @@ const AdvancedDashboardCanvas: React.FC<AdvancedDashboardCanvasProps> = ({
                   left: 0,
                   right: 0,
                   bottom: 0,
-                  border: '2px solid var(--color-brand-primary)',
+                  border: '2px solid var(--ant-color-primary)',
                   borderRadius: '4px',
                   pointerEvents: 'none',
                   zIndex: 1
@@ -1505,8 +1505,8 @@ const AdvancedDashboardCanvas: React.FC<AdvancedDashboardCanvasProps> = ({
             left: contextMenu.x,
             top: contextMenu.y,
             zIndex: 10000,
-            background: 'var(--color-surface-base)',
-            border: '1px solid var(--color-border-primary)',
+            background: 'var(--ant-color-bg-container)',
+            border: '1px solid var(--ant-color-border)',
             borderRadius: '6px',
             boxShadow: 'var(--shadow-lg)',
             padding: '4px 0',

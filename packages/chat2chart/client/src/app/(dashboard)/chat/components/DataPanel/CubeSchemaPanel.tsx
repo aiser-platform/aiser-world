@@ -50,17 +50,42 @@ const CubeSchemaPanel: React.FC<CubeSchemaPanelProps> = ({ dataSourceId, onSchem
     const [expandedKeys, setExpandedKeys] = useState<string[]>([]);
 
     useEffect(() => {
-        loadCubeSchema();
+        // CRITICAL: Only load Cube.js schema if dataSourceId is provided AND it's a Cube.js source
+        // Don't attempt connection for file sources or when no data source is selected
+        if (dataSourceId) {
+            // Check if this is actually a Cube.js source before attempting connection
+            // We'll check the data source type from parent component or skip if not needed
+            loadCubeSchema();
+        }
     }, [dataSourceId]);
 
     const loadCubeSchema = async () => {
+        // CRITICAL: Don't attempt Cube.js connection if no data source or if it's a file source
+        if (!dataSourceId) {
+            setError('No data source selected');
+            setLoading(false);
+            return;
+        }
+        
         setLoading(true);
         setError(null);
         
         try {
             // Fetch real Cube.js schema from the container
             const { environment } = await import('@/config/environment');
-            const response = await fetch(`${environment.cubejs.url.replace(/\/$/, '')}/cubejs-api/v1/meta`);
+            const cubeUrl = environment.cubejs?.url;
+            
+            // Skip if Cube.js URL is not configured
+            if (!cubeUrl) {
+                setError('Cube.js is not configured');
+                setLoading(false);
+                return;
+            }
+            
+            const response = await fetch(`${cubeUrl.replace(/\/$/, '')}/cubejs-api/v1/meta`, {
+                // Add timeout to prevent hanging
+                signal: AbortSignal.timeout(5000)
+            });
             
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -74,8 +99,14 @@ const CubeSchemaPanel: React.FC<CubeSchemaPanelProps> = ({ dataSourceId, onSchem
                 throw new Error('Invalid Cube.js schema format');
             }
         } catch (error) {
-            console.error('Failed to fetch Cube.js schema:', error);
-            setError(error instanceof Error ? error.message : 'Failed to load schema');
+            // Don't log as error if Cube.js is simply not available - this is expected for many deployments
+            if (error instanceof Error && error.name === 'AbortError') {
+                console.warn('Cube.js connection timeout - Cube.js may not be configured');
+            } else {
+                console.debug('Cube.js schema not available (this is OK if not using Cube.js):', error);
+            }
+            setError(null); // Don't show error - just don't display Cube schema
+            setCubeSchema(null);
         } finally {
             setLoading(false);
         }

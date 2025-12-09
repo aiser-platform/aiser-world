@@ -1,7 +1,5 @@
-import pytest
 from fastapi.testclient import TestClient
 from app.main import app
-import json
 
 
 def test_create_project_connection_endpoint(monkeypatch):

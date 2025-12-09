@@ -1,20 +1,21 @@
-from fastapi import APIRouter, Depends, HTTPException, Body, Request, Query
+from fastapi import APIRouter, Depends, HTTPException, Body, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
-from typing import List, Optional, Any, Dict
+from typing import Optional, Any, Dict
 import asyncio
 from datetime import datetime, timedelta
 import logging
 
 from app.db.session import get_async_session
-import os
 import json
 from app.core.config import settings
-import logging
 
 logger = logging.getLogger(__name__)
 from app.modules.authentication.deps.auth_bearer import JWTCookieBearer
 from app.modules.authentication.auth import Auth
+from app.modules.pricing.rate_limiter import RateLimiter
+from app.modules.pricing.plans import is_feature_available
+from fastapi import status
 import inspect
 import types
 
@@ -200,6 +201,21 @@ async def save_query(
     metadata = payload.get("metadata")
     if not name or not sql:
         raise HTTPException(status_code=400, detail="name and sql required")
+    
+    # CRITICAL: Check for duplicate name (unique per user/org/project)
+    check_res = await db.execute(text(
+        """
+        SELECT id FROM saved_queries
+        WHERE user_id = :user_id 
+        AND COALESCE(organization_id,0) = COALESCE(:org_id,0) 
+        AND COALESCE(project_id,0) = COALESCE(:proj_id,0)
+        AND name = :name
+        """
+    ), {"user_id": user_id, "org_id": organization_id, "proj_id": project_id, "name": name})
+    existing = check_res.fetchone()
+    if existing:
+        raise HTTPException(status_code=400, detail=f"Query name '{name}' already exists. Please use a unique name.")
+    
     await db.execute(text(
         """
         INSERT INTO saved_queries (user_id, organization_id, project_id, name, sql, metadata, created_at, updated_at)
@@ -208,6 +224,50 @@ async def save_query(
     ), {"user_id": user_id, "org_id": organization_id, "proj_id": project_id, "name": name, "sql": sql, "metadata": json.dumps(metadata or {})})
     await db.commit()
     return {"success": True}
+
+
+@router.delete("/saved-queries/{query_id}")
+async def delete_saved_query(
+    query_id: int,
+    organization_id: Optional[str] = None,
+    project_id: Optional[str] = None,
+    current_user: Dict[str, Any] = Depends(JWTCookieBearer()),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """Delete a saved query"""
+    await ensure_tables(db)
+    user_payload = _resolve_user_payload(current_user)
+    try:
+        user_id = int(user_payload.get("id") or user_payload.get('sub') or 1)
+    except Exception:
+        user_id = 1
+    
+    # Check if query exists and belongs to user
+    check_res = await db.execute(text(
+        """
+        SELECT id FROM saved_queries
+        WHERE id = :query_id
+        AND user_id = :user_id 
+        AND COALESCE(organization_id,0) = COALESCE(:org_id,0) 
+        AND COALESCE(project_id,0) = COALESCE(:proj_id,0)
+        """
+    ), {"query_id": query_id, "user_id": user_id, "org_id": organization_id, "proj_id": project_id})
+    existing = check_res.fetchone()
+    if not existing:
+        raise HTTPException(status_code=404, detail="Saved query not found or you don't have permission to delete it")
+    
+    # Delete the query
+    await db.execute(text(
+        """
+        DELETE FROM saved_queries
+        WHERE id = :query_id
+        AND user_id = :user_id 
+        AND COALESCE(organization_id,0) = COALESCE(:org_id,0) 
+        AND COALESCE(project_id,0) = COALESCE(:proj_id,0)
+        """
+    ), {"query_id": query_id, "user_id": user_id, "org_id": organization_id, "proj_id": project_id})
+    await db.commit()
+    return {"success": True, "message": "Query deleted successfully"}
 
 
 @router.get("/schedules")
@@ -328,7 +388,6 @@ async def create_snapshot(
     # Enforce organization/project scope if provided
     user_roles = user_payload.get('roles', []) or []
     # Enforce organization/project scope: allow if user belongs to organization or has admin roles
-    from app.db.session import get_async_session as _get_session
     # Check organization membership
     if organization_id:
         # If user is not in same org and not admin, deny
@@ -640,6 +699,53 @@ async def list_snapshots(
     ), {"user_id": user_id, "org_id": org_id_param, "proj_id": proj_id_param})
     rows = [{"id": r[0], "name": r[1], "data_source_id": r[2], "row_count": r[3], "metadata": r[4], "created_at": r[5]} for r in res.fetchall()]
     return {"success": True, "items": rows}
+
+
+@router.delete("/snapshots/{snapshot_id}")
+async def delete_snapshot(
+    snapshot_id: int,
+    organization_id: Optional[str] = None,
+    project_id: Optional[str] = None,
+    current_token: str = Depends(JWTCookieBearer()),
+    db: AsyncSession = Depends(get_async_session)
+):
+    """Delete a query snapshot"""
+    await ensure_tables(db)
+    if isinstance(current_token, dict):
+        user_payload = current_token
+    else:
+        user_payload = Auth().decodeJWT(current_token) or {}
+    try:
+        user_id = int(user_payload.get("id") or user_payload.get('sub') or 1)
+    except Exception:
+        user_id = 1
+    
+    # Check if snapshot exists and belongs to user
+    check_res = await db.execute(text(
+        """
+        SELECT id FROM query_snapshots
+        WHERE id = :snapshot_id
+        AND user_id = :user_id 
+        AND COALESCE(organization_id,0) = COALESCE(:org_id,0) 
+        AND COALESCE(project_id,0) = COALESCE(:proj_id,0)
+        """
+    ), {"snapshot_id": snapshot_id, "user_id": user_id, "org_id": organization_id, "proj_id": project_id})
+    existing = check_res.fetchone()
+    if not existing:
+        raise HTTPException(status_code=404, detail="Snapshot not found or you don't have permission to delete it")
+    
+    # Delete the snapshot
+    await db.execute(text(
+        """
+        DELETE FROM query_snapshots
+        WHERE id = :snapshot_id
+        AND user_id = :user_id 
+        AND COALESCE(organization_id,0) = COALESCE(:org_id,0) 
+        AND COALESCE(project_id,0) = COALESCE(:proj_id,0)
+        """
+    ), {"snapshot_id": snapshot_id, "user_id": user_id, "org_id": organization_id, "proj_id": project_id})
+    await db.commit()
+    return {"success": True, "message": "Snapshot deleted successfully"}
 
 
 @router.get("/snapshots/{snapshot_id}")

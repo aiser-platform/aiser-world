@@ -39,22 +39,31 @@ export const DEFAULT_BRAND_PRESETS: BrandPreset[] = [
     organizationType: 'general',
     organization: 'Aiser',
     light: {
-      '--ant-primary-color': '#2563eb',
-      '--ant-primary-color-hover': '#1d4ed8',
-      '--ant-primary-color-active': '#1e40af',
-      '--ant-primary-color-outline': '#dbeafe',
-      '--ant-color-bg-layout': '#f8f9fa',
-      '--ant-color-bg-header': '#e8eaed',
-      '--ant-color-bg-sider': '#e8eaed',
-      '--ant-color-bg-content': '#ffffff',
-      '--ant-color-bg-container': '#f1f3f4',
-      '--ant-color-bg-elevated': '#ffffff',
-      '--ant-color-text': '#262626',
-      '--ant-color-text-secondary': '#595959',
-      '--ant-color-text-tertiary': '#8c8c8c',
+      '--ant-primary-color': '#00c2cb',
+      '--ant-primary-color-hover': '#00a5af',
+      '--ant-primary-color-active': '#008b95',
+      '--ant-primary-color-outline': '#ccf6f8',
+      '--ant-color-bg-layout': '#ffffff',
+      '--color-bg-base': '#ffffff',
+      '--ant-color-bg-container': '#f8f9fa',
+      '--color-bg-container': '#f8f9fa',
+      '--ant-color-bg-elevated': '#f1f3f5',
+      '--color-bg-elevated': '#f1f3f5',
+      '--ant-color-bg-navigation': '#fafafa',
+      '--color-bg-navigation': '#fafafa',
+      '--color-bg-navigation-sider': '#eef1f5',
+      '--color-bg-navigation-header': '#ffffff',
+      '--color-bg-navigation-header-glow': '#dfe4ec',
+      '--ant-color-text': '#24292f',
+      '--color-text-primary': '#24292f',
+      '--ant-color-text-secondary': '#57606a',
+      '--color-text-secondary': '#57606a',
+      '--ant-color-text-tertiary': '#8b949e',
+      '--color-text-tertiary': '#8b949e',
       '--ant-color-text-quaternary': '#bfbfbf',
-      '--ant-color-border': '#d9d9d9',
-      '--ant-color-border-secondary': '#f0f0f0',
+      '--ant-color-border': '#e1e4e8',
+      '--color-border': '#e1e4e8',
+      '--ant-color-border-secondary': '#e1e4e8',
       '--ant-color-success': '#52c41a',
       '--ant-color-warning': '#faad14',
       '--ant-color-error': '#ff4d4f',
@@ -64,21 +73,30 @@ export const DEFAULT_BRAND_PRESETS: BrandPreset[] = [
       '--ant-border-radius': '6px',
     },
     dark: {
-      '--ant-primary-color': '#3b82f6',
-      '--ant-primary-color-hover': '#60a5fa',
-      '--ant-primary-color-active': '#2563eb',
-      '--ant-primary-color-outline': '#1e3a8a',
+      '--ant-primary-color': '#00c2cb',
+      '--ant-primary-color-hover': '#00a5af',
+      '--ant-primary-color-active': '#008b95',
+      '--ant-primary-color-outline': 'rgba(0, 194, 203, 0.22)',
       '--ant-color-bg-layout': '#0d1117',
-      '--ant-color-bg-header': '#001529',
-      '--ant-color-bg-sider': '#001529',
-      '--ant-color-bg-content': '#161b22',
-      '--ant-color-bg-container': '#1c2128',
-      '--ant-color-bg-elevated': '#21262d',
-      '--ant-color-text': '#e5e5e5',
-      '--ant-color-text-secondary': '#a0a0a0',
-      '--ant-color-text-tertiary': '#8c8c8c',
+      '--color-bg-base': '#0d1117',
+      '--ant-color-bg-container': '#161b22',
+      '--color-bg-container': '#161b22',
+      '--ant-color-bg-elevated': '#1c2128',
+      '--color-bg-elevated': '#1c2128',
+      '--ant-color-bg-navigation': '#030712',
+      '--color-bg-navigation': '#030712',
+      '--color-bg-navigation-sider': '#030712',
+      '--color-bg-navigation-header': '#10131c',
+      '--color-bg-navigation-header-glow': '#1c2432',
+      '--ant-color-text': '#e6edf3',
+      '--color-text-primary': '#e6edf3',
+      '--ant-color-text-secondary': '#8b949e',
+      '--color-text-secondary': '#8b949e',
+      '--ant-color-text-tertiary': '#6e7681',
+      '--color-text-tertiary': '#6e7681',
       '--ant-color-text-quaternary': '#6b7280',
-      '--ant-color-border': '#404040',
+      '--ant-color-border': '#30363d',
+      '--color-border': '#30363d',
       '--ant-color-border-secondary': '#30363d',
       '--ant-color-success': '#52c41a',
       '--ant-color-warning': '#faad14',
@@ -122,7 +140,7 @@ export const DEFAULT_BRAND_PRESETS: BrandPreset[] = [
     dark: {
       '--ant-primary-color': '#3b82f6',
       '--ant-primary-color-hover': '#60a5fa',
-      '--ant-primary-color-active': '#2563eb',
+      '--ant-primary-color-active': '#00c2cb',
       '--ant-primary-color-outline': '#1e3a8a',
       '--ant-color-bg-layout': '#0f172a',
       '--ant-color-bg-header': '#1e293b',
@@ -490,14 +508,34 @@ export function BrandThemeProvider({ children }: { children: ReactNode }) {
     // Only apply on client side
     if (typeof window === 'undefined') return;
     
-    // Apply to CSS variables
+    // Filter out deprecated variables - don't set them
+    const deprecatedVars = [
+      '--ant-color-bg-header',
+      '--ant-color-bg-sider',
+      '--ant-color-bg-content',
+    ];
+    
+    // Apply to CSS variables (excluding deprecated ones)
     Object.entries(tokens).forEach(([key, value]) => {
-      document.documentElement.style.setProperty(key, value);
+      if (!deprecatedVars.includes(key)) {
+        document.documentElement.style.setProperty(key, value);
+      }
     });
+    
+    // CRITICAL: If navigation background is changed, also update ThemeProvider's Layout and Menu components
+    // This ensures header, sidebar, menu, and submenu colors update immediately
+    if (tokens['--color-bg-navigation']) {
+      // Trigger a re-render by updating the theme mode detection
+      // The ThemeProvider will pick up the new CSS variable value
+      const event = new CustomEvent('theme-token-updated', { 
+        detail: { token: '--color-bg-navigation', value: tokens['--color-bg-navigation'] }
+      });
+      window.dispatchEvent(event);
+    }
 
     // Apply to Ant Design theme tokens
     const antdTokens = {
-      colorPrimary: tokens['--ant-primary-color'] || '#2563eb',
+      colorPrimary: tokens['--ant-primary-color'] || '#00c2cb',
       colorSuccess: tokens['--ant-color-success'] || '#52c41a',
       colorWarning: tokens['--ant-color-warning'] || '#faad14',
       colorError: tokens['--ant-color-error'] || '#ff4d4f',
@@ -634,20 +672,20 @@ export function BrandThemeProvider({ children }: { children: ReactNode }) {
           algorithm: isDarkMode ? theme.darkAlgorithm : theme.defaultAlgorithm,
           token: {
             // Apply brand tokens to Ant Design
-            colorPrimary: brandTokens['--ant-primary-color'] || '#2563eb',
+            colorPrimary: brandTokens['--ant-primary-color'] || '#00c2cb',
             colorSuccess: brandTokens['--ant-color-success'] || '#52c41a',
             colorWarning: brandTokens['--ant-color-warning'] || '#faad14',
             colorError: brandTokens['--ant-color-error'] || '#ff4d4f',
             colorInfo: brandTokens['--ant-color-info'] || '#1890ff',
-            colorBgLayout: brandTokens['--ant-color-bg-layout'] || (isDarkMode ? '#0d1117' : '#f8f9fa'),
-            colorBgContainer: brandTokens['--ant-color-bg-container'] || (isDarkMode ? '#1c2128' : '#f1f3f4'),
-            colorBgElevated: brandTokens['--ant-color-bg-elevated'] || (isDarkMode ? '#21262d' : '#ffffff'),
-            colorText: brandTokens['--ant-color-text'] || (isDarkMode ? '#e5e5e5' : '#262626'),
-            colorTextSecondary: brandTokens['--ant-color-text-secondary'] || (isDarkMode ? '#a0a0a0' : '#595959'),
-            colorTextTertiary: brandTokens['--ant-color-text-tertiary'] || (isDarkMode ? '#8c8c8c' : '#8c8c8c'),
+            colorBgLayout: brandTokens['--ant-color-bg-layout'] || (isDarkMode ? '#0d1117' : '#ffffff'),
+            colorBgContainer: brandTokens['--ant-color-bg-container'] || (isDarkMode ? '#161b22' : '#f8f9fa'),
+            colorBgElevated: brandTokens['--ant-color-bg-elevated'] || (isDarkMode ? '#1c2128' : '#f1f3f5'),
+            colorText: brandTokens['--ant-color-text'] || (isDarkMode ? '#e6edf3' : '#24292f'),
+            colorTextSecondary: brandTokens['--ant-color-text-secondary'] || (isDarkMode ? '#8b949e' : '#57606a'),
+            colorTextTertiary: brandTokens['--ant-color-text-tertiary'] || (isDarkMode ? '#6e7681' : '#8b949e'),
             colorTextQuaternary: brandTokens['--ant-color-text-quaternary'] || (isDarkMode ? '#6b7280' : '#bfbfbf'),
-            colorBorder: brandTokens['--ant-color-border'] || (isDarkMode ? '#404040' : '#d9d9d9'),
-            colorBorderSecondary: brandTokens['--ant-color-border-secondary'] || (isDarkMode ? '#30363d' : '#f0f0f0'),
+            colorBorder: brandTokens['--ant-color-border'] || (isDarkMode ? '#30363d' : '#e1e4e8'),
+            colorBorderSecondary: brandTokens['--ant-color-border-secondary'] || (isDarkMode ? '#30363d' : '#e1e4e8'),
             fontSize: parseInt(brandTokens['--ant-font-size']?.replace('px', '') || '14'),
             fontFamily: brandTokens['--ant-font-family'] || '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
             borderRadius: parseInt(brandTokens['--ant-border-radius']?.replace('px', '') || '6'),

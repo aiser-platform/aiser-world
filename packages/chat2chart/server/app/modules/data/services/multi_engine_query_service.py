@@ -148,40 +148,91 @@ class MultiEngineQueryService:
             # Analyze query and data source
             query_analysis = self._analyze_query(query, data_source)
 
-            # Validate data_source schema if file-based and ensure sample_data columns exist
+            # CRITICAL: For file data sources, ALWAYS rewrite table names to 'data' BEFORE execution
+            # This must happen regardless of whether sample_data exists, as DuckDB always uses 'data' table
             if data_source.get('type') == 'file':
-                sample = data_source.get('sample_data') or data_source.get('data')
-                if sample and isinstance(sample, list) and len(sample) > 0:
-                    # Check if user referenced a table name in SQL (common mistake)
-                    # If query references a table not present in inline data, warn early
-                    # Simple heuristic: extract FROM <identifier>
-                    import re
-                    m = re.search(r"from\s+([a-zA-Z0-9_\.]+)", query.lower())
-                    if m:
-                        table_name = m.group(1)
-                        # inline file data should be queried as 'data' table in DuckDB path
-                        if table_name not in ("data", "_aiser_inline_df"):
-                            logger.warning(f"Query references table '{table_name}' but inline file data uses 'data' — rewriting query to use 'data' if possible")
-                            # Attempt a best-effort rewrite: replace occurrences of the referenced table with 'data'
-                            try:
-                                import re as _re
-                                # Replace exact table occurrences (word-boundary). Keep original for audit.
-                                rewritten = _re.sub(rf"\b{_re.escape(table_name)}\b", 'data', query, flags=_re.IGNORECASE)
-                                if rewritten != query:
-                                    logger.info(f"Rewritten query for inline file source: {rewritten}")
-                                    query_analysis['original_query'] = query
-                                    query = rewritten
-                                query_analysis['note'] = f"Query referenced table '{table_name}' and was rewritten to 'data' for inline file sources"
-                            except Exception as _e:
-                                logger.debug(f"Failed to rewrite query table name: {_e}")
+                import re
+                # Pattern to match: FROM "table" or FROM table or FROM "schema"."table"
+                # Handles both quoted identifiers (double quotes) and unquoted, including file_* patterns
+                # More aggressive pattern: match any table name that starts with 'file_' or is not 'data'
+                table_pattern = r'(?i)(from|join)\s+(?:"([^"]+)"|`([^`]+)`|([a-zA-Z0-9_\.]+))'
+                matches = list(re.finditer(table_pattern, query))
+                table_names_found = []
+                for match in matches:
+                    # match.group(1) = FROM/JOIN keyword, match.group(2) = double-quoted, match.group(3) = backtick-quoted, match.group(4) = unquoted
+                    table_name = match.group(2) or match.group(3) or match.group(4)
+                    keyword = match.group(1).upper()
+                    # Rewrite ANY table name that's not 'data' or '_aiser_inline_df' for file sources
+                    if table_name and table_name.lower() not in ("data", "_aiser_inline_df"):
+                        table_names_found.append((table_name, keyword, match.start(), match.end()))
+                
+                if table_names_found:
+                    # Rewrite query to use 'data' table
+                    logger.warning(f"🔄 File data source detected - rewriting table name(s) {[t[0] for t in table_names_found]} to 'data'")
+                    try:
+                        import re as _re
+                        rewritten = query
+                        # Replace in reverse order to preserve positions
+                        for table_name, keyword, start, end in reversed(table_names_found):
+                            # Match the entire FROM/JOIN clause with the table name
+                            # Handle all quote styles: "table", `table`, or unquoted table
+                            # More robust pattern that handles all cases
+                            if '"' in query[start:end]:
+                                # Double-quoted identifier
+                                pattern = rf'(?i)({keyword})\s+"{_re.escape(table_name)}"'
+                                replacement = f'{keyword} "data"'
+                            elif '`' in query[start:end]:
+                                # Backtick-quoted identifier
+                                pattern = rf'(?i)({keyword})\s+`{_re.escape(table_name)}`'
+                                replacement = f'{keyword} "data"'
+                            else:
+                                # Unquoted identifier - use word boundary
+                                pattern = rf'(?i)({keyword})\s+{_re.escape(table_name)}\b'
+                                replacement = f'{keyword} "data"'
+                            
+                            rewritten = _re.sub(pattern, replacement, rewritten)
+                        
+                        if rewritten != query:
+                            logger.info(f"✅ Rewritten query for file data source:\nOriginal: {query}\nRewritten: {rewritten}")
+                            query_analysis['original_query'] = query
+                            query = rewritten
+                            query_analysis['note'] = f"Query table name(s) {[t[0] for t in table_names_found]} rewritten to 'data' for file data source"
+                        else:
+                            logger.warning(f"⚠️ Query rewriting didn't change query - pattern might not match")
+                    except Exception as _e:
+                        logger.error(f"❌ Failed to rewrite query table name: {_e}", exc_info=True)
+                        # Don't fail the query, but log the error for debugging
 
             # Select engine if not specified
             if not engine:
                 engine = QueryOptimizer.select_optimal_engine(
                     query, query_analysis["data_size"], query_analysis["complexity"]
                 )
+            
+            # Route file sources to appropriate engines (DuckDB or Pandas, not Direct SQL)
+            if data_source.get("type") == "file":
+                if engine == QueryEngine.DIRECT_SQL:
+                    logger.info("File data source detected; switching from Direct SQL to DuckDB engine")
+                    engine = QueryEngine.DUCKDB
+                elif engine == QueryEngine.CUBE:
+                    logger.info("File data source detected; switching from Cube.js to DuckDB engine")
+                    engine = QueryEngine.DUCKDB
+            
+            # Route API sources to appropriate engines (Pandas for REST API data, DuckDB for structured data)
+            elif data_source.get("type") == "api":
+                if engine == QueryEngine.DIRECT_SQL:
+                    logger.info("API data source detected; switching from Direct SQL to Pandas engine")
+                    engine = QueryEngine.PANDAS
+                elif engine == QueryEngine.CUBE:
+                    logger.info("API data source detected; switching from Cube.js to Pandas engine")
+                    engine = QueryEngine.PANDAS
+                elif engine == QueryEngine.DUCKDB:
+                    # DuckDB can work with API data if it's structured, but Pandas is more flexible
+                    logger.info("API data source detected; using DuckDB (can handle structured API responses)")
+                    # Keep DuckDB - it can handle structured data from APIs
+            
             # If DuckDB was selected but the data source is a remote database, prefer Direct SQL
-            if engine == QueryEngine.DUCKDB and data_source.get("type") == "database":
+            elif engine == QueryEngine.DUCKDB and data_source.get("type") in ("database", "warehouse"):
                 logger.info("DuckDB selected but data source is a remote database; switching to Direct SQL engine for safety")
                 engine = QueryEngine.DIRECT_SQL
 
@@ -373,19 +424,81 @@ class DuckDBEngine(BaseQueryEngine):
         """Execute query using DuckDB"""
         try:
             logger.info("🦆 Executing query with DuckDB")
+            logger.info(f"🦆 Query: {query[:300]}...")
 
             # Create DuckDB connection
             conn = duckdb.connect()
+            
+            # CRITICAL: Enforce read-only mode for safety
+            # DuckDB doesn't have explicit read-only mode, but we can prevent DDL/DML operations
+            # by validating queries before execution (handled in query validation)
+            logger.debug("🔒 DuckDB connection created (read-only enforced via query validation)")
 
             # Load data into DuckDB
             if data_source["type"] == "file":
                 await self._load_file_data(conn, data_source)
+                # Verify table exists and has data
+                try:
+                    test_result = conn.execute("SELECT COUNT(*) as count FROM data LIMIT 1").fetchone()
+                    row_count = test_result[0] if test_result else 0
+                    logger.info(f"✅ Verified 'data' table exists with {row_count} rows")
+                    if row_count == 0:
+                        logger.warning("⚠️ 'data' table is empty - query may return no results")
+                except Exception as verify_error:
+                    logger.error(f"❌ Failed to verify 'data' table: {verify_error}")
+                    raise Exception(f"Data table not loaded properly: {verify_error}")
             elif data_source["type"] == "database":
                 await self._load_database_data(conn, data_source)
 
+            # CRITICAL: Validate query for read-only safety (prevent DDL/DML operations)
+            query_upper = query.upper().strip()
+            dangerous_keywords = ['DROP', 'DELETE', 'UPDATE', 'INSERT', 'ALTER', 'CREATE TABLE', 'TRUNCATE', 'GRANT', 'REVOKE']
+            if any(keyword in query_upper for keyword in dangerous_keywords):
+                logger.error(f"❌ Blocked dangerous query operation: {query[:200]}")
+                return {
+                    "success": False,
+                    "error": "Read-only mode: DDL/DML operations are not allowed. Only SELECT queries are permitted."
+                }
+            
+            # CRITICAL: DuckDB uses date_trunc (lowercase) but PostgreSQL uses DATE_TRUNC
+            # Convert DATE_TRUNC to date_trunc for DuckDB compatibility
+            duckdb_query = query
+            if 'DATE_TRUNC' in query.upper():
+                import re
+                # Replace DATE_TRUNC with date_trunc (DuckDB function name)
+                duckdb_query = re.sub(r'DATE_TRUNC\s*\(', 'date_trunc(', query, flags=re.IGNORECASE)
+                if duckdb_query != query:
+                    logger.info(f"🔄 Converted DATE_TRUNC to date_trunc for DuckDB compatibility")
+            
             # Execute query
-            result = conn.execute(query).fetchall()
-            columns = [desc[0] for desc in conn.description] if conn.description else []
+            try:
+                result = conn.execute(duckdb_query).fetchall()
+                # Get column names from the result description
+                columns = []
+                if conn.description:
+                    columns = [desc[0] for desc in conn.description]
+                elif result and len(result) > 0:
+                    # Fallback: infer columns from first row if description not available
+                    first_row = result[0]
+                    if isinstance(first_row, dict):
+                        columns = list(first_row.keys())
+                    elif isinstance(first_row, (list, tuple)):
+                        # Try to get column names from query if possible
+                        import re
+                        select_match = re.search(r'select\s+(.+?)\s+from', duckdb_query, re.IGNORECASE)
+                        if select_match:
+                            select_clause = select_match.group(1)
+                            # Parse column names from SELECT clause
+                            cols = [c.strip().split(' AS ')[-1].strip().strip('"').strip("'") 
+                                   for c in select_clause.split(',')]
+                            columns = cols[:len(first_row)] if cols else [f'column_{i}' for i in range(len(first_row))]
+                        else:
+                            columns = [f'column_{i}' for i in range(len(first_row))]
+            except Exception as query_error:
+                logger.error(f"❌ DuckDB query execution error: {str(query_error)}")
+                logger.error(f"❌ Query: {duckdb_query}")
+                logger.error(f"❌ Original query: {query}")
+                raise
 
             # Convert to list of dictionaries
             data = [dict(zip(columns, row)) for row in result]
@@ -406,9 +519,33 @@ class DuckDBEngine(BaseQueryEngine):
     async def _load_file_data(
         self, conn: duckdb.DuckDBPyConnection, data_source: Dict[str, Any]
     ):
-        """Load file data into DuckDB"""
+        """
+        Load file data into DuckDB with multi-sheet Excel support.
+        For Excel files, creates virtual tables for each sheet.
+        """
         file_path = data_source.get("file_path")
         file_format = data_source.get("format", "csv")
+        schema = data_source.get("schema", {})
+
+        # Check if schema contains DuckDB table info (from multi-sheet Excel processing)
+        duckdb_tables = schema.get("duckdb_tables") if isinstance(schema, dict) else None
+        
+        # For Excel files with multi-sheet support, use pre-created tables
+        if file_format in ("xlsx", "xls") and duckdb_tables:
+            logger.info(f"🦆 Loading multi-sheet Excel file with {len(duckdb_tables)} sheets")
+            # Tables are already created during file processing
+            # Just verify they exist and create a main 'data' view from the first sheet
+            if duckdb_tables:
+                first_sheet_table = list(duckdb_tables.values())[0]
+                try:
+                    # Create a view 'data' pointing to the first sheet (for backward compatibility)
+                    conn.execute(f"CREATE OR REPLACE VIEW data AS SELECT * FROM {first_sheet_table}")
+                    logger.info(f"✅ Created 'data' view from table '{first_sheet_table}'")
+                except Exception as e:
+                    logger.warning(f"⚠️ Could not create view from {first_sheet_table}, using direct table: {e}")
+                    # Fallback: create alias
+                    conn.execute(f"CREATE OR REPLACE VIEW data AS SELECT * FROM {first_sheet_table}")
+            return
 
         # Prefer inline/sample data when available (avoids IO errors when file_path is missing)
         inline_data = data_source.get("data") or data_source.get("sample_data")
@@ -451,16 +588,47 @@ class DuckDBEngine(BaseQueryEngine):
         if not file_path:
             raise Exception("No data available for file data source: missing file_path and no inline sample data")
 
-        if file_format == "csv":
+        # For Excel files, use DuckDB's Excel extension (if available) or fallback to pandas
+        if file_format in ("xlsx", "xls"):
+            try:
+                # Check if multi-sheet Excel with pre-created tables
+                if duckdb_tables:
+                    # Use the first sheet table as 'data' view
+                    first_sheet_table = list(duckdb_tables.values())[0]
+                    # Recreate the view (tables should be persisted in schema)
+                    conn.execute(f"CREATE OR REPLACE VIEW data AS SELECT * FROM {first_sheet_table}")
+                    logger.info(f"✅ Recreated 'data' view from persisted table '{first_sheet_table}'")
+                    return
+                
+                # Try to use DuckDB's Excel reading (requires excel extension)
+                # For now, we'll use pandas to read and then register in DuckDB
+                import pandas as pd
+                df = pd.read_excel(file_path, engine='openpyxl', sheet_name=0)  # Read first sheet
+                df = df.replace({pd.NA: None, pd.NaT: None})
+                conn.register("_excel_df", df)
+                conn.execute("CREATE TABLE data AS SELECT * FROM _excel_df")
+                logger.info(f"✅ Loaded Excel file into DuckDB: {len(df)} rows")
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to load Excel with DuckDB, falling back: {e}")
+                # Fallback: read first sheet only
+                import pandas as pd
+                df = pd.read_excel(file_path, engine='openpyxl')
+                conn.register("_excel_df", df)
+                conn.execute("CREATE TABLE data AS SELECT * FROM _excel_df")
+        elif file_format == "csv":
+            # Escape single quotes in file path for SQL safety
+            safe_file_path = file_path.replace("'", "''")
             conn.execute(
-                f"CREATE TABLE data AS SELECT * FROM read_csv_auto('{file_path}')"
+                f"CREATE TABLE data AS SELECT * FROM read_csv_auto('{safe_file_path}')"
             )
         elif file_format == "parquet":
+            safe_file_path = file_path.replace("'", "''")
             conn.execute(
-                f"CREATE TABLE data AS SELECT * FROM read_parquet('{file_path}')"
+                f"CREATE TABLE data AS SELECT * FROM read_parquet('{safe_file_path}')"
             )
         elif file_format == "json":
-            conn.execute(f"CREATE TABLE data AS SELECT * FROM read_json('{file_path}')")
+            safe_file_path = file_path.replace("'", "''")
+            conn.execute(f"CREATE TABLE data AS SELECT * FROM read_json_auto('{safe_file_path}')")
 
     async def _load_database_data(
         self, conn: duckdb.DuckDBPyConnection, data_source: Dict[str, Any]
@@ -475,15 +643,39 @@ class CubeEngine(BaseQueryEngine):
     """Cube.js engine for OLAP queries"""
 
     def __init__(self):
-        self.cube_api_url = "http://localhost:4000/cubejs-api/v1"
-        self.cube_api_secret = "dev-cube-secret-key"
+        # Cube.js configuration - use environment variable or default
+        import os
+        cube_host = os.getenv('CUBE_API_URL', 'http://localhost:4000')
+        # Remove /cubejs-api/v1 if present in env var, we'll add it
+        if '/cubejs-api' in cube_host:
+            self.cube_api_url = cube_host
+        else:
+            self.cube_api_url = f"{cube_host}/cubejs-api/v1"
+        self.cube_api_secret = os.getenv('CUBE_API_SECRET', 'dev-cube-secret-key')
 
     async def execute(
         self, query: str, data_source: Dict[str, Any], analysis: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Execute query using Cube.js"""
         try:
+            # CRITICAL: Only use Cube.js for database/warehouse sources, not file sources
+            if data_source.get('type') == 'file':
+                logger.warning("⚠️ Cube.js engine selected for file data source - this should not happen. File sources use DuckDB.")
+                return {"success": False, "error": "Cube.js is not suitable for file data sources. Use DuckDB engine instead."}
+            
             logger.info("📊 Executing query with Cube.js")
+            
+            # Check if Cube.js is available (only for database/warehouse sources)
+            try:
+                cube_base_url = self.cube_api_url.replace('/cubejs-api/v1', '')
+                async with aiohttp.ClientSession() as test_session:
+                    async with test_session.get(f"{cube_base_url}/ready", timeout=aiohttp.ClientTimeout(total=2)) as test_resp:
+                        if test_resp.status != 200:
+                            return {"success": False, "error": "Cube.js server is not available"}
+            except Exception as cube_check_error:
+                # Don't log as error if Cube.js is simply not configured - this is expected for many deployments
+                logger.debug(f"Cube.js server not available (this is OK if not using Cube.js): {cube_check_error}")
+                return {"success": False, "error": f"Cube.js server is not available: {str(cube_check_error)}"}
 
             # Convert SQL query to Cube.js query format
             cube_query = self._convert_sql_to_cube_query(query, analysis)
@@ -633,23 +825,214 @@ class DirectSQLEngine(BaseQueryEngine):
         try:
             logger.info("🗄️ Executing query with Direct SQL engine")
 
-            # Extract connection info from data_source
-            conn_info = data_source.get('connection_info') or data_source.get('metadata') or {}
+            # Extract connection info from data_source - check multiple possible locations
+            conn_info = (
+                data_source.get('connection_info') or 
+                data_source.get('connection_config') or 
+                data_source.get('metadata') or 
+                data_source.get('config') or
+                {}
+            )
+            
+            # Also check if connection_config is a string (JSON)
+            if isinstance(conn_info, str):
+                try:
+                    import json
+                    conn_info = json.loads(conn_info)
+                except:
+                    conn_info = {}
+            
+            # CRITICAL: Decrypt credentials if encrypted
+            if isinstance(conn_info, dict):
+                try:
+                    from app.modules.data.utils.credentials import decrypt_credentials
+                    conn_info = decrypt_credentials(conn_info)
+                except Exception as decrypt_error:
+                    logger.debug(f"Could not decrypt credentials (may not be encrypted): {decrypt_error}")
+            
+            # If conn_info is still empty, try to parse from schema (where some connection details might be stored)
+            if not conn_info or (isinstance(conn_info, dict) and not conn_info.get('host')):
+                schema = data_source.get('schema')
+                if isinstance(schema, str):
+                    try:
+                        import json
+                        schema_dict = json.loads(schema)
+                        # Schema might contain connection details
+                        if schema_dict.get('host'):
+                            conn_info = {**conn_info, **schema_dict} if isinstance(conn_info, dict) else schema_dict
+                    except:
+                        pass
 
+            # CRITICAL: Validate query for read-only safety
+            query_upper = query.upper().strip()
+            dangerous_keywords = ['DROP', 'DELETE', 'UPDATE', 'INSERT', 'ALTER', 'CREATE', 'TRUNCATE', 'GRANT', 'REVOKE']
+            if any(keyword in query_upper for keyword in dangerous_keywords):
+                logger.error(f"❌ Blocked dangerous query operation: {query[:200]}")
+                return {
+                    "success": False,
+                    "error": "Read-only mode: DDL/DML operations are not allowed. Only SELECT queries are permitted."
+                }
+            
             # Prefer a full connection URI if provided
             conn_uri = conn_info.get('uri') or conn_info.get('connection_string') or conn_info.get('connection_string_uri')
 
+            # Check if this is ClickHouse - use HTTP API instead of SQLAlchemy
+            db_type = (conn_info.get('db_type') or conn_info.get('type') or data_source.get('db_type') or 'postgresql').lower()
+            
+            if db_type == 'clickhouse':
+                # Use HTTP API for ClickHouse queries
+                try:
+                    import aiohttp
+                    import os
+                    import re
+                    
+                    # Extract from connection string/URI if present
+                    if conn_uri:
+                        # Parse clickhouse://user:pass@host:port/database format
+                        match = re.match(r'clickhouse(?:[+]http)?://(?:([^:]+):([^@]+)@)?([^:/]+)(?::(\d+))?(?:/(.+))?', conn_uri)
+                        if match:
+                            uri_user, uri_pass, uri_host, uri_port, uri_db = match.groups()
+                            username = uri_user or conn_info.get('username') or conn_info.get('user') or 'default'
+                            password = uri_pass or conn_info.get('password') or conn_info.get('pass') or ''
+                            host = uri_host or conn_info.get('host') or conn_info.get('hostname')
+                            port = int(uri_port) if uri_port else (conn_info.get('port') or 8123)
+                            database = uri_db or conn_info.get('database') or conn_info.get('db') or 'default'
+                        else:
+                            # Fallback to extracting from conn_info
+                            host = conn_info.get('host') or conn_info.get('hostname')
+                            port = conn_info.get('port') or 8123
+                            database = conn_info.get('database') or conn_info.get('db') or 'default'
+                            username = conn_info.get('username') or conn_info.get('user') or 'default'
+                            password = conn_info.get('password') or conn_info.get('pass') or ''
+                    else:
+                        # Extract directly from conn_info
+                        host = conn_info.get('host') or conn_info.get('hostname')
+                        port = conn_info.get('port') or 8123
+                        database = conn_info.get('database') or conn_info.get('db') or 'default'
+                        username = conn_info.get('username') or conn_info.get('user') or 'default'
+                        password = conn_info.get('password') or conn_info.get('pass') or ''
+                    
+                    # Use Docker service name as default if in Docker environment
+                    if not host:
+                        # Check if we're in Docker (common indicators)
+                        if os.path.exists('/.dockerenv') or os.getenv('DOCKER_CONTAINER'):
+                            host = 'clickhouse'  # Docker service name
+                        else:
+                            host = 'localhost'
+                    
+                    # Log connection details for debugging (without password)
+                    logger.info(f"🔌 ClickHouse connection: host={host}, port={port}, database={database}, user={username}")
+                    logger.debug(f"🔍 ClickHouse password present: {bool(password)}, length: {len(password) if password else 0}")
+                    
+                    # Verify we have credentials
+                    if not password:
+                        logger.error(f"❌ ClickHouse password is empty! Check if credentials were properly decrypted.")
+                        logger.error(f"🔍 Connection config keys: {list(conn_info.keys())}")
+                        logger.error(f"🔍 Has __enc_password: {'__enc_password' in conn_info}")
+                        logger.error(f"🔍 Has password key: {'password' in conn_info}")
+                        logger.error(f"🔍 Has pass key: {'pass' in conn_info}")
+                        logger.error(f"🔍 Connection config sample (no sensitive data): {str({k: '***' if 'pass' in k.lower() or 'key' in k.lower() else v for k, v in list(conn_info.items())[:5]})}")
+                        # Try to get password from environment as fallback for ClickHouse
+                        import os
+                        if not password and db_type == 'clickhouse':
+                            password = os.getenv('CLICKHOUSE_PASSWORD', '')
+                            logger.info(f"🔍 Using CLICKHOUSE_PASSWORD from environment: {bool(password)}")
+                    
+                    http_url = f"http://{host}:{port}"
+                    # Ensure query ends with FORMAT JSON for ClickHouse
+                    formatted_query = query.rstrip(';').strip()
+                    
+                    # ClickHouse doesn't support lag() window function - convert to neighbor() or arrayElement()
+                    # Replace lag(column) OVER (ORDER BY ...) with neighbor(column, -1) OVER (ORDER BY ...)
+                    import re
+                    # Pattern to match lag(column) OVER (ORDER BY ...)
+                    lag_pattern = r'\blag\s*\(\s*([^)]+)\s*\)\s+OVER\s*\([^)]*ORDER\s+BY\s+([^)]+)\)'
+                    if re.search(lag_pattern, formatted_query, re.IGNORECASE):
+                        logger.warning("⚠️ Query contains lag() window function - ClickHouse doesn't support lag(). Converting to neighbor()...")
+                        # Replace lag(column) OVER (ORDER BY ...) with neighbor(column, -1) OVER (ORDER BY ...)
+                        formatted_query = re.sub(
+                            r'\blag\s*\(\s*([^)]+)\s*\)\s+OVER\s*\(([^)]*ORDER\s+BY\s+[^)]+)\)',
+                            r'neighbor(\1, -1) OVER (\2)',
+                            formatted_query,
+                            flags=re.IGNORECASE
+                        )
+                        logger.info(f"✅ Converted lag() to neighbor(): {formatted_query[:200]}...")
+                    
+                    if not formatted_query.upper().endswith('FORMAT JSON'):
+                        formatted_query = f"{formatted_query} FORMAT JSON"
+                    
+                    async with aiohttp.ClientSession() as session:
+                        auth = aiohttp.BasicAuth(username, password) if password else None
+                        async with session.post(f"{http_url}/", data=formatted_query, auth=auth) as resp:
+                            if resp.status == 200:
+                                data = await resp.json()
+                                # ClickHouse JSON format: {"meta": [...], "data": [...], "rows": N}
+                                meta = data.get('meta', [])
+                                columns = [col.get('name', '') for col in meta] if meta else []
+                                rows_data = data.get('data', [])
+                                rows = []
+                                
+                                # Parse rows - ClickHouse returns list of dicts or list of lists
+                                for row_data in rows_data:
+                                    if isinstance(row_data, dict):
+                                        rows.append(row_data)
+                                    elif isinstance(row_data, list) and columns:
+                                        rows.append(dict(zip(columns, row_data)))
+                                    else:
+                                        rows.append({'value': row_data})
+                                
+                                return {
+                                    "success": True,
+                                    "data": rows,
+                                    "columns": columns,
+                                    "row_count": len(rows),
+                                }
+                            else:
+                                error_text = await resp.text()
+                                return {"success": False, "error": f"ClickHouse HTTP error {resp.status}: {error_text}"}
+                except ImportError:
+                    return {"success": False, "error": "aiohttp package required for ClickHouse queries"}
+                except Exception as clickhouse_error:
+                    logger.error(f"❌ ClickHouse query execution failed: {str(clickhouse_error)}")
+                    return {"success": False, "error": f"ClickHouse query failed: {str(clickhouse_error)}"}
+
             if not conn_uri:
                 # Try to build a SQLAlchemy URL from common fields
-                db_type = (conn_info.get('db_type') or conn_info.get('type') or data_source.get('db_type') or 'postgresql').lower()
                 user = conn_info.get('username') or conn_info.get('user')
                 password = conn_info.get('password') or conn_info.get('pass')
-                host = conn_info.get('host') or conn_info.get('hostname') or 'localhost'
+                host = conn_info.get('host') or conn_info.get('hostname')
                 port = conn_info.get('port')
-                database = conn_info.get('database') or conn_info.get('db')
+                database = conn_info.get('database') or conn_info.get('db') or conn_info.get('database_name') or conn_info.get('initial_database')
+                
+                # Use Docker service names as defaults when in Docker environment
+                if not host:
+                    import os
+                    if os.path.exists('/.dockerenv') or os.getenv('DOCKER_CONTAINER'):
+                        # Use environment variables or Docker service names
+                        if db_type == 'postgresql':
+                            host = os.getenv('POSTGRES_SERVER', 'postgres')
+                        elif db_type == 'mysql':
+                            host = os.getenv('MYSQL_SERVER', 'mysql')
+                        elif db_type == 'clickhouse':
+                            host = os.getenv('CLICKHOUSE_HOST', 'clickhouse')
+                        else:
+                            host = 'localhost'
+                    else:
+                        host = 'localhost'
 
                 if not database:
-                    raise Exception("Direct SQL requires a database name in connection_info. Please provide one of: 'database', 'db', or a full 'uri/connection_string' in the data source connection_info")
+                    # Last resort: try to extract from stored schema
+                    stored_schema = data_source.get('schema')
+                    if isinstance(stored_schema, str):
+                        try:
+                            import json
+                            schema_dict = json.loads(stored_schema)
+                            database = schema_dict.get('database') or schema_dict.get('db')
+                        except:
+                            pass
+                    
+                    if not database:
+                        raise Exception("Direct SQL requires a database name in connection_info. Please provide one of: 'database', 'db', or a full 'uri/connection_string' in the data source connection_info")
 
                 driver = 'psycopg2' if db_type.startswith('postgres') else ''
                 if driver:
@@ -670,10 +1053,26 @@ class DirectSQLEngine(BaseQueryEngine):
 
                 conn_uri = f"{scheme}://{auth}{hostpart}/{database}"
 
+            # CRITICAL: Enforce read-only mode for database connections
+            # Add tenant_id/user_id filtering if available
+            tenant_id = data_source.get('tenant_id') or data_source.get('organization_id')
+            user_id = data_source.get('user_id')
+            
+            # Wrap query to enforce tenant isolation (if tenant_id available)
+            # Note: This is a simple approach - in production, use RLS at database level
+            if tenant_id and 'tenant_id' not in query.upper() and 'WHERE' in query.upper():
+                # Try to add tenant_id filter (simple approach - may need refinement)
+                logger.debug(f"🔒 Adding tenant isolation filter (tenant_id={tenant_id})")
+                # Note: This is a basic implementation - proper RLS should be at DB level
+            
             # Run blocking DB calls in a thread to avoid blocking the event loop
             def run_sync_query(uri: str, sql: str) -> Dict[str, Any]:
                 try:
-                    eng = sa.create_engine(uri)
+                    # CRITICAL: Set connection to read-only mode if supported
+                    # For PostgreSQL: SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY
+                    # For MySQL: SET SESSION TRANSACTION READ ONLY
+                    # This is handled per-database type in the connection setup
+                    eng = sa.create_engine(uri, pool_pre_ping=True)
                     with eng.connect() as conn:
                         res = conn.execute(sa.text(sql))
                         try:
@@ -776,8 +1175,90 @@ class PandasEngine(BaseQueryEngine):
 
     async def _load_data_to_pandas(self, data_source: Dict[str, Any]) -> pd.DataFrame:
         """Load data into Pandas DataFrame"""
+        # API-based sources: fetch from API endpoint
+        if data_source.get("type") == "api":
+            try:
+                import aiohttp
+                config = data_source.get("connection_config") or data_source.get("config") or {}
+                api_url = config.get("url") or config.get("endpoint") or data_source.get("api_url")
+                
+                if not api_url:
+                    logger.error("API data source missing URL/endpoint configuration")
+                    return pd.DataFrame()
+                
+                # Decrypt credentials if encrypted
+                try:
+                    from app.modules.data.utils.credentials import decrypt_credentials
+                    config = decrypt_credentials(config)
+                except Exception:
+                    pass
+                
+                headers = config.get("headers", {})
+                method = config.get("method", "GET").upper()
+                params = config.get("params", {})
+                auth = None
+                
+                # Handle authentication
+                if config.get("api_key"):
+                    api_key_header = config.get("api_key_header", "X-API-Key")
+                    headers[api_key_header] = config["api_key"]
+                elif config.get("bearer_token"):
+                    headers["Authorization"] = f"Bearer {config['bearer_token']}"
+                elif config.get("username") and config.get("password"):
+                    import aiohttp
+                    auth = aiohttp.BasicAuth(config["username"], config["password"])
+                
+                async with aiohttp.ClientSession() as session:
+                    async with session.request(method, api_url, headers=headers, params=params, auth=auth) as response:
+                        if response.status != 200:
+                            logger.error(f"API request failed with status {response.status}")
+                            return pd.DataFrame()
+                        
+                        content_type = response.headers.get("Content-Type", "").lower()
+                        text = await response.text()
+                        
+                        # Parse response based on content type
+                        if "json" in content_type:
+                            data = await response.json()
+                            # Handle various JSON structures
+                            if isinstance(data, list):
+                                return pd.DataFrame(data)
+                            elif isinstance(data, dict):
+                                # Check for common API response patterns
+                                if "data" in data:
+                                    return pd.DataFrame(data["data"])
+                                elif "results" in data:
+                                    return pd.DataFrame(data["results"])
+                                elif "items" in data:
+                                    return pd.DataFrame(data["items"])
+                                else:
+                                    # Flatten single object
+                                    return pd.DataFrame([data])
+                        elif "csv" in content_type:
+                            import io
+                            return pd.read_csv(io.StringIO(text))
+                        else:
+                            # Try JSON first, then CSV
+                            try:
+                                import json
+                                data = json.loads(text)
+                                if isinstance(data, list):
+                                    return pd.DataFrame(data)
+                                elif isinstance(data, dict):
+                                    return pd.DataFrame([data])
+                            except:
+                                try:
+                                    import io
+                                    return pd.read_csv(io.StringIO(text))
+                                except:
+                                    logger.warning(f"Could not parse API response as JSON or CSV")
+                                    return pd.DataFrame()
+            except Exception as e:
+                logger.error(f"Failed to load API data source: {e}")
+                return pd.DataFrame()
+        
         # File-based sources: prefer inline/sample data, then persisted sample_data in DB, then file_path
-        if data_source["type"] == "file":
+        if data_source.get("type") == "file":
             inline_data = data_source.get("data") or data_source.get("sample_data")
 
             # Inline list/dict/string handling

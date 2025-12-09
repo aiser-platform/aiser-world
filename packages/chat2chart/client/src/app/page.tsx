@@ -14,14 +14,18 @@ export default function HomePage() {
     }, [router]);
 
     return (
-        <div style={{ 
-            display: 'flex', 
-            justifyContent: 'center', 
-            alignItems: 'center', 
-            height: '100vh',
-            fontSize: '16px',
-            color: '#666'
-        }}>
+        <div
+            style={{
+                display: 'inline-flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                height: '100vh',
+                width: '100%',
+                fontSize: '16px',
+                color: 'var(--ant-color-text, #1f1f1f)',
+                background: 'var(--ant-color-bg-layout, #ffffff)',
+            }}
+        >
             Redirecting to login...
         </div>
     );

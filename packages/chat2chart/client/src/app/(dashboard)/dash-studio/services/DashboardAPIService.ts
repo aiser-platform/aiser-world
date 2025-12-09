@@ -386,7 +386,8 @@ export class DashboardAPIService {
   // Chart Management (Standalone Charts)
   async createChart(chartData: any) {
     try {
-      const response = await fetch(`${this.baseURL}/charts/builder/save`, {
+      // Use fetchApi with credentials for proper authentication
+      const response = await fetchApi('charts/builder/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -395,7 +396,8 @@ export class DashboardAPIService {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text().catch(() => '');
+        throw new Error(`HTTP error! status: ${response.status}${errorText ? `: ${errorText}` : ''}`);
       }
 
       return await response.json();

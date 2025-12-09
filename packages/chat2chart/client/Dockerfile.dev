@@ -1,7 +1,10 @@
-FROM node:18-alpine
+FROM node:20-alpine
 
 # Set working directory
 WORKDIR /app
+
+# Install system dependencies
+RUN apk add --no-cache netcat-openbsd curl
 
 # Install dependencies if package.json present during build
 COPY package*.json ./

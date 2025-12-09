@@ -1,0 +1,25 @@
+/* Thought Process Display Styles */
+
+.thought-process-card {
+    border-radius: 8px;
+    margin-bottom: 16px;
+}
+
+.thought-process-card.dark {
+    background-color: #1f1f1f;
+    border-color: #434343;
+}
+
+.thought-process-card.light {
+    background-color: #ffffff;
+    border-color: #d9d9d9;
+}
+
+.thought-process-card.dark .ant-card-head-title {
+    color: #ffffff;
+}
+
+.thought-process-card.light .ant-card-head-title {
+    color: #000000;
+}
+

@@ -77,9 +77,10 @@ class ApiService {
             const formData = new FormData();
             formData.append('file', file);
 
-            const response = await fetch(`${this.baseURL}/data/upload`, {
+            const response = await fetch('/api/data/upload', {
                 method: 'POST',
                 body: formData,
+                credentials: 'include',
             });
 
             if (!response.ok) {

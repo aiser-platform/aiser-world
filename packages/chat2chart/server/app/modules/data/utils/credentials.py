@@ -1,6 +1,5 @@
 from typing import Dict, Any
 import os
-import json
 import logging
 
 logger = logging.getLogger(__name__)
@@ -15,6 +14,7 @@ except Exception:
 def _get_fernet():
     key = os.getenv("ENCRYPTION_KEY")
     if not key or Fernet is None:
+        logger.warning("⚠️ ENCRYPTION_KEY not set or Fernet not available - credentials will not be encrypted/decrypted")
         return None
     try:
         # ENCRYPTION_KEY should be urlsafe_base64

@@ -30,6 +30,8 @@ export interface IConversation {
     id: string | null;
     title: string;
     messages?: IChatMessage[];
+    created_at?: string | Date;
+    updated_at?: string | Date;
     json_metadata?: {
         database?: IDatabase;
         schema?: string;
@@ -144,6 +146,41 @@ export class IChatMessage {
     saved?: boolean; // Whether message is saved to backend
     metadata?: any; // Additional metadata
 
+    // Enhanced AI properties
+    chartConfig?: any; // Chart configuration for ECharts
+    echartsConfig?: any; // ECharts configuration
+    message?: string; // Convenience field for rendered message text
+    narration?: string; // Executive summary / narration text
+    dataSourceId?: string; // Data source ID
+    analysis?: string; // AI analysis text
+    insights?: any[]; // AI insights
+    recommendations?: any[]; // AI recommendations
+    sqlSuggestions?: string[]; // SQL suggestions
+    followUpQuestions?: string[]; // Follow-up questions (3 questions)
+    aiCapabilities?: string[]; // AI capabilities used
+    userPatternAnalysis?: any; // User pattern analysis
+    aiEngine?: string; // AI engine used
+    success?: boolean; // Success status
+    sqlQuery?: string; // SQL query for chart menu
+    queryResult?: any; // Raw query result returned from backend
+    progress?: { // Progress state from LangGraph orchestrator
+        percentage: number;
+        message: string;
+        stage: string;
+    };
+    currentStage?: string; // Current workflow stage
+    progressMessage?: string; // Human-readable progress message
+    progressPercentage?: number; // Progress percentage (0-100)
+    executiveSummary?: string; // Executive summary (camelCase for frontend)
+    executive_summary?: string; // Executive summary (snake_case from backend)
+    fileInfo?: { // File upload information
+        name: string;
+        size: number;
+        type: string;
+        dataSourceId?: string;
+        rowCount?: number;
+    };
+
     constructor(props: IChatMessage) {
         this.id = props.id;
         this.created_at = props.created_at;
@@ -160,6 +197,26 @@ export class IChatMessage {
         this.messageType = props.messageType;
         this.saved = props.saved;
         this.metadata = props.metadata;
+        // Enhanced AI properties
+        this.chartConfig = props.chartConfig;
+        this.echartsConfig = props.echartsConfig;
+        this.dataSourceId = props.dataSourceId;
+        this.analysis = props.analysis;
+        this.insights = props.insights;
+        this.recommendations = props.recommendations;
+        this.sqlSuggestions = props.sqlSuggestions;
+        this.aiCapabilities = props.aiCapabilities;
+        this.userPatternAnalysis = props.userPatternAnalysis;
+        this.aiEngine = props.aiEngine;
+        this.success = props.success;
+        this.message = props.message;
+        this.narration = props.narration;
+        this.progress = props.progress;
+        this.currentStage = props.currentStage;
+        this.progressMessage = props.progressMessage;
+        this.progressPercentage = props.progressPercentage;
+        this.executiveSummary = props.executiveSummary || props.executive_summary;
+        this.executive_summary = props.executive_summary || props.executiveSummary;
     }
 }
 

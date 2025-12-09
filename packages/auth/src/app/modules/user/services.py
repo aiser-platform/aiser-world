@@ -37,7 +37,6 @@ from app.modules.user.models import User
 from app.modules.user.repository import UserRepository
 from app.modules.user.schemas import (
     UserCreate,
-    UserCreateInternal,
     UserResponse,
     UserUpdate,
 )
@@ -59,21 +58,30 @@ class UserService(BaseService):
 
     def create_user(self, user_in: UserCreate, db: Session) -> User:
         """Create new user with hashed password"""
-        # Check if email exists
-        if self.repository.get_by_email(user_in.email, db):
+        # Normalize email and username to lowercase for consistent checking
+        email_lower = user_in.email.lower().strip()
+        username_lower = user_in.username.lower().strip()
+        
+        # Check if email exists (case-insensitive)
+        existing_user = self.repository.get_by_email(email_lower, db)
+        if existing_user:
+            logger.warning(f"Signup attempt with existing email: {email_lower}")
             raise ValueError("Email already registered")
 
-        # Check if username exists
-        if self.repository.get_by_username(user_in.username, db):
+        # Check if username exists (case-insensitive)
+        existing_user = self.repository.get_by_username(username_lower, db)
+        if existing_user:
+            logger.warning(f"Signup attempt with existing username: {username_lower}")
             raise ValueError("Username already registered")
 
         # Hash the password
         hashed_password = self.auth.hash_password(user_in.password)
 
         # Create user payload with hashed password (ensure no `id` present)
+        # Use normalized lowercase values for email and username
         user_payload = {
-            "email": user_in.email,
-            "username": user_in.username,
+            "email": email_lower,
+            "username": username_lower,
             "password": hashed_password,
         }
 
@@ -85,11 +93,20 @@ class UserService(BaseService):
         self, identifier: str, password: str, db: Session
     ) -> Optional[User]:
         """Authenticate user by email or username and password"""
+        logger.info(f"Attempting to authenticate identifier: {identifier}")
         user = self.repository.get_by_email(
             identifier, db
         ) or self.repository.get_by_username(identifier, db)
 
-        if not user or not self.auth.verify_password(password, user.password):
+        if not user:
+            logger.warning(f"User not found for identifier: {identifier}")
+            return None
+        
+        logger.info(f"User found: {user.email}, Hashed password from DB: {user.password[:10]}...") # Log first 10 chars of hash
+        is_password_valid = self.auth.verify_password(password, user.password)
+        logger.info(f"Password verification result for {user.email}: {is_password_valid}")
+        
+        if not is_password_valid:
             return None
         return user
 
@@ -123,6 +140,8 @@ class UserService(BaseService):
         self, credentials: SignInRequest, device_info: DeviceInfo, db: Session
     ) -> SignInResponse:
         """Authenticate user and generate JWT token"""
+        logger.info(f"Sign-in attempt for identifier: {credentials.identifier}")
+        
         user = self.authenticate(credentials.identifier, credentials.password, db)
         if not user:
             raise HTTPException(status_code=401, detail="Invalid credentials")
@@ -379,20 +398,36 @@ class UserService(BaseService):
             logger.error(f"Error refreshing token: {e}")
             raise HTTPException(status_code=401, detail=str(e))
 
-    def get_me(self, token: str, db: Session) -> User:
+    def get_me(self, token: str, db: Session) -> dict:
         """
         Get current user details from token
+        Returns a dictionary with only the fields needed for UserResponse
         """
         try:
             decoded_token = self.auth.decodeJWT(token)
             if not decoded_token:
                 raise HTTPException(status_code=401, detail="Invalid token")
 
-            user = self.get_user(decoded_token["user_id"], db)
+            # Handle both 'id' and 'user_id' keys from JWT payload
+            user_id = decoded_token.get("id") or decoded_token.get("user_id")
+            if not user_id:
+                raise HTTPException(status_code=401, detail="Invalid token: missing user ID")
+
+            user = self.get_user(user_id, db)
             if not user:
                 raise HTTPException(status_code=404, detail="User not found")
 
-            return user
+            # Return only the fields that UserResponse expects
+            return {
+                "id": str(user.id) if user.id else str(user_id),
+                "username": user.username or "",
+                "email": user.email or "",
+                "is_verified": getattr(user, 'is_verified', True),
+                "created_at": str(user.created_at) if hasattr(user, 'created_at') and user.created_at else None,
+                "updated_at": str(user.updated_at) if hasattr(user, 'updated_at') and user.updated_at else None,
+            }
+        except HTTPException:
+            raise
         except Exception as e:
             logger.error(f"Error getting user: {e}")
             raise HTTPException(status_code=401, detail=str(e))

@@ -1,74 +1,105 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Modal, Tabs, Upload, Button, Form, Input, Select, message, Card, Space, Tag, Typography, Alert, Progress, Steps, Spin, Divider, Radio, List, Badge, Tooltip, Row, Col, Collapse, Checkbox } from 'antd';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
-    InboxOutlined, 
+    Modal, 
+    Steps, 
+    Form, 
+    Input, 
+    Select, 
+    Button, 
+    Card, 
+    Space, 
+    Tag, 
+    Alert, 
+    Upload, 
+    Radio, 
+    Row, 
+    Col, 
+    Collapse,
+    Typography,
+    Divider,
+    message,
+    Table
+} from 'antd';
+import { 
     DatabaseOutlined, 
-    ApiOutlined, 
     CloudOutlined, 
-    ExperimentOutlined, 
+    InboxOutlined, 
+    ApiOutlined,
     CheckCircleOutlined,
-    EyeOutlined,
-    EditOutlined,
-    LinkOutlined,
-    RocketOutlined,
-    BulbOutlined,
-    FileTextOutlined,
+    UploadOutlined,
     SettingOutlined,
-    ArrowRightOutlined,
-    ArrowLeftOutlined,
-    ReloadOutlined,
+    LockOutlined,
+    GlobalOutlined,
+    FileOutlined,
     SaveOutlined,
-    PlayCircleOutlined,
-    CheckOutlined,
-    WarningOutlined
+    CloseCircleOutlined,
+    LoadingOutlined,
+    InfoCircleOutlined,
+    EditOutlined
 } from '@ant-design/icons';
-import { IFileUpload } from '../FileUpload/types';
-import { apiService } from '@/services/apiService';
-import { WorkflowNavigation, WorkflowStep } from '../WorkflowNavigation';
-import { environment, getCubeJsAuthHeader } from '@/config/environment';
-// Resolve backend URL based on runtime hostname (localhost dev vs deployed)
-import { getBackendUrlForApi } from '@/utils/backendUrl';
-const backendUrl = typeof window !== 'undefined' && window.location.hostname === 'localhost'
-    ? '/api'
-    : (environment?.api?.baseUrl || getBackendUrlForApi());
-import { useOrganization } from '@/context/OrganizationContext';
 
-const { Dragger } = Upload;
-const { Title, Text, Paragraph } = Typography;
-const { Option } = Select;
 const { Step } = Steps;
+const { Option } = Select;
 const { Panel } = Collapse;
+const { Title, Text } = Typography;
+const { Dragger } = Upload;
 
 interface UniversalDataSourceModalProps {
     isOpen: boolean;
     onClose: () => void;
     onDataSourceCreated: (dataSource: any) => void;
-    initialDataSourceType?: 'file' | 'database' | 'warehouse' | 'api';
+    initialDataSourceType?: 'file' | 'database' | 'warehouse' | 'api' | '';
     isChatIntegration?: boolean;
 }
 
 interface DataSourceConfig {
     name: string;
-    type: 'file' | 'database' | 'warehouse' | 'api';
+    type: 'file' | 'database' | 'warehouse' | 'api' | '';
     description?: string;
-    businessContext?: string;
 }
 
-interface CubeIntegration {
-    status: 'pending' | 'analyzing' | 'generated' | 'deployed' | 'error';
-    schema?: any;
-    yaml?: string;
-    cubes?: any[];
-    deployment_url?: string;
-}
-
-interface ConnectionTestResult {
-    success: boolean;
-    message?: string;
-    connection_info?: any;
-    error?: string;
+interface ConnectionConfig {
+    // Basic connection
+    host: string;
+    port: number;
+    database: string;
+    username: string;
+    password: string;
+    
+    // Advanced options
+    sslMode: string;
+    connectionPool: boolean;
+    minConnections: number;
+    maxConnections: number;
+    connectionTimeout: number;
+    
+    // Enterprise features
+    sshHost?: string;
+    sshPort?: number;
+    sshUsername?: string;
+    sshPassword?: string;
+    sshKeyPath?: string;
+    sslCert?: string;
+    sslKey?: string;
+    sslCA?: string;
+    
+    // Cloud storage and data lake fields
+    storageUri?: string;
+    accessKey?: string;
+    secretKey?: string;
+    region?: string;
+    endpoint?: string;
+    accountName?: string;
+    accountKey?: string;
+    sasToken?: string;
+    gcpProjectId?: string;
+    gcpCredentials?: string;
+    fileFormat?: string; // For S3/Azure Blob files (e.g., 'parquet', 'csv', 'json')
+    snapshotId?: number; // For Iceberg time travel
+    version?: number; // For Delta Lake time travel
+    timestamp?: string; // For Delta Lake time travel
 }
 
 const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
@@ -78,3101 +109,2266 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
     initialDataSourceType = 'file',
     isChatIntegration = false
 }) => {
-    const [activeTab, setActiveTab] = useState(initialDataSourceType);
-    const [uploading, setUploading] = useState(false);
-    const [connecting, setConnecting] = useState(false);
-    const [aiModeling, setAiModeling] = useState(false);
-    const [currentStep, setCurrentStep] = useState(1);
+    const [currentStep, setCurrentStep] = useState(0);
+    const [loading, setLoading] = useState(false);
+    const [testResult, setTestResult] = useState<any>(null);
+    const [connectionUrlEditable, setConnectionUrlEditable] = useState(true); // Editable by default
+    const [customConnectionUrl, setCustomConnectionUrl] = useState('');
+    
+    // Data source configuration
     const [dataSourceConfig, setDataSourceConfig] = useState<DataSourceConfig>({
-        name: '',
-        type: initialDataSourceType
+        name: '', // Will auto-generate if empty
+        type: initialDataSourceType || '',
+        description: ''
     });
     
-    // Sync activeTab with dataSourceConfig.type
-    useEffect(() => {
-        setActiveTab(dataSourceConfig.type);
-    }, [dataSourceConfig.type]);
+    // Auto-generate name from connection details
+    const generateDataSourceName = () => {
+        const dbType = selectedDatabaseType || 'Database';
+        const host = connectionConfig.host || '';
+        const database = connectionConfig.database || '';
+        
+        if (host && database) {
+            return `${dbType.charAt(0).toUpperCase() + dbType.slice(1)} - ${host}/${database}`;
+        } else if (host) {
+            return `${dbType.charAt(0).toUpperCase() + dbType.slice(1)} - ${host}`;
+        } else {
+            return `${dbType.charAt(0).toUpperCase() + dbType.slice(1)} Connection`;
+        }
+    };
     
-    // File upload state
-    const [uploadedFile, setUploadedFile] = useState<IFileUpload | null>(null);
-    const [actualFile, setActualFile] = useState<File | null>(null);
-    
-    // Connection test states
-    const [dbTestResult, setDbTestResult] = useState<ConnectionTestResult | null>(null);
-    const [warehouseTestResult, setWarehouseTestResult] = useState<ConnectionTestResult | null>(null);
-    const [apiTestResult, setApiTestResult] = useState<ConnectionTestResult | null>(null);
-    
-    // Connection saving states
-    const [dbConnectionSaved, setDbConnectionSaved] = useState(false);
-    const [warehouseConnectionSaved, setWarehouseConnectionSaved] = useState(false);
-    const [apiConnectionSaved, setApiConnectionSaved] = useState(false);
-    
-    // Enhanced database connection state with advanced options
-    const [dbConnection, setDbConnection] = useState({
+    // Connection configuration
+    const [connectionConfig, setConnectionConfig] = useState<ConnectionConfig>({
         host: '',
         port: 5432,
         database: '',
         username: '',
         password: '',
-        type: 'postgresql',
-        connectionType: 'manual' as 'manual' | 'uri' | 'advanced',
-        uri: '',
-        // Advanced connection options
         sslMode: 'prefer',
         connectionPool: false,
         minConnections: 1,
         maxConnections: 10,
         connectionTimeout: 30,
-        statementTimeout: 300,
-        // Database-specific options
-        charset: 'utf8mb4',
-        encrypt: 'yes',
-        trustServerCertificate: false,
-        serviceName: '',
-        sid: '',
-        tnsAdmin: '',
-        authSource: 'admin',
-        replicaSet: '',
-        readPreference: 'primary',
-        // Custom fields for non-standard databases
-        customFields: {} as Record<string, any>
+        // Cloud storage fields
+        storageUri: '',
+        accessKey: '',
+        secretKey: '',
+        region: 'us-east-1',
+        endpoint: '',
+        accountName: '',
+        accountKey: '',
+        sasToken: '',
+        gcpProjectId: '',
+        gcpCredentials: '',
+        fileFormat: '',
+        version: undefined,
+        timestamp: '',
+        snapshotId: undefined
     });
-
-    // Enhanced data warehouse connection state
-    const [warehouseConnection, setWarehouseConnection] = useState({
-        type: 'snowflake',
-        // Snowflake specific
-        account: '',
-        warehouse: '',
-        database: '',
-        schema: '',
-        username: '',
-        password: '',
-        role: 'PUBLIC',
-        clientSessionKeepAlive: false,
-        warehouseSize: 'X-SMALL',
-        // BigQuery specific
-        projectId: '',
-        datasetId: '',
-        credentialsJson: '',
-        location: 'US',
-        useLegacySql: false,
-        // Redshift specific
-        ssl: 'prefer',
-        timeout: 30,
-        tcpKeepalivesIdle: 300,
-        // Databricks specific
-        workspaceUrl: '',
-        accessToken: '',
-        clusterId: '',
-        catalog: 'hive_metastore',
-        httpPath: '',
-        // Azure Synapse specific
-        server: '',
-        encrypt: 'yes',
-        trustServerCertificate: false,
-        poolType: 'serverless',
-        // ClickHouse specific
-        secure: false,
-        compression: 'lz4',
-        // Custom fields for non-standard warehouses
-        customFields: {} as Record<string, any>
-    });
-
-    // API connection state
-    const [apiConnection, setApiConnection] = useState({
-        url: '',
-        method: 'GET',
-        headers: '',
-        authentication: 'none',
-        apiKey: '',
-        username: '',
-        password: ''
-    });
-
-    // Cube.js integration state
-    const [cubeIntegration, setCubeIntegration] = useState<CubeIntegration>({
-        status: 'pending'
-    });
-
-    // AI Data Modeling state
-    const [aiDataModeling, setAiDataModeling] = useState({
-        semanticModels: [],
-        businessInsights: [],
-        dataRelationships: [],
-        recommendedMetrics: [],
-        isGenerating: false,
-        yamlSchema: '',
-        visualSchema: null,
-        insights: null,
-        error: null,
-        visualMap: null,
-        preAggSuggestions: [],
-        preAggSelections: []
-    });
-
-    // User review state
-    const [userReview, setUserReview] = useState({
-        schemaApproved: false,
-        deploymentReady: false
-    });
-
-    // Data sources state
-    const [dataSources, setDataSources] = useState<any[]>([]);
-
-    const { currentOrganization, projects: orgProjects } = useOrganization();
-
-    // Load saved data sources on component mount
+    
+    // File upload
+    const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+    const [filePreview, setFilePreview] = useState<any>(null); // Preview data from file
+    const [selectedSheet, setSelectedSheet] = useState<string>('');
+    const [delimiter, setDelimiter] = useState<string>(',');
+    const [availableSheets, setAvailableSheets] = useState<string[]>([]);
+    
+    // Supported data sources
+    const dataSourceTypes = [
+        {
+            key: 'file',
+            label: 'File Upload',
+            icon: <InboxOutlined />,
+            description: 'CSV, Excel, Parquet, JSON files',
+            color: 'blue'
+        },
+        {
+            key: 'database',
+            label: 'Database',
+            icon: <DatabaseOutlined />,
+            description: 'PostgreSQL, MySQL, SQL Server',
+            color: 'green'
+        },
+        {
+            key: 'warehouse',
+            label: 'Data Warehouse',
+            icon: <CloudOutlined />,
+            description: 'ClickHouse, Snowflake, BigQuery, Delta Lake, Apache Iceberg, S3, Azure, GCP',
+            color: 'purple'
+        },
+        {
+            key: 'api',
+            label: 'API',
+            icon: <ApiOutlined />,
+            description: 'REST API endpoints',
+            color: 'orange'
+        }
+    ];
+    
+    // Detect dark mode for theme-aware logos
+    const [isDarkMode, setIsDarkMode] = useState(false);
+    
     useEffect(() => {
-        loadSavedDataSources();
-    }, [currentOrganization, orgProjects]);
-
-    // Load saved data sources from localStorage and backend
-    const loadSavedDataSources = async () => {
-        try {
-            // Load from localStorage
-            const savedSourcesRaw = JSON.parse(localStorage.getItem('aiser_data_sources') || '[]');
-            // Ensure we only load non-sensitive metadata
-            const savedSources = (savedSourcesRaw || []).map((s: any) => ({
-                id: s.id,
-                name: s.name,
-                type: s.type,
-                status: s.status,
-                createdAt: s.createdAt,
-                format: s.format || null,
-                preview: s.preview || null
-            }));
-            setDataSources(savedSources);
-            
-            // Load from backend using project-scoped API
-            try {
-                // Resolve organization/project context from OrganizationContext or localStorage
-                const organizationId = currentOrganization?.id ?? localStorage.getItem('currentOrganizationId') ?? 1;
-                let projectIdRaw = localStorage.getItem('currentProjectId');
-                if (!projectIdRaw && Array.isArray(orgProjects) && orgProjects.length > 0) projectIdRaw = String(orgProjects[0].id);
-                const projectId = projectIdRaw ?? (orgProjects && orgProjects.length > 0 ? String(orgProjects[0].id) : localStorage.getItem('currentProjectId') ?? 1);
-
-                const response = await fetch(`${backendUrl}/data/api/organizations/${organizationId}/projects/${projectId}/data-sources`);
-                if (response.ok) {
-                    const result = await response.json();
-                    const backendSources = result.data_sources || [];
-                    
-                    // Merge with localStorage sources
-                    const allSources = [...savedSources, ...backendSources];
-                    setDataSources(allSources);
-                    console.log('Loaded data sources from backend:', backendSources);
-                }
-            } catch (backendError) {
-                console.log('Backend data sources not available, using localStorage only');
-            }
-            
-            console.log('Loaded saved data sources:', savedSources);
-        } catch (error) {
-            console.error('Failed to load saved data sources:', error);
-        }
-    };
-
-    // Test database connection
-    const testDatabaseConnection = async () => {
-        try {
-            setConnecting(true);
-            setDbTestResult(null);
-            
-            const connectionPayload = buildDatabaseConnectionPayload(dbConnection);
-            
-            const testResponse = await fetch(`${backendUrl}/data/database/test`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(connectionPayload),
-            });
-            
-            const testResult = await testResponse.json();
-            
-            if (testResult.success) {
-                setDbTestResult({
-                    success: true,
-                    message: testResult.message || 'Database connection test successful!',
-                    connection_info: testResult.connection_info
-                });
-                
-                // Store connection details for future use
-                if (testResult.connection_info) {
-                    setDbConnection(prev => ({
-                        ...prev,
-                        customFields: {
-                            ...prev.customFields,
-                            ...testResult.connection_info
-                        }
-                    }));
-                }
-                
-                message.success('Database connection test successful!');
-            } else {
-                setDbTestResult({
-                    success: false,
-                    error: testResult.error || 'Connection test failed'
-                });
-                message.error('Database connection test failed: ' + (testResult.error || 'Unknown error'));
-            }
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            setDbTestResult({
-                success: false,
-                error: errorMessage
-            });
-            message.error('Database connection test failed: ' + errorMessage);
-        } finally {
-            setConnecting(false);
-        }
-    };
-
-    // Test warehouse connection
-    const testWarehouseConnection = async () => {
-        try {
-            setConnecting(true);
-            
-            const connectionPayload = buildWarehouseConnectionPayload(warehouseConnection);
-            
-            const response = await fetch(`${backendUrl}/data/warehouse/test`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    connection_config: connectionPayload
-                })
-            });
-            
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Connection test failed: ${response.status} ${response.statusText}`);
-            }
-            
-            const result = await response.json();
-            
-            if (result.success) {
-                setWarehouseTestResult({
-                    success: true,
-                    message: result.message,
-                    connection_info: result.connection_info
-                });
-                message.success('Warehouse connection test successful!');
-            } else {
-                setWarehouseTestResult({
-                    success: false,
-                    message: result.message || 'Connection test failed',
-                    error: result.error
-                });
-                message.error('Warehouse connection test failed: ' + (result.error || 'Unknown error'));
-            }
-        } catch (error) {
-            console.error('Warehouse connection test error:', error);
-            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            setWarehouseTestResult({
-                success: false,
-                message: 'Connection test failed',
-                error: errorMessage
-            });
-            message.error('Warehouse connection test failed: ' + errorMessage);
-        } finally {
-            setConnecting(false);
-        }
-    };
-
-    // Test API connection
-    const testAPIConnection = async () => {
-        try {
-            setConnecting(true);
-            setApiTestResult(null);
-            
-            // Simulate API test
-            await new Promise(resolve => setTimeout(resolve, 1500));
-            
-            setApiTestResult({
-                success: true,
-                message: 'API connection test successful!'
-            });
-            
-            message.success('API connection test successful!');
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            setApiTestResult({
-                success: false,
-                error: errorMessage
-            });
-            message.error('API connection test failed: ' + errorMessage);
-        } finally {
-            setConnecting(false);
-        }
-    };
-
-    // Save database connection
-    const saveDatabaseConnection = async () => {
-        try {
-            if (!dbTestResult?.success) {
-                message.error('Please test the connection first');
-                return;
-            }
-            
-            // Build the connection payload for the backend
-            const connectionPayload = buildDatabaseConnectionPayload(dbConnection);
-            
-            // Call the backend API to save the connection
-            const response = await fetch(`${environment.api.baseUrl}/data/database/connect`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    ...connectionPayload,
-                    name: dataSourceConfig.name || `Database: ${dbConnection.host}`
-                })
-            });
-            
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Failed to save database connection: ${response.status} ${response.statusText}`);
-            }
-            
-            const result = await response.json();
-            
-            if (result.success) {
-                // Use the backend response to create the data source
-                const connectionData = {
-                    id: result.data_source_id,
-                    name: dataSourceConfig.name || result.connection_info.name,
-                    type: result.connection_info.type, // Use backend type
-                    status: result.connection_info.status,
-                    config: {
-                        connectionDetails: {
-                            ...dbConnection,
-                            backend_id: result.data_source_id,
-                            connection_info: result.connection_info
-                        }
-                    },
-                    createdAt: new Date().toISOString(),
-                    lastTested: new Date().toISOString()
-                };
-                
-                // Save to localStorage
-                const savedSources = JSON.parse(localStorage.getItem('aiser_data_sources') || '[]');
-                const existingIndex = savedSources.findIndex((ds: any) => ds.id === connectionData.id);
-                
-                if (existingIndex >= 0) {
-                    savedSources[existingIndex] = connectionData;
-                } else {
-                    savedSources.push(connectionData);
-                }
-                
-                localStorage.setItem('aiser_data_sources', JSON.stringify(savedSources));
-                setDataSources(savedSources);
-                
-                // Save with enhanced metadata for AI analysis
-                await saveDataSourceWithMetadata(connectionData);
-                
-                setDbConnectionSaved(true);
-                message.success('Database connection saved successfully!');
-                
-                // Auto-advance to next step
-                goToNextStep();
-            } else {
-                throw new Error(result.error || 'Failed to save database connection');
-            }
-        } catch (error) {
-            console.error('Failed to save database connection:', error);
-            message.error('Failed to save database connection: ' + (error instanceof Error ? error.message : 'Unknown error'));
-        }
-    };
-
-    // Save warehouse connection
-    const saveWarehouseConnection = async () => {
-        try {
-            if (!warehouseTestResult?.success) {
-                message.error('Please test the connection first');
-                return;
-            }
-            
-            // Build the warehouse connection payload
-            const connectionPayload = buildWarehouseConnectionPayload(warehouseConnection);
-            
-            // Call the backend API to save the connection
-            const response = await fetch(`${backendUrl}/cube-modeling/connect-warehouse`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    connection_config: {
-                        ...connectionPayload,
-                        name: dataSourceConfig.name || `Warehouse: ${warehouseConnection.type}`
-                    }
-                })
-            });
-            
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Failed to save warehouse connection: ${response.status} ${response.statusText}`);
-            }
-            
-            const result = await response.json();
-            
-            if (result.success) {
-                // Use the backend response to create the data source
-                const connectionData = {
-                    id: result.connection_id,
-                    name: dataSourceConfig.name || `Warehouse: ${warehouseConnection.type}`,
-                    type: 'warehouse', // Warehouse connections are always warehouse type
-                    status: 'connected',
-                    config: {
-                        connectionDetails: {
-                            ...warehouseConnection,
-                            backend_id: result.connection_id,
-                            connection_info: {
-                                database_type: result.database_type,
-                                schema_info: result.schema_info,
-                                available_tables: result.available_tables,
-                                cube_integration_ready: result.cube_integration_ready
-                            }
-                        }
-                    },
-                    createdAt: new Date().toISOString(),
-                    lastTested: new Date().toISOString()
-                };
-                
-                // Save to localStorage
-                const savedSources = JSON.parse(localStorage.getItem('aiser_data_sources') || '[]');
-                const existingIndex = savedSources.findIndex((ds: any) => ds.id === connectionData.id);
-                
-                if (existingIndex >= 0) {
-                    savedSources[existingIndex] = connectionData;
-                } else {
-                    savedSources.push(connectionData);
-                }
-                
-                localStorage.setItem('aiser_data_sources', JSON.stringify(savedSources));
-                setDataSources(savedSources);
-                
-                setWarehouseConnectionSaved(true);
-                message.success('Warehouse connection saved successfully!');
-                
-                // Auto-advance to next step
-                goToNextStep();
-            } else {
-                throw new Error(result.error || 'Failed to save warehouse connection');
-            }
-        } catch (error) {
-            console.error('Failed to save warehouse connection:', error);
-            message.error('Failed to save warehouse connection: ' + (error instanceof Error ? error.message : 'Unknown error'));
-        }
-    };
-
-    // Save API connection
-    const saveAPIConnection = async () => {
-        try {
-            if (!apiTestResult?.success) {
-                message.error('Please test the connection first');
-                return;
-            }
-            
-            const connectionData = {
-                id: `api_${Date.now()}`,
-                name: dataSourceConfig.name || `API: ${apiConnection.url}`,
-                type: 'api',
-                status: 'connected',
-                config: {
-                    connectionDetails: {
-                        ...apiConnection,
-                        backend_id: `api_${Date.now()}`
-                    }
-                },
-                createdAt: new Date().toISOString(),
-                lastTested: new Date().toISOString()
-            };
-            
-            // Save to localStorage
-            const savedSources = JSON.parse(localStorage.getItem('aiser_data_sources') || '[]');
-            const existingIndex = savedSources.findIndex((ds: any) => ds.id === connectionData.id);
-            
-            if (existingIndex >= 0) {
-                savedSources[existingIndex] = connectionData;
-            } else {
-                savedSources.push(connectionData);
-            }
-            
-            localStorage.setItem('aiser_data_sources', JSON.stringify(savedSources));
-            setDataSources(savedSources);
-            
-            setApiConnectionSaved(true);
-            message.success('API connection saved successfully!');
-            
-            // Auto-advance to next step
-            goToNextStep();
-        } catch (error) {
-            console.error('Failed to save API connection:', error);
-            message.error('Failed to save API connection');
-        }
-    };
-
-    // Enhanced data source saving with comprehensive metadata for AI analysis
-    const saveDataSourceWithMetadata = async (dataSource: any) => {
-        try {
-            // Capture comprehensive metadata for AI analysis (excluding sensitive values)
-            const metadata = {
-                // Basic info
-                id: dataSource.id,
-                name: dataSource.name,
-                type: dataSource.type,
-                status: dataSource.status,
-                created_at: new Date().toISOString(),
-                
-                // Connection metadata (non-sensitive)
-                connection_metadata: {
-                    type: dataSource.type,
-                    ...(dataSource.type === 'database' && {
-                        db_type: dataSource.config?.connectionDetails?.type,
-                        host: dataSource.config?.connectionDetails?.host,
-                        port: dataSource.config?.connectionDetails?.port,
-                        database: dataSource.config?.connectionDetails?.database,
-                        ssl_mode: dataSource.config?.connectionDetails?.sslMode,
-                        connection_pool: dataSource.config?.connectionDetails?.connectionPool,
-                        min_connections: dataSource.config?.connectionDetails?.minConnections,
-                        max_connections: dataSource.config?.connectionDetails?.maxConnections,
-                        connection_timeout: dataSource.config?.connectionDetails?.connectionTimeout,
-                        statement_timeout: dataSource.config?.connectionDetails?.statementTimeout
-                    }),
-                    ...(dataSource.type === 'warehouse' && {
-                        warehouse_type: dataSource.config?.connectionDetails?.type,
-                        account: dataSource.config?.connectionDetails?.account,
-                        warehouse: dataSource.config?.connectionDetails?.warehouse,
-                        database: dataSource.config?.connectionDetails?.database,
-                        schema: dataSource.config?.connectionDetails?.schema,
-                        role: dataSource.config?.connectionDetails?.role,
-                        warehouse_size: dataSource.config?.connectionDetails?.warehouseSize
-                    }),
-                    ...(dataSource.type === 'api' && {
-                        method: dataSource.config?.connectionDetails?.method,
-                        base_url: dataSource.config?.connectionDetails?.url,
-                        authentication_type: dataSource.config?.connectionDetails?.authentication,
-                        headers_count: dataSource.config?.connectionDetails?.headers ? Object.keys(JSON.parse(dataSource.config.connectionDetails.headers || '{}')).length : 0
-                    }),
-                    ...(dataSource.type === 'file' && {
-                        file_format: dataSource.config?.connectionDetails?.format,
-                        file_size: dataSource.config?.connectionDetails?.size,
-                        row_count: dataSource.config?.connectionDetails?.row_count,
-                        column_count: dataSource.config?.connectionDetails?.schema?.columns?.length,
-                        has_schema: !!dataSource.config?.connectionDetails?.schema
-                    })
-                },
-                
-                // AI analysis context
-                ai_context: {
-                    business_context: dataSourceConfig.businessContext || '',
-                    description: dataSourceConfig.description || '',
-                    analysis_ready: true,
-                    cube_integration_ready: dataSource.type === 'database' || dataSource.type === 'warehouse',
-                    schema_generation_ready: true
-                },
-                
-                // Performance and optimization hints
-                optimization_hints: {
-                    large_dataset: dataSource.type === 'warehouse' || (dataSource.type === 'file' && (dataSource.config?.connectionDetails?.row_count > 100000)),
-                    real_time: dataSource.type === 'database' || dataSource.type === 'api',
-                    batch_processing: dataSource.type === 'file' || dataSource.type === 'warehouse',
-                    streaming: dataSource.type === 'api'
-                }
-            };
-            
-            // Update data source with metadata
-            const enhancedDataSource = {
-                ...dataSource,
-                metadata: metadata,
-                ai_analysis_ready: true
-            };
-            
-            // Save to localStorage
-            const savedSources = JSON.parse(localStorage.getItem('aiser_data_sources') || '[]');
-            const existingIndex = savedSources.findIndex((ds: any) => ds.id === enhancedDataSource.id);
-            
-            if (existingIndex >= 0) {
-                savedSources[existingIndex] = enhancedDataSource;
-            } else {
-                savedSources.push(enhancedDataSource);
-            }
-            
-            localStorage.setItem('aiser_data_sources', JSON.stringify(savedSources));
-            setDataSources(savedSources);
-            
-            console.log('Data source saved with comprehensive metadata for AI analysis:', metadata);
-            
-            return enhancedDataSource;
-            
-        } catch (error) {
-            console.error('Failed to save data source with metadata:', error);
-            throw error;
-        }
-    };
-
-    // Comprehensive data source connectors with real connection capabilities
-    const dataSourceConnectors = [
-        // Standard Databases
-        {
-            name: 'PostgreSQL',
-            type: 'postgresql',
-            icon: <DatabaseOutlined />,
-            description: 'Enterprise relational database',
-            features: ['Structured data', 'SQL queries', 'Real-time analytics', 'ACID compliance'],
-            defaultPort: 5432,
-            recommended: true,
-            logo: '🐘',
-            connectionFields: ['host', 'port', 'database', 'username', 'password', 'ssl_mode', 'connection_pool'],
-            sslOptions: ['disable', 'require', 'verify-ca', 'verify-full'],
-            connectionPoolOptions: ['min_connections', 'max_connections', 'connection_timeout']
-        },
-        {
-            name: 'MySQL',
-            type: 'mysql',
-            icon: <DatabaseOutlined />,
-            description: 'Open source database',
-            features: ['Fast performance', 'Easy setup', 'Wide support', 'Replication'],
-            defaultPort: 3306,
-            recommended: false,
-            logo: '🐬',
-            connectionFields: ['host', 'port', 'database', 'username', 'password', 'charset', 'ssl_mode'],
-            charsetOptions: ['utf8mb4', 'utf8', 'latin1'],
-            sslOptions: ['disabled', 'preferred', 'required', 'verify_ca', 'verify_identity']
-        },
-        {
-            name: 'SQL Server',
-            type: 'sqlserver',
-            icon: <DatabaseOutlined />,
-            description: 'Microsoft database',
-            features: ['Enterprise features', 'Windows integration', 'BI tools', 'Always On'],
-            defaultPort: 1433,
-            recommended: false,
-            logo: '🪟',
-            connectionFields: ['host', 'port', 'database', 'username', 'password', 'encrypt', 'trust_server_certificate'],
-            encryptOptions: ['yes', 'no', 'strict'],
-            authenticationModes: ['sql', 'windows', 'azure_ad']
-        },
-        {
-            name: 'Oracle',
-            type: 'oracle',
-            icon: <DatabaseOutlined />,
-            description: 'Enterprise database',
-            features: ['High availability', 'Real Application Clusters', 'Partitioning', 'Advanced Security'],
-            defaultPort: 1521,
-            recommended: false,
-            logo: '🏛️',
-            connectionFields: ['host', 'port', 'service_name', 'sid', 'username', 'password', 'tns_admin'],
-            connectionTypes: ['service_name', 'sid', 'tns'],
-            tnsOptions: ['tns_admin', 'wallet_location']
-        },
-        {
-            name: 'MongoDB',
-            type: 'mongodb',
-            icon: <DatabaseOutlined />,
-            description: 'Document database',
-            features: ['Flexible schema', 'JSON data', 'Scalable', 'Sharding'],
-            defaultPort: 27017,
-            recommended: false,
-            logo: '🍃',
-            connectionFields: ['host', 'port', 'database', 'username', 'password', 'auth_source', 'replica_set'],
-            authSources: ['admin', 'local', 'database_name'],
-            replicaSetOptions: ['replica_set_name', 'read_preference']
-        },
-        {
-            name: 'Redis',
-            type: 'redis',
-            icon: <DatabaseOutlined />,
-            description: 'In-memory data store',
-            features: ['Ultra-fast', 'Caching', 'Session storage', 'Real-time analytics'],
-            defaultPort: 6379,
-            recommended: false,
-            logo: '🔴',
-            connectionFields: ['host', 'port', 'database', 'password', 'ssl', 'connection_pool'],
-            sslOptions: ['disabled', 'enabled'],
-            connectionPoolOptions: ['max_connections', 'connection_timeout']
-        },
-        
-        // Cloud Data Warehouses
-        {
-            name: 'Snowflake',
-            type: 'snowflake',
-            icon: <CloudOutlined />,
-            description: 'Cloud data warehouse',
-            features: ['Scalable storage', 'Fast queries', 'Data sharing', 'Multi-cloud'],
-            defaultPort: 443,
-            recommended: true,
-            logo: '❄️',
-            connectionFields: ['account', 'warehouse', 'database', 'schema', 'username', 'password', 'role', 'client_session_keep_alive'],
-            warehouseSizes: ['X-SMALL', 'SMALL', 'MEDIUM', 'LARGE', 'X-LARGE', 'XX-LARGE'],
-            roleOptions: ['ACCOUNTADMIN', 'SYSADMIN', 'USERADMIN', 'PUBLIC']
-        },
-        {
-            name: 'BigQuery',
-            type: 'bigquery',
-            icon: <CloudOutlined />,
-            description: 'Google Cloud analytics',
-            features: ['Serverless', 'ML ready', 'Cost effective', 'Real-time streaming'],
-            defaultPort: null,
-            recommended: true,
-            logo: '🔍',
-            connectionFields: ['project_id', 'dataset_id', 'credentials_json', 'location', 'use_legacy_sql'],
-            locationOptions: ['US', 'EU', 'asia-northeast1', 'australia-southeast1'],
-            sqlDialects: ['standard', 'legacy']
-        },
-        {
-            name: 'Redshift',
-            type: 'redshift',
-            icon: <CloudOutlined />,
-            description: 'AWS analytics database',
-            features: ['Columnar storage', 'Massive scale', 'S3 integration', 'Spectrum'],
-            defaultPort: 5439,
-            recommended: false,
-            logo: '🔴',
-            connectionFields: ['host', 'port', 'database', 'username', 'password', 'ssl', 'timeout', 'tcp_keepalives_idle'],
-            sslOptions: ['prefer', 'require', 'verify-ca', 'verify-full'],
-            timeoutOptions: ['connection_timeout', 'statement_timeout']
-        },
-        {
-            name: 'Databricks',
-            type: 'databricks',
-            icon: <CloudOutlined />,
-            description: 'Unified analytics platform',
-            features: ['ML-ready', 'Delta Lake', 'Collaborative notebooks', 'Unity Catalog'],
-            defaultPort: null,
-            recommended: true,
-            logo: '🔷',
-            connectionFields: ['workspace_url', 'access_token', 'cluster_id', 'catalog', 'schema', 'http_path'],
-            catalogOptions: ['hive_metastore', 'unity_catalog'],
-            clusterTypes: ['all-purpose', 'sql-warehouse', 'ml-runtime']
-        },
-        {
-            name: 'Azure Synapse',
-            type: 'synapse',
-            icon: <CloudOutlined />,
-            description: 'Microsoft analytics service',
-            features: ['Serverless', 'Built-in ML', 'Power BI integration', 'Dedicated pools'],
-            defaultPort: null,
-            recommended: true,
-            logo: '🔵',
-            connectionFields: ['server', 'database', 'username', 'password', 'encrypt', 'trust_server_certificate'],
-            encryptOptions: ['yes', 'no', 'strict'],
-            poolTypes: ['serverless', 'dedicated']
-        },
-        {
-            name: 'ClickHouse',
-            type: 'clickhouse',
-            icon: <CloudOutlined />,
-            description: 'Column-oriented DBMS',
-            features: ['OLAP', 'Real-time analytics', 'High compression', 'Distributed queries'],
-            defaultPort: 9000,
-            recommended: false,
-            logo: '🏗️',
-            connectionFields: ['host', 'port', 'database', 'username', 'password', 'secure', 'compression'],
-            secureOptions: ['false', 'true'],
-            compressionOptions: ['lz4', 'zstd', 'none']
-        },
-        
-        // Specialized Databases
-        {
-            name: 'Elasticsearch',
-            type: 'elasticsearch',
-            icon: <DatabaseOutlined />,
-            description: 'Search & analytics engine',
-            features: ['Full-text search', 'Real-time analytics', 'Machine learning', 'APM'],
-            defaultPort: 9200,
-            recommended: false,
-            logo: '🔍',
-            connectionFields: ['host', 'port', 'index', 'username', 'password', 'ssl', 'api_key'],
-            sslOptions: ['false', 'true'],
-            authMethods: ['basic', 'api_key', 'bearer_token']
-        },
-        {
-            name: 'InfluxDB',
-            type: 'influxdb',
-            icon: <DatabaseOutlined />,
-            description: 'Time series database',
-            features: ['Time series', 'IoT data', 'Real-time monitoring', 'Downsampling'],
-            defaultPort: 8086,
-            recommended: false,
-            logo: '⏰',
-            connectionFields: ['host', 'port', 'database', 'username', 'password', 'ssl', 'retention_policy'],
-            sslOptions: ['false', 'true'],
-            retentionPolicies: ['autogen', 'custom']
-        },
-        {
-            name: 'Neo4j',
-            type: 'neo4j',
-            icon: <DatabaseOutlined />,
-            description: 'Graph database',
-            features: ['Graph queries', 'Relationship mapping', 'Pattern matching', 'Cypher language'],
-            defaultPort: 7687,
-            recommended: false,
-            logo: '🕸️',
-            connectionFields: ['host', 'port', 'database', 'username', 'password', 'encryption', 'trust_strategy'],
-            encryptionOptions: ['none', 'tls', 'tls_no_verify'],
-            trustStrategies: ['trust_all_certificates', 'trust_system_ca_signed_certificates']
-        },
-        {
-            name: 'Custom Database',
-            type: 'custom',
-            icon: <DatabaseOutlined />,
-            description: 'Custom or proprietary database system',
-            features: ['Custom connection', 'Flexible configuration', 'Proprietary protocols'],
-            defaultPort: null,
-            recommended: false,
-            logo: '🔧',
-            connectionFields: ['host', 'port', 'database', 'username', 'password', 'custom_protocol', 'custom_options'],
-            customProtocols: ['tcp', 'udp', 'http', 'https', 'custom'],
-            customOptions: ['connection_string', 'driver_path', 'environment_variables']
-        },
-        {
-            name: 'Custom Warehouse',
-            type: 'custom_warehouse',
-            icon: <CloudOutlined />,
-            description: 'Custom or proprietary data warehouse',
-            features: ['Custom connection', 'Flexible configuration', 'Proprietary protocols'],
-            defaultPort: null,
-            recommended: false,
-            logo: '🔧',
-            connectionFields: ['endpoint', 'protocol', 'authentication', 'custom_options'],
-            protocols: ['http', 'https', 'tcp', 'udp', 'custom'],
-            authenticationMethods: ['api_key', 'oauth2', 'basic', 'custom']
-        }
-    ];
-
-    // Enhanced workflow steps with proper progression
-    const workflowSteps: WorkflowStep[] = [
-        {
-            key: 'connect',
-            title: 'Configure',
-            description: 'Minimal setup for files, databases, warehouses, or APIs',
-            isRequired: true,
-            isCompleted: false,
-            canSkip: false
-        },
-        {
-            key: 'analyze',
-            title: 'Model',
-            description: 'Auto schema → optional AI enhance → visual verify',
-            isRequired: true,
-            isCompleted: false,
-            canSkip: false
-        },
-        {
-            key: 'deploy',
-            title: 'Deploy',
-            description: 'Deploy semantic model and start analyzing',
-            isRequired: true,
-            isCompleted: false,
-            canSkip: false
-        }
-    ];
-
-    // AI-driven transformation state
-    const [aiTransformations, setAiTransformations] = useState<{
-        suggestedTransformations: Array<{
-            id: string;
-            name: string;
-            description: string;
-            priority: string;
-            impact: string;
-            suggested: boolean;
-        }>;
-        dataQualityIssues: Array<{
-            issue: string;
-            severity: string;
-            column: string;
-        }>;
-        cleaningRecommendations: string[];
-        businessRules: string[];
-        isAnalyzing: boolean;
-    }>({
-        suggestedTransformations: [],
-        dataQualityIssues: [],
-        cleaningRecommendations: [],
-        businessRules: [],
-        isAnalyzing: false
-    });
-
-    // AI data modeling state - using the one declared above
-    // User review and approval state - using the one declared above  
-    // Multiple data sources state - using the one declared above
-
-    // Current active data source
-    const [activeDataSourceId, setActiveDataSourceId] = useState<string | null>(null);
-
-    // Get current active data source
-    const getActiveDataSource = () => {
-        return dataSources.find(ds => ds.id === activeDataSourceId) || null;
-    };
-
-    // Build comprehensive database connection payload based on database type
-    const buildDatabaseConnectionPayload = (connection: typeof dbConnection) => {
-        const basePayload = {
-            type: connection.type,
-            connection_type: connection.connectionType
+        const checkDarkMode = () => {
+            const html = document.documentElement;
+            const isDark = html.classList.contains('dark') || 
+                          html.getAttribute('data-theme') === 'dark' ||
+                          window.matchMedia('(prefers-color-scheme: dark)').matches;
+            setIsDarkMode(isDark);
         };
 
-        if (connection.connectionType === 'uri') {
-            return {
-                ...basePayload,
-                connection_string: connection.uri
-            };
-        }
-
-        // Build type-specific payload
-        switch (connection.type) {
-            case 'postgresql':
-                return {
-                    ...basePayload,
-                    host: connection.host,
-                    port: connection.port,
-                    database: connection.database,
-                    username: connection.username,
-                    password: connection.password,
-                    ssl_mode: connection.sslMode,
-                    connection_pool: connection.connectionPool,
-                    min_connections: connection.minConnections,
-                    max_connections: connection.maxConnections,
-                    connection_timeout: connection.connectionTimeout,
-                    statement_timeout: connection.statementTimeout
-                };
-            
-            case 'mysql':
-                return {
-                    ...basePayload,
-                    host: connection.host,
-                    port: connection.port,
-                    database: connection.database,
-                    username: connection.username,
-                    password: connection.password,
-                    charset: connection.charset,
-                    ssl_mode: connection.sslMode
-                };
-            
-            case 'sqlserver':
-                return {
-                    ...basePayload,
-                    host: connection.host,
-                    port: connection.port,
-                    database: connection.database,
-                    username: connection.username,
-                    password: connection.password,
-                    encrypt: connection.encrypt,
-                    trust_server_certificate: connection.trustServerCertificate
-                };
-            
-            case 'oracle':
-                return {
-                    ...basePayload,
-                    host: connection.host,
-                    port: connection.port,
-                    service_name: connection.serviceName,
-                    sid: connection.sid,
-                    username: connection.username,
-                    password: connection.password,
-                    tns_admin: connection.tnsAdmin
-                };
-            
-            case 'mongodb':
-                return {
-                    ...basePayload,
-                    host: connection.host,
-                    port: connection.port,
-                    database: connection.database,
-                    username: connection.username,
-                    password: connection.password,
-                    auth_source: connection.authSource,
-                    replica_set: connection.replicaSet,
-                    read_preference: connection.readPreference
-                };
-            
-            case 'redis':
-                return {
-                    ...basePayload,
-                    host: connection.host,
-                    port: connection.port,
-                    database: connection.database,
-                    password: connection.password,
-                    ssl: connection.sslMode !== 'disable' ? true : false,
-                    connection_pool: connection.connectionPool,
-                    max_connections: connection.maxConnections,
-                    connection_timeout: connection.connectionTimeout
-                };
-            
-            case 'elasticsearch':
-                return {
-                    ...basePayload,
-                    host: connection.host,
-                    port: connection.port,
-                    index: connection.database,
-                    username: connection.username,
-                    password: connection.password,
-                    ssl: connection.sslMode !== 'disable'
-                };
-            
-            case 'influxdb':
-                return {
-                    ...basePayload,
-                    host: connection.host,
-                    port: connection.port,
-                    database: connection.database,
-                    username: connection.username,
-                    password: connection.password,
-                    ssl: connection.sslMode !== 'disable'
-                };
-            
-            case 'neo4j':
-                return {
-                    ...basePayload,
-                    host: connection.host,
-                    port: connection.port,
-                    database: connection.database,
-                    username: connection.username,
-                    password: connection.password,
-                    encryption: connection.sslMode,
-                    trust_strategy: connection.trustServerCertificate ? 'trust_all_certificates' : 'trust_system_ca_signed_certificates'
-                };
-            
-            default:
-                // For custom/unknown database types, include all fields
-                return {
-                    ...basePayload,
-                    host: connection.host,
-                    port: connection.port,
-                    database: connection.database,
-                    username: connection.username,
-                    password: connection.password,
-                    custom_fields: connection.customFields
-                };
-        }
-    };
-
-    // Build comprehensive warehouse connection payload based on warehouse type
-    const buildWarehouseConnectionPayload = (connection: typeof warehouseConnection) => {
-        const basePayload = {
-            type: connection.type
-        };
-
-        switch (connection.type) {
-            case 'snowflake':
-                return {
-                    ...basePayload,
-                    account: connection.account,
-                    warehouse: connection.warehouse,
-                    database: connection.database,
-                    schema: connection.schema,
-                    username: connection.username,
-                    password: connection.password,
-                    role: connection.role,
-                    client_session_keep_alive: connection.clientSessionKeepAlive,
-                    warehouse_size: connection.warehouseSize
-                };
-            
-            case 'bigquery':
-                return {
-                    ...basePayload,
-                    project_id: connection.projectId,
-                    dataset_id: connection.datasetId,
-                    credentials_json: connection.credentialsJson,
-                    location: connection.location,
-                    use_legacy_sql: connection.useLegacySql
-                };
-            
-            case 'redshift':
-                return {
-                    ...basePayload,
-                    host: connection.account, // account field used for host in Redshift
-                    port: 5439,
-                    database: connection.database,
-                    username: connection.username,
-                    password: connection.password,
-                    ssl: connection.ssl,
-                    timeout: connection.timeout,
-                    tcp_keepalives_idle: connection.tcpKeepalivesIdle
-                };
-            
-            case 'databricks':
-                return {
-                    ...basePayload,
-                    workspace_url: connection.workspaceUrl,
-                    cluster_id: connection.clusterId,
-                    catalog: connection.catalog,
-                    schema: connection.schema,
-                    http_path: connection.httpPath
-                };
-            
-            case 'synapse':
-                return {
-                    ...basePayload,
-                    server: connection.server,
-                    database: connection.database,
-                    username: connection.username,
-                    password: connection.password,
-
-                    encrypt: connection.encrypt,
-                    trust_server_certificate: connection.trustServerCertificate,
-                    pool_type: connection.poolType
-                };
-            
-            case 'clickhouse':
-                return {
-                    ...basePayload,
-                    host: connection.account, // account field used for host in ClickHouse
-                    port: 9000,
-                    database: connection.database,
-                    username: connection.username,
-                    password: connection.password,
-                    secure: connection.secure,
-                    compression: connection.compression
-                };
-            
-            case 'custom_warehouse':
-                return {
-                    ...basePayload,
-                    endpoint: connection.customFields.endpoint || '',
-                    protocol: connection.customFields.protocol || 'https',
-                    authentication: connection.customFields.authentication || 'api_key',
-                    custom_options: connection.customFields.custom_options || {}
-                };
-            
-            case 'custom':
-                return {
-                    ...basePayload,
-                    custom_protocol: connection.customFields.custom_protocol || 'tcp',
-                    custom_options: connection.customFields.custom_options || {},
-                    connection_string: connection.customFields.connection_string || '',
-                    driver_path: connection.customFields.driver_path || '',
-                    environment_variables: connection.customFields.environment_variables || {}
-                };
-            
-            default:
-                // For custom/unknown warehouse types, include all fields
-                return {
-                    ...basePayload,
-                    custom_fields: connection.customFields
-                };
-        }
-    };
-
-    // Add new data source
-    const addDataSource = (type: 'file' | 'database' | 'warehouse' | 'api') => {
-        const newId = `ds_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        const newDataSource = {
-            id: newId,
-            name: `New ${type} Connection`,
-            type,
-            config: {},
-            status: 'disconnected' as const,
-            isActive: true
-        };
-        setDataSources(prev => [...prev, newDataSource]);
-        setActiveDataSourceId(newId);
-        return newDataSource;
-    };
-
-    // Update step completion status
-    const updateStepCompletion = () => {
-        const updatedSteps = workflowSteps.map((step, index) => {
-            if (index === currentStep - 1) {
-                return { ...step, isCompleted: true };
-            }
-            return step;
+        checkDarkMode();
+        const observer = new MutationObserver(checkDarkMode);
+        observer.observe(document.documentElement, { 
+            attributes: true, 
+            attributeFilter: ['class', 'data-theme'] 
         });
-        // Note: workflowSteps is const, so we'll update completion in state
+        
+        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        mediaQuery.addEventListener('change', checkDarkMode);
+
+        return () => {
+            observer.disconnect();
+            mediaQuery.removeEventListener('change', checkDarkMode);
+        };
+    }, []);
+
+    // Brand colors for each database (used for colored styling and fallback)
+    const brandColors: Record<string, string> = {
+        'postgresql': '#336791',
+        'mysql': '#4479A1',
+        'sqlserver': '#CC2927',
+        'clickhouse': '#FFCC02',
+        'snowflake': '#29B5E8',
+        'bigquery': '#4285F4',
+        'redshift': '#8C4FFF',
+        'delta_lake': '#00ADD8',
+        'iceberg': '#1E88E5',
+        's3_parquet': '#FF9900',
+        'azure_blob': '#0078D4',
+        'gcp_cloud_storage': '#4285F4'
     };
 
-    // Initialize modal when opened
+    // Helper function to get database logo URL from CDN
+    const getDatabaseLogoUrl = (dbType: string): string => {
+        // Using simple-icons CDN for logos
+        const iconMap: Record<string, string> = {
+            'postgresql': 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/postgresql.svg',
+            'mysql': 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/mysql.svg',
+            'sqlserver': 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/microsoftsqlserver.svg',
+            'clickhouse': 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/clickhouse.svg',
+            'snowflake': 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/snowflake.svg',
+            'bigquery': 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/googlebigquery.svg',
+            'redshift': 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/amazonredshift.svg',
+            'delta_lake': 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/delta.svg',
+            'iceberg': 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/apacheiceberg.svg',
+            's3_parquet': 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/amazons3.svg',
+            'azure_blob': 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/microsoftazure.svg',
+            'gcp_cloud_storage': 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/googlecloud.svg'
+        };
+        return iconMap[dbType] || 'https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/database.svg';
+    };
+    
+    // Helper component to render database logo with theme-aware colored styling
+    const DatabaseLogo: React.FC<{ dbType: string; size?: number }> = ({ dbType, size = 20 }) => {
+        const logoUrl = getDatabaseLogoUrl(dbType);
+        const [imgError, setImgError] = useState(false);
+        const brandColor = brandColors[dbType] || '#666';
+        
+        return (
+            <span
+                style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: size,
+                    height: size,
+                    marginRight: '8px',
+                    flexShrink: 0,
+                    verticalAlign: 'middle',
+                    position: 'relative'
+                }}
+            >
+                {!imgError ? (
+                    <img
+                        src={logoUrl}
+                        alt={`${dbType} logo`}
+                        width={size}
+                        height={size}
+                        style={{ 
+                            objectFit: 'contain',
+                            display: 'block',
+                            // Apply brand color as CSS filter to colorize the SVG
+                            // Using a combination of filters to apply brand color tinting
+                            filter: isDarkMode 
+                                ? `brightness(1.15) contrast(1.1) drop-shadow(0 0 2px ${brandColor}50)`
+                                : `drop-shadow(0 0 1px ${brandColor}40)`,
+                            // Add subtle padding and background for better visibility
+                            padding: '1px',
+                            borderRadius: '2px',
+                            backgroundColor: isDarkMode ? `${brandColor}15` : 'transparent'
+                        }}
+                        onError={() => setImgError(true)}
+                    />
+                ) : (
+                    // Fallback: colored badge with first letter
+                    <span
+                        style={{
+                            width: size,
+                            height: size,
+                            borderRadius: '4px',
+                            backgroundColor: brandColor,
+                            color: '#fff',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: size * 0.6,
+                            fontWeight: 'bold',
+                            textTransform: 'uppercase',
+                            boxShadow: isDarkMode ? `0 0 4px ${brandColor}60` : `0 1px 2px ${brandColor}40`
+                        }}
+                    >
+                        {dbType.charAt(0).toUpperCase()}
+                    </span>
+                )}
+            </span>
+        );
+    };
+
+    // Database types
+    const databaseTypes = [
+        { value: 'postgresql', label: 'PostgreSQL', port: 5432, isDataLake: false, isCloudStorage: false },
+        { value: 'mysql', label: 'MySQL', port: 3306, isDataLake: false, isCloudStorage: false },
+        { value: 'sqlserver', label: 'SQL Server', port: 1433, isDataLake: false, isCloudStorage: false },
+        { value: 'clickhouse', label: 'ClickHouse', port: 8123, isDataLake: false, isCloudStorage: false },
+        { value: 'snowflake', label: 'Snowflake', port: 443, isDataLake: false, isCloudStorage: false },
+        { value: 'bigquery', label: 'BigQuery', port: null, isDataLake: false, isCloudStorage: false },
+        { value: 'redshift', label: 'Redshift', port: 5439, isDataLake: false, isCloudStorage: false },
+        { value: 'delta_lake', label: 'Delta Lake', port: null, isDataLake: true, isCloudStorage: false },
+        { value: 'iceberg', label: 'Apache Iceberg', port: null, isDataLake: true, isCloudStorage: false },
+        { value: 's3_parquet', label: 'S3 Cloud Storage', port: null, isDataLake: false, isCloudStorage: true },
+        { value: 'azure_blob', label: 'Azure Blob Storage', port: null, isDataLake: false, isCloudStorage: true },
+        { value: 'gcp_cloud_storage', label: 'GCP Cloud Storage', port: null, isDataLake: false, isCloudStorage: true }
+    ];
+    
+    const [selectedDatabaseType, setSelectedDatabaseType] = useState('postgresql');
+    
+    // Track user modifications to prevent overriding user input
+    const userModifiedRef = useRef({
+        port: false,
+        sslMode: false,
+        host: false,
+        database: false,
+        username: false,
+        password: false
+    });
+    
+    // Set defaults only when database type changes and user hasn't modified the field
+    useEffect(() => {
+        const databaseTypes = [
+            { value: 'postgresql', port: 5432, sslMode: 'prefer' },
+            { value: 'mysql', port: 3306, sslMode: 'prefer' },
+            { value: 'sqlserver', port: 1433, sslMode: 'prefer' },
+            { value: 'clickhouse', port: 8123, sslMode: 'disable' },
+            { value: 'snowflake', port: 443, sslMode: 'require' },
+            { value: 'bigquery', port: null, sslMode: 'require' },
+            { value: 'redshift', port: 5439, sslMode: 'require' }
+        ];
+        
+        const dbType = databaseTypes.find(db => db.value === selectedDatabaseType);
+        if (dbType) {
+            setConnectionConfig(prev => ({
+                ...prev,
+                // Only set defaults if user hasn't manually modified these fields
+                port: !userModifiedRef.current.port ? (dbType.port || prev.port) : prev.port,
+                sslMode: !userModifiedRef.current.sslMode ? dbType.sslMode : prev.sslMode
+            }));
+        }
+    }, [selectedDatabaseType]);
+    
+    // Reset form when modal opens
     useEffect(() => {
         if (isOpen) {
-            setCurrentStep(1);
-            setActiveTab(initialDataSourceType);
-            
-            // Load existing data sources from localStorage
-            const savedSources = JSON.parse(localStorage.getItem('aiser_data_sources') || '[]');
-            if (savedSources.length > 0) {
-                setDataSources(savedSources);
-                setActiveDataSourceId(savedSources[0].id);
-            } else {
-                // Initialize with one data source if none exist
-                addDataSource(initialDataSourceType);
-            }
-            
-            // Reset form states but preserve existing data
+            setCurrentStep(0);
             setDataSourceConfig({
                 name: '',
-                type: initialDataSourceType
+                type: initialDataSourceType,
+                description: ''
             });
-            
-            // Don't reset uploadedFile - preserve it across steps
-            // setUploadedFile(null);
-            
-            setDbConnection({
-                host: '',
-                port: 5432,
-                database: '',
-                username: '',
-                password: '',
-                type: 'postgresql',
-                connectionType: 'manual',
-                uri: '',
-                sslMode: 'prefer',
-                connectionPool: false,
-                minConnections: 1,
-                maxConnections: 10,
-                connectionTimeout: 30,
-                statementTimeout: 300,
-                charset: 'utf8mb4',
-                encrypt: 'yes',
-                trustServerCertificate: false,
-                serviceName: '',
-                sid: '',
-                tnsAdmin: '',
-                authSource: 'admin',
-                replicaSet: '',
-                readPreference: 'primary',
-                customFields: {}
-            });
-            setWarehouseConnection({
-                type: 'snowflake',
-                account: '',
-                warehouse: '',
-                database: '',
-                schema: '',
-                username: '',
-                password: '',
-                role: 'PUBLIC',
-                clientSessionKeepAlive: false,
-                warehouseSize: 'X-SMALL',
-                projectId: '',
-                datasetId: '',
-                credentialsJson: '',
-                location: 'US',
-                useLegacySql: false,
-                ssl: 'prefer',
-                timeout: 30,
-                tcpKeepalivesIdle: 300,
-                workspaceUrl: '',
-                accessToken: '',
-                clusterId: '',
-                catalog: 'hive_metastore',
-                httpPath: '',
-                server: '',
-                encrypt: 'yes',
-                trustServerCertificate: false,
-                poolType: 'serverless',
-                secure: false,
-                compression: 'lz4',
-                customFields: {}
-            });
-            setApiConnection({
-                url: '',
-                method: 'GET',
-                headers: '',
-                authentication: 'none',
-                apiKey: '',
-                username: '',
-                password: ''
-            });
-            setCubeIntegration({
-                status: 'pending'
-            });
-            setAiTransformations({
-                suggestedTransformations: [],
-                dataQualityIssues: [],
-                cleaningRecommendations: [],
-                businessRules: [],
-                isAnalyzing: false
-            });
-            setAiDataModeling({
-                semanticModels: [],
-                businessInsights: [],
-                dataRelationships: [],
-                recommendedMetrics: [],
-                isGenerating: false,
-                yamlSchema: '',
-                visualSchema: null,
-                insights: null,
-                error: null,
-                visualMap: null,
-                preAggSuggestions: [],
-                preAggSelections: []
-            });
+            setTestResult(null);
+            setUploadedFile(null);
             }
     }, [isOpen, initialDataSourceType]);
 
-    // Step validation
-    const canProceedToNext = (): boolean => {
-        switch (currentStep) {
-            case 1: // Configure
-                return !!getActiveDataSource() && getActiveDataSource()?.status === 'connected';
-            case 2: // AI Analysis & Modeling
-                return aiDataModeling.semanticModels.length > 0 || !!aiDataModeling.yamlSchema;
-            case 3: // Deploy & Ready
-                return userReview.schemaApproved;
-            default:
-                return false;
+    // Update port when database type changes
+    useEffect(() => {
+        const dbType = databaseTypes.find(db => db.value === selectedDatabaseType);
+        if (dbType && dbType.port) {
+            setConnectionConfig(prev => ({ ...prev, port: dbType.port! }));
         }
-    };
-
-    // Handle step change
-    const handleStepChange = (step: number) => {
-        if (step < 1 || step > workflowSteps.length) {
-            return;
+    }, [selectedDatabaseType]);
+    
+    const steps = [
+        {
+            title: 'Data Source Type',
+            description: 'Choose your data source'
+        },
+        {
+            title: 'Configure, Test & Save',
+            description: 'Set up connection and verify'
         }
-        setCurrentStep(step);
+    ];
+    
+    const handleDataSourceTypeSelect = (type: string) => {
+        setDataSourceConfig(prev => ({ ...prev, type: type as any }));
+        setCurrentStep(1);
     };
-
-    // Handle save and continue
-    const handleSaveAndContinue = async () => {
+    
+    const handleFileUpload = async (file: File) => {
+        setUploadedFile(file);
+        // Auto-fill data source name from filename (remove extension)
+        const autoName = file.name.split('.').slice(0, -1).join('.') || file.name;
+        setDataSourceConfig(prev => ({ 
+            ...prev, 
+            name: prev.name || autoName // Only auto-fill if name is empty
+        }));
+        
+        // Reset preview and options
+        setFilePreview(null);
+        setSelectedSheet('');
+        setAvailableSheets([]);
+        
+        // Auto-detect delimiter for CSV files
+        if (file.name.endsWith('.csv')) {
+            setDelimiter(',');
+        } else if (file.name.endsWith('.tsv')) {
+            setDelimiter('\t');
+        }
+        
+        // Auto-preview the file
+        // Small delay to ensure state is updated
+        setTimeout(() => {
+            handlePreviewFile();
+        }, 100);
+        
+        return false; // Prevent auto upload
+    };
+    
+    const handlePreviewFile = async (skipSave: boolean = true) => {
+        if (!uploadedFile) return;
+        
+        setLoading(true);
         try {
-            console.log('Saving and continuing from step:', currentStep);
+            // Create a preview request to get file structure
+            // Note: This uploads the file but we can skip saving to data sources if skipSave is true
+            const formData = new FormData();
+            formData.append('file', uploadedFile);
+            formData.append('include_preview', 'true');
+            if (delimiter) formData.append('delimiter', delimiter);
+            if (selectedSheet) formData.append('sheet_name', selectedSheet);
+            // Add a flag to indicate this is preview-only (backend can handle this)
+            if (skipSave) {
+                formData.append('preview_only', 'true');
+            }
             
-            if (currentStep === 1) {
-                // Create a new data source if none exists or update existing one
-                const existingSource = getActiveDataSource();
-                
-                if (!existingSource) {
-                    console.log('No active source found, creating new one');
-                    // Create a new data source
-                    const newSource = {
-                        id: `ds_${Date.now()}`,
-                        name: dataSourceConfig.name || 'Connected Data Source',
-                        type: activeTab, // Use the active tab to determine the type
-                        config: {},
-                        status: 'connected' as const,
-                        isActive: true
-                    };
-                    setDataSources([newSource]);
-                    setActiveDataSourceId(newSource.id);
+            const response = await fetch('/api/data/upload', {
+                method: 'POST',
+                credentials: 'include',
+                body: formData
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                if (result.data_source?.preview_data) {
+                    setFilePreview(result.data_source.preview_data);
+                    // Extract sheet names if available
+                    if (result.data_source.sheets) {
+                        setAvailableSheets(result.data_source.sheets);
+                        if (result.data_source.sheets.length > 0 && !selectedSheet) {
+                            setSelectedSheet(result.data_source.sheets[0]);
+                        }
+                    }
+                    setTestResult({ success: true, message: 'Preview loaded successfully' });
+                } else if (result.success) {
+                    // If no preview_data but success, try to extract from data_source
+                    setTestResult({ success: true, message: 'File processed successfully' });
+                }
+            } else {
+                const errorData = await response.json().catch(() => ({ error: 'Preview failed' }));
+                setTestResult({ success: false, error: errorData.error || errorData.detail || 'Preview failed' });
+            }
+        } catch (error: any) {
+            console.error('Preview error:', error);
+            setTestResult({ success: false, error: error.message || 'Preview failed' });
+        } finally {
+            setLoading(false);
+        }
+    };
+    
+    const generateConnectionUrl = () => {
+        if (dataSourceConfig.type === 'api') {
+            return connectionConfig.host || '';
+        }
+        
+        if (!connectionConfig.host || !connectionConfig.database || !connectionConfig.username) {
+            return '';
+        }
+        
+        // SQLAlchemy connection URL format: dialect+driver://username:password@host:port/database
+        let dialect = '';
+        let driver = '';
+        
+        switch (selectedDatabaseType) {
+            case 'postgresql':
+                dialect = 'postgresql';
+                driver = 'psycopg2';
+                break;
+            case 'mysql':
+                dialect = 'mysql';
+                driver = 'pymysql';
+                break;
+            case 'sqlserver':
+                dialect = 'mssql';
+                driver = 'pyodbc';
+                break;
+            case 'clickhouse':
+                dialect = 'clickhouse';
+                driver = 'native'; // Use native driver as recommended
+                break;
+            case 'snowflake':
+                dialect = 'snowflake';
+                driver = 'snowflake-sqlalchemy';
+                break;
+            case 'bigquery':
+                dialect = 'bigquery';
+                driver = 'bigquery';
+                break;
+            case 'redshift':
+                dialect = 'redshift';
+                driver = 'psycopg2';
+                break;
+            default:
+                dialect = 'postgresql';
+                driver = 'psycopg2';
+        }
+        
+        const port = connectionConfig.port ? `:${connectionConfig.port}` : '';
+        const password = connectionConfig.password ? `:${connectionConfig.password}` : '';
+        
+        // Build query parameters
+        const queryParams = [];
+        if (connectionConfig.sslMode && connectionConfig.sslMode !== 'disable') {
+            queryParams.push(`sslmode=${connectionConfig.sslMode}`);
+        }
+        
+        // ClickHouse specific parameters
+        if (selectedDatabaseType === 'clickhouse') {
+            if (connectionConfig.sslMode === 'require') {
+                queryParams.push('secure=true');
+            }
+            if (connectionConfig.connectionTimeout) {
+                queryParams.push(`timeout=${connectionConfig.connectionTimeout}`);
+            }
+        }
+        
+        // SQL Server specific parameters
+        if (selectedDatabaseType === 'sqlserver') {
+            queryParams.push('driver=ODBC+Driver+17+for+SQL+Server');
+            if (connectionConfig.sslMode === 'require') {
+                queryParams.push('Encrypt=yes');
+            }
+        }
+        
+        const queryString = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
+        
+        return `${dialect}+${driver}://${connectionConfig.username}${password}@${connectionConfig.host}${port}/${connectionConfig.database}${queryString}`;
+    };
+    
+    const parseConnectionUrl = (url: string) => {
+        try {
+            // Handle SQLAlchemy connection strings (dialect+driver://...)
+            let urlToParse = url;
+            let dialect = '';
+            let driver = '';
+            
+            // Extract dialect and driver from SQLAlchemy format
+            if (url.includes('://')) {
+                const protocolPart = url.split('://')[0];
+                if (protocolPart.includes('+')) {
+                    [dialect, driver] = protocolPart.split('+');
+                    // Reconstruct URL with just the dialect for URL parsing
+                    urlToParse = url.replace(`${dialect}+${driver}://`, `${dialect}://`);
                 } else {
-                    console.log('Updating existing source');
-                    // Update existing data source
-                    const updatedSource = {
-                        ...existingSource,
-                        status: 'connected' as const,
-                        name: dataSourceConfig.name || `Connected ${existingSource.type}`
-                    };
-                    setDataSources(prev => prev.map(ds => 
-                        ds.id === existingSource.id ? updatedSource : ds
-                    ));
+                    dialect = protocolPart;
+                }
+            }
+            
+            const urlObj = new URL(urlToParse);
+            const protocol = urlObj.protocol.replace(':', '');
+            
+            // Map dialects to database types
+            let dbType = '';
+            switch (dialect || protocol) {
+                case 'postgresql':
+                    dbType = 'postgresql';
+                    break;
+                case 'mysql':
+                    dbType = 'mysql';
+                    break;
+                case 'mssql':
+                    dbType = 'sqlserver';
+                    break;
+                case 'clickhouse':
+                    dbType = 'clickhouse';
+                    break;
+                case 'snowflake':
+                    dbType = 'snowflake';
+                    break;
+                case 'bigquery':
+                    dbType = 'bigquery';
+                    break;
+                case 'redshift':
+                    dbType = 'redshift';
+                    break;
+                default:
+                    dbType = 'postgresql';
+            }
+            
+            // Update database type
+            setSelectedDatabaseType(dbType);
+            
+            // Parse query parameters
+            const queryParams = new URLSearchParams(urlObj.search);
+            let sslMode = 'prefer';
+            
+            // Handle SSL mode from query parameters
+            if (queryParams.has('sslmode')) {
+                sslMode = queryParams.get('sslmode') || 'prefer';
+            } else if (queryParams.has('secure') && queryParams.get('secure') === 'true') {
+                sslMode = 'require';
+            } else if (queryParams.has('Encrypt') && queryParams.get('Encrypt') === 'yes') {
+                sslMode = 'require';
+            }
+            
+            // Update connection config
+            setConnectionConfig(prev => ({
+                ...prev,
+                host: urlObj.hostname,
+                port: parseInt(urlObj.port) || (dbType === 'postgresql' ? 5432 : dbType === 'mysql' ? 3306 : dbType === 'clickhouse' ? 8123 : 1433),
+                database: urlObj.pathname.replace('/', ''),
+                username: urlObj.username,
+                password: urlObj.password,
+                sslMode: sslMode
+            }));
+            
+            // Mark fields as user-modified to prevent defaults from overriding
+            userModifiedRef.current.host = true;
+            userModifiedRef.current.port = true;
+            userModifiedRef.current.database = true;
+            userModifiedRef.current.username = true;
+            userModifiedRef.current.password = true;
+            userModifiedRef.current.sslMode = true;
+            
+            message.success('SQLAlchemy connection URL parsed and applied successfully!');
+        } catch (error) {
+            message.error('Invalid connection URL format. Please check the URL syntax.');
+        }
+    };
+    
+    const testConnection = async () => {
+        setLoading(true);
+        try {
+            if (dataSourceConfig.type === 'file') {
+                if (!uploadedFile) {
+                    setTestResult({ success: false, error: 'Please select a file first' });
+                    return;
+                }
+                // Auto-fill name if empty
+                if (!dataSourceConfig.name) {
+                    const autoName = uploadedFile.name.split('.').slice(0, -1).join('.') || uploadedFile.name;
+                    setDataSourceConfig(prev => ({ ...prev, name: autoName }));
+                }
+                setTestResult({ success: true, message: `File ready: ${uploadedFile.name} (${(uploadedFile.size / 1024).toFixed(1)} KB)` });
+                return;
+            }
+            
+            if (dataSourceConfig.type === 'warehouse' && ['delta_lake', 'iceberg', 's3_parquet', 'azure_blob'].includes(selectedDatabaseType)) {
+                // Test cloud storage connection
+                if (!connectionConfig.storageUri || connectionConfig.storageUri.trim() === '') {
+                    setTestResult({ success: false, error: 'Please provide a storage URI (s3:// or azure://)' });
+                    return;
                 }
                 
-                message.success('Connection saved successfully!');
+                const hasS3Creds = connectionConfig.storageUri.startsWith('s3://') && 
+                                  connectionConfig.accessKey && connectionConfig.secretKey;
+                const hasAzureCreds = connectionConfig.storageUri.startsWith('azure://') && 
+                                     connectionConfig.accountName && 
+                                     (connectionConfig.accountKey || connectionConfig.sasToken);
                 
-                // Auto-advance to next step
-                console.log('Advancing to step 2');
-                setCurrentStep(2);
+                if (!hasS3Creds && !hasAzureCreds) {
+                    setTestResult({ success: false, error: 'Please provide valid credentials for your cloud storage provider' });
+                    return;
+                }
                 
-                // Trigger step completion update
-                updateStepCompletion();
+                // Test connection via backend
+                try {
+                    const formatType = selectedDatabaseType === 'delta_lake' ? 'delta' : 
+                                     selectedDatabaseType === 'iceberg' ? 'iceberg' :
+                                     selectedDatabaseType === 's3_parquet' ? 's3_parquet' : 'azure_blob';
+                    
+                    const testRequest = {
+                        format_type: formatType,
+                        storage_uri: connectionConfig.storageUri.trim(),
+                        credentials: {
+                            ...(connectionConfig.accessKey && { access_key: connectionConfig.accessKey }),
+                            ...(connectionConfig.secretKey && { secret_key: connectionConfig.secretKey }),
+                            ...(connectionConfig.region && { region: connectionConfig.region }),
+                            ...(connectionConfig.accountName && { account_name: connectionConfig.accountName }),
+                            ...(connectionConfig.accountKey && { account_key: connectionConfig.accountKey }),
+                            ...(connectionConfig.sasToken && { sas_token: connectionConfig.sasToken })
+                        },
+                        ...(connectionConfig.version && { version: connectionConfig.version }),
+                        ...(connectionConfig.timestamp && { timestamp: connectionConfig.timestamp }),
+                        ...(connectionConfig.snapshotId && { snapshot_id: connectionConfig.snapshotId })
+                    };
+                    
+                    const response = await fetch('/api/data/delta-iceberg/test', {
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(testRequest)
+                    });
+                    
+                    const result = await response.json();
+                    setTestResult(result);
+                } catch (error: any) {
+                    setTestResult({ 
+                        success: false, 
+                        error: error.message || 'Connection test failed. Please check your settings.' 
+                    });
+                }
+                return;
+            }
+            
+            if (dataSourceConfig.type === 'api') {
+                if (!connectionConfig.host || !dataSourceConfig.name) {
+                    setTestResult({ success: false, error: 'Please fill in API name and base URL' });
+                    return;
+                }
+                
+                // Test API connection by making a simple request
+                try {
+                    const testUrl = connectionConfig.host.endsWith('/') ? 
+                        connectionConfig.host + 'health' : 
+                        connectionConfig.host + '/health';
+                    
+                    const response = await fetch(testUrl, {
+                        method: 'GET',
+                    headers: {
+                            'Content-Type': 'application/json',
+                            ...(connectionConfig.password && { 'Authorization': `Bearer ${connectionConfig.password}` })
+                        },
+                        signal: AbortSignal.timeout(5000) // 5 second timeout
+                    });
+                    
+                    if (response.ok) {
+                        setTestResult({ success: true, message: 'API endpoint is accessible and responding' });
+                } else {
+                        setTestResult({ success: true, message: `API endpoint responded with status ${response.status} - connection test passed` });
             }
         } catch (error) {
-            console.error('Save error:', error);
-            message.error('Failed to save progress');
-        }
-    };
-
-    // Auto-advance to next step when data source is connected
-    const goToNextStep = () => {
-        if (currentStep < workflowSteps.length) {
-            setCurrentStep(currentStep + 1);
-        }
-    };
-
-    // Handle successful data source connection
-    const handleDataSourceConnected = async () => {
-        try {
-            const activeSource = getActiveDataSource();
-            if (!activeSource) {
-                message.error('No active data source found');
+                    setTestResult({ success: true, message: 'API configuration validated (endpoint accessibility test skipped)' });
+                }
                 return;
             }
 
-            // For file uploads, actually upload the file to backend
-            if (activeSource.type === 'file' && uploadedFile && actualFile) {
-                console.log('Processing file upload for:', uploadedFile.filename);
+            // Database/Warehouse connection test
+            if (!connectionConfig.host || !connectionConfig.database || !connectionConfig.username || !connectionConfig.password) {
+                setTestResult({ success: false, error: 'Please fill in all required database fields' });
+                return;
+            }
+            
+            // Use the correct endpoint based on database type
+            let endpoint = '/api/data/database/test';
+            let requestBody = {
+                type: selectedDatabaseType,
+                host: connectionConfig.host,
+                port: connectionConfig.port,
+                database: connectionConfig.database,
+                username: connectionConfig.username,
+                password: connectionConfig.password,
+                ssl_mode: connectionConfig.sslMode
+            };
+            
+            // All databases use the same test endpoint - no need for special handling
+            // The backend /data/database/test handles all database types including warehouses
+            
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestBody)
+            });
+
+            const result = await response.json();
+            console.log('Test result:', result);
+            setTestResult(result);
+        } catch (error) {
+            setTestResult({ 
+                success: false, 
+                error: 'Connection test failed. Please check your settings.' 
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
+    
+    const saveDataSource = async () => {
+        setLoading(true);
+        try {
+            let response;
+            
+            if (dataSourceConfig.type === 'file') {
+                if (!uploadedFile) {
+                    setTestResult({ success: false, error: 'Please select a file first' });
+                    message.error('Please select a file to upload');
+                    return;
+                }
+                
+                // Auto-fill name if empty
+                if (!dataSourceConfig.name || dataSourceConfig.name.trim() === '') {
+                    const autoName = uploadedFile.name.split('.').slice(0, -1).join('.') || uploadedFile.name;
+                    setDataSourceConfig(prev => ({ ...prev, name: autoName }));
+                }
+                
+                // Validate file name
+                if (!dataSourceConfig.name || dataSourceConfig.name.trim() === '') {
+                    setTestResult({ success: false, error: 'Data source name is required' });
+                    message.error('Please enter a name for this data source');
+                    return;
+                }
+                
+                // Verify file is included and is a valid File object BEFORE creating FormData
+                if (!uploadedFile || !(uploadedFile instanceof File)) {
+                    setTestResult({ success: false, error: 'Invalid file. Please select a file to upload.' });
+                    message.error('Please select a valid file to upload');
+                    setLoading(false);
+                    return;
+                }
+                
+                // Create FormData and append file
+                const formData = new FormData();
+                formData.append('file', uploadedFile, uploadedFile.name); // Include filename explicitly
+                formData.append('name', dataSourceConfig.name.trim());
+                formData.append('include_preview', 'true');
+                if (delimiter) formData.append('delimiter', delimiter);
+                if (selectedSheet) formData.append('sheet_name', selectedSheet);
+                
+                // Double-check file is in FormData
+                if (!formData.has('file')) {
+                    setTestResult({ success: false, error: 'File is missing from upload request' });
+                    message.error('File upload error: File is missing');
+                    setLoading(false);
+                    return;
+                }
+                
+                // Log for debugging (remove in production)
+                console.log('Uploading file:', {
+                    name: uploadedFile.name,
+                    size: uploadedFile.size,
+                    type: uploadedFile.type,
+                    hasFile: formData.has('file')
+                });
+                
                 try {
-                    const formData = new FormData();
-                    formData.append('file', actualFile);
-                    
-                    const uploadResponse = await fetch(`${environment.api.baseUrl}/data/upload`, {
+                    response = await fetch('/api/data/upload', {
                         method: 'POST',
+                        credentials: 'include',
+                        // DO NOT set Content-Type header - browser will set it automatically with boundary for FormData
+                        // This is critical - if we set Content-Type manually, the boundary won't be included
                         body: formData
                     });
                     
-                    if (!uploadResponse.ok) {
-                        const errorText = await uploadResponse.text();
-                        console.error('Upload response error:', errorText);
-                        throw new Error(`File upload failed: ${uploadResponse.status} ${uploadResponse.statusText}`);
-                    }
-                    
-                    const uploadResult = await uploadResponse.json();
-                    
-                    if (uploadResult.success) {
-                        // Update the data source with actual backend data
-                        const updatedSource = {
-                            ...activeSource,
-                            status: 'connected' as const,
-                            name: dataSourceConfig.name || uploadResult.data_source.name,
-                            type: 'file', // Ensure type is file for file uploads
-                            config: {
-                                ...activeSource.config,
-                                connectionDetails: {
-                                    ...uploadResult.data_source,
-                                    backend_id: uploadResult.data_source.id
-                                }
-                            }
-                        };
-                        
-                        setDataSources(prev => prev.map(ds => 
-                            ds.id === activeSource.id ? updatedSource : ds
-                        ));
-                        
-                        message.success('File uploaded and data source connected successfully!');
-                        
-                        // Auto-advance to next step
-                        goToNextStep();
+                    if (!response.ok) {
+                        const errorData = await response.json().catch(() => ({ 
+                            error: `Server error (${response.status}): ${response.statusText}` 
+                        }));
+                        const errorMessage = errorData.detail || errorData.error || errorData.message || `Upload failed: ${response.status}`;
+                        setTestResult({ success: false, error: errorMessage });
+                        message.error(`Failed to upload: ${errorMessage}`);
                         return;
-                    } else {
-                        throw new Error(uploadResult.error || 'Upload failed');
                     }
-                } catch (uploadError) {
-                    console.error('File upload error:', uploadError);
-                    const errorMessage = uploadError instanceof Error ? uploadError.message : 'Unknown upload error';
-                    message.error('File upload failed: ' + errorMessage);
-                    return;
+                    
+                    const result = await response.json();
+                    if (result.success) {
+                        const dataSource = result.data_source || {
+                            id: result.data_source_id,
+                            name: dataSourceConfig.name || uploadedFile.name,
+                            type: 'file',
+                            format: uploadedFile.name.split('.').pop(),
+                            status: 'connected',
+                            created_at: new Date().toISOString()
+                        };
+                        onDataSourceCreated(dataSource);
+                        onClose();
+                        message.success('File uploaded and saved successfully!');
+                    } else {
+                        const errorMessage = result.error || result.detail || 'Failed to upload file';
+                        setTestResult({ success: false, error: errorMessage });
+                        message.error(`Upload failed: ${errorMessage}`);
+                    }
+                } catch (error: any) {
+                    const errorMessage = error.message || 'Network error. Please check your connection and try again.';
+                    setTestResult({ success: false, error: errorMessage });
+                    message.error(`Upload failed: ${errorMessage}`);
                 }
-            }
-
-            // For database connections, test the connection first
-            if (activeSource.type === 'database') {
-                await testDatabaseConnection();
-                if (dbTestResult?.success) {
-                    await saveDatabaseConnection();
-                }
-            }
-
-            // For warehouse connections, test the connection first
-            if (activeSource.type === 'warehouse') {
-                await testWarehouseConnection();
-                if (warehouseTestResult?.success) {
-                    await saveWarehouseConnection();
-                }
-            }
-
-            // For other data source types, proceed as before
-            const updatedSource = {
-                ...activeSource,
-                status: 'connected' as const,
-                name: dataSourceConfig.name || `Connected ${activeSource.type}`,
-                type: activeSource.type, // Ensure type is preserved
-                config: {
-                    ...activeSource.config,
-                    connectionDetails: activeSource.type === 'database' ? dbConnection :
-                        activeSource.type === 'warehouse' ? warehouseConnection :
-                        apiConnection
-                }
-            };
-            
-            setDataSources(prev => prev.map(ds => 
-                ds.id === activeSource.id ? updatedSource : ds
-            ));
-
-            // Save the connection to backend/localStorage
-            await saveDataSourceConnection(updatedSource);
-            
-            message.success('Data source connected successfully!');
-            
-            // Auto-advance to next step
-            goToNextStep();
-        } catch (error) {
-            console.error('Connection failed:', error);
-            message.error('Failed to connect data source');
-        }
-    };
-
-    // Save data source connection
-    const saveDataSourceConnection = async (dataSource: any) => {
-        try {
-            // Optimistically update localStorage and local state
-                const savedSourcesRaw = JSON.parse(localStorage.getItem('aiser_data_sources') || '[]');
-                const metadata = {
-                    id: dataSource.id,
-                    name: dataSource.name,
-                    type: dataSource.type,
-                    status: dataSource.status || 'pending',
-                    createdAt: dataSource.createdAt || new Date().toISOString(),
-                    format: dataSource.format || null,
-                    preview: dataSource.preview || null
+            } else if (dataSourceConfig.type === 'api') {
+                // For API data sources, create a mock data source
+                const apiDataSource = {
+                    id: `api_${Date.now()}`,
+                    name: dataSourceConfig.name,
+                    type: 'api',
+                    config: {
+                        base_url: connectionConfig.host,
+                        auth_type: connectionConfig.username,
+                        api_key: connectionConfig.password,
+                        description: dataSourceConfig.description
+                    },
+                    status: 'connected',
+                    created_at: new Date().toISOString()
                 };
-                const existingIndex = savedSourcesRaw.findIndex((ds: any) => ds.id === dataSource.id);
-                if (existingIndex >= 0) {
-                    savedSourcesRaw[existingIndex] = { ...savedSourcesRaw[existingIndex], ...metadata };
+                
+                onDataSourceCreated(apiDataSource);
+                onClose();
+                message.success('API data source created successfully!');
+                return;
                 } else {
-                    savedSourcesRaw.push(metadata);
+                // Database/Warehouse/Cloud Storage connection
+                let endpoint = '/api/data/database/connect';
+                let requestBody: any;
+                
+                // Handle data lake types (Delta/Iceberg) and cloud storage (S3/Azure/GCP) FIRST
+                if (['delta_lake', 'iceberg', 's3_parquet', 'azure_blob', 'gcp_cloud_storage'].includes(selectedDatabaseType)) {
+                    // Validate cloud storage fields
+                    if (!connectionConfig.storageUri || connectionConfig.storageUri.trim() === '') {
+                        setTestResult({ success: false, error: 'Storage URI is required' });
+                        message.error('Please provide a storage URI (s3://, azure://, or gcs://)');
+                        return;
+                    }
+                    
+                    const hasS3Creds = (connectionConfig.storageUri.startsWith('s3://')) && 
+                                      connectionConfig.accessKey && connectionConfig.secretKey;
+                    const hasAzureCreds = (connectionConfig.storageUri.startsWith('azure://') || 
+                                           connectionConfig.storageUri.startsWith('abfss://')) && 
+                                         connectionConfig.accountName && 
+                                         (connectionConfig.accountKey || connectionConfig.sasToken);
+                    const hasGCPCreds = (connectionConfig.storageUri.startsWith('gcs://') || 
+                                         connectionConfig.storageUri.startsWith('gs://')) && 
+                                        connectionConfig.gcpCredentials;
+                    
+                    if (!hasS3Creds && !hasAzureCreds && !hasGCPCreds) {
+                        setTestResult({ success: false, error: 'Please provide valid credentials for your cloud storage provider' });
+                        message.error('Please provide valid cloud storage credentials');
+                        return;
+                    }
+                    
+                    // For cloud storage (not data lakes), require file format
+                    const isCloudStorage = ['s3_parquet', 'azure_blob', 'gcp_cloud_storage'].includes(selectedDatabaseType);
+                    if (isCloudStorage && !connectionConfig.fileFormat) {
+                        setTestResult({ success: false, error: 'File format is required for cloud storage connections' });
+                        message.error('Please select a file format (Parquet, CSV, JSON, or TSV)');
+                        return;
+                    }
+                    
+                    // Auto-generate name if not provided
+                    let finalName = dataSourceConfig.name;
+                    if (!finalName || finalName.trim() === '') {
+                        const uriParts = connectionConfig.storageUri.split('/').filter(p => p);
+                        const bucketOrAccount = uriParts[1] || 'Cloud Storage';
+                        finalName = `${databaseTypes.find(db => db.value === selectedDatabaseType)?.label} - ${bucketOrAccount}`;
+                        setDataSourceConfig(prev => ({ ...prev, name: finalName }));
+                    }
+                    
+                    // Use Delta/Iceberg connector endpoint
+                    endpoint = '/api/data/delta-iceberg/connect';
+                    requestBody = {
+                        format_type: selectedDatabaseType === 'delta_lake' ? 'delta' : 
+                                   selectedDatabaseType === 'iceberg' ? 'iceberg' :
+                                   selectedDatabaseType === 's3_parquet' ? 's3_parquet' : 
+                                   selectedDatabaseType === 'azure_blob' ? 'azure_blob' :
+                                   'gcp_cloud_storage',
+                        storage_uri: connectionConfig.storageUri.trim(),
+                        credentials: {
+                            ...(connectionConfig.accessKey && { access_key: connectionConfig.accessKey }),
+                            ...(connectionConfig.secretKey && { secret_key: connectionConfig.secretKey }),
+                            ...(connectionConfig.region && { region: connectionConfig.region }),
+                            ...(connectionConfig.endpoint && { endpoint: connectionConfig.endpoint }),
+                            ...(connectionConfig.accountName && { account_name: connectionConfig.accountName }),
+                            ...(connectionConfig.accountKey && { account_key: connectionConfig.accountKey }),
+                            ...(connectionConfig.sasToken && { sas_token: connectionConfig.sasToken }),
+                            ...(connectionConfig.gcpCredentials && { service_account_key: connectionConfig.gcpCredentials }),
+                            ...(connectionConfig.gcpProjectId && { project_id: connectionConfig.gcpProjectId })
+                        },
+                        name: finalName,
+                        ...(connectionConfig.fileFormat && { file_format: connectionConfig.fileFormat }),
+                        ...(connectionConfig.version && { version: connectionConfig.version }),
+                        ...(connectionConfig.timestamp && { timestamp: connectionConfig.timestamp }),
+                        ...(connectionConfig.snapshotId && { snapshot_id: connectionConfig.snapshotId })
+                    };
+                } else {
+                    // Regular database/warehouse connection
+                    // IMPORTANT: Even if URI was provided, if connectionConfig is populated, use manual fields
+                    const hasManualFields = connectionConfig.host && connectionConfig.database && connectionConfig.username;
+                    const useUri = customConnectionUrl && customConnectionUrl.trim().length > 0 && !hasManualFields;
+                    
+                    if (!useUri && (!connectionConfig.host || !connectionConfig.database || !connectionConfig.username || !connectionConfig.password)) {
+                        setTestResult({ success: false, error: 'Please fill in all required database fields or provide a connection URI' });
+                        return;
+                    }
+                    
+                    // Auto-generate name if not provided
+                    let finalName = dataSourceConfig.name;
+                    if (!finalName || finalName.trim() === '') {
+                        finalName = generateDataSourceName();
+                        setDataSourceConfig(prev => ({ ...prev, name: finalName }));
+                    }
+                    
+                    if (useUri) {
+                        requestBody = {
+                            type: selectedDatabaseType,
+                            uri: customConnectionUrl.trim(),
+                            name: finalName,
+                            connection_type: 'uri'
+                        };
+                    } else {
+                        requestBody = {
+                            type: selectedDatabaseType,
+                            host: connectionConfig.host,
+                            port: connectionConfig.port,
+                            database: connectionConfig.database,
+                            username: connectionConfig.username,
+                            password: connectionConfig.password,
+                            name: finalName,
+                            ssl_mode: connectionConfig.sslMode,
+                            connection_type: 'manual'
+                        };
+                    }
+                    
+                    // For enterprise warehouses, use the warehouse connect endpoint
+                    if (['snowflake', 'bigquery', 'redshift', 'clickhouse'].includes(selectedDatabaseType)) {
+                        endpoint = '/api/data/warehouses/connect';
+                        requestBody = {
+                            connection_config: requestBody
+                        };
+                    }
                 }
-                localStorage.setItem('aiser_data_sources', JSON.stringify(savedSourcesRaw));
-            setDataSources(prev => prev.map(ds => ds.id === dataSource.id ? dataSource : ds));
-
-            // Also save to backend if API is available
-            try {
-                const organizationId = currentOrganization?.id ?? localStorage.getItem('currentOrganizationId') ?? 1;
-                let projectIdRaw = localStorage.getItem('currentProjectId');
-                if (!projectIdRaw && Array.isArray(orgProjects) && orgProjects.length > 0) projectIdRaw = String(orgProjects[0].id);
-                const projectId = projectIdRaw ?? (orgProjects && orgProjects.length > 0 ? String(orgProjects[0].id) : localStorage.getItem('currentProjectId') ?? 1);
-
-                const resp = await fetch(`${backendUrl}/data/api/organizations/${organizationId}/projects/${projectId}/data-sources`, {
+                
+                response = await fetch(endpoint, {
                     method: 'POST',
                     credentials: 'include',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        id: dataSource.id,
-                        name: dataSource.name,
-                        type: dataSource.type,
-                        format: dataSource.format,
-                        description: dataSource.description || dataSource.name,
-                        config: dataSource.config || {},
-                        metadata: dataSource.metadata || { created_via: 'universal_modal' }
-                    })
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestBody)
                 });
-
-                if (resp.ok) {
-                    const body = await resp.json();
-                    if (body.success && body.data_source) {
-                        // Merge backend-provided values (id, created_at, etc.)
-                    const merged = { ...dataSource, ...body.data_source };
-                    // update state with merged but strip secrets from local cache
-                    const mergedMetadata = {
-                        id: merged.id,
-                        name: merged.name,
-                        type: merged.type,
-                        // normalize status to known UI values
-                        status: merged.status || 'connected',
-                        createdAt: merged.created_at || merged.createdAt || new Date().toISOString(),
-                        format: merged.format || null,
-                        preview: merged.preview || null
-                    };
-                    setDataSources(prev => prev.map(ds => ds.id === dataSource.id ? merged : ds));
-                    const savedSourcesRaw2 = JSON.parse(localStorage.getItem('aiser_data_sources') || '[]');
-                    const idx = savedSourcesRaw2.findIndex((s: any) => s.id === dataSource.id);
-                    if (idx >= 0) savedSourcesRaw2[idx] = { ...savedSourcesRaw2[idx], ...mergedMetadata };
-                    else savedSourcesRaw2.push(mergedMetadata);
-                    localStorage.setItem('aiser_data_sources', JSON.stringify(savedSourcesRaw2));
-                    }
-                } else {
-                    console.warn('Backend save returned non-ok', resp.status);
-                }
-            } catch (apiError) {
-                console.warn('Backend save failed, using local storage:', apiError);
             }
-        } catch (error) {
-            console.error('Failed to save data source:', error);
-            throw error;
-        }
-    };
-
-    // Generate AI schema using the backend AI service with enhanced capabilities for large datasets
-    const generateAISchema = async () => {
-        try {
-            setAiDataModeling(prev => ({ ...prev, isGenerating: true }));
             
-            const activeSource = getActiveDataSource();
-            if (!activeSource) {
-                message.error('No active data source found');
-                return;
-            }
-
-            // Enhanced AI insights generation for large datasets
-            if (activeSource.type === 'file' && activeSource.config.connectionDetails?.backend_id) {
-                try {
-                    const insightsResponse = await fetch(`${environment.api.baseUrl}/data/${activeSource.config.connectionDetails.backend_id}/insights`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            enhanced_analysis: true,
-                            large_dataset_handling: true,
-                            sampling_strategy: 'adaptive', // For datasets > 1M rows
-                            quality_threshold: 0.8,
-                            business_context: dataSourceConfig.businessContext || 'enterprise analytics'
-                        })
-                    });
-                    
-                    if (insightsResponse.ok) {
-                        const insightsResult = await insightsResponse.json();
-                        if (insightsResult.success) {
-                            // Store enhanced insights
-                            setAiDataModeling(prev => ({ 
-                                ...prev,
-                                businessInsights: insightsResult.insights?.business_insights || [],
-                                recommendedMetrics: insightsResult.insights?.recommended_visualizations || [],
-                                dataQualityScore: insightsResult.insights?.quality_score || 0,
-                                complexityAssessment: insightsResult.insights?.complexity_level || 'medium',
-                                optimizationSuggestions: insightsResult.insights?.optimization_tips || []
-                            }));
-                        }
-                    }
-                } catch (insightsError) {
-                    console.log('Enhanced AI insights generation failed, continuing with basic schema generation');
-                }
-            }
-
-            // Enhanced AI schema generation with large dataset handling
-            const schemaPayload = {
-                data_source_id: activeSource.id,
-                data_source_type: activeSource.type,
-                connection_details: activeSource.type === 'file' ? {
-                    format: activeSource.config.connectionDetails?.format || 'csv',
-                    columns: activeSource.config.connectionDetails?.schema?.columns?.map((col: any) => ({
-                        name: col.name,
-                        type: col.type,
-                        sample_values: col.sample_values || [],
-                        null_percentage: col.null_percentage || 0,
-                        unique_values: col.unique_values || 0
-                    })) || [],
-                    row_count: activeSource.config.connectionDetails?.schema?.row_count || 0,
-                    file_size_mb: activeSource.config.connectionDetails?.file_size_mb || 0,
-                    complexity_indicators: {
-                        has_nested_structures: activeSource.config.connectionDetails?.schema?.has_nested_structures || false,
-                        has_missing_values: activeSource.config.connectionDetails?.schema?.has_missing_values || false,
-                        has_duplicates: activeSource.config.connectionDetails?.schema?.has_duplicates || false,
-                        column_correlations: activeSource.config.connectionDetails?.schema?.column_correlations || []
-                    }
-                } : {
-                    ...activeSource.config.connectionDetails,
-                    database_type: activeSource.type,
-                    estimated_row_count: activeSource.config.connectionDetails?.estimated_rows || 'unknown',
-                    table_complexity: activeSource.config.connectionDetails?.table_complexity || 'medium'
-                },
-                business_context: dataSourceConfig.businessContext || 'enterprise analytics',
-                // Schema-level scope: default to selected schema, include selected table/view when applicable
-                scope: activeSource.type === 'database' ? ((): any => {
-                    const currentSchema: string = (activeSource.config?.connectionDetails?.schema || 'public');
-                    const currentTable: string | undefined = undefined;
-                    return {
-                        schemas: currentSchema ? [currentSchema] : [],
-                        tables: currentTable ? [currentTable] : []
-                    };
-                })() : undefined,
-                schema_generation_config: {
-                    optimization_level: 'enterprise', // 'basic', 'standard', 'enterprise'
-                    handle_large_datasets: true,
-                    enable_partitioning: true,
-                    enable_caching_strategies: true,
-                    generate_advanced_metrics: true,
-                    include_time_dimensions: true,
-                    enable_hierarchical_structures: true,
-                    performance_optimization: true
-                }
-            };
-
-            const response = await fetch(`${environment.api.baseUrl}/ai/schema/generate`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(schemaPayload),
-            });
-
             if (!response.ok) {
-                throw new Error('Failed to generate enhanced schema');
+                const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+                console.error('Save failed:', response.status, errorData);
+                setTestResult({ 
+                    success: false, 
+                    error: errorData.detail || errorData.error || `Server error: ${response.status}`
+                });
+                message.error(`Failed to save: ${errorData.detail || errorData.error || response.status}`);
+                return;
             }
 
             const result = await response.json();
+            console.log('Save success:', result);
             
-            if (result.success && result.yaml_schema) {
-                setAiDataModeling(prev => ({ 
-                    ...prev,
-                    yamlSchema: result.yaml_schema,
-                    isGenerating: false,
-                    schemaMetadata: {
-                        generationTime: new Date().toISOString(),
-                        optimizationLevel: 'enterprise',
-                        estimatedPerformance: result.estimated_performance || 'high',
-                        cachingStrategy: result.caching_strategy || 'adaptive',
-                        partitioningStrategy: result.partitioning_strategy || 'auto'
+            if (result.success) {
+                // Handle different response formats from different endpoints
+                const dataSource = result.data_source || {
+                    id: result.data_source_id,
+                    name: dataSourceConfig.name,
+                    type: 'database',
+                    db_type: selectedDatabaseType,
+                    status: 'connected',
+                    connection_info: result.connection_info
+                };
+                
+                message.success({
+                    content: `✅ ${dataSource.name} connected successfully!`,
+                    duration: 5,
+                    style: {
+                        marginTop: '20vh',
                     }
+                });
+                
+                // Notify parent to refresh data sources
+                onDataSourceCreated(dataSource);
+                
+                // Trigger a custom event to refresh all data source panels
+                window.dispatchEvent(new CustomEvent('datasource-created', { 
+                    detail: dataSource 
                 }));
                 
-                message.success(`Enhanced AI schema generated successfully! ${result.optimization_tips ? 'Optimization tips available.' : ''}`);
-                
-                // Show optimization recommendations if available
-                if (result.optimization_tips) {
-                    setAiDataModeling(prev => ({
-                        ...prev,
-                        optimizationSuggestions: result.optimization_tips
-                    }));
-                }
+                // Small delay to let user see the success message
+                setTimeout(() => {
+                    onClose();
+                }, 500);
             } else {
-                throw new Error(result.error || 'Enhanced schema generation failed');
+                setTestResult({ success: false, error: result.error || 'Failed to save data source' });
+                message.error(result.error || 'Failed to save data source');
             }
         } catch (error) {
-            console.error('Enhanced schema generation error:', error);
-            message.error('Failed to generate enhanced AI schema');
-            setAiDataModeling(prev => ({ ...prev, isGenerating: false }));
-        }
-    };
-
-    // Regenerate schema
-    const regenerateSchema = () => {
-                        setAiDataModeling(prev => ({ ...prev, yamlSchema: '' }));
-        generateAISchema();
-    };
-
-    // Auto-generate from source, build visual map, then deploy via backend
-    const autoGenerateFromSource = async () => {
-        const activeSource = getActiveDataSource();
-        if (!activeSource) {
-            message.error('No active data source found');
-            return;
-        }
-        const res = await fetch(`${environment.api.baseUrl}/cube/schema/auto`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ data_source_id: activeSource.id })
-        });
-        if (!res.ok) {
-            message.error('Failed to auto-generate schema');
-            return;
-        }
-        const j = await res.json();
-        if (j.success && j.yaml_schema) {
-            setAiDataModeling(prev => ({ ...prev, yamlSchema: j.yaml_schema }));
-            message.success('Auto-generated YAML schema from source');
-        }
-    };
-
-    const buildVisualMap = async () => {
-        if (!aiDataModeling.yamlSchema) return;
-        try {
-            const res = await fetch(`${environment.api.baseUrl}/cube/schema/visual-map`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ yaml_schema: aiDataModeling.yamlSchema })
+            setTestResult({ 
+                success: false, 
+                error: 'Failed to save data source. Please try again.' 
             });
-            if (res.ok) {
-                const j = await res.json();
-                setAiDataModeling(prev => ({ ...prev, visualMap: j } as any));
-            }
-        } catch {}
-    };
-
-    // Deploy schema to Cube.js via backend endpoint for consistency
-    const deployToCube = async () => {
-        try {
-            setCubeIntegration(prev => ({ ...prev, status: 'analyzing' }));
-            
-            const activeSource = getActiveDataSource();
-            if (!activeSource || !aiDataModeling.yamlSchema) {
-                message.error('No active data source or schema found');
-                return;
-            }
-
-            try {
-                const deployRes = await fetch(`${environment.api.baseUrl}/cube/schema/deploy`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ cube_schema: { yaml: aiDataModeling.yamlSchema }, cube_name: activeSource.name })
-                });
-                if (!deployRes.ok) throw new Error('Deploy failed');
-                const dj = await deployRes.json();
-                if (dj.success) {
-                    setCubeIntegration(prev => ({ ...prev, status: 'deployed', deployment_url: 'http://localhost:4000', schema: aiDataModeling.yamlSchema }));
-                    message.success('Successfully deployed to Cube.js!');
-                } else {
-                    throw new Error(dj.error || 'Deploy failed');
-                }
-            } catch (cubeError) {
-                console.error('Cube deployment error:', cubeError);
-                message.error('Cube.js deployment failed');
-                setCubeIntegration(prev => ({ ...prev, status: 'error' }));
-            }
-
-        } catch (error) {
-            console.error('Cube.js deployment error:', error);
-            message.error('Failed to deploy to Cube.js');
-            setCubeIntegration(prev => ({ ...prev, status: 'error' }));
+        } finally {
+            setLoading(false);
         }
     };
-
-    // Handle data source creation completion
-    const handleDataSourceCreated = async () => {
-        try {
-            const activeSource = getActiveDataSource();
-            if (!activeSource) {
-                message.error('No active data source found');
-                return;
-            }
-
-            // Create the final data source object
-            const nameToUse = (dataSourceConfig.name || `Connected ${activeSource.type}`).trim();
-            // Enforce unique display name among existing dataSources
-            const nameExists = dataSources.some(ds => (ds?.name || '').toLowerCase() === nameToUse.toLowerCase());
-            if (nameExists) {
-                message.error('A data source with this name already exists. Please choose a different name.');
-                return;
-            }
-            const finalDataSource = {
-                id: activeSource.id,
-                name: nameToUse,
-                type: activeSource.type,
-                config: activeSource.config,
-                status: 'connected' as const,
-                isActive: true,
-                cubeIntegration,
-                aiModeling: aiDataModeling,
-                createdAt: new Date().toISOString()
-            };
-
-            // Call the callback
-            onDataSourceCreated(finalDataSource);
+    
+    const renderDataSourceTypeSelection = () => (
+        <div style={{ padding: '8px 0' }}>
+            <Title level={4} style={{ textAlign: 'center', marginBottom: '16px' }}>
+                Choose Your Data Source Type
+            </Title>
             
-            // Close the modal
-            onClose();
-            
-            message.success('Data source created successfully!');
-            
-        } catch (error) {
-            console.error('Failed to create data source:', error);
-            message.error('Failed to create data source');
-        }
-    };
-
-    // Render file upload step
+            <Row gutter={[16, 16]}>
+                {dataSourceTypes.map(type => (
+                    <Col span={12} key={type.key}>
+                        <Card
+                            hoverable
+                            onClick={() => handleDataSourceTypeSelect(type.key)}
+                            style={{ 
+                                textAlign: 'center',
+                                cursor: 'pointer',
+                                border: dataSourceConfig.type === type.key ? `2px solid #1890ff` : '1px solid #d9d9d9'
+                            }}
+                        >
+                            <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+                                <div style={{ fontSize: '32px', color: type.color === 'blue' ? '#1890ff' : 
+                                    type.color === 'green' ? '#52c41a' : 
+                                    type.color === 'purple' ? '#722ed1' : '#fa8c16' }}>
+                                    {type.icon}
+                                </div>
+                                <Title level={5} style={{ margin: 0 }}>{type.label}</Title>
+                                <Text type="secondary">{type.description}</Text>
+                            </Space>
+                        </Card>
+                    </Col>
+                ))}
+            </Row>
+        </div>
+    );
+    
     const renderFileUpload = () => (
-        <div style={{ padding: '16px' }}>
-            {/* Removed Existing Data Sources section - not needed for this workflow */}
+        <div style={{ padding: '24px 0' }}>
+            <Title level={4}>Upload Your File</Title>
+            <Text type="secondary" style={{ display: 'block', marginBottom: '24px' }}>
+                Supported formats: CSV, Excel (.xlsx), Parquet, JSON
+            </Text>
             
+            {/* File Upload */}
+            <Form.Item label="Select File" required>
                 <Dragger
-                    name="file"
-                    multiple={false}
-                    accept=".csv,.tsv,.xlsx,.xls,.json,.parquet,.parq,.snappy"
-                    beforeUpload={(file) => {
-                    // Enforce unique display name immediately
-                    const duplicate = dataSources.some(ds => (ds?.name || '').toLowerCase() === `file: ${file.name}`.toLowerCase());
-                    if (duplicate) {
-                        message.error('A data source with this name already exists. Please rename the file or choose a different name.');
-                        return Upload.LIST_IGNORE as any;
-                    }
-                    // Store the actual File object for upload
-                    setActualFile(file);
-                    
-                    // Store metadata
-                    setUploadedFile({
-                        filename: file.name,
-                        content_type: file.type,
-                        storage_type: 'local',
-                        file_size: file.size,
-                        uuid_filename: file.name
-                    });
-                    
-                    // Automatically create a file-type data source when file is uploaded
-                    const newDataSource = {
-                        id: `ds_${Date.now()}`,
-                        name: `File: ${file.name}`,
-                        type: 'file' as const,
-                        status: 'pending' as const,
-                        config: {},
-                        createdAt: new Date().toISOString()
-                    };
-                    
-                    setDataSources(prev => [...prev, newDataSource]);
-                    setActiveDataSourceId(newDataSource.id);
-                    
+                    accept=".csv,.xlsx,.xls,.parquet,.json"
+                beforeUpload={(file) => {
+                    handleFileUpload(file);
                     return false; // Prevent auto upload
                 }}
-                onRemove={() => {
-                    setUploadedFile(null);
-                    setActualFile(null);
-                }}
+                    showUploadList={false}
+                    style={{ padding: '40px 0' }}
                 >
                     <p className="ant-upload-drag-icon">
-                        <InboxOutlined />
+                        <UploadOutlined style={{ fontSize: '48px', color: '#1890ff' }} />
                     </p>
-                    <p className="ant-upload-text">Click or drag file to this area to upload</p>
-                    <p className="ant-upload-hint">
-                    Enhanced support for CSV, TSV, Excel, JSON, Parquet files with AI-powered auto-detection
+                    <p className="ant-upload-text">
+                        {uploadedFile ? uploadedFile.name : 'Click or drag file to this area to upload'}
                     </p>
                     <p className="ant-upload-hint">
-                    📄 CSV/TSV • 📈 Excel • 🔧 JSON • 📦 Parquet • 🚀 Auto-detection
+                        Support for single file upload. File will be analyzed automatically.
                     </p>
                 </Dragger>
 
+                {uploadedFile && (
+                    <Alert
+                        message="File Ready"
+                        description={`${uploadedFile.name} (${(uploadedFile.size / 1024).toFixed(1)} KB) is ready for upload. ${filePreview ? 'Preview loaded.' : loading ? 'Loading preview...' : ''}`}
+                        type="success"
+                        showIcon
+                        style={{ marginTop: '16px' }}
+                    />
+                )}
+            </Form.Item>
+
+            {/* File Options - Sheet Selection and Delimiter */}
             {uploadedFile && (
-                <Card style={{ marginTop: '16px' }}>
-                        <Space>
-                        <FileTextOutlined style={{ color: '#52c41a' }} />
-                        <Text strong>{uploadedFile.filename}</Text>
-                        <Text type="secondary">({(uploadedFile.file_size / 1024 / 1024).toFixed(2)} MB)</Text>
-                        <Tag color="success">Ready for Analysis</Tag>
-                        </Space>
-                        
-                        <div style={{ marginTop: '12px' }}>
-                            <Text type="secondary">
-                                File will be processed with AI-powered auto-detection for:
-                            </Text>
-                            <div style={{ marginTop: '8px' }}>
-                                <Tag color="blue">📊 Schema Inference</Tag>
-                                <Tag color="green">🔍 Data Quality Analysis</Tag>
-                                <Tag color="purple">💡 Business Insights</Tag>
-                                <Tag color="orange">📈 Visualization Recommendations</Tag>
-                            </div>
-                        </div>
-                </Card>
+                <Row gutter={16}>
+                    {uploadedFile.name.endsWith('.xlsx') || uploadedFile.name.endsWith('.xls') ? (
+                        <Col span={12}>
+                            <Form.Item label="Sheet (Excel)" help="Select which sheet to import">
+                                <Select
+                                    value={selectedSheet}
+                                    onChange={setSelectedSheet}
+                                    placeholder="Auto-detect"
+                                    allowClear
+                                    onSelect={() => {
+                                        // Refresh preview when sheet changes
+                                        if (filePreview) {
+                                            handlePreviewFile();
+                                        }
+                                    }}
+                                >
+                                    {availableSheets.map(sheet => (
+                                        <Option key={sheet} value={sheet}>{sheet}</Option>
+                                    ))}
+                                </Select>
+                            </Form.Item>
+                        </Col>
+                    ) : null}
+                    {uploadedFile.name.endsWith('.csv') || uploadedFile.name.endsWith('.tsv') ? (
+                        <Col span={12}>
+                            <Form.Item label="Delimiter" help="Auto-detected, but you can override">
+                                <Select
+                                    value={delimiter}
+                                    onChange={setDelimiter}
+                                    onSelect={() => {
+                                        // Refresh preview when delimiter changes
+                                        if (filePreview) {
+                                            handlePreviewFile();
+                                        }
+                                    }}
+                                >
+                                    <Option value=",">Comma (,)</Option>
+                                    <Option value=";">Semicolon (;)</Option>
+                                    <Option value="\t">Tab</Option>
+                                    <Option value="|">Pipe (|)</Option>
+                                </Select>
+                            </Form.Item>
+                        </Col>
+                    ) : null}
+                </Row>
             )}
-            
-            <div style={{ marginTop: '16px', textAlign: 'center' }}>
-                        <Button
-                            type="primary"
-                    size="large"
-                    disabled={!uploadedFile}
-                    onClick={() => {
-                        console.log('Active data source before connection:', getActiveDataSource());
-                        console.log('Active tab:', activeTab);
-                        console.log('Uploaded file:', uploadedFile);
-                        handleDataSourceConnected();
-                    }}
-                    icon={<ArrowRightOutlined />}
-                >
-                    Continue to Analysis
-                        </Button>
-            </div>
+
+            {/* Data Preview */}
+            {filePreview && Array.isArray(filePreview) && filePreview.length > 0 && (
+                <Form.Item label="Data Preview" help="First few rows of your data">
+                    <div style={{ 
+                        maxHeight: '200px', 
+                        overflow: 'auto', 
+                        border: '1px solid var(--ant-color-border)',
+                        borderRadius: '4px',
+                        padding: '8px',
+                        backgroundColor: 'var(--ant-color-bg-container)'
+                    }}>
+                        <Table
+                            dataSource={filePreview.slice(0, 5)}
+                            columns={Object.keys(filePreview[0] || {}).map(key => ({
+                                title: key,
+                                dataIndex: key,
+                                key: key,
+                                ellipsis: true
+                            }))}
+                            pagination={false}
+                            size="small"
+                            scroll={{ x: 'max-content' }}
+                        />
+                        <Text type="secondary" style={{ fontSize: '12px', display: 'block', marginTop: '8px' }}>
+                            Showing first 5 rows of {filePreview.length} total rows
+                        </Text>
+                    </div>
+                </Form.Item>
+            )}
+
+            {/* Data Source Name */}
+            <Form.Item label="Data Source Name" required>
+                <Input
+                    value={dataSourceConfig.name}
+                    onChange={(e) => setDataSourceConfig(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="Enter a name for this data source"
+                />
+            </Form.Item>
+
+            {/* Description */}
+            <Form.Item label="Description">
+                <Input.TextArea
+                    value={dataSourceConfig.description}
+                    onChange={(e) => setDataSourceConfig(prev => ({ ...prev, description: e.target.value }))}
+                    placeholder="Describe this data source..."
+                    rows={3}
+                />
+            </Form.Item>
+
+            {/* Test result alert for file uploads */}
+            {testResult && (
+                <Alert
+                    message={testResult.success ? "File Ready!" : "Upload Failed"}
+                    description={testResult.message || testResult.error}
+                    type={testResult.success ? "success" : "error"}
+                    showIcon
+                    style={{ marginTop: '16px' }}
+                />
+            )}
         </div>
     );
 
-    // Render database connection step
-    const renderDatabaseConnection = () => (
-        <div style={{ padding: '16px' }}>
+    const renderDatabaseConfiguration = () => {
+        const isCloudStorage = ['s3_parquet', 'azure_blob', 'gcp_cloud_storage'].includes(selectedDatabaseType);
+        const isDataLake = ['delta_lake', 'iceberg'].includes(selectedDatabaseType);
+        
+        return (
+        <div style={{ padding: '8px 0' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <Title level={4} style={{ margin: 0 }}>
+                    {isCloudStorage ? 'Cloud Storage Configuration' :
+                     isDataLake ? 'Data Lake Configuration' :
+                     'Database Configuration'}
+                </Title>
+            </div>
+            
             <Form layout="vertical">
-                <Form.Item label="Database Type">
+                <Row gutter={16}>
+                    <Col span={12}>
+                        <Form.Item label="Database Type" required>
                     <Select
-                        value={dbConnection.type}
-                        onChange={(value) => setDbConnection(prev => ({ ...prev, type: value }))}
-                    >
-                        {dataSourceConnectors
-                            .filter(connector => ['postgresql', 'mysql', 'sqlserver', 'snowflake', 'bigquery', 'redshift'].includes(connector.type))
-                            .map(connector => (
-                                <Option key={connector.type} value={connector.type}>
-                                    <Space>
-                                        {connector.logo} {connector.name}
-                                        {connector.recommended && <Tag color="green">Recommended</Tag>}
-                                    </Space>
-                                </Option>
-                            ))}
+                                value={selectedDatabaseType}
+                                onChange={(value) => {
+                                    setSelectedDatabaseType(value);
+                                    // Clear connection config when changing database type to avoid confusion
+                                    setConnectionConfig(prev => ({
+                                        host: '',
+                                        port: databaseTypes.find(db => db.value === value)?.port || 5432,
+                                        database: '',
+                                        username: '',
+                                        password: '',
+                                        sslMode: 'prefer',
+                                        connectionPool: false,
+                                        minConnections: 1,
+                                        maxConnections: 10,
+                                        connectionTimeout: 30,
+                                        storageUri: '',
+                                        accessKey: '',
+                                        secretKey: '',
+                                        region: 'us-east-1',
+                                        endpoint: '',
+                                        accountName: '',
+                                        accountKey: '',
+                                        sasToken: '',
+                                        gcpProjectId: '',
+                                        gcpCredentials: '',
+                                        fileFormat: '',
+                                        version: undefined,
+                                        timestamp: '',
+                                        snapshotId: undefined
+                                    }));
+                                    setTestResult(null);
+                                }}
+                                style={{ width: '100%' }}
+                            >
+                                {databaseTypes
+                                    .filter(db => {
+                                        // Filter based on data source type selection
+                                        if (dataSourceConfig.type === 'database') {
+                                            // For "Database" type, show only traditional databases (not cloud storage or data lakes)
+                                            return !db.isDataLake && !db.isCloudStorage;
+                                        } else if (dataSourceConfig.type === 'warehouse') {
+                                            // For "Warehouse" type, show all warehouse options (databases, data lakes, cloud storage)
+                                            return true;
+                                        }
+                                        // Default: show all
+                                        return true;
+                                    })
+                                    .map(db => (
+                                        <Option key={db.value} value={db.value}>
+                                            <Space>
+                                                <DatabaseLogo dbType={db.value} size={18} />
+                                                <span>{db.label}</span>
+                                            </Space>
+                                        </Option>
+                                    ))}
                     </Select>
                 </Form.Item>
-                
-                <Form.Item label="Connection Type">
-                    <Radio.Group
-                        value={dbConnection.connectionType}
-                        onChange={(e) => setDbConnection(prev => ({ ...prev, connectionType: e.target.value }))}
-                    >
-                        <Radio value="manual">Manual Configuration</Radio>
-                        <Radio value="uri">Connection String</Radio>
-                    </Radio.Group>
-                </Form.Item>
-
-                {dbConnection.connectionType === 'manual' ? (
-                    <>
-                        <Form.Item label="Host">
+                    </Col>
+                    <Col span={12}>
+                        <Form.Item label="Data Source Name" required>
                             <Input
-                                value={dbConnection.host}
-                                onChange={(e) => setDbConnection(prev => ({ ...prev, host: e.target.value }))}
+                                value={dataSourceConfig.name}
+                                onChange={(e) => setDataSourceConfig(prev => ({ ...prev, name: e.target.value }))}
+                                placeholder={`${databaseTypes.find(db => db.value === selectedDatabaseType)?.label} Connection`}
+                            />
+                </Form.Item>
+                    </Col>
+                </Row>
+                
+                <Row gutter={16}>
+                    <Col span={12}>
+                        <Form.Item label="Host" required>
+                            <Input
+                                value={connectionConfig.host}
+                                onChange={(e) => setConnectionConfig(prev => ({ ...prev, host: e.target.value }))}
                                 placeholder="localhost"
                             />
                         </Form.Item>
-                        
-                        <Form.Item label="Port">
+                    </Col>
+                    <Col span={12}>
+                        <Form.Item label="Port" required>
                             <Input
                                 type="number"
-                                value={dbConnection.port}
-                                onChange={(e) => setDbConnection(prev => ({ ...prev, port: parseInt(e.target.value) }))}
+                                value={connectionConfig.port}
+                                onChange={(e) => {
+                                    userModifiedRef.current.port = true;
+                                    setConnectionConfig(prev => ({ ...prev, port: parseInt(e.target.value) }));
+                                }}
                                 placeholder="5432"
                             />
                         </Form.Item>
+                    </Col>
+                </Row>
                         
-                        <Form.Item label="Database">
+                <Row gutter={16}>
+                    <Col span={12}>
+                        <Form.Item label="Database" required>
                             <Input
-                                value={dbConnection.database}
-                                onChange={(e) => setDbConnection(prev => ({ ...prev, database: e.target.value }))}
+                                value={connectionConfig.database}
+                                onChange={(e) => setConnectionConfig(prev => ({ ...prev, database: e.target.value }))}
                                 placeholder="mydatabase"
                             />
                         </Form.Item>
-                        
-                        <Form.Item label="Username">
+                    </Col>
+                    <Col span={12}>
+                        <Form.Item label="Username" required>
                             <Input
-                                value={dbConnection.username}
-                                onChange={(e) => setDbConnection(prev => ({ ...prev, username: e.target.value }))}
+                                value={connectionConfig.username}
+                                onChange={(e) => setConnectionConfig(prev => ({ ...prev, username: e.target.value }))}
                                 placeholder="username"
                             />
                         </Form.Item>
+                    </Col>
+                </Row>
                         
-                        <Form.Item label="Password">
+                <Form.Item label="Password" required>
                             <Input.Password
-                                value={dbConnection.password}
-                                onChange={(e) => setDbConnection(prev => ({ ...prev, password: e.target.value }))}
+                        value={connectionConfig.password}
+                        onChange={(e) => setConnectionConfig(prev => ({ ...prev, password: e.target.value }))}
                                 placeholder="password"
                             />
                         </Form.Item>
-                    </>
-                ) : (
-                    <Form.Item label="Connection String">
-                        <Input.TextArea
-                            value={dbConnection.uri}
-                            onChange={(e) => setDbConnection(prev => ({ ...prev, uri: e.target.value }))}
-                            placeholder="postgresql://username:password@localhost:5432/database"
-                            rows={3}
-                        />
-                    </Form.Item>
-                )}
                 
-                {/* Connection Test Results */}
-                {dbTestResult && (
-                    <div style={{ marginTop: '16px' }}>
-                        {dbTestResult.success ? (
-                            <Alert
-                                message="Connection Test Successful!"
-                                description={dbTestResult.message}
-                                type="success"
-                                showIcon
-                                action={
-                                    <Button
-                                        size="small"
-                                        type="primary"
-                                        onClick={saveDatabaseConnection}
-                                        icon={<SaveOutlined />}
-                                        disabled={dbConnectionSaved}
-                                    >
-                                        {dbConnectionSaved ? 'Saved' : 'Save Connection'}
-                                    </Button>
-                                }
-                            />
-                        ) : (
-                            <Alert
-                                message="Connection Test Failed"
-                                description={dbTestResult.error}
-                                type="error"
-                                showIcon
-                            />
-                        )}
-                    </div>
-                )}
-
-                <div style={{ marginTop: '16px', textAlign: 'center' }}>
-                    <Space>
-                        <Button
-                            type="default"
-                            size="large"
-                            disabled={!dbConnection.host && !dbConnection.uri}
-                            onClick={testDatabaseConnection}
-                            loading={connecting}
-                            icon={<ExperimentOutlined />}
-                        >
-                            Test Connection
-                        </Button>
-                        <Button
-                            type="primary"
-                            size="large"
-                            disabled={!dbTestResult?.success || dbConnectionSaved}
-                            onClick={saveDatabaseConnection}
-                            icon={<SaveOutlined />}
-                        >
-                            {dbConnectionSaved ? 'Connection Saved' : 'Save & Continue'}
-                        </Button>
-                    </Space>
-                </div>
-            </Form>
-        </div>
-    );
-
-    // Render warehouse connection step
-    const renderWarehouseConnection = () => (
-        <div style={{ padding: '16px' }}>
-            <Form layout="vertical">
-                <Form.Item label="Warehouse Type">
-                    <Select
-                        value={warehouseConnection.type}
-                        onChange={(value) => setWarehouseConnection(prev => ({ ...prev, type: value }))}
-                    >
-                        {dataSourceConnectors
-                            .filter(connector => ['snowflake', 'bigquery', 'redshift', 'databricks', 'synapse'].includes(connector.type))
-                            .map(connector => (
-                                <Option key={connector.type} value={connector.type}>
-                                    <Space>
-                                        {connector.logo} {connector.name}
-                                        {connector.recommended && <Tag color="green">Recommended</Tag>}
-                                    </Space>
-                                </Option>
-                            ))}
-                    </Select>
-                </Form.Item>
-                
-                <Form.Item label="Account/Project">
-                    <Input
-                        value={warehouseConnection.account}
-                        onChange={(e) => setWarehouseConnection(prev => ({ ...prev, account: e.target.value }))}
-                        placeholder="account.snowflake.com or project-id"
-                    />
-                </Form.Item>
-                
-                <Form.Item label="Warehouse">
-                    <Input
-                        value={warehouseConnection.warehouse}
-                        onChange={(e) => setWarehouseConnection(prev => ({ ...prev, warehouse: e.target.value }))}
-                        placeholder="warehouse name"
-                    />
-                </Form.Item>
-                
-                <Form.Item label="Database">
-                    <Input
-                        value={warehouseConnection.database}
-                        onChange={(e) => setWarehouseConnection(prev => ({ ...prev, database: e.target.value }))}
-                        placeholder="database name"
-                    />
-                </Form.Item>
-                
-                <Form.Item label="Schema">
-                    <Input
-                        value={warehouseConnection.schema}
-                        onChange={(e) => setWarehouseConnection(prev => ({ ...prev, schema: e.target.value }))}
-                        placeholder="schema name"
-                    />
-                </Form.Item>
-                
-                <Form.Item label="Username">
-                    <Input
-                        value={warehouseConnection.username}
-                        onChange={(e) => setWarehouseConnection(prev => ({ ...prev, username: e.target.value }))}
-                        placeholder="username"
-                    />
-                </Form.Item>
-                
-                <Form.Item label="Password">
-                    <Input.Password
-                        value={warehouseConnection.password}
-                        onChange={(e) => setWarehouseConnection(prev => ({ ...prev, password: e.target.value }))}
-                        placeholder="password"
-                    />
-                </Form.Item>
-                
-                {/* Connection Test Results */}
-                {warehouseTestResult && (
-                    <div style={{ marginTop: '16px' }}>
-                        {warehouseTestResult.success ? (
-                            <Alert
-                                message="Connection Test Successful!"
-                                description={warehouseTestResult.message}
-                                type="success"
-                                showIcon
-                                action={
-                                    <Button
-                                        size="small"
-                                        type="primary"
-                                        onClick={saveWarehouseConnection}
-                                        icon={<SaveOutlined />}
-                                        disabled={warehouseConnectionSaved}
-                                    >
-                                        {warehouseConnectionSaved ? 'Saved' : 'Save Connection'}
-                                    </Button>
-                                }
-                            />
-                        ) : (
-                            <Alert
-                                message="Connection Test Failed"
-                                description={warehouseTestResult.error}
-                                type="error"
-                                showIcon
-                            />
-                        )}
-                    </div>
-                )}
-
-                <div style={{ marginTop: '16px', textAlign: 'center' }}>
-                    <Space>
-                        <Button
-                            type="default"
-                            size="large"
-                            disabled={!warehouseConnection.account}
-                            onClick={testWarehouseConnection}
-                            loading={connecting}
-                            icon={<ExperimentOutlined />}
-                        >
-                            Test Connection
-                        </Button>
-                        <Button
-                            type="primary"
-                            size="large"
-                            disabled={!warehouseTestResult?.success || warehouseConnectionSaved}
-                            onClick={saveWarehouseConnection}
-                            icon={<SaveOutlined />}
-                        >
-                            {warehouseConnectionSaved ? 'Connection Saved' : 'Save & Continue'}
-                        </Button>
-                    </Space>
-                </div>
-            </Form>
-        </div>
-    );
-
-    // Render API connection step
-    const renderAPIConnection = () => (
-        <div style={{ padding: '16px' }}>
-            <Form layout="vertical">
-                <Form.Item label="API URL">
-                    <Input
-                        value={apiConnection.url}
-                        onChange={(e) => setApiConnection(prev => ({ ...prev, url: e.target.value }))}
-                        placeholder="https://api.example.com/data"
-                    />
-                </Form.Item>
-                
-                <Form.Item label="HTTP Method">
-                    <Select
-                        value={apiConnection.method}
-                        onChange={(value) => setApiConnection(prev => ({ ...prev, method: value }))}
-                    >
-                        <Option value="GET">GET</Option>
-                        <Option value="POST">POST</Option>
-                        <Option value="PUT">PUT</Option>
-                        <Option value="DELETE">DELETE</Option>
-                    </Select>
-                </Form.Item>
-                
-                <Form.Item label="Authentication">
-                    <Select
-                        value={apiConnection.authentication}
-                        onChange={(value) => setApiConnection(prev => ({ ...prev, authentication: value }))}
-                    >
-                        <Option value="none">None</Option>
-                        <Option value="api_key">API Key</Option>
-                        <Option value="basic">Basic Auth</Option>
-                    </Select>
-                </Form.Item>
-                
-                {apiConnection.authentication === 'api_key' && (
-                    <Form.Item label="API Key">
+                {/* Connection URL - Editable by default, click to preview */}
+                <Form.Item label="Connection URL">
+                    <Space.Compact style={{ width: '100%' }}>
                         <Input
-                            value={apiConnection.apiKey}
-                            onChange={(e) => setApiConnection(prev => ({ ...prev, apiKey: e.target.value }))}
-                            placeholder="your-api-key"
+                            value={connectionUrlEditable ? (customConnectionUrl || generateConnectionUrl()) : generateConnectionUrl()}
+                            readOnly={!connectionUrlEditable}
+                            onChange={connectionUrlEditable ? (e) => {
+                                setCustomConnectionUrl(e.target.value);
+                                // Clear custom URL if user clears the field to revert to auto-generated
+                                if (!e.target.value.trim()) {
+                                    setCustomConnectionUrl('');
+                                }
+                            } : undefined}
+                            onBlur={() => {
+                                // When user stops editing, if field is empty, clear custom URL to use auto-generated
+                                if (connectionUrlEditable && !customConnectionUrl.trim()) {
+                                    setCustomConnectionUrl('');
+                                }
+                            }}
+                            placeholder="postgresql://username:password@host:port/database"
+                            style={{ 
+                                backgroundColor: connectionUrlEditable ? '#fff' : '#f5f5f5',
+                                fontFamily: 'monospace',
+                                fontSize: '12px'
+                            }}
                         />
-                    </Form.Item>
-                )}
-                
-                {apiConnection.authentication === 'basic' && (
-                    <>
-                        <Form.Item label="Username">
-                            <Input
-                                value={apiConnection.username}
-                                onChange={(e) => setApiConnection(prev => ({ ...prev, username: e.target.value }))}
-                                placeholder="username"
-                            />
-                        </Form.Item>
-                        
-                        <Form.Item label="Password">
-                            <Input.Password
-                                value={apiConnection.password}
-                                onChange={(e) => setApiConnection(prev => ({ ...prev, password: e.target.value }))}
-                                placeholder="password"
-                            />
-                        </Form.Item>
-                    </>
-                )}
-                
-                <Form.Item label="Headers (Optional)">
-                    <Input.TextArea
-                        value={apiConnection.headers}
-                        onChange={(e) => setApiConnection(prev => ({ ...prev, headers: e.target.value }))}
-                        placeholder='{"Content-Type": "application/json"}'
-                        rows={3}
-                    />
+                        <Button
+                            type={connectionUrlEditable ? 'default' : 'primary'}
+                            onClick={() => {
+                                if (connectionUrlEditable && customConnectionUrl) {
+                                    // Parse the custom URL and update connection config when switching to preview
+                                    parseConnectionUrl(customConnectionUrl);
+                                } else if (!connectionUrlEditable) {
+                                    // Switching to edit mode - clear custom URL so user can edit fresh
+                                    setCustomConnectionUrl('');
+                                }
+                                setConnectionUrlEditable(!connectionUrlEditable);
+                            }}
+                            style={{ minWidth: '80px' }}
+                        >
+                            {connectionUrlEditable ? 'Preview' : 'Edit'}
+                        </Button>
+                    </Space.Compact>
+                    <Text type="secondary" style={{ fontSize: '12px' }}>
+                        {connectionUrlEditable ? 
+                            'Edit the connection URL directly. Click "Preview" to see auto-generated URL from form fields.' :
+                            'Preview of auto-generated URL. Click "Edit" to modify directly.'
+                        }
+                    </Text>
                 </Form.Item>
                 
-                {/* Connection Test Results */}
-                {apiTestResult && (
-                    <div style={{ marginTop: '16px' }}>
-                        {apiTestResult.success ? (
-                            <Alert
-                                message="Connection Test Successful!"
-                                description={apiTestResult.message}
-                                type="success"
-                                showIcon
-                                action={
-                                    <Button
-                                        size="small"
-                                        type="primary"
-                                        onClick={saveAPIConnection}
-                                        icon={<SaveOutlined />}
-                                        disabled={apiConnectionSaved}
+                {/* Advanced Options */}
+                <Collapse ghost>
+                    <Panel header="🔧 Advanced Options" key="advanced">
+                        <Row gutter={16}>
+                            <Col span={12}>
+                                <Form.Item label="SSL Mode">
+                    <Select
+                        value={connectionConfig.sslMode}
+                        onChange={(value) => {
+                            userModifiedRef.current.sslMode = true;
+                            setConnectionConfig(prev => ({ ...prev, sslMode: value }));
+                        }}
+                    >
+                                        <Option value="disable">Disable</Option>
+                                        <Option value="prefer">Prefer</Option>
+                                        <Option value="require">Require</Option>
+                                        <Option value="verify-ca">Verify CA</Option>
+                                        <Option value="verify-full">Verify Full</Option>
+                    </Select>
+                </Form.Item>
+                            </Col>
+                            <Col span={12}>
+                                <Form.Item label="Connection Pool">
+                                    <Radio.Group
+                                        value={connectionConfig.connectionPool}
+                                        onChange={(e) => setConnectionConfig(prev => ({ ...prev, connectionPool: e.target.value }))}
                                     >
-                                        {apiConnectionSaved ? 'Saved' : 'Save Connection'}
-                                    </Button>
-                                }
-                            />
-                        ) : (
-                            <Alert
-                                message="Connection Test Failed"
-                                description={apiTestResult.error}
-                                type="error"
-                                showIcon
-                            />
+                                        <Radio value={false}>Disabled</Radio>
+                                        <Radio value={true}>Enabled</Radio>
+                                    </Radio.Group>
+                </Form.Item>
+                            </Col>
+                        </Row>
+                
+                        {connectionConfig.connectionPool && (
+                            <Row gutter={16}>
+                                <Col span={8}>
+                                    <Form.Item label="Min Connections">
+                    <Input
+                                            type="number"
+                                            value={connectionConfig.minConnections}
+                                            onChange={(e) => setConnectionConfig(prev => ({ ...prev, minConnections: parseInt(e.target.value) }))}
+                    />
+                </Form.Item>
+                                </Col>
+                                <Col span={8}>
+                                    <Form.Item label="Max Connections">
+                    <Input
+                                            type="number"
+                                            value={connectionConfig.maxConnections}
+                                            onChange={(e) => setConnectionConfig(prev => ({ ...prev, maxConnections: parseInt(e.target.value) }))}
+                    />
+                </Form.Item>
+                                </Col>
+                                <Col span={8}>
+                                    <Form.Item label="Timeout (s)">
+                    <Input
+                                            type="number"
+                                            value={connectionConfig.connectionTimeout}
+                                            onChange={(e) => setConnectionConfig(prev => ({ ...prev, connectionTimeout: parseInt(e.target.value) }))}
+                    />
+                </Form.Item>
+                                </Col>
+                            </Row>
                         )}
-                    </div>
-                )}
-
-                <div style={{ marginTop: '16px', textAlign: 'center' }}>
-                    <Space>
-                        <Button
-                            type="default"
-                            size="large"
-                            disabled={!apiConnection.url}
-                            onClick={testAPIConnection}
-                            loading={connecting}
-                            icon={<ExperimentOutlined />}
-                        >
-                            Test Connection
-                        </Button>
-                        <Button
-                            type="primary"
-                            size="large"
-                            disabled={!apiTestResult?.success || apiConnectionSaved}
-                            onClick={saveAPIConnection}
-                            icon={<SaveOutlined />}
-                        >
-                            {apiConnectionSaved ? 'Connection Saved' : 'Save & Continue'}
-                        </Button>
-                    </Space>
-                </div>
+                    </Panel>
+                </Collapse>
             </Form>
         </div>
-    );
+        );
+    };
 
-    // Render AI analysis step
-    const renderAnalysisStep = () => (
-        <div style={{ padding: '16px' }}>
-            <Card title="🧠 AI Data Analysis" style={{ marginBottom: '16px' }}>
-                    <Space direction="vertical" style={{ width: '100%' }}>
-                    <Text>AI is analyzing your data to:</Text>
-                        <List
-                        size="small"
-                        dataSource={[
-                            'Identify data quality issues',
-                            'Suggest transformations',
-                            'Generate semantic models',
-                            'Create business insights'
-                        ]}
-                        renderItem={(item) => (
-                                <List.Item>
-                                <CheckCircleOutlined style={{ color: 'var(--ant-color-success, #52c41a)', marginRight: '8px' }} />
-                                {item}
-                                </List.Item>
-                            )}
-                        />
-                                    </Space>
-                    </Card>
-
-            {/* AI Analysis Progress */}
-            <Card 
-                title="Modeling" 
-                style={{ 
-                    marginBottom: '12px',
-                    backgroundColor: 'var(--ant-color-bg-container, #ffffff)',
-                    borderColor: 'var(--ant-color-border, #d9d9d9)'
-                }}
-                headStyle={{ 
-                    backgroundColor: 'var(--ant-color-bg-container, #ffffff)',
-                    borderBottomColor: 'var(--ant-color-border, #d9d9d9)',
-                    color: 'var(--ant-color-text, #141414)'
-                }}
-                bodyStyle={{ 
-                    backgroundColor: 'var(--ant-color-bg-container, #ffffff)',
-                    color: 'var(--ant-color-text, #141414)'
-                }}
-            >
-                        <Space direction="vertical" style={{ width: '100%', gap: 8 }}>
-                        <Space wrap>
-                            <Button 
-                                onClick={autoGenerateFromSource}
-                                icon={<ApiOutlined />}
-                                size="small"
+    const renderCloudStorageConfiguration = () => {
+        const isS3 = selectedDatabaseType === 's3_parquet';
+        const isAzure = selectedDatabaseType === 'azure_blob';
+        const isGCP = selectedDatabaseType === 'gcp_cloud_storage';
+        const isDelta = selectedDatabaseType === 'delta_lake';
+        const isIceberg = selectedDatabaseType === 'iceberg';
+        const isCloudStorage = isS3 || isAzure || isGCP;
+        
+        return (
+            <div style={{ padding: '8px 0' }}>
+                <Title level={4} style={{ marginBottom: '16px' }}>
+                    {isDelta ? 'Delta Lake Configuration' : 
+                     isIceberg ? 'Apache Iceberg Configuration' :
+                     isS3 ? 'Amazon S3 Configuration' :
+                     isAzure ? 'Azure Blob Storage Configuration' :
+                     isGCP ? 'Google Cloud Storage Configuration' :
+                     'Cloud Storage Configuration'}
+                </Title>
+                
+                <Form layout="vertical">
+                    {/* Database Type Selector - Always visible and prominent */}
+                    <Row gutter={16}>
+                        <Col span={24}>
+                            <Form.Item 
+                                label="Database/Storage Type" 
+                                required
+                                help="You can change this selection at any time"
                             >
-                                Auto Schema
-                            </Button>
-                            <Button 
-                                onClick={buildVisualMap}
-                                icon={<ApiOutlined />}
-                                size="small"
-                                disabled={!aiDataModeling.yamlSchema}
+                                <Select
+                                    value={selectedDatabaseType}
+                                    onChange={(value) => {
+                                        setSelectedDatabaseType(value);
+                                        // Clear connection config when changing database type to avoid confusion
+                                        setConnectionConfig(prev => ({
+                                            host: '',
+                                            port: databaseTypes.find(db => db.value === value)?.port || 5432,
+                                            database: '',
+                                            username: '',
+                                            password: '',
+                                            sslMode: 'prefer',
+                                            connectionPool: false,
+                                            minConnections: 1,
+                                            maxConnections: 10,
+                                            connectionTimeout: 30,
+                                            storageUri: '',
+                                            accessKey: '',
+                                            secretKey: '',
+                                            region: 'us-east-1',
+                                            endpoint: '',
+                                            accountName: '',
+                                            accountKey: '',
+                                            sasToken: '',
+                                            gcpProjectId: '',
+                                            gcpCredentials: '',
+                                            fileFormat: '',
+                                            version: undefined,
+                                            timestamp: '',
+                                            snapshotId: undefined
+                                        }));
+                                        setTestResult(null);
+                                    }}
+                                    style={{ width: '100%' }}
+                                    size="large"
+                                >
+                                {databaseTypes.map(db => (
+                                    <Option key={db.value} value={db.value}>
+                                        <Space>
+                                            <DatabaseLogo dbType={db.value} size={18} />
+                                            <span>{db.label}</span>
+                                        </Space>
+                                    </Option>
+                                ))}
+                                </Select>
+                            </Form.Item>
+                        </Col>
+                    </Row>
+                    
+                    <Row gutter={16}>
+                        <Col span={24}>
+                            <Form.Item label="Data Source Name" required>
+                                <Input
+                                    value={dataSourceConfig.name}
+                                    onChange={(e) => setDataSourceConfig(prev => ({ ...prev, name: e.target.value }))}
+                                    placeholder={`${databaseTypes.find(db => db.value === selectedDatabaseType)?.label} Connection`}
+                                />
+                            </Form.Item>
+                        </Col>
+                    </Row>
+                    
+                    <Row gutter={16}>
+                        <Col span={24}>
+                            <Form.Item 
+                                label="Storage URI" 
+                                required
+                                help={
+                                    isS3 ? "Format: s3://bucket-name/path/to/file.parquet" : 
+                                    isAzure ? "Format: azure://account-name/container-name/path/to/file.csv" :
+                                    isGCP ? "Format: gcs://bucket-name/path/to/file.json or gs://bucket-name/path/to/file.parquet" :
+                                    isDelta ? "Format: s3://bucket/path/ or azure://account/container/path/ or gcs://bucket/path/" :
+                                    isIceberg ? "Format: s3://bucket/path/ or azure://account/container/path/ or gcs://bucket/path/" :
+                                    "Format: s3://, azure://, or gcs://"
+                                }
                             >
-                                Visual Map
-                            </Button>
-                            <Button 
-                                type="primary" 
-                                onClick={generateAISchema}
-                                loading={aiDataModeling.isGenerating}
-                                icon={<BulbOutlined />}
-                                size="small"
-                            >
-                                AI Enhance Schema
-                            </Button>
-                        </Space>
-            
-            {aiDataModeling.isGenerating && (
-                        <div style={{ textAlign: 'center' }}>
-                            <Spin size="large" />
-                            <Text>AI is analyzing your data and generating schema...</Text>
-                                            </div>
-                    )}
+                                <Input
+                                    value={connectionConfig.storageUri || ''}
+                                    onChange={(e) => {
+                                        const uri = e.target.value;
+                                        setConnectionConfig(prev => ({ ...prev, storageUri: uri }));
+                                        // Auto-detect and set file format from URI if not set
+                                        if (isCloudStorage && !connectionConfig.fileFormat) {
+                                            const ext = uri.split('.').pop()?.toLowerCase();
+                                            if (ext && ['parquet', 'csv', 'json', 'tsv'].includes(ext)) {
+                                                setConnectionConfig(prev => ({ ...prev, fileFormat: ext }));
+                                            }
+                                        }
+                                    }}
+                                    placeholder={
+                                        isS3 ? "s3://my-bucket/data/file.parquet" : 
+                                        isAzure ? "azure://myaccount/container/file.csv" :
+                                        isGCP ? "gcs://my-bucket/data/file.json" :
+                                        "s3://bucket/path/ or azure://account/container/path/ or gcs://bucket/path/"
+                                    }
+                                />
+                            </Form.Item>
+                        </Col>
+                    </Row>
                     
-                                         {aiDataModeling.yamlSchema && (
-                          <Card 
-                              title="Generated YAML Schema" 
-                              size="small"
-                              style={{ 
-                                  backgroundColor: 'var(--ant-color-bg-container, #ffffff)',
-                                  borderColor: 'var(--ant-color-border, #d9d9d9)'
-                              }}
-                              headStyle={{ 
-                                  backgroundColor: 'var(--ant-color-bg-container, #ffffff)',
-                                  borderBottomColor: 'var(--ant-color-border, #d9d9d9)',
-                                  color: 'var(--ant-color-text, #141414)'
-                              }}
-                              bodyStyle={{ 
-                                  backgroundColor: 'var(--ant-color-bg-container, #ffffff)',
-                                  color: 'var(--ant-color-text, #141414)'
-                              }}
-                          >
-                              <div style={{ marginBottom: '8px' }}>
-                                  <Text strong>Schema Preview (Cube.js Compatible):</Text>
-                                  <div style={{ 
-                                      backgroundColor: 'var(--ant-color-fill-secondary, #f5f5f5)', 
-                                      padding: '8px', 
-                                      borderRadius: '6px',
-                                      fontFamily: 'monospace',
-                                      fontSize: '12px',
-                                      border: '1px solid var(--ant-color-border, #d9d9d9)',
-                                      maxHeight: '160px',
-                                      overflow: 'auto'
-                                  }}>
-                                      <pre>{aiDataModeling.yamlSchema}</pre>
-                                  </div>
-                              </div>
-                              
-                              <div style={{ marginBottom: '16px' }}>
-                                  <Text strong>Schema Editor & Visualization:</Text>
-                                  <Tabs
-                                      defaultActiveKey="yaml"
-                                      style={{ marginTop: '12px' }}
-                                      items={[
-                                          {
-                                              key: 'yaml',
-                                              label: (
-                                                  <Space>
-                                                      <FileTextOutlined />
-                                                      YAML Editor
-                                                  </Space>
-                                              ),
-                                              children: (
-                                                  <div style={{ padding: '8px 0' }}>
-                                                      <Input.TextArea
-                                                          value={aiDataModeling.yamlSchema}
-                                                          onChange={(e) => setAiDataModeling(prev => ({ 
-                                                              ...prev, 
-                                                              yamlSchema: e.target.value 
-                                                          }))}
-                                                          rows={10}
-                                                          style={{ 
-                                                              fontFamily: 'monospace', 
-                                                              fontSize: '12px',
-                                                              backgroundColor: 'var(--ant-color-fill-secondary, #f5f5f5)',
-                                                              border: '1px solid var(--ant-color-border, #d9d9d9)'
-                                                          }}
-                                                          placeholder="Edit your YAML schema here... This will be deployed to Cube.js"
-                                                      />
-                                                  </div>
-                                              )
-                                          },
-                                          {
-                                              key: 'visual',
-                                              label: (
-                                                  <Space>
-                                                      <ApiOutlined />
-                                                      Visual Map
-                                                  </Space>
-                                              ),
-                                              children: (
-                                                  <div style={{ padding: '8px 0' }}>
-                                                      <Button size="small" onClick={buildVisualMap} disabled={!aiDataModeling.yamlSchema}>Refresh Map</Button>
-                                                      <pre style={{ maxHeight: 200, overflow: 'auto', background: 'var(--ant-color-fill-secondary, #f5f5f5)', padding: 8 }}>
-                                                          {JSON.stringify(aiDataModeling.visualMap || {}, null, 2)}
-                                                      </pre>
-                                                  </div>
-                                              )
-                                          },
-                                          {
-                                              key: 'preaggs',
-                                              label: (
-                                                  <Space>
-                                                      <ApiOutlined />
-                                                      Pre-aggregations
-                                                  </Space>
-                                              ),
-                                              children: (
-                                                  <div style={{ padding: '8px 0' }}>
-                                                      <Space style={{ marginBottom: 8 }}>
-                                                          <Button size="small" disabled={!aiDataModeling.yamlSchema} onClick={async ()=>{
-                                                              if (!aiDataModeling.yamlSchema) return;
-                                                              const res = await fetch(`${environment.api.baseUrl}/cube/preaggregations/suggest`, {
-                                                                  method: 'POST', headers: { 'Content-Type': 'application/json' },
-                                                                  body: JSON.stringify({ yaml_schema: aiDataModeling.yamlSchema })
-                                                              });
-                                                              if (res.ok){
-                                                                  const j = await res.json();
-                                                                  setAiDataModeling(prev => ({ ...prev, preAggSuggestions: j.suggestions } as any));
-                                                              }
-                                                          }}>Suggest</Button>
-                                                          <Button type="primary" size="small" disabled={!aiDataModeling.preAggSelections || (aiDataModeling.preAggSelections as any[])?.length===0} onClick={async ()=>{
-                                                              const selections = (aiDataModeling.preAggSelections as any[]) || [];
-                                                              const res = await fetch(`${environment.api.baseUrl}/cube/preaggregations/apply`, {
-                                                                  method: 'POST', headers: { 'Content-Type': 'application/json' },
-                                                                  body: JSON.stringify({ yaml_schema: aiDataModeling.yamlSchema, selections })
-                                                              });
-                                                              if (res.ok){
-                                                                  const j = await res.json();
-                                                                  if (j.success && j.yaml_schema){
-                                                                      setAiDataModeling(prev => ({ ...prev, yamlSchema: j.yaml_schema }));
-                                                                  }
-                                                              }
-                                                          }}>Apply Selected</Button>
-                                                      </Space>
-                                                      <div style={{ maxHeight: 220, overflow: 'auto', border: '1px solid #434343', padding: 8, background: '#262626', color: '#fff' }}>
-                                                          {Array.isArray((aiDataModeling as any).preAggSuggestions) && (aiDataModeling as any).preAggSuggestions.length > 0 ? (
-                                                              (aiDataModeling as any).preAggSuggestions.map((s: any, idx: number) => (
-                                                                  <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                                                                      <Checkbox onChange={(e)=>{
-                                                                          const checked = e.target.checked;
-                                                                          setAiDataModeling(prev => {
-                                                                              const cur = (prev as any).preAggSelections || [];
-                                                                              const next = checked ? [...cur, s] : cur.filter((x: any)=> x.name !== s.name || x.cube !== s.cube);
-                                                                              return { ...(prev as any), preAggSelections: next } as any;
-                                                                          });
-                                                                      }} />
-                                                                      <span>{s.cube} • {s.name} • {s.granularity}</span>
-                                                                  </div>
-                                                              ))
-                                                          ) : (
-                                                              <span>No suggestions yet. Click Suggest.</span>
-                                                          )}
-                                                      </div>
-                                                  </div>
-                                              )
-                                          }
-                                      ]}
-                                  />
-                              </div>
-                              
-                              <div style={{ marginBottom: '16px' }}>
-                                  <Text strong>Schema Validation:</Text>
-                                  <div style={{ marginTop: '8px' }}>
-                                      <Tag color={aiDataModeling.yamlSchema?.includes('cubes:') ? 'success' : 'warning'}>
-                                          {aiDataModeling.yamlSchema?.includes('cubes:') ? '✅ Valid Cube.js Schema' : '⚠️ Schema Format Check'}
-                                      </Tag>
-                                      <Tag color={aiDataModeling.yamlSchema?.includes('dimensions:') ? 'success' : 'warning'}>
-                                          {aiDataModeling.yamlSchema?.includes('dimensions:') ? '✅ Has Dimensions' : '⚠️ Missing Dimensions'}
-                                      </Tag>
-                                      <Tag color={aiDataModeling.yamlSchema?.includes('measures:') ? 'success' : 'warning'}>
-                                          {aiDataModeling.yamlSchema?.includes('measures:') ? '✅ Has Measures' : '⚠️ Missing Measures'}
-                                      </Tag>
-                                  </div>
-                              </div>
-                              
-                              <Space style={{ marginTop: '16px' }}>
-                                  <Button 
-                                      size="small" 
-                                      onClick={() => setUserReview(prev => ({ ...prev, schemaApproved: true }))}
-                                      icon={<CheckCircleOutlined />}
-                                      type="primary"
-                                  >
-                                      Approve Schema
-                                  </Button>
-                                  <Button 
-                                      size="small" 
-                                      onClick={regenerateSchema}
-                                      icon={<ReloadOutlined />}
-                                  >
-                                      Regenerate
-                                  </Button>
-                                  <Button 
-                                      size="small" 
-                                      onClick={() => {
-                                          // Enhanced YAML validation
-                                          try {
-                                              const schema = aiDataModeling.yamlSchema;
-                                              const checks = {
-                                                  hasCubes: schema?.includes('cubes:'),
-                                                  hasDimensions: schema?.includes('dimensions:'),
-                                                  hasMeasures: schema?.includes('measures:'),
-                                                  hasTimeDimensions: schema?.includes('timeDimensions:'),
-                                                  hasFilters: schema?.includes('filters:')
-                                              };
-                                              
-                                              const validChecks = Object.values(checks).filter(Boolean).length;
-                                              const totalChecks = Object.keys(checks).length;
-                                              
-                                              if (validChecks >= 3) {
-                                                  message.success(`Schema validation: ${validChecks}/${totalChecks} checks passed!`);
-                                              } else {
-                                                  message.warning(`Schema validation: ${validChecks}/${totalChecks} checks passed. Consider regenerating.`);
-                                              }
-                                          } catch (e) {
-                                              message.error('Schema validation failed');
-                                          }
-                                      }}
-                                      icon={<EyeOutlined />}
-                                  >
-                                      Validate
-                                  </Button>
-                              </Space>
-                         </Card>
-                     )}
-                </Space>
-            </Card>
-
-                    <div style={{ textAlign: 'center', marginTop: '24px' }}>
-                        <Button 
-                            type="primary" 
-                            size="large"
-                    disabled={!aiDataModeling.yamlSchema}
-                    onClick={() => setCurrentStep(3)}
-                    icon={<ArrowRightOutlined />}
-                >
-                    Continue to Deployment
-                        </Button>
-                        </div>
-        </div>
-    );
-
-    // Render deployment step
-    const renderDeploymentStep = () => (
-        <div style={{ padding: '16px' }}>
-            <Card 
-                title="🚀 Deploy & Ready" 
-                style={{ 
-                    marginBottom: '16px',
-                    backgroundColor: 'var(--ant-color-bg-container, #ffffff)',
-                    borderColor: 'var(--ant-color-border, #d9d9d9)'
-                }}
-                headStyle={{ 
-                    backgroundColor: 'var(--ant-color-bg-container, #ffffff)',
-                    borderBottomColor: 'var(--ant-color-border, #d9d9d9)',
-                    color: 'var(--ant-color-text, #141414)'
-                }}
-                bodyStyle={{ 
-                    backgroundColor: 'var(--ant-color-bg-container, #ffffff)',
-                    color: 'var(--ant-color-text, #141414)'
-                }}
-            >
-                    <Space direction="vertical" style={{ width: '100%' }}>
-                    <Text>Your data source is ready to be deployed!</Text>
-                    <List
-                        size="small"
-                        dataSource={[
-                            'Cube.js schema generated',
-                            'Data models created',
-                            'Ready for analytics',
-                            'Chat integration enabled'
-                        ]}
-                        renderItem={(item) => (
-                            <List.Item>
-                                <CheckCircleOutlined style={{ color: 'var(--ant-color-success, #52c41a)', marginRight: '8px' }} />
-                                {item}
-                            </List.Item>
-                        )}
-                    />
-                    </Space>
-                </Card>
-
-            {/* Semantic Data Model Deployment */}
-            <Card 
-                title="Semantic Data Model Deployment" 
-                style={{ 
-                    marginBottom: '16px',
-                    backgroundColor: 'var(--ant-color-bg-container, #ffffff)',
-                    borderColor: 'var(--ant-color-border, #d9d9d9)'
-                }}
-                headStyle={{ 
-                    backgroundColor: 'var(--ant-color-bg-container, #ffffff)',
-                    borderBottomColor: 'var(--ant-color-border, #d9d9d9)',
-                    color: 'var(--ant-color-text, #141414)'
-                }}
-                bodyStyle={{ 
-                    backgroundColor: 'var(--ant-color-bg-container, #ffffff)',
-                    color: 'var(--ant-color-text, #141414)'
-                }}
-            >
-                    <Space direction="vertical" style={{ width: '100%' }}>
-                    <Text>Deploy your semantic data model for analytics:</Text>
-                    
-                    <Button 
-                        type="primary" 
-                        onClick={deployToCube}
-                        loading={cubeIntegration.status === 'analyzing'}
-                        icon={<RocketOutlined />}
-                    >
-                        Deploy Semantic Model
-                    </Button>
-                    
-                    {cubeIntegration.status === 'analyzing' && (
-                        <div style={{ textAlign: 'center' }}>
-                            <Spin size="large" />
-                            <Text>Deploying to Cube.js server...</Text>
-                    </div>
-                    )}
-
-                    {cubeIntegration.status === 'deployed' && (
-                    <Alert
-                            message="Successfully deployed to Cube.js!"
-                            description={`Your data source is now available at: ${cubeIntegration.deployment_url || 'http://localhost:4000'}`}
-                        type="success"
-                        showIcon
-                        />
-                    )}
-                    
-                    {cubeIntegration.status === 'error' && (
-                        <Alert
-                            message="Deployment failed"
-                            description="There was an error deploying to Cube.js. Please try again."
-                            type="error"
-                            showIcon
-                        />
-                    )}
-                </Space>
-            </Card>
-
-            <div style={{ textAlign: 'center', marginTop: '24px' }}>
-                <Button 
-                    type="primary" 
-                    size="large"
-                    disabled={cubeIntegration.status !== 'deployed'}
-                    onClick={handleDataSourceCreated}
-                    icon={<CheckCircleOutlined />}
-                >
-                    Complete Setup
-                    </Button>
-            </div>
-        </div>
-    );
-
-    // Render workflow navigation
-    const renderWorkflowNavigation = () => (
-        <div style={{ marginBottom: '24px' }}>
-            <WorkflowNavigation
-                currentStep={currentStep - 1}
-                totalSteps={workflowSteps.length}
-                steps={workflowSteps}
-                onStepChange={(step) => handleStepChange(step + 1)}
-                onCancel={onClose}
-                onSave={handleSaveAndContinue}
-                onComplete={handleDataSourceCreated}
-                loading={uploading || connecting || aiModeling}
-                canProceed={canProceedToNext()}
-                showProgress={true}
-                // Remove custom actions to avoid duplicate buttons
-            />
-        </div>
-    );
-
-    // Render main content based on current step
-    const renderMainContent = () => {
-        switch (currentStep) {
-            case 1:
-                return (
-                    <div>
-                        {/* Compact Data Source Configuration (removed outer card chrome) */}
+                    {/* File Format Selection for Cloud Storage (not data lakes) */}
+                    {isCloudStorage && (
                         <Row gutter={16}>
+                            <Col span={24}>
+                                <Form.Item 
+                                    label="File Format" 
+                                    required
+                                    help="Select the format of your data file"
+                                >
+                                    <Select
+                                        value={connectionConfig.fileFormat || undefined}
+                                        onChange={(value) => setConnectionConfig(prev => ({ ...prev, fileFormat: value }))}
+                                        placeholder="Select file format"
+                                    >
+                                        <Option value="parquet">Parquet (.parquet)</Option>
+                                        <Option value="csv">CSV (.csv)</Option>
+                                        <Option value="tsv">TSV (.tsv)</Option>
+                                        <Option value="json">JSON (.json)</Option>
+                                    </Select>
+                                </Form.Item>
+                            </Col>
+                        </Row>
+                    )}
+                    
+                    {isS3 && (
+                        <>
+                            <Row gutter={16}>
                                 <Col span={12}>
-                                    <Form.Item label="Data Source Name" required>
+                                    <Form.Item label="Access Key ID" required>
                                         <Input
-                                            value={dataSourceConfig.name}
-                                            onChange={(e) => setDataSourceConfig(prev => ({ ...prev, name: e.target.value }))}
-                                            placeholder={getDataSourceNamePlaceholder()}
-                                            prefix={<DatabaseOutlined />}
-                                            style={{ backgroundColor: '#262626', borderColor: '#434343', color: '#ffffff' }}
+                                            value={connectionConfig.accessKey || ''}
+                                            onChange={(e) => setConnectionConfig(prev => ({ ...prev, accessKey: e.target.value }))}
+                                            placeholder="AKIA..."
                                         />
                                     </Form.Item>
                                 </Col>
                                 <Col span={12}>
-                                    <Form.Item label="Data Source Type">
+                                    <Form.Item label="Secret Access Key" required>
+                                        <Input.Password
+                                            value={connectionConfig.secretKey || ''}
+                                            onChange={(e) => setConnectionConfig(prev => ({ ...prev, secretKey: e.target.value }))}
+                                            placeholder="Enter secret key"
+                                        />
+                                    </Form.Item>
+                                </Col>
+                            </Row>
+                            <Row gutter={16}>
+                                <Col span={12}>
+                                    <Form.Item label="Region" required>
+                                        <Input
+                                            value={connectionConfig.region || 'us-east-1'}
+                                            onChange={(e) => setConnectionConfig(prev => ({ ...prev, region: e.target.value }))}
+                                            placeholder="us-east-1"
+                                        />
+                                    </Form.Item>
+                                </Col>
+                            </Row>
+                        </>
+                    )}
+                    
+                    {isAzure && (
+                        <>
+                            <Row gutter={16}>
+                                <Col span={12}>
+                                    <Form.Item label="Storage Account Name" required>
+                                        <Input
+                                            value={connectionConfig.accountName || ''}
+                                            onChange={(e) => setConnectionConfig(prev => ({ ...prev, accountName: e.target.value }))}
+                                            placeholder="myaccount"
+                                        />
+                                    </Form.Item>
+                                </Col>
+                                <Col span={12}>
+                                    <Form.Item label="Account Key or SAS Token" required>
+                                        <Input.Password
+                                            value={connectionConfig.accountKey || connectionConfig.sasToken || ''}
+                                            onChange={(e) => {
+                                                const value = e.target.value;
+                                                // Auto-detect if it's a SAS token (starts with ?)
+                                                if (value.startsWith('?')) {
+                                                    setConnectionConfig(prev => ({ ...prev, sasToken: value, accountKey: '' }));
+                                                } else {
+                                                    setConnectionConfig(prev => ({ ...prev, accountKey: value, sasToken: '' }));
+                                                }
+                                            }}
+                                            placeholder="Account key or SAS token"
+                                        />
+                                    </Form.Item>
+                                </Col>
+                            </Row>
+                        </>
+                    )}
+                    
+                    {isGCP && (
+                        <>
+                            <Alert
+                                message="GCP Cloud Storage Authentication"
+                                description="Provide your GCP service account JSON key for secure access"
+                                type="info"
+                                showIcon
+                                style={{ marginBottom: 16 }}
+                            />
+                            <Row gutter={16}>
+                                <Col span={24}>
+                                    <Form.Item 
+                                        label="Service Account JSON Key" 
+                                        required
+                                        help="Paste your GCP service account JSON key. This will be securely encrypted."
+                                    >
+                                        <Input.TextArea
+                                            rows={6}
+                                            value={connectionConfig.gcpCredentials || ''}
+                                            onChange={(e) => setConnectionConfig(prev => ({ ...prev, gcpCredentials: e.target.value }))}
+                                            placeholder='{"type": "service_account", "project_id": "...", "private_key_id": "...", ...}'
+                                            style={{ fontFamily: 'monospace', fontSize: '12px' }}
+                                        />
+                                    </Form.Item>
+                                </Col>
+                            </Row>
+                            <Row gutter={16}>
+                                <Col span={12}>
+                                    <Form.Item label="Project ID (Optional)">
+                                        <Input
+                                            value={connectionConfig.gcpProjectId || ''}
+                                            onChange={(e) => setConnectionConfig(prev => ({ ...prev, gcpProjectId: e.target.value }))}
+                                            placeholder="my-gcp-project"
+                                        />
+                                    </Form.Item>
+                                </Col>
+                            </Row>
+                        </>
+                    )}
+                    
+                    {(isDelta || isIceberg) && (
+                        <>
+                            <Alert
+                                message="Cloud Provider Selection"
+                                description="Select your cloud storage provider and configure credentials"
+                                type="info"
+                                showIcon
+                                style={{ marginBottom: 16 }}
+                            />
+                            <Row gutter={16}>
+                                <Col span={12}>
+                                    <Form.Item label="Cloud Provider" required>
                                         <Select
-                                            value={activeTab}
-                                            disabled
-                                            style={{ backgroundColor: '#262626', borderColor: '#434343' }}
+                                            value={
+                                                connectionConfig.storageUri?.startsWith('s3://') ? 's3' : 
+                                                connectionConfig.storageUri?.startsWith('azure://') || connectionConfig.storageUri?.startsWith('abfss://') ? 'azure' :
+                                                connectionConfig.storageUri?.startsWith('gcs://') || connectionConfig.storageUri?.startsWith('gs://') ? 'gcp' :
+                                                undefined
+                                            }
+                                            onChange={(value) => {
+                                                const uri = connectionConfig.storageUri || '';
+                                                if (value === 's3' && !uri.startsWith('s3://')) {
+                                                    setConnectionConfig(prev => ({ ...prev, storageUri: 's3://' }));
+                                                } else if (value === 'azure' && !uri.startsWith('azure://') && !uri.startsWith('abfss://')) {
+                                                    setConnectionConfig(prev => ({ ...prev, storageUri: 'azure://' }));
+                                                } else if (value === 'gcp' && !uri.startsWith('gcs://') && !uri.startsWith('gs://')) {
+                                                    setConnectionConfig(prev => ({ ...prev, storageUri: 'gcs://' }));
+                                                }
+                                            }}
+                                            placeholder="Select provider"
                                         >
-                                            <Option value="file">File Upload</Option>
-                                            <Option value="database">Database</Option>
-                                            <Option value="warehouse">Data Warehouse</Option>
-                                            <Option value="api">API</Option>
+                                            <Option value="s3">Amazon S3</Option>
+                                            <Option value="azure">Azure Blob Storage</Option>
+                                            <Option value="gcp">Google Cloud Storage</Option>
                                         </Select>
                                     </Form.Item>
                                 </Col>
                             </Row>
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
-                                <Button type="link" size="small" onClick={() => setShowAdvanced(v => !v)}>
-                                    {showAdvanced ? 'Hide advanced' : 'Show advanced'}
-                                </Button>
-                            </div>
-                            {showAdvanced && (
+                            
+                            {connectionConfig.storageUri?.startsWith('s3://') && (
                                 <>
-                                    <Form.Item label="Description (Optional)">
-                                        <Input.TextArea
-                                            value={dataSourceConfig.description}
-                                            onChange={(e) => setDataSourceConfig(prev => ({ ...prev, description: e.target.value }))}
-                                            placeholder="Describe the purpose and contents of this data source"
-                                            rows={2}
-                                            style={{ backgroundColor: '#262626', borderColor: '#434343', color: '#ffffff' }}
-                                        />
-                                    </Form.Item>
-                                    <Form.Item label="Business Context (Optional)">
-                                        <Input.TextArea
-                                            value={dataSourceConfig.businessContext}
-                                            onChange={(e) => setDataSourceConfig(prev => ({ ...prev, businessContext: e.target.value }))}
-                                            placeholder="Describe the business context and use cases for this data"
-                                            rows={2}
-                                            style={{ backgroundColor: '#262626', borderColor: '#434343', color: '#ffffff' }}
-                                        />
-                                    </Form.Item>
+                                    <Row gutter={16}>
+                                        <Col span={12}>
+                                            <Form.Item label="Access Key ID" required>
+                                                <Input
+                                                    value={connectionConfig.accessKey || ''}
+                                                    onChange={(e) => setConnectionConfig(prev => ({ ...prev, accessKey: e.target.value }))}
+                                                    placeholder="AKIA..."
+                                                />
+                                            </Form.Item>
+                                        </Col>
+                                        <Col span={12}>
+                                            <Form.Item label="Secret Access Key" required>
+                                                <Input.Password
+                                                    value={connectionConfig.secretKey || ''}
+                                                    onChange={(e) => setConnectionConfig(prev => ({ ...prev, secretKey: e.target.value }))}
+                                                    placeholder="Enter secret key"
+                                                />
+                                            </Form.Item>
+                                        </Col>
+                                    </Row>
+                                    <Row gutter={16}>
+                                        <Col span={12}>
+                                            <Form.Item label="Region" required>
+                                                <Input
+                                                    value={connectionConfig.region || 'us-east-1'}
+                                                    onChange={(e) => setConnectionConfig(prev => ({ ...prev, region: e.target.value }))}
+                                                    placeholder="us-east-1"
+                                                />
+                                            </Form.Item>
+                                        </Col>
+                                    </Row>
                                 </>
                             )}
-
-                        <Tabs
-                            activeKey={activeTab}
-                            onChange={(key) => setActiveTab(key as 'file' | 'database' | 'warehouse' | 'api')}
-                            items={[
-                                {
-                                    key: 'file',
-                                    label: (
-                                        <Tooltip title="CSV, Excel, JSON - Good for one-time analysis, small datasets">
-                                            <span>
-                                                <InboxOutlined />
-                                                File Upload
-                                                {uploadedFile && <CheckCircleOutlined style={{ color: '#52c41a', marginLeft: '8px' }} />}
-                                            </span>
-                                        </Tooltip>
-                                    ),
-                                    children: renderFileUpload()
-                                },
-                                {
-                                    key: 'database',
-                                    label: (
-                                        <Tooltip title="PostgreSQL, MySQL, SQL Server - Structured data, real-time access, ACID compliance">
-                                            <span>
-                                                <DatabaseOutlined />
-                                                Database
-                                                {dbConnection.host && <CheckCircleOutlined style={{ color: '#52c41a', marginLeft: '8px' }} />}
-                                            </span>
-                                        </Tooltip>
-                                    ),
-                                    children: renderDatabaseConnection()
-                                },
-                                {
-                                    key: 'warehouse',
-                                    label: (
-                                        <Tooltip title="Snowflake, BigQuery, Redshift - Large-scale analytics, ML-ready, cost-effective">
-                                            <span>
-                                                <CloudOutlined />
-                                                Data Warehouse
-                                                {warehouseConnection.account && <CheckCircleOutlined style={{ color: '#52c41a', marginLeft: '8px' }} />}
-                                            </span>
-                                        </Tooltip>
-                                    ),
-                                    children: renderWarehouseConnection()
-                                },
-                                {
-                                    key: 'api',
-                                    label: (
-                                        <Tooltip title="REST, GraphQL - Live data, external services, real-time updates">
-                                            <span>
-                                                <ApiOutlined />
-                                                API
-                                                {apiConnection.url && <CheckCircleOutlined style={{ color: '#52c41a', marginLeft: '8px' }} />}
-                                            </span>
-                                        </Tooltip>
-                                    ),
-                                    children: renderAPIConnection()
-                                }
-                            ]}
+                            
+                            {connectionConfig.storageUri?.startsWith('azure://') || connectionConfig.storageUri?.startsWith('abfss://') ? (
+                                <>
+                                    <Row gutter={16}>
+                                        <Col span={12}>
+                                            <Form.Item label="Storage Account Name" required>
+                                                <Input
+                                                    value={connectionConfig.accountName || ''}
+                                                    onChange={(e) => setConnectionConfig(prev => ({ ...prev, accountName: e.target.value }))}
+                                                    placeholder="myaccount"
+                                                />
+                                            </Form.Item>
+                                        </Col>
+                                        <Col span={12}>
+                                            <Form.Item label="Account Key or SAS Token" required>
+                                                <Input.Password
+                                                    value={connectionConfig.accountKey || connectionConfig.sasToken || ''}
+                                                    onChange={(e) => {
+                                                        const value = e.target.value;
+                                                        if (value.startsWith('?')) {
+                                                            setConnectionConfig(prev => ({ ...prev, sasToken: value, accountKey: '' }));
+                                                        } else {
+                                                            setConnectionConfig(prev => ({ ...prev, accountKey: value, sasToken: '' }));
+                                                        }
+                                                    }}
+                                                    placeholder="Account key or SAS token"
+                                                />
+                                            </Form.Item>
+                                        </Col>
+                                    </Row>
+                                </>
+                            ) : null}
+                            
+                            {(connectionConfig.storageUri?.startsWith('gcs://') || connectionConfig.storageUri?.startsWith('gs://')) && (
+                                <>
+                                    <Row gutter={16}>
+                                        <Col span={24}>
+                                            <Form.Item 
+                                                label="Service Account JSON Key" 
+                                                required
+                                                help="Paste your GCP service account JSON key. This will be securely encrypted."
+                                            >
+                                                <Input.TextArea
+                                                    rows={6}
+                                                    value={connectionConfig.gcpCredentials || ''}
+                                                    onChange={(e) => setConnectionConfig(prev => ({ ...prev, gcpCredentials: e.target.value }))}
+                                                    placeholder='{"type": "service_account", "project_id": "...", "private_key_id": "...", ...}'
+                                                    style={{ fontFamily: 'monospace', fontSize: '12px' }}
+                                                />
+                                            </Form.Item>
+                                        </Col>
+                                    </Row>
+                                    <Row gutter={16}>
+                                        <Col span={12}>
+                                            <Form.Item label="Project ID (Optional)">
+                                                <Input
+                                                    value={connectionConfig.gcpProjectId || ''}
+                                                    onChange={(e) => setConnectionConfig(prev => ({ ...prev, gcpProjectId: e.target.value }))}
+                                                    placeholder="my-gcp-project"
+                                                />
+                                            </Form.Item>
+                                        </Col>
+                                    </Row>
+                                </>
+                            )}
+                            
+                            {isDelta && (
+                                <Collapse ghost style={{ marginTop: 16 }}>
+                                    <Panel header="🕐 Time Travel Options (Optional)" key="time-travel">
+                                        <Row gutter={16}>
+                                            <Col span={12}>
+                                                <Form.Item label="Version (Optional)">
+                                                    <Input
+                                                        type="number"
+                                                        value={connectionConfig.version || ''}
+                                                        onChange={(e) => setConnectionConfig(prev => ({ 
+                                                            ...prev, 
+                                                            version: e.target.value ? parseInt(e.target.value) : undefined 
+                                                        }))}
+                                                        placeholder="Delta version number"
+                                                    />
+                                                </Form.Item>
+                                            </Col>
+                                            <Col span={12}>
+                                                <Form.Item label="Timestamp (Optional)">
+                                                    <Input
+                                                        value={connectionConfig.timestamp || ''}
+                                                        onChange={(e) => setConnectionConfig(prev => ({ ...prev, timestamp: e.target.value }))}
+                                                        placeholder="2024-01-01 00:00:00"
+                                                    />
+                                                </Form.Item>
+                                            </Col>
+                                        </Row>
+                                    </Panel>
+                                </Collapse>
+                            )}
+                            
+                            {isIceberg && (
+                                <Collapse ghost style={{ marginTop: 16 }}>
+                                    <Panel header="📸 Snapshot Options (Optional)" key="snapshot">
+                                        <Row gutter={16}>
+                                            <Col span={12}>
+                                                <Form.Item label="Snapshot ID (Optional)">
+                                                    <Input
+                                                        type="number"
+                                                        value={connectionConfig.snapshotId || ''}
+                                                        onChange={(e) => setConnectionConfig(prev => ({ 
+                                                            ...prev, 
+                                                            snapshotId: e.target.value ? parseInt(e.target.value) : undefined 
+                                                        }))}
+                                                        placeholder="Iceberg snapshot ID"
+                                                    />
+                                                </Form.Item>
+                                            </Col>
+                                        </Row>
+                                    </Panel>
+                                </Collapse>
+                            )}
+                        </>
+                    )}
+                    
+                    <Form.Item label="Description">
+                        <Input.TextArea
+                            value={dataSourceConfig.description}
+                            onChange={(e) => setDataSourceConfig(prev => ({ ...prev, description: e.target.value }))}
+                            placeholder="Describe this data source..."
+                            rows={3}
                         />
-                    </div>
-                );
-            case 2:
-                return renderAnalysisStep();
-            case 3:
-                return renderDeploymentStep();
+                    </Form.Item>
+                </Form>
+            </div>
+        );
+    };
+    
+    const renderApiConfiguration = () => (
+        <div style={{ padding: '8px 0' }}>
+            <Title level={4} style={{ marginBottom: '16px' }}>API Configuration</Title>
+            
+            <Form layout="vertical">
+                <Row gutter={16}>
+                    <Col span={12}>
+                        <Form.Item label="API Name" required>
+                    <Input
+                                value={dataSourceConfig.name}
+                                onChange={(e) => setDataSourceConfig(prev => ({ ...prev, name: e.target.value }))}
+                                placeholder="My API Data Source"
+                    />
+                </Form.Item>
+                    </Col>
+                    <Col span={12}>
+                        <Form.Item label="Base URL" required>
+                            <Input
+                                value={connectionConfig.host}
+                                onChange={(e) => setConnectionConfig(prev => ({ ...prev, host: e.target.value }))}
+                                placeholder="https://api.example.com"
+                            />
+                </Form.Item>
+                    </Col>
+                </Row>
+                
+                <Row gutter={16}>
+                    <Col span={12}>
+                        <Form.Item label="Authentication Type">
+                    <Select
+                                placeholder="Select authentication method"
+                                onChange={(value) => setConnectionConfig(prev => ({ ...prev, username: value }))}
+                    >
+                        <Option value="none">None</Option>
+                        <Option value="basic">Basic Auth</Option>
+                                <Option value="bearer">Bearer Token</Option>
+                                <Option value="api_key">API Key</Option>
+                    </Select>
+                </Form.Item>
+                    </Col>
+                    <Col span={12}>
+                        <Form.Item label="API Key/Token">
+                            <Input.Password
+                                value={connectionConfig.password}
+                                onChange={(e) => setConnectionConfig(prev => ({ ...prev, password: e.target.value }))}
+                                placeholder="Enter API key or token"
+                            />
+                        </Form.Item>
+                    </Col>
+                </Row>
+                
+                <Form.Item label="Description">
+                    <Input.TextArea
+                        value={dataSourceConfig.description}
+                        onChange={(e) => setDataSourceConfig(prev => ({ ...prev, description: e.target.value }))}
+                        placeholder="Describe this API data source..."
+                        rows={3}
+                    />
+                </Form.Item>
+            </Form>
+        </div>
+    );
+
+    const renderTestAndSave = () => {
+        // This function now only renders the test result alert
+        // Buttons are moved to footer
+        return (
+            <>
+                {testResult && (
+                    <Alert
+                        message={testResult.success ? "Connection Successful!" : "Connection Failed"}
+                        description={testResult.message || testResult.error}
+                        type={testResult.success ? "success" : "error"}
+                        showIcon
+                        style={{ marginTop: '16px' }}
+                    />
+                )}
+            </>
+        );
+    };
+
+    const renderStepContent = () => {
+        switch (currentStep) {
+            case 0:
+                return renderDataSourceTypeSelection();
+            case 1:
+                if (dataSourceConfig.type === 'file') {
+                    return renderFileUpload();
+                } else if (dataSourceConfig.type === 'api') {
+                    return (
+                        <>
+                            {renderApiConfiguration()}
+                            <Divider style={{ margin: '24px 0' }} />
+                            {renderTestAndSave()}
+                        </>
+                    );
+                } else if (dataSourceConfig.type === 'warehouse') {
+                    // Check if it's a data lake or cloud storage type (Delta/Iceberg/S3/Azure/GCP)
+                    if (['delta_lake', 'iceberg', 's3_parquet', 'azure_blob', 'gcp_cloud_storage'].includes(selectedDatabaseType)) {
+                        return (
+                            <>
+                                {renderCloudStorageConfiguration()}
+                                <Divider style={{ margin: '24px 0' }} />
+                                {renderTestAndSave()}
+                            </>
+                        );
+                    }
+                    return (
+                        <>
+                            {renderDatabaseConfiguration()}
+                            <Divider style={{ margin: '24px 0' }} />
+                            {renderTestAndSave()}
+                        </>
+                    );
+                } else {
+                    return (
+                        <>
+                            {renderDatabaseConfiguration()}
+                            <Divider style={{ margin: '24px 0' }} />
+                            {renderTestAndSave()}
+                        </>
+                    );
+                }
             default:
                 return null;
         }
     };
 
-    // Auto-populate data source name when connection details change
-    const autoPopulateDataSourceName = () => {
-        let suggestedName = '';
-        
-        switch (activeTab) {
-            case 'file':
-                if (uploadedFile) {
-                    suggestedName = `File: ${uploadedFile.filename}`;
-                }
-                break;
-            case 'database':
-                if (dbConnection.host && dbConnection.database) {
-                    suggestedName = `Database: ${dbConnection.database}@${dbConnection.host}`;
-                }
-                break;
-            case 'warehouse':
-                if (warehouseConnection.account && warehouseConnection.database) {
-                    suggestedName = `Warehouse: ${warehouseConnection.type} - ${warehouseConnection.database}`;
-                }
-                break;
-            case 'api':
-                if (apiConnection.url) {
-                    const url = new URL(apiConnection.url);
-                    suggestedName = `API: ${url.hostname}`;
-                }
-                break;
-        }
-        
-        if (suggestedName && !dataSourceConfig.name) {
-            setDataSourceConfig(prev => ({ ...prev, name: suggestedName }));
-        }
-    };
-
-    // Update data source config when active tab changes
-    useEffect(() => {
-        autoPopulateDataSourceName();
-    }, [activeTab, uploadedFile, actualFile, dbConnection.host, dbConnection.database, warehouseConnection.account, warehouseConnection.database, apiConnection.url]);
-
-    // Get dynamic placeholder for data source name based on active tab
-    const getDataSourceNamePlaceholder = () => {
-        switch (activeTab) {
-            case 'file':
-                return uploadedFile ? `File: ${uploadedFile.filename}` : 'Enter a name for your file upload';
-            case 'database':
-                return dbConnection.host ? `Database: ${dbConnection.host}:${dbConnection.port}` : 'Enter a name for your database connection';
-            case 'warehouse':
-                return warehouseConnection.account ? `Warehouse: ${warehouseConnection.type} - ${warehouseConnection.account}` : 'Enter a name for your warehouse connection';
-            case 'api':
-                return apiConnection.url ? `API: ${apiConnection.url}` : 'Enter a name for your API connection';
-            default:
-                return 'Enter a descriptive name for your data source';
-        }
-    };
-
-    // Create a new data source based on the active tab
-    const createDataSource = async () => {
-        try {
-            const { id: ctxOrgId } = currentOrganization || { id: undefined };
-            let projectIdRaw = localStorage.getItem('currentProjectId');
-            if (!projectIdRaw && Array.isArray(orgProjects) && orgProjects.length > 0) projectIdRaw = String(orgProjects[0].id);
-
-            const organizationId = ctxOrgId ?? localStorage.getItem('currentOrganizationId') ?? 1;
-            const projectId = projectIdRaw ?? (orgProjects && orgProjects.length > 0 ? String(orgProjects[0].id) : localStorage.getItem('currentProjectId') ?? 1);
-
-            const newDataSource = {
-                id: `ds_${Date.now()}`,
-                name: dataSourceConfig.name || `New ${activeTab}`,
-                type: activeTab, // Use the active tab to determine the type
-                status: 'pending' as const,
-                config: {},
-                createdAt: new Date().toISOString()
-            };
-            
-            // Try to create in backend first
-            try {
-                const backendUrl = typeof window !== 'undefined' && window.location.hostname === 'localhost' ? '/api' : '';
-                const response = await fetch(`${backendUrl}/data/api/organizations/${organizationId}/projects/${projectId}/data-sources`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        // include credentials header if available
-                        'Authorization': typeof document !== 'undefined' ? `Bearer ${(document.cookie.match(/(?:^|; )c2c_access_token=([^;]+)/)||[])[1] || ''}` : ''
-                    },
-                    body: JSON.stringify({
-                        name: newDataSource.name,
-                        type: newDataSource.type,
-                        format: activeTab === 'file' ? 'csv' : undefined,
-                        description: `Data source created via universal modal`,
-                        config: newDataSource.config || {},
-                        metadata: {
-                            created_via: 'universal_modal'
-                        }
-                    }),
-                });
-                
-                if (response.ok) {
-                    const result = await response.json();
-                    if (result.success && result.data_source) {
-                        newDataSource.id = result.data_source.id;
-                        // normalize backend 'ready' to frontend 'connected'
-                        newDataSource.status = result.data_source.status || 'connected';
-                        newDataSource.config = result.data_source.connection_config || newDataSource.config;
-                        console.log('✅ Data source created in backend:', result.data_source);
-
-                        // Notify parent component
-                        try {
-                            onDataSourceCreated && onDataSourceCreated(result.data_source);
-                        } catch (err) {
-                            console.warn('onDataSourceCreated handler failed', err);
+    const canProceedToNext = () => {
+        switch (currentStep) {
+            case 0:
+                return dataSourceConfig.type !== undefined && dataSourceConfig.type !== '';
+            case 1:
+                if (dataSourceConfig.type === 'file') {
+                    return uploadedFile !== null && dataSourceConfig.name !== '';
+                } else if (dataSourceConfig.type === 'api') {
+                    return connectionConfig.host !== '' && dataSourceConfig.name !== '';
+                } else {
+                    // Check if this is a cloud storage or data lake type
+                    const isDataLake = databaseTypes.find(db => db.value === selectedDatabaseType)?.isDataLake;
+                    const isCloudStorage = selectedDatabaseType === 's3_parquet' || 
+                                          selectedDatabaseType === 'azure_blob' || 
+                                          selectedDatabaseType === 'gcp_cloud_storage';
+                    
+                    if (isDataLake || isCloudStorage) {
+                        // For cloud storage/data lake types
+                        const hasStorageUri = connectionConfig.storageUri !== '' && 
+                            (connectionConfig.storageUri?.startsWith('s3://') || 
+                             connectionConfig.storageUri?.startsWith('azure://') || 
+                             connectionConfig.storageUri?.startsWith('abfss://') ||
+                             connectionConfig.storageUri?.startsWith('gcs://') ||
+                             connectionConfig.storageUri?.startsWith('gs://'));
+                        
+                        if (selectedDatabaseType === 's3_parquet') {
+                            // S3 requires: storageUri, accessKey, secretKey, fileFormat
+                            return hasStorageUri && 
+                                   connectionConfig.accessKey !== '' && 
+                                   connectionConfig.secretKey !== '' &&
+                                   connectionConfig.fileFormat !== '' &&
+                                   dataSourceConfig.name !== '';
+                        } else if (selectedDatabaseType === 'azure_blob') {
+                            // Azure Blob requires: storageUri, accountName, (accountKey OR sasToken), fileFormat
+                            return hasStorageUri && 
+                                   connectionConfig.accountName !== '' && 
+                                   (connectionConfig.accountKey !== '' || connectionConfig.sasToken !== '') &&
+                                   connectionConfig.fileFormat !== '' &&
+                                   dataSourceConfig.name !== '';
+                        } else if (selectedDatabaseType === 'gcp_cloud_storage') {
+                            // GCP Cloud Storage requires: storageUri, serviceAccountKey (gcpCredentials), fileFormat
+                            return hasStorageUri && 
+                                   connectionConfig.gcpCredentials !== '' &&
+                                   connectionConfig.fileFormat !== '' &&
+                                   dataSourceConfig.name !== '';
+                        } else if (selectedDatabaseType === 'delta_lake') {
+                            // Delta Lake requires: storageUri, and S3, Azure, or GCP credentials
+                            const hasS3Creds = connectionConfig.storageUri?.startsWith('s3://') && 
+                                               connectionConfig.accessKey !== '' && 
+                                               connectionConfig.secretKey !== '';
+                            const hasAzureCreds = (connectionConfig.storageUri?.startsWith('azure://') || 
+                                                  connectionConfig.storageUri?.startsWith('abfss://')) && 
+                                                 connectionConfig.accountName !== '' && 
+                                                 (connectionConfig.accountKey !== '' || connectionConfig.sasToken !== '');
+                            const hasGCPCreds = (connectionConfig.storageUri?.startsWith('gcs://') || 
+                                                 connectionConfig.storageUri?.startsWith('gs://')) && 
+                                                connectionConfig.gcpCredentials !== '';
+                            return hasStorageUri && (hasS3Creds || hasAzureCreds || hasGCPCreds) && dataSourceConfig.name !== '';
+                        } else if (selectedDatabaseType === 'iceberg') {
+                            // Iceberg requires: storageUri, and S3, Azure, or GCP credentials
+                            const hasS3Creds = connectionConfig.storageUri?.startsWith('s3://') && 
+                                               connectionConfig.accessKey !== '' && 
+                                               connectionConfig.secretKey !== '';
+                            const hasAzureCreds = (connectionConfig.storageUri?.startsWith('azure://') || 
+                                                  connectionConfig.storageUri?.startsWith('abfss://')) && 
+                                                 connectionConfig.accountName !== '' && 
+                                                 (connectionConfig.accountKey !== '' || connectionConfig.sasToken !== '');
+                            const hasGCPCreds = (connectionConfig.storageUri?.startsWith('gcs://') || 
+                                                 connectionConfig.storageUri?.startsWith('gs://')) && 
+                                                connectionConfig.gcpCredentials !== '';
+                            return hasStorageUri && (hasS3Creds || hasAzureCreds || hasGCPCreds) && dataSourceConfig.name !== '';
                         }
                     }
+                    
+                    // For traditional database/warehouse types
+                    return connectionConfig.host !== '' && 
+                           connectionConfig.database !== '' && 
+                           connectionConfig.username !== '' && 
+                           connectionConfig.password !== '' &&
+                           dataSourceConfig.name !== '';
                 }
-            } catch (backendError) {
-                console.log('Backend creation failed, using local storage only');
-            }
-            
-            // Update local state
-            setDataSources(prev => [...prev, newDataSource]);
-            setActiveDataSourceId(newDataSource.id);
-            
-            // Save to localStorage as backup
-            const updatedSources = [...dataSources, newDataSource];
-            localStorage.setItem('aiser_data_sources', JSON.stringify(updatedSources));
-            
-            // Auto-advance to next step
-            goToNextStep();
-            
-        } catch (error) {
-            console.error('Failed to create data source:', error);
-            message.error('Failed to create data source');
+            case 2:
+                // For files, this step should not be reached
+                if (dataSourceConfig.type === 'file') {
+                    return false; // Files don't use step 2
+                }
+                // For databases/warehouses/APIs, require successful test
+                return testResult?.success === true;
+            default:
+                return false;
         }
     };
-
-    // UI state
-    const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
+    
+    const handleNext = () => {
+        if (currentStep < 2) {
+            // For files, don't advance to step 2 - they complete in step 1
+            if (dataSourceConfig.type === 'file') {
+                // Files complete in step 1, no need to advance
+                return;
+            } else {
+                setCurrentStep(prev => prev + 1);
+            }
+        }
+    };
+    
+    const handlePrev = () => {
+        if (currentStep > 0) {
+            setCurrentStep(prev => prev - 1);
+        }
+    };
 
     return (
         <Modal
             title={
                 <Space>
                     <DatabaseOutlined />
-                    {isChatIntegration ? 'Connect Data for Chat Analysis' : 'Enhanced Universal Data Source Wizard'}
+                    {isChatIntegration ? 'Connect Data for Chat Analysis' : 'Universal Data Source Wizard'}
                 </Space>
             }
             open={isOpen}
             onCancel={onClose}
             footer={null}
-            width={900}
-            destroyOnHidden
+            width={800}
+            destroyOnClose
         >
-            {renderWorkflowNavigation()}
-            {renderMainContent()}
+            <Steps current={currentStep} style={{ marginBottom: '32px' }}>
+                {steps.map((step, index) => (
+                    <Step key={index} title={step.title} description={step.description} />
+                ))}
+            </Steps>
+            
+            {renderStepContent()}
+            
+            <Divider />
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                    {currentStep > 0 && (
+                        <Button onClick={handlePrev}>
+                            ← Previous
+                        </Button>
+                    )}
+                    {currentStep === 0 && (
+                        <Button onClick={onClose} type="text">
+                            Cancel
+                        </Button>
+                    )}
+                </div>
+                
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    {currentStep === 0 && (
+                        <Button 
+                            type="primary" 
+                            onClick={handleNext}
+                            disabled={!canProceedToNext()}
+                        >
+                            Next →
+                        </Button>
+                    )}
+                    {currentStep === 1 && dataSourceConfig.type === 'file' && (
+                        <Button
+                            type="primary"
+                            onClick={saveDataSource}
+                            loading={loading}
+                            disabled={!uploadedFile || !dataSourceConfig.name}
+                            icon={<SaveOutlined />}
+                        >
+                            Save
+                        </Button>
+                    )}
+                    {currentStep === 1 && dataSourceConfig.type !== 'file' && (
+                        <>
+                            <Button 
+                                type="default"
+                                onClick={testConnection}
+                                loading={loading}
+                                icon={<CheckCircleOutlined />}
+                            >
+                                Test
+                            </Button>
+                            <Button 
+                                type="primary" 
+                                onClick={saveDataSource}
+                                loading={loading}
+                                icon={<SaveOutlined />}
+                                disabled={testResult ? !testResult.success : false}
+                            >
+                                Save
+                            </Button>
+                        </>
+                    )}
+                </div>
+            </div>
         </Modal>
     );
 };

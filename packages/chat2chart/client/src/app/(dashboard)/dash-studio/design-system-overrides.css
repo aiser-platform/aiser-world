@@ -153,6 +153,43 @@
 }
 
 /* =================================================================
+   CONSISTENT SCROLLBAR STYLING (Applied Globally)
+   ================================================================= */
+
+/* Universal scrollbar styling for all scrollable panels */
+*::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+    background: var(--ant-color-bg-layout);
+}
+
+*::-webkit-scrollbar-corner {
+    background: var(--ant-color-bg-layout);
+}
+
+*::-webkit-scrollbar-thumb {
+    background: var(--ant-color-border);
+    border-radius: 3px;
+    transition: background-color 0.3s ease;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+    background: var(--ant-color-border-secondary);
+}
+
+/* Dark mode support for scrollbars */
+[data-theme='dark'] *::-webkit-scrollbar-thumb {
+    background: var(--ant-color-border);
+}
+
+[data-theme='dark'] *::-webkit-scrollbar-thumb:hover {
+    background: var(--ant-color-border-secondary);
+}
+
+/* =================================================================
    TAB CONTENT AREAS
    ================================================================= */
 

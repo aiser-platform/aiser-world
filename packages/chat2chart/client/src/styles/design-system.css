@@ -7,42 +7,39 @@
    DESIGN TOKEN MAPPING
    ======================================== */
 
-/* Enhanced Color Adaptation - Direct Color Values for Reliability */
+/* Enhanced Color Adaptation - derive layout tokens from base color system to keep edges consistent */
 :root {
-  /* Light Mode - Stronger header/sidebar than page background */
-  --layout-background: #f8f9fa; /* Lightest - page background */
-  --layout-header-background: #e8eaed; /* Stronger than page background */
-  --layout-sidebar-background: #e8eaed; /* Same as header - stronger than page */
-  --layout-sidebar-background-hover: #d1d5db; /* Even stronger on hover */
-  --layout-content-background: #ffffff; /* Content area - distinct from panels */
-  --layout-panel-background: #f1f3f4; /* Panel background - distinct from content */
-  --layout-panel-background-subtle: #f0f2f5;
-  --layout-panel-background-raised: #f1f3f4;
-  --layout-background-container: #f1f3f4;
+  --layout-background: var(--color-bg-base, #f8f9fa);
+  --layout-header-background: var(--color-bg-container, #fafafa);
+  --layout-sidebar-background: var(--color-bg-container, #fafafa);
+  --layout-sidebar-background-hover: var(--color-border, #d1d5db);
+  --layout-content-background: var(--color-bg-container, #ffffff);
+  --layout-panel-background: var(--color-bg-container, #f1f3f4);
+  --layout-panel-background-subtle: var(--color-bg-container, #f0f2f5);
+  --layout-panel-background-raised: var(--color-bg-container, #f1f3f4);
+  --layout-background-container: var(--color-bg-container, #f1f3f4);
 }
 
-[data-theme="dark"] {
-  /* Dark Mode - Dark blue theme */
-  --layout-background: #0d1117; /* Darkest - page background */
-  --layout-header-background: #001529; /* Dark blue header */
-  --layout-sidebar-background: #001529; /* Dark blue sidebar */
-  --layout-sidebar-background-hover: #002140; /* Slightly lighter hover */
-  --layout-content-background: #161b22; /* Content area - distinct from panels */
-  --layout-panel-background: #1c2128; /* Panel background - distinct from content */
-  --layout-panel-background-subtle: #21262d;
-  --layout-panel-background-raised: #1c2128;
-  --layout-background-container: #1c2128;
+[data-theme="dark"],
+html.dark {
+  --layout-background: var(--color-bg-base, #0d1117);
+  --layout-header-background: var(--color-bg-container, #0f1b3d);
+  --layout-sidebar-background: var(--color-bg-container, #0f1b3d);
+  --layout-sidebar-background-hover: var(--color-border, #1a2d5a);
+  --layout-content-background: var(--color-bg-container, #161b22);
+  --layout-panel-background: var(--color-bg-container, #1c2128);
+  --layout-panel-background-subtle: var(--color-bg-container, #21262d);
+  --layout-panel-background-raised: var(--color-bg-container, #1c2128);
+  --layout-background-container: var(--color-bg-container, #1c2128);
   
-  /* Dark Mode Text Colors */
-  --color-text-primary: #ffffff; /* White text for dark mode */
-  --color-text-secondary: #bfbfbf;
-  --color-text-tertiary: #8c8c8c;
-  --color-text-quaternary: #6b7280;
+  --color-text-primary: var(--color-text-primary, #ffffff);
+  --color-text-secondary: var(--color-text-secondary, #bfbfbf);
+  --color-text-tertiary: var(--color-text-tertiary, #8c8c8c);
+  --color-text-quaternary: var(--color-text-quaternary, #6b7280);
   
-  /* Dark Mode Border Colors */
-  --color-border-primary: #404040;
-  --color-border-secondary: #374151;
-  --border-color: #404040;
+  --color-border-primary: var(--color-border-primary, #404040);
+  --color-border-secondary: var(--color-border-secondary, #374151);
+  --border-color: var(--color-border-primary, #404040);
 }
 
 /* Enhanced Shadow Tokens for Better Visibility */
@@ -65,9 +62,9 @@
   --border-color: #d9d9d9;
   
   /* Brand Tokens */
-  --color-brand-primary: #2563eb;
-  --color-brand-primary-hover: #1d4ed8;
-  --color-brand-primary-active: #1e40af;
+  --color-brand-primary: var(--color-primary, #00c2cb);
+  --color-brand-primary-hover: var(--color-primary-hover, #00a5af);
+  --color-brand-primary-active: var(--color-primary-active, #008b95);
   --color-brand-primary-light: #60a5fa;
   --color-brand-primary-foreground: #ffffff;
   
@@ -212,35 +209,19 @@
 
 /* Main Layout */
 .ant-layout {
-  background: var(--layout-background) !important;
+  background: var(--ant-color-bg-layout) !important;
 }
 
 .ant-layout-header {
-  background: var(--layout-header-background) !important;
-  border-bottom: 1px solid var(--color-border-primary) !important;
+  background: var(--ant-color-bg-container) !important;
+  border-bottom: 1px solid var(--ant-color-border) !important;
 }
 
-.ant-layout-sider {
-  background: var(--layout-sidebar-background) !important;
-  border-right: 2px solid var(--color-border-primary) !important;
-  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1) !important;
-}
+/* Navigation colors handled by aiser-navigation-unified.css */
+/* All sidebar and menu colors are now managed by aiser-navigation-unified.css */
 
 .ant-layout-content {
-  background: var(--layout-content-background) !important;
-}
-
-/* Force Layout Children */
-.ant-layout-sider .ant-layout-sider-children {
-  background: var(--layout-sidebar-background) !important;
-}
-
-.ant-menu {
-  background: var(--layout-sidebar-background) !important;
-}
-
-.ant-menu-inline {
-  background: var(--layout-sidebar-background) !important;
+  background: var(--ant-color-bg-container) !important;
 }
 
 .ant-layout-header > * {
@@ -248,11 +229,13 @@
 }
 
 .ant-layout-sider > div:first-child {
-  background: var(--layout-sidebar-background) !important;
+  background: var(--color-bg-navigation) !important;
+  background-color: var(--color-bg-navigation) !important;
 }
 
 .ant-layout-sider .ant-menu-root {
-  background: var(--layout-sidebar-background) !important;
+  background: var(--color-bg-navigation) !important;
+  background-color: var(--color-bg-navigation) !important;
 }
 
 /* Enhanced Sidebar Menu Items */
@@ -263,13 +246,13 @@
 }
 
 .ant-menu-item:hover {
-  background: var(--color-brand-primary-light) !important;
-  color: var(--color-brand-primary) !important;
+  background: var(--ant-color-primary-bg) !important;
+  color: var(--ant-color-primary) !important;
 }
 
 .ant-menu-item-selected {
-  background: var(--color-brand-primary) !important;
-  color: var(--color-brand-primary-foreground) !important;
+  background: var(--ant-color-primary) !important;
+  color: #ffffff !important;
 }
 
 .ant-menu-submenu {
@@ -283,22 +266,22 @@
 }
 
 .ant-menu-submenu-title:hover {
-  background: var(--color-brand-primary-light) !important;
-  color: var(--color-brand-primary) !important;
+  background: var(--ant-color-primary-bg) !important;
+  color: var(--ant-color-primary) !important;
 }
 
 /* Dashboard Studio Dropdown Styling */
 .ant-dropdown,
 .ant-dropdown-menu {
-  background: var(--layout-panel-background) !important;
-  border: 2px solid var(--color-border-primary) !important;
+  background: var(--ant-color-bg-container) !important;
+  border: 1px solid var(--ant-color-border) !important;
   box-shadow: var(--shadow-xl) !important;
   border-radius: 12px !important;
   padding: 8px !important;
 }
 
 .ant-dropdown-menu-item {
-  color: var(--color-text-primary) !important;
+  color: var(--ant-color-text) !important;
   background: transparent !important;
   border-radius: 8px !important;
   margin: 2px 0 !important;
@@ -307,28 +290,28 @@
 }
 
 .ant-dropdown-menu-item:hover {
-  background: var(--layout-sidebar-background-hover) !important;
-  color: var(--color-text-primary) !important;
+  background: var(--ant-color-fill-secondary) !important;
+  color: var(--ant-color-text) !important;
   transform: translateX(4px) !important;
 }
 
 .ant-dropdown-menu-item-selected {
-  background: var(--color-brand-primary) !important;
-  color: var(--color-brand-primary-foreground) !important;
+  background: var(--ant-color-primary) !important;
+  color: #ffffff !important;
   box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3) !important;
 }
 
 /* Project Selector Dropdown */
 .ant-select-dropdown {
-  background: var(--layout-panel-background) !important;
-  border: 2px solid var(--color-border-primary) !important;
+  background: var(--ant-color-bg-container) !important;
+  border: 1px solid var(--ant-color-border) !important;
   box-shadow: var(--shadow-xl) !important;
   border-radius: 12px !important;
   padding: 8px !important;
 }
 
 .ant-select-item {
-  color: var(--color-text-primary) !important;
+  color: var(--ant-color-text) !important;
   background: transparent !important;
   border-radius: 8px !important;
   margin: 2px 0 !important;
@@ -337,21 +320,21 @@
 }
 
 .ant-select-item:hover {
-  background: var(--layout-sidebar-background-hover) !important;
-  color: var(--color-text-primary) !important;
+  background: var(--ant-color-fill-secondary) !important;
+  color: var(--ant-color-text) !important;
   transform: translateX(4px) !important;
 }
 
 .ant-select-item-option-selected {
-  background: var(--color-brand-primary) !important;
-  color: var(--color-brand-primary-foreground) !important;
+  background: var(--ant-color-primary) !important;
+  color: #ffffff !important;
   box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3) !important;
 }
 
 /* Select Dropdown Styling */
 .ant-select-dropdown {
-  background: var(--layout-sidebar-background) !important;
-  border: 1px solid var(--color-border-primary) !important;
+  background: var(--ant-color-bg-container) !important;
+  border: 1px solid var(--ant-color-border) !important;
   border-radius: 8px !important;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
 }
@@ -363,19 +346,19 @@
 }
 
 .ant-select-item:hover {
-  background: var(--color-brand-primary-light) !important;
-  color: var(--color-brand-primary) !important;
+  background: rgba(37, 99, 235, 0.1) !important;
+  color: var(--ant-color-primary) !important;
 }
 
 .ant-select-item-option-selected {
-  background: var(--color-brand-primary) !important;
-  color: var(--color-brand-primary-foreground) !important;
+  background: var(--ant-color-primary) !important;
+  color: #ffffff !important;
 }
 
 /* Debug: Test if CSS variables are working */
 body {
-  background: var(--layout-background) !important;
-  color: var(--color-text-primary) !important;
+  background: var(--ant-color-bg-layout) !important;
+  color: var(--ant-color-text) !important;
   margin: 0 !important;
   padding: 0 !important;
   width: 100% !important;
@@ -385,20 +368,17 @@ body {
 
 /* Force test styles */
 .test-panel {
-  background: var(--layout-panel-background) !important;
-  border: 2px solid var(--color-border-primary) !important;
+  background: var(--ant-color-bg-container) !important;
+  border: 1px solid var(--ant-color-border) !important;
   box-shadow: var(--shadow-md) !important;
   padding: 16px !important;
   margin: 8px !important;
   border-radius: var(--ant-border-radius-lg) !important;
 }
 
-/* Global Backgrounds - Remove ALL white edges */
-* {
-  margin: 0 !important;
-  padding: 0 !important;
-  box-sizing: border-box !important;
-}
+/* Global Backgrounds - Use Ant Design tokens */
+/* NOTE: Do not use * selector for margins/padding - too aggressive */
+/* Use specific selectors instead */
 
 html, body {
   margin: 0 !important;
@@ -406,11 +386,11 @@ html, body {
   width: 100% !important;
   height: 100% !important;
   overflow-x: hidden !important;
-  background: var(--layout-background) !important;
+  background: var(--ant-color-bg-layout) !important;
 }
 
 #__next {
-  background: var(--layout-background) !important;
+  background: var(--ant-color-bg-layout) !important;
   margin: 0 !important;
   padding: 0 !important;
   width: 100% !important;
@@ -421,7 +401,7 @@ html, body {
 /* Force Ant Design Layout Components */
 .ant-layout,
 .ant-layout-has-sider {
-  background: var(--layout-background) !important;
+  background: var(--ant-color-bg-layout) !important;
   margin: 0 !important;
   padding: 0 !important;
   width: 100% !important;
@@ -430,7 +410,7 @@ html, body {
 
 /* Force main content area */
 .ant-layout-content {
-  background: var(--layout-background) !important;
+  background: var(--ant-color-bg-layout) !important;
   margin: 0 !important;
   padding: 0 !important;
   width: 100% !important;
@@ -439,7 +419,7 @@ html, body {
 
 /* Force page content div */
 .page-content {
-  background: var(--layout-background) !important;
+  background: var(--ant-color-bg-layout) !important;
   margin: 0 !important;
   padding: 0 !important;
   width: 100% !important;
@@ -453,7 +433,7 @@ html, body {
 /* Force our design system to override Ant Design's automatic theming */
 .ant-layout,
 .ant-layout-has-sider {
-  background: var(--layout-background) !important;
+  background: var(--ant-color-bg-layout) !important;
   margin: 0 !important;
   padding: 0 !important;
   width: 100% !important;
@@ -462,8 +442,8 @@ html, body {
 
 /* Force header to use our colors - highest specificity */
 .ant-layout-header {
-  background: var(--layout-header-background) !important;
-  border-bottom: 3px solid var(--color-border-primary) !important;
+  background: var(--ant-color-bg-container) !important;
+  border-bottom: 1px solid var(--ant-color-border) !important;
   box-shadow: 0 3px 12px rgba(0, 0, 0, 0.15) !important;
   margin: 0 !important;
   padding: 0 16px !important;
@@ -474,32 +454,14 @@ html, body {
   justify-content: space-between !important;
 }
 
-/* Force sidebar to use our colors - highest specificity */
-.ant-layout-sider,
-.ant-layout-sider-light,
-.ant-layout-sider-dark,
-.ant-layout-sider-collapsed {
-  background: var(--layout-sidebar-background) !important;
-  border-right: 3px solid var(--color-border-primary) !important;
-  box-shadow: 3px 0 12px rgba(0, 0, 0, 0.15) !important;
-}
-
-/* Force sidebar menu to use our colors - highest specificity */
-.ant-menu,
-.ant-menu-light,
-.ant-menu-dark,
-.ant-menu-root,
-.ant-menu-inline,
-.ant-menu-vertical {
-  background: var(--layout-sidebar-background) !important;
-  color: var(--color-text-primary) !important;
-}
+/* Navigation colors handled by aiser-navigation-unified.css */
+/* All sidebar and menu colors are now managed by aiser-navigation-unified.css */
 
 .ant-menu-item,
 .ant-menu-submenu-title,
 .ant-menu-item-only-child {
-  color: var(--color-text-primary) !important;
-  background: transparent !important;
+  color: var(--ant-color-text) !important;
+  /* Background color handled by navigation-colors-consolidated.css */
   border-radius: 6px !important;
   margin: 2px 8px !important;
   padding: 8px 12px !important;
@@ -508,62 +470,56 @@ html, body {
 .ant-menu-item:hover,
 .ant-menu-submenu-title:hover,
 .ant-menu-item-only-child:hover {
-  background: var(--layout-sidebar-background-hover) !important;
-  color: var(--color-text-primary) !important;
+  background: var(--ant-color-fill-secondary) !important;
+  color: var(--ant-color-text) !important;
   transform: translateX(2px) !important;
   transition: all 0.2s ease !important;
 }
 
 .ant-menu-item-selected,
 .ant-menu-item-selected:hover {
-  background: var(--color-brand-primary) !important;
-  color: var(--color-brand-primary-foreground) !important;
+  background: var(--ant-color-primary) !important;
+  color: #ffffff !important;
   box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3) !important;
 }
 
 /* Force navigation menu items to align with sidebar */
+/* Background colors handled by navigation-colors-consolidated.css */
 .ant-menu-item,
 .ant-menu-submenu-title {
-  background: transparent !important;
   border: none !important;
   outline: none !important;
 }
 
 .ant-menu-item:focus,
 .ant-menu-submenu-title:focus {
-  background: transparent !important;
+  /* Background color handled by navigation-colors-consolidated.css */
   outline: none !important;
 }
 
 .ant-menu-item:active,
 .ant-menu-submenu-title:active {
-  background: var(--layout-sidebar-background-hover) !important;
+  background: var(--ant-color-fill-secondary) !important;
 }
 
-/* Force sidebar submenu */
-.ant-menu-submenu-popup,
-.ant-menu-submenu-popup .ant-menu {
-  background: var(--layout-panel-background) !important;
-  border: 1px solid var(--color-border-primary) !important;
-  box-shadow: var(--shadow-lg) !important;
-  border-radius: 8px !important;
-}
+/* Navigation colors handled by aiser-navigation-unified.css */
+/* All submenu popup colors are now managed by aiser-navigation-unified.css */
 
 .ant-menu-submenu-popup .ant-menu-item {
   margin: 2px 4px !important;
   border-radius: 4px !important;
-  color: var(--color-text-primary) !important;
-  background: transparent !important;
+  color: var(--ant-color-text) !important;
+  /* Background color handled by aiser-navigation-unified.css */
 }
 
 .ant-menu-submenu-popup .ant-menu-item:hover {
-  background: var(--layout-sidebar-background-hover) !important;
-  color: var(--color-text-primary) !important;
+  background: var(--ant-color-fill-secondary) !important;
+  color: var(--ant-color-text) !important;
 }
 
 /* Force main content area */
 .ant-layout-content {
-  background: var(--layout-background) !important;
+  background: var(--ant-color-bg-layout) !important;
   margin: 0 !important;
   padding: 0 !important;
   width: 100% !important;
@@ -573,15 +529,15 @@ html, body {
 /* Force dropdowns to use our colors */
 .ant-dropdown,
 .ant-dropdown-menu {
-  background: var(--layout-panel-background) !important;
-  border: 2px solid var(--color-border-primary) !important;
+  background: var(--ant-color-bg-container) !important;
+  border: 1px solid var(--ant-color-border) !important;
   box-shadow: var(--shadow-xl) !important;
   border-radius: 12px !important;
   padding: 8px !important;
 }
 
 .ant-dropdown-menu-item {
-  color: var(--color-text-primary) !important;
+  color: var(--ant-color-text) !important;
   background: transparent !important;
   border-radius: 8px !important;
   margin: 2px 0 !important;
@@ -590,28 +546,28 @@ html, body {
 }
 
 .ant-dropdown-menu-item:hover {
-  background: var(--layout-sidebar-background-hover) !important;
-  color: var(--color-text-primary) !important;
+  background: var(--ant-color-fill-secondary) !important;
+  color: var(--ant-color-text) !important;
   transform: translateX(4px) !important;
 }
 
 .ant-dropdown-menu-item-selected {
-  background: var(--color-brand-primary) !important;
-  color: var(--color-brand-primary-foreground) !important;
+  background: var(--ant-color-primary) !important;
+  color: #ffffff !important;
   box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3) !important;
 }
 
 /* Force select dropdowns */
 .ant-select-dropdown {
-  background: var(--layout-panel-background) !important;
-  border: 2px solid var(--color-border-primary) !important;
+  background: var(--ant-color-bg-container) !important;
+  border: 1px solid var(--ant-color-border) !important;
   box-shadow: var(--shadow-xl) !important;
   border-radius: 12px !important;
   padding: 8px !important;
 }
 
 .ant-select-item {
-  color: var(--color-text-primary) !important;
+  color: var(--ant-color-text) !important;
   background: transparent !important;
   border-radius: 8px !important;
   margin: 2px 0 !important;
@@ -620,14 +576,14 @@ html, body {
 }
 
 .ant-select-item:hover {
-  background: var(--layout-sidebar-background-hover) !important;
-  color: var(--color-text-primary) !important;
+  background: var(--ant-color-fill-secondary) !important;
+  color: var(--ant-color-text) !important;
   transform: translateX(4px) !important;
 }
 
 .ant-select-item-option-selected {
-  background: var(--color-brand-primary) !important;
-  color: var(--color-brand-primary-foreground) !important;
+  background: var(--ant-color-primary) !important;
+  color: #ffffff !important;
   box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3) !important;
 }
 
@@ -786,7 +742,7 @@ html {
   padding: 0 !important;
   width: 100% !important;
   height: 100% !important;
-  background: var(--layout-background) !important;
+  background: var(--ant-color-bg-layout) !important;
   overflow-x: hidden !important;
 }
 
@@ -795,7 +751,7 @@ body {
   padding: 0 !important;
   width: 100% !important;
   height: 100% !important;
-  background: var(--layout-background) !important;
+  background: var(--ant-color-bg-layout) !important;
   overflow-x: hidden !important;
 }
 
@@ -804,7 +760,7 @@ body {
   padding: 0 !important;
   width: 100% !important;
   height: 100% !important;
-  background: var(--layout-background) !important;
+  background: var(--ant-color-bg-layout) !important;
   overflow-x: hidden !important;
 }
 
@@ -814,7 +770,7 @@ body {
   padding: 0 !important;
   width: 100% !important;
   height: 100% !important;
-  background: var(--layout-background) !important;
+  background: var(--ant-color-bg-layout) !important;
   position: relative !important;
 }
 
@@ -823,16 +779,16 @@ body {
   padding: 0 !important;
   width: 100% !important;
   height: 100% !important;
-  background: var(--layout-background) !important;
+  background: var(--ant-color-bg-layout) !important;
 }
 
 /* Ultra-aggressive header styling with maximum specificity */
 .ant-layout-header,
 div[class*="ant-layout-header"],
 .ant-layout-header > * {
-  background: var(--layout-header-background) !important;
-  background-color: var(--layout-header-background) !important;
-  border-bottom: 2px solid var(--color-border-primary) !important;
+  background: var(--ant-color-bg-container) !important;
+  background-color: var(--ant-color-bg-container) !important;
+  border-bottom: 1px solid var(--ant-color-border) !important;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
   position: fixed !important;
   top: 0 !important;
@@ -845,19 +801,15 @@ div[class*="ant-layout-header"],
   padding: 0 16px !important;
 }
 
-/* Dark mode header enhancements - stronger color */
-[data-theme="dark"] .ant-layout-header {
-  background-color: #21262d; /* Stronger than page background */
-  border-bottom-color: #404040;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
-}
+/* Navigation colors handled by aiser-navigation-unified.css */
+/* Header colors are now managed by aiser-navigation-unified.css */
 
 /* Header content styling */
 .ant-layout-header .header-content {
   display: flex;
   align-items: center;
   gap: 16px;
-  color: var(--ant-color-text, var(--color-text-primary));
+  color: var(--ant-color-text);
 }
 
 [data-theme="dark"] .ant-layout-header .header-content {
@@ -896,18 +848,14 @@ body {
 .ant-layout-sider-collapsed,
 div[class*="ant-layout-sider"],
 .ant-layout-sider-children {
-  background: var(--layout-sidebar-background) !important;
-  background-color: var(--layout-sidebar-background) !important;
-  border-right: 2px solid var(--color-border-primary) !important;
+  background: var(--ant-color-bg-container) !important;
+  background-color: var(--ant-color-bg-container) !important;
+  border-right: 1px solid var(--ant-color-border) !important;
   box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1) !important;
 }
 
-/* Dark mode sidebar - harmonized with dropdown background */
-[data-theme="dark"] .ant-layout-sider {
-  background-color: #1a1a1a; /* Same as dropdown background */
-  border-right-color: #404040;
-  box-shadow: 2px 0 12px rgba(0, 0, 0, 0.3);
-}
+/* Navigation colors handled by aiser-navigation-unified.css */
+/* Removed conflicting rules - use aiser-navigation-unified.css instead */
 
 /* Ultra-aggressive menu styling with maximum specificity */
 .ant-menu,
@@ -920,9 +868,8 @@ div[class*="ant-menu"],
 .ant-menu-item,
 .ant-menu-submenu-title,
 .ant-menu-item-only-child {
-  background: var(--layout-sidebar-background) !important;
-  background-color: var(--layout-sidebar-background) !important;
-  color: var(--color-text-primary) !important;
+  /* Background color handled by navigation-colors-consolidated.css */
+  color: var(--ant-color-text) !important;
 }
 
 .ant-menu-item,
@@ -936,17 +883,17 @@ div[class*="ant-menu"],
 .ant-menu-item:hover,
 .ant-menu-submenu-title:hover,
 .ant-menu-item-only-child:hover {
-  background: var(--layout-sidebar-background-hover) !important;
-  background-color: var(--layout-sidebar-background-hover) !important;
-  color: var(--color-text-primary) !important;
+  background: var(--ant-color-fill-secondary) !important;
+  background-color: var(--ant-color-fill-secondary) !important;
+  color: var(--ant-color-text) !important;
   transform: translateX(2px) !important;
 }
 
 .ant-menu-item-selected,
 .ant-menu-item-selected:hover {
-  background: var(--color-brand-primary) !important;
-  background-color: var(--color-brand-primary) !important;
-  color: var(--color-brand-primary-foreground) !important;
+  background: var(--ant-color-primary) !important;
+  background-color: var(--ant-color-primary) !important;
+  color: #ffffff !important;
   box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3) !important;
 }
 
@@ -958,128 +905,48 @@ div[class*="ant-menu"],
 
 [data-theme="dark"] .ant-menu-item:hover,
 [data-theme="dark"] .ant-menu-submenu-title:hover {
-  background-color: #2a2a2a; /* Slightly lighter than sidebar (#1a1a1a) */
-  color: #ffffff;
+  background-color: var(--ant-color-fill-secondary) !important; /* Use unified fill color */
+  color: var(--ant-color-text) !important;
 }
 
 [data-theme="dark"] .ant-menu-item-selected,
 [data-theme="dark"] .ant-menu-item-selected:hover {
-  background-color: #2563eb;
+  background-color: var(--ant-color-primary, #00c2cb);
   color: #ffffff;
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+  box-shadow: 0 2px 8px rgba(0, 194, 203, 0.35);
 }
 
-/* Force sidebar menu background */
-.ant-menu,
-.ant-menu-light,
-.ant-menu-dark,
-.ant-menu-root,
-.ant-menu-inline,
-.ant-menu-vertical,
-div[class*="ant-menu"] {
-  background: var(--layout-sidebar-background) !important;
-  background-color: var(--layout-sidebar-background) !important;
-  color: var(--color-text-primary) !important;
-}
-
-/* Force sidebar menu items */
-.ant-menu-item,
-.ant-menu-submenu-title,
-.ant-menu-item-only-child,
-li[class*="ant-menu-item"] {
-  color: var(--color-text-primary) !important;
-  background: transparent !important;
-  background-color: transparent !important;
-  border-radius: 6px !important;
-  margin: 2px 8px !important;
-  padding: 8px 12px !important;
-}
+/* Navigation colors handled by aiser-navigation-unified.css */
+/* Removed conflicting rules - use aiser-navigation-unified.css instead */
 
 .ant-menu-item:hover,
 .ant-menu-submenu-title:hover,
 .ant-menu-item-only-child:hover,
 li[class*="ant-menu-item"]:hover {
-  background: var(--layout-sidebar-background-hover) !important;
-  background-color: var(--layout-sidebar-background-hover) !important;
-  color: var(--color-text-primary) !important;
+  background: var(--ant-color-fill-secondary) !important;
+  background-color: var(--ant-color-fill-secondary) !important;
+  color: var(--ant-color-text) !important;
   transform: translateX(2px) !important;
   transition: all 0.2s ease !important;
 }
 
 .ant-menu-item-selected,
 .ant-menu-item-selected:hover {
-  background: var(--color-brand-primary) !important;
-  background-color: var(--color-brand-primary) !important;
-  color: var(--color-brand-primary-foreground) !important;
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3) !important;
+  background: var(--ant-color-primary, #00c2cb) !important;
+  background-color: var(--ant-color-primary, #00c2cb) !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(0, 194, 203, 0.35) !important;
 }
 
-/* Enhanced submenu styling for dark mode */
-.ant-menu-submenu-popup,
-.ant-menu-submenu-popup .ant-menu,
-div[class*="ant-menu-submenu-popup"] {
-  background: var(--ant-color-bg-elevated, var(--layout-panel-background));
-  border: 1px solid var(--ant-color-border, var(--color-border-primary));
-  box-shadow: var(--shadow-lg);
-  border-radius: 8px;
-}
+/* Navigation colors handled by aiser-navigation-unified.css */
+/* Removed conflicting rules - use aiser-navigation-unified.css instead */
 
-.ant-menu-submenu-popup .ant-menu-item {
-  margin: 2px 4px;
-  border-radius: 4px;
-  color: var(--ant-color-text, var(--color-text-primary));
-  background: transparent;
-  transition: all 0.2s ease;
-}
+/* Navigation colors handled by aiser-navigation-unified.css */
+/* All submenu popup colors are now managed by aiser-navigation-unified.css */
 
-.ant-menu-submenu-popup .ant-menu-item:hover {
-  background: var(--ant-color-fill-quaternary, var(--layout-sidebar-background-hover));
-  color: var(--ant-color-text, var(--color-text-primary));
-}
-
-/* Dark mode submenu enhancements - matching sidebar */
-[data-theme="dark"] .ant-menu-submenu-popup {
-  background: #1a1a1a; /* Same as sidebar */
-  border-color: #404040;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-}
-
-[data-theme="dark"] .ant-menu-submenu-popup .ant-menu-item {
-  color: #e5e5e5;
-}
-
-[data-theme="dark"] .ant-menu-submenu-popup .ant-menu-item:hover {
-  background-color: #2a2a2a; /* Same as menu hover */
-  color: #ffffff;
-}
-
-/* Force main content to account for fixed header and sidebar */
-.ant-layout-content {
-  background: var(--layout-background) !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  width: 100% !important;
-  height: 100vh !important;
-  margin-top: 64px !important;
-  margin-left: 256px !important;
-  overflow-y: auto !important;
-  position: relative !important;
-}
-
-/* Adjust content when sidebar is collapsed */
-.ant-layout-has-sider .ant-layout-content {
-  margin-left: 80px !important;
-}
-
-/* Force page content to fill all available space */
-.page-content {
-  background: var(--layout-background) !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
-  min-height: calc(100vh - 64px) !important;
-}
+/* NOTE: Layout positioning rules moved to layout-system.css */
+/* This file now only contains design tokens and component styling */
+/* Layout-specific rules (positioning, spacing, overflow) are in layout-system.css */
 
 /* Remove any potential gaps from flex containers */
 .flex,
@@ -1188,7 +1055,7 @@ html, body, #__next, .ant-layout {
 }
 
 .page-content {
-  background: var(--layout-background) !important;
+  background: var(--ant-color-bg-layout) !important;
   margin: 0 !important;
   padding: 0 !important;
   width: 100% !important;
@@ -1243,11 +1110,11 @@ summary, time, mark, audio, video {
 
 /* Chat Panel */
 .enhanced-chat-panel {
-  background: var(--layout-panel-background-subtle);
-  color: var(--color-text-primary);
+  background: var(--ant-color-bg-elevated);
+  color: var(--ant-color-text);
   border-radius: var(--ant-border-radius-lg);
   box-shadow: var(--shadow-md);
-  border: 2px solid var(--color-border-primary);
+  border: 1px solid var(--ant-color-border);
   position: relative;
   margin: 0;
 }
@@ -1259,38 +1126,38 @@ summary, time, mark, audio, video {
   left: 0;
   right: 0;
   height: 3px;
-  background: linear-gradient(90deg, var(--color-brand-primary), var(--color-functional-success));
+  background: linear-gradient(90deg, var(--ant-color-primary), var(--ant-color-success));
   border-radius: var(--ant-border-radius-lg) var(--ant-border-radius-lg) 0 0;
   z-index: 1;
 }
 
 .chat-header {
-  background: var(--layout-header-background);
-  border-bottom: 1px solid var(--color-border-primary);
-  color: var(--color-text-primary);
+  background: var(--ant-color-bg-container);
+  border-bottom: 1px solid var(--ant-color-border);
+  color: var(--ant-color-text);
 }
 
 .chat-messages {
-  background: var(--layout-background-container);
-  color: var(--color-text-primary);
+  background: var(--ant-color-bg-container);
+  color: var(--ant-color-text);
 }
 
 .chat-input-section {
   background: var(--layout-header-background);
-  border-top: 1px solid var(--color-border-primary);
-  color: var(--color-text-primary);
+  border-top: 1px solid var(--ant-color-border);
+  color: var(--ant-color-text);
 }
 
 /* Message Components */
 .user-message {
-  background: var(--color-brand-primary);
-  color: var(--color-brand-primary-foreground);
+  background: var(--ant-color-primary);
+  color: #ffffff;
 }
 
 .ai-message {
-  background: var(--color-surface-raised);
-  color: var(--color-text-primary);
-  border: 1px solid var(--color-border-primary);
+  background: var(--ant-color-bg-elevated);
+  color: var(--ant-color-text);
+  border: 1px solid var(--ant-color-border);
 }
 
 /* ========================================
@@ -1298,30 +1165,30 @@ summary, time, mark, audio, video {
    ======================================== */
 
 .message-content {
-  color: var(--color-text-primary);
+  color: var(--ant-color-text);
 }
 
 /* Input Components */
 .chat-textarea {
-  background: var(--color-input-background) !important;
-  border: 1px solid var(--color-input-border) !important;
-  color: var(--color-text-primary) !important;
+  background: var(--ant-color-bg-container) !important;
+  border: 1px solid var(--ant-color-border) !important;
+  color: var(--ant-color-text) !important;
 }
 
 .chat-textarea:focus {
-  border-color: var(--color-brand-primary) !important;
-  box-shadow: 0 0 0 2px var(--color-brand-primary-light) !important;
+  border-color: var(--ant-color-primary) !important;
+  box-shadow: 0 0 0 2px var(--ant-color-primary-bg) !important;
 }
 
 .send-button {
-  background: var(--color-brand-primary) !important;
+  background: var(--ant-color-primary) !important;
   border-color: var(--color-brand-primary) !important;
-  color: var(--color-brand-primary-foreground) !important;
+  color: #ffffff !important;
 }
 
 .send-button:hover:not(:disabled) {
-  background: var(--color-brand-primary-hover) !important;
-  border-color: var(--color-brand-primary-hover) !important;
+  background: var(--ant-color-primary-hover) !important;
+  border-color: var(--ant-color-primary-hover) !important;
 }
 
 /* ========================================
@@ -1330,9 +1197,9 @@ summary, time, mark, audio, video {
 
 /* Data Panel */
 .enhanced-data-panel {
-  background: var(--layout-panel-background-raised);
-  color: var(--color-text-primary);
-  border: 2px solid var(--color-border-secondary);
+  background: var(--ant-color-bg-elevated);
+  color: var(--ant-color-text);
+  border: 1px solid var(--ant-color-border-secondary);
   border-radius: var(--ant-border-radius-md);
   position: relative;
   box-shadow: var(--shadow-md);
@@ -1346,27 +1213,27 @@ summary, time, mark, audio, video {
   left: 0;
   right: 0;
   height: 3px;
-  background: linear-gradient(90deg, var(--color-functional-info), var(--color-brand-primary));
+  background: linear-gradient(90deg, var(--ant-color-info), var(--ant-color-primary));
   border-radius: var(--ant-border-radius-md) var(--ant-border-radius-md) 0 0;
   z-index: 1;
 }
 
 .data-header {
-  background: var(--color-surface-raised);
+  background: var(--ant-color-bg-elevated);
   border-bottom: 1px solid var(--color-border-primary);
-  color: var(--color-text-primary);
+  color: var(--ant-color-text);
 }
 
 .data-content {
-  background: var(--layout-background-container);
-  color: var(--color-text-primary);
+  background: var(--ant-color-bg-container);
+  color: var(--ant-color-text);
 }
 
 /* History Panel */
 .collapsible-history-panel {
   background: var(--layout-panel-background);
-  color: var(--color-text-primary);
-  border: 2px solid var(--color-border-primary);
+  color: var(--ant-color-text);
+  border: 1px solid var(--ant-color-border);
   border-radius: var(--ant-border-radius-sm);
   position: relative;
   box-shadow: var(--shadow-sm);
@@ -1386,9 +1253,9 @@ summary, time, mark, audio, video {
 }
 
 .history-panel-header {
-  background: var(--color-surface-raised);
+  background: var(--ant-color-bg-elevated);
   border-bottom: 1px solid var(--color-border-primary);
-  color: var(--color-text-primary);
+  color: var(--ant-color-text);
   position: relative;
   z-index: 2;
 }
@@ -1437,15 +1304,15 @@ summary, time, mark, audio, video {
    ======================================== */
 
 .chart-container {
-  background: var(--layout-background-container);
-  border: 1px solid var(--color-border-primary);
-  color: var(--color-text-primary);
+  background: var(--ant-color-bg-container);
+  border: 1px solid var(--ant-color-border);
+  color: var(--ant-color-text);
 }
 
 .chart-header {
-  background: var(--color-surface-raised);
+  background: var(--ant-color-bg-elevated);
   border-bottom: 1px solid var(--color-border-primary);
-  color: var(--color-text-primary);
+  color: var(--ant-color-text);
 }
 
 /* ========================================
@@ -1461,7 +1328,7 @@ summary, time, mark, audio, video {
 .markdown-content pre {
   background: var(--code-background);
   color: var(--code-color);
-  border: 1px solid var(--color-border-primary);
+  border: 1px solid var(--ant-color-border);
 }
 
 /* ========================================
@@ -1469,14 +1336,14 @@ summary, time, mark, audio, video {
    ======================================== */
 
 .execution-metadata {
-  background: var(--color-surface-raised);
-  border: 1px solid var(--color-border-primary);
-  color: var(--color-text-primary);
+  background: var(--ant-color-bg-elevated);
+  border: 1px solid var(--ant-color-border);
+  color: var(--ant-color-text);
 }
 
 .metadata-content span {
   background: var(--tag-background);
-  color: var(--color-text-primary);
+  color: var(--ant-color-text);
   border: 1px solid var(--color-border-secondary);
 }
 
@@ -1485,14 +1352,14 @@ summary, time, mark, audio, video {
    ======================================== */
 
 .modal-content {
-  background: var(--layout-background-container);
-  color: var(--color-text-primary);
+  background: var(--ant-color-bg-container);
+  color: var(--ant-color-text);
 }
 
 .modal-header {
-  background: var(--color-surface-raised);
+  background: var(--ant-color-bg-elevated);
   border-bottom: 1px solid var(--color-border-primary);
-  color: var(--color-text-primary);
+  color: var(--ant-color-text);
 }
 
 /* ========================================
@@ -1610,7 +1477,7 @@ summary, time, mark, audio, video {
    ======================================== */
 
 .text-primary {
-  color: var(--color-text-primary);
+  color: var(--ant-color-text);
 }
 
 .text-secondary {
@@ -1626,15 +1493,15 @@ summary, time, mark, audio, video {
 }
 
 .bg-container {
-  background: var(--layout-background-container);
+  background: var(--ant-color-bg-container);
 }
 
 .bg-elevated {
-  background: var(--color-surface-raised);
+  background: var(--ant-color-bg-elevated);
 }
 
 .border-primary {
-  border-color: var(--color-border-primary);
+  border-color: var(--ant-color-border);
 }
 
 /* ========================================
@@ -1646,8 +1513,8 @@ summary, time, mark, audio, video {
 .enhanced-data-panel,
 .collapsible-history-panel,
 .test-panel {
-  background: var(--layout-panel-background) !important;
-  border: 2px solid var(--color-border-primary) !important;
+  background: var(--ant-color-bg-container) !important;
+  border: 1px solid var(--ant-color-border) !important;
   box-shadow: var(--shadow-lg) !important;
   border-radius: var(--ant-border-radius-lg) !important;
   margin: 8px !important;
@@ -1656,15 +1523,15 @@ summary, time, mark, audio, video {
 
 /* Enhanced panel backgrounds for better contrast */
 .enhanced-chat-panel {
-  background: var(--layout-panel-background-subtle) !important;
+  background: var(--ant-color-bg-elevated) !important;
 }
 
 .enhanced-data-panel {
-  background: var(--layout-panel-background-raised) !important;
+  background: var(--ant-color-bg-elevated) !important;
 }
 
 .collapsible-history-panel {
-  background: var(--layout-panel-background) !important;
+  background: var(--ant-color-bg-container) !important;
 }
 
 /* Force body and layout backgrounds */
@@ -1673,40 +1540,26 @@ html,
 #__next,
 .ant-layout,
 .ant-layout-content {
-  background: var(--layout-background) !important;
-  color: var(--color-text-primary) !important;
+  background: var(--ant-color-bg-layout) !important;
+  color: var(--ant-color-text) !important;
 }
 
 /* Force sidebar and header backgrounds */
 .ant-layout-header {
-  background: var(--layout-header-background) !important;
-  border-bottom: 1px solid var(--color-border-primary) !important;
+  background: var(--ant-color-bg-container) !important;
+  border-bottom: 1px solid var(--ant-color-border) !important;
   margin: 0 !important;
   padding: 0 !important;
   width: 100% !important;
 }
 
-/* Force sidebar dark mode - override Ant Design */
-.ant-layout-sider,
-.ant-layout-sider-light,
-.ant-layout-sider-dark {
-  background: var(--layout-sidebar-background) !important;
-  border-right: 3px solid var(--color-border-primary) !important;
-  box-shadow: 3px 0 12px rgba(0, 0, 0, 0.15) !important;
-}
-
-/* Force sidebar menu items */
-.ant-menu,
-.ant-menu-light,
-.ant-menu-dark {
-  background: var(--layout-sidebar-background) !important;
-  color: var(--color-text-primary) !important;
-}
+/* Navigation colors handled by aiser-navigation-unified.css */
+/* Removed conflicting rules - use aiser-navigation-unified.css instead */
 
 .ant-menu-item,
 .ant-menu-submenu-title {
-  color: var(--color-text-primary) !important;
-  background: transparent !important;
+  color: var(--ant-color-text) !important;
+  /* Background color handled by navigation-colors-consolidated.css */
   border-radius: 6px !important;
   margin: 2px 8px !important;
   padding: 8px 12px !important;
@@ -1714,15 +1567,15 @@ html,
 
 .ant-menu-item:hover,
 .ant-menu-submenu-title:hover {
-  background: var(--layout-sidebar-background-hover) !important;
-  color: var(--color-text-primary) !important;
+  background: var(--ant-color-fill-secondary) !important;
+  color: var(--ant-color-text) !important;
   transform: translateX(2px) !important;
   transition: all 0.2s ease !important;
 }
 
 .ant-menu-item-selected {
-  background: var(--color-brand-primary) !important;
-  color: var(--color-brand-primary-foreground) !important;
+  background: var(--ant-color-primary) !important;
+  color: #ffffff !important;
   box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3) !important;
 }
 
@@ -1731,44 +1584,20 @@ html,
   transform: translateX(2px) !important;
 }
 
-/* Sidebar submenu styling */
-.ant-menu-submenu-popup {
-  background: var(--layout-panel-background) !important;
-  border: 1px solid var(--color-border-primary) !important;
-  box-shadow: var(--shadow-lg) !important;
-  border-radius: 8px !important;
-}
-
-.ant-menu-submenu-popup .ant-menu-item {
-  margin: 2px 4px !important;
-  border-radius: 4px !important;
-}
-
-/* Force header contrast */
-.ant-layout-header {
-  background: var(--layout-header-background) !important;
-  border-bottom: 3px solid var(--color-border-primary) !important;
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.15) !important;
-  margin: 0 !important;
-  padding: 0 16px !important;
-  width: 100% !important;
-  height: 64px !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: space-between !important;
-}
+/* Navigation colors handled by aiser-navigation-unified.css */
+/* All sidebar, menu, and header colors are now managed by aiser-navigation-unified.css */
 
 /* Force header buttons to use design system colors */
 .ant-layout-header .ant-btn {
-  color: var(--color-text-primary) !important;
+  color: var(--ant-color-text) !important;
   background: transparent !important;
   border: 1px solid transparent !important;
 }
 
 .ant-layout-header .ant-btn:hover {
   background: var(--layout-panel-background-hover) !important;
-  color: var(--color-text-primary) !important;
-  border-color: var(--color-border-primary) !important;
+  color: var(--ant-color-text) !important;
+  border-color: var(--ant-color-border) !important;
 }
 
 /* Ultra-aggressive panel styling with maximum specificity */
@@ -1781,9 +1610,9 @@ html,
 .unified-design-panel,
 div[class*="panel"],
 div[class*="Panel"] {
-  background: var(--layout-panel-background) !important;
+  background: var(--ant-color-bg-container) !important;
   background-color: var(--layout-panel-background) !important;
-  border: 2px solid var(--color-border-primary) !important;
+  border: 1px solid var(--ant-color-border) !important;
   box-shadow: var(--shadow-lg) !important;
   border-radius: 12px !important;
   position: relative !important;
@@ -1793,9 +1622,9 @@ div[class*="Panel"] {
 
 /* Chat History panel - special positioning within content area */
 .chat-history-panel {
-  background: var(--layout-panel-background) !important;
+  background: var(--ant-color-bg-container) !important;
   background-color: var(--layout-panel-background) !important;
-  border: 2px solid var(--color-border-primary) !important;
+  border: 1px solid var(--ant-color-border) !important;
   box-shadow: var(--shadow-lg) !important;
   border-radius: 12px !important;
   position: relative !important;
@@ -1833,7 +1662,7 @@ div[class*="Panel"] {
 .chart-config-panel,
 .dashboard-canvas,
 .unified-design-panel {
-  background: var(--ant-color-bg-elevated, var(--layout-panel-background));
+  background: var(--ant-color-bg-elevated);
   border: 2px solid var(--ant-color-border, var(--color-border-primary));
   box-shadow: var(--shadow-lg);
   border-radius: 12px;
@@ -1871,7 +1700,7 @@ div[class*="Panel"] {
 
 /* Force main content area */
 .ant-layout-content {
-  background: var(--layout-background) !important;
+  background: var(--ant-color-bg-layout) !important;
   margin: 0 !important;
   padding: 0 !important;
   width: 100% !important;
@@ -1880,7 +1709,7 @@ div[class*="Panel"] {
 /* Remove any remaining white edges */
 .ant-layout,
 .ant-layout-has-sider {
-  background: var(--layout-background) !important;
+  background: var(--ant-color-bg-layout) !important;
   margin: 0 !important;
   padding: 0 !important;
 }
@@ -1891,8 +1720,8 @@ div[class*="Panel"] {
 
 /* Dashboard Studio Sidebar */
 .ant-layout-sider.modern-sidebar {
-  background: var(--layout-sidebar-background) !important;
-  border-right: 2px solid var(--color-border-primary) !important;
+  background: var(--ant-color-bg-container) !important;
+  border-right: 1px solid var(--ant-color-border) !important;
   box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1) !important;
 }
 
@@ -1901,33 +1730,33 @@ div[class*="Panel"] {
 .ant-select-selector {
   background: var(--color-surface-base) !important;
   border-color: var(--color-border-secondary) !important;
-  color: var(--color-text-primary) !important;
+  color: var(--ant-color-text) !important;
 }
 
 .ant-select-focused .ant-select-selector {
-  border-color: var(--color-brand-primary) !important;
-  box-shadow: 0 0 0 2px var(--color-brand-primary-light) !important;
+  border-color: var(--ant-color-primary) !important;
+  box-shadow: 0 0 0 2px var(--ant-color-primary-bg) !important;
 }
 
 .ant-select-dropdown {
-  background: var(--layout-panel-background) !important;
-  border: 1px solid var(--color-border-primary) !important;
+  background: var(--ant-color-bg-container) !important;
+  border: 1px solid var(--ant-color-border) !important;
   box-shadow: var(--shadow-lg) !important;
 }
 
 .ant-select-item {
-  color: var(--color-text-primary) !important;
-  background: var(--layout-panel-background) !important;
+  color: var(--ant-color-text) !important;
+  background: var(--ant-color-bg-container) !important;
 }
 
 .ant-select-item:hover {
   background: var(--layout-panel-background-hover) !important;
-  color: var(--color-text-primary) !important;
+  color: var(--ant-color-text) !important;
 }
 
 .ant-select-item-option-selected {
-  background: var(--color-brand-primary) !important;
-  color: var(--color-brand-primary-foreground) !important;
+  background: var(--ant-color-primary) !important;
+  color: #ffffff !important;
 }
 }
 
@@ -1936,20 +1765,11 @@ div[class*="Panel"] {
    LIGHT MODE OVERRIDES - SOFTER COLORS
    ======================================== */
 
-/* Light mode overrides - stronger colors */
-html[data-theme="light"] .ant-layout-header,
-html[data-theme="light"] .ant-layout-header * {
-  background: #e8eaed !important; /* Stronger than page background */
-  background-color: #e8eaed !important;
-}
+/* Navigation colors handled by aiser-navigation-unified.css */
+/* Header colors are now managed by aiser-navigation-unified.css */
 
-html[data-theme="light"] .ant-layout-sider,
-html[data-theme="light"] .ant-layout-sider *,
-html[data-theme="light"] .ant-menu,
-html[data-theme="light"] .ant-menu * {
-  background: #e8eaed !important; /* Stronger than page background */
-  background-color: #e8eaed !important;
-}
+/* Navigation colors handled by aiser-navigation-unified.css */
+/* All sidebar and menu colors are now managed by aiser-navigation-unified.css */
 
 html[data-theme="light"] .enhanced-chat-panel,
 html[data-theme="light"] .enhanced-data-panel,
@@ -1965,58 +1785,15 @@ html[data-theme="light"] .unified-design-panel {
 
 
 /* ========================================
-   ULTRA-AGGRESSIVE HEADER FIXES
+   NAVIGATION COLORS - REMOVED
    ======================================== */
 
-/* Force header background with maximum specificity */
-body .ant-layout-header,
-html body .ant-layout-header,
-#__next .ant-layout-header,
-div[class*="ant-layout-header"] {
-  background: var(--layout-header-background) !important;
-  background-color: var(--layout-header-background) !important;
-}
+/* Navigation colors (header, sidebar, menu) are now handled by aiser-navigation-unified.css */
+/* This is the SINGLE SOURCE OF TRUTH for navigation colors */
+/* All conflicting rules have been removed to ensure consistency */
 
-/* Light mode header force */
-html[data-theme="light"] body .ant-layout-header,
-html[data-theme="light"] html body .ant-layout-header,
-html[data-theme="light"] #__next .ant-layout-header {
-  background: #e8eaed !important;
-  background-color: #e8eaed !important;
-}
-
-/* Dark mode header force */
-html[data-theme="dark"] body .ant-layout-header,
-html[data-theme="dark"] html body .ant-layout-header,
-html[data-theme="dark"] #__next .ant-layout-header {
-  background: #21262d !important;
-  background-color: #21262d !important;
-}
-
-/* Force sidebar background with maximum specificity */
-body .ant-layout-sider,
-html body .ant-layout-sider,
-#__next .ant-layout-sider,
-div[class*="ant-layout-sider"] {
-  background: var(--layout-sidebar-background) !important;
-  background-color: var(--layout-sidebar-background) !important;
-}
-
-/* Light mode sidebar force */
-html[data-theme="light"] body .ant-layout-sider,
-html[data-theme="light"] html body .ant-layout-sider,
-html[data-theme="light"] #__next .ant-layout-sider {
-  background: #e8eaed !important;
-  background-color: #e8eaed !important;
-}
-
-/* Dark mode sidebar force */
-html[data-theme="dark"] body .ant-layout-sider,
-html[data-theme="dark"] html body .ant-layout-sider,
-html[data-theme="dark"] #__next .ant-layout-sider {
-  background: #1a1a1a !important; /* Same as dropdown background */
-  background-color: #1a1a1a !important;
-}
+/* Navigation colors handled by aiser-navigation-unified.css */
+/* All sidebar colors are now managed by aiser-navigation-unified.css */
 
 
 /* ========================================
@@ -2030,8 +1807,8 @@ html[data-theme="dark"] #__next .ant-layout-sider {
 textarea.ant-input,
 textarea.ant-input:focus,
 textarea.ant-input-focused {
-  border: 2px solid var(--color-border-primary) !important;
-  border-color: var(--color-border-primary) !important;
+  border: 1px solid var(--ant-color-border) !important;
+  border-color: var(--ant-color-border) !important;
   box-shadow: none !important;
   outline: none !important;
 }
@@ -2422,8 +2199,8 @@ html body div[class*="ant-layout-header"],
   right: 0 !important;
   width: 100% !important;
   z-index: 9999 !important;
-  background: var(--layout-header-background) !important;
-  border-bottom: 1px solid var(--color-border-primary) !important;
+  background: var(--ant-color-bg-container) !important;
+  border-bottom: 1px solid var(--ant-color-border) !important;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
 }
 
@@ -2482,17 +2259,17 @@ html, body {
   z-index: 999 !important;
 }
 
+/* NOTE: Layout positioning rules moved to layout-system.css */
+/* These rules are overridden by layout-system.css which uses fixed positioning */
+/* Keeping minimal background styling only */
 .ant-layout-content {
-  margin-top: 64px !important; /* Account for fixed header */
-  margin-left: 200px !important; /* Account for fixed sidebar */
-  transition: margin-left 0.2s ease !important;
+  background: var(--ant-color-bg-layout) !important;
+  /* Positioning/spacing handled by layout-system.css */
 }
 
 .ant-layout-sider-collapsed + .ant-layout-content {
-  margin-left: 80px !important; /* Account for collapsed sidebar */
+  background: var(--ant-color-bg-layout) !important;
 }
-
-
 /* ========================================
    PROPER ANT DESIGN INTEGRATION
    ======================================== */
@@ -2593,249 +2370,35 @@ body {
    DARK MODE SIDEBAR & MENU ALIGNMENT FIX
    ======================================== */
 
-/* Ensure dark mode sidebar background is properly applied */
-[data-theme="dark"] .ant-layout-sider,
-[data-theme="dark"] .ant-layout-sider-light,
-[data-theme="dark"] .ant-layout-sider-dark {
-  background: #1a1a1a !important;
-  background-color: #1a1a1a !important;
-}
+/* Navigation colors handled by aiser-navigation-unified.css */
+/* Removed conflicting rules - use aiser-navigation-unified.css instead */
 
-/* Ensure dark mode menu background matches sidebar */
-[data-theme="dark"] .ant-menu,
-[data-theme="dark"] .ant-menu-light,
-[data-theme="dark"] .ant-menu-dark,
-[data-theme="dark"] .ant-menu-root,
-[data-theme="dark"] .ant-menu-inline,
-[data-theme="dark"] .ant-menu-vertical {
-  background: #1a1a1a !important;
-  background-color: #1a1a1a !important;
-}
-
-/* Dark mode menu items */
-[data-theme="dark"] .ant-menu-item,
-[data-theme="dark"] .ant-menu-submenu-title,
-[data-theme="dark"] .ant-menu-item-only-child {
-  background: #1a1a1a !important;
-  background-color: #1a1a1a !important;
-  color: #e5e5e5 !important;
-}
-
-/* Dark mode menu item hover */
-[data-theme="dark"] .ant-menu-item:hover,
-[data-theme="dark"] .ant-menu-submenu-title:hover,
-[data-theme="dark"] .ant-menu-item-only-child:hover {
-  background: #2a2a2a !important;
-  background-color: #2a2a2a !important;
-  color: #ffffff !important;
-}
-
-/* Dark mode menu item selected */
-[data-theme="dark"] .ant-menu-item-selected,
-[data-theme="dark"] .ant-menu-item-selected:hover {
-  background: #2563eb !important;
-  background-color: #2563eb !important;
-  color: #ffffff !important;
-}
-
-/* Dark mode submenu popup */
-[data-theme="dark"] .ant-menu-submenu-popup {
-  background: #1a1a1a !important;
-  background-color: #1a1a1a !important;
-  border-color: #404040 !important;
-}
-
-[data-theme="dark"] .ant-menu-submenu-popup .ant-menu-item {
-  background: #1a1a1a !important;
-  background-color: #1a1a1a !important;
-  color: #e5e5e5 !important;
-}
-
-[data-theme="dark"] .ant-menu-submenu-popup .ant-menu-item:hover {
-  background: #2a2a2a !important;
-  background-color: #2a2a2a !important;
-  color: #ffffff !important;
-}
-
-/* Force Ant Design's dark algorithm to work properly */
-.ant-layout-sider-dark {
-  background: #1a1a1a !important;
-  background-color: #1a1a1a !important;
-}
-
-.ant-menu-dark {
-  background: #1a1a1a !important;
-  background-color: #1a1a1a !important;
-}
-
-.ant-menu-dark .ant-menu-item {
-  background: #1a1a1a !important;
-  background-color: #1a1a1a !important;
-  color: #e5e5e5 !important;
-}
-
-.ant-menu-dark .ant-menu-item:hover {
-  background: #2a2a2a !important;
-  background-color: #2a2a2a !important;
-  color: #ffffff !important;
-}
-
-.ant-menu-dark .ant-menu-item-selected {
-  background: #2563eb !important;
-  background-color: #2563eb !important;
-  color: #ffffff !important;
-}
+/* Navigation colors handled by aiser-navigation-unified.css */
+/* All sidebar, menu, and submenu colors are now managed by aiser-navigation-unified.css */
 
 
 /* ========================================
    HEADER DARK MODE FIX
    ======================================== */
 
-/* Ensure header background matches sidebar in dark mode */
-[data-theme="dark"] .ant-layout-header {
-  background: #1a1a1a !important;
-  background-color: #1a1a1a !important;
-}
-
-/* Light mode header */
-[data-theme="light"] .ant-layout-header {
-  background: #e8eaed !important;
-  background-color: #e8eaed !important;
-}
-
-/* Force header styling for all header elements */
-.ant-layout-header,
-.LayoutHeader,
-.layout-header {
-  background: var(--ant-color-bg-container) !important;
-}
-
-/* Dark mode specific header overrides */
-[data-theme="dark"] .ant-layout-header,
-[data-theme="dark"] .LayoutHeader,
-[data-theme="dark"] .layout-header {
-  background: #1a1a1a !important;
-  background-color: #1a1a1a !important;
-  color: #e5e5e5 !important;
-}
-
-/* Light mode specific header overrides */
-[data-theme="light"] .ant-layout-header,
-[data-theme="light"] .LayoutHeader,
-[data-theme="light"] .layout-header {
-  background: #e8eaed !important;
-  background-color: #e8eaed !important;
-  color: #262626 !important;
-}
+/* Navigation colors handled by aiser-navigation-unified.css */
+/* All header colors are now managed by aiser-navigation-unified.css */
 
 
 /* ========================================
    DROPDOWN MENU COLOR FIX
    ======================================== */
 
-/* Ensure dropdown menus match sidebar background */
-.ant-menu-submenu-popup {
-  background: var(--ant-color-bg-container) !important;
-  background-color: var(--ant-color-bg-container) !important;
-  border-color: var(--ant-color-border) !important;
-}
+/* Navigation colors handled by aiser-navigation-unified.css */
+/* All submenu popup colors are now managed by aiser-navigation-unified.css */
 
-/* Light mode dropdown */
-[data-theme="light"] .ant-menu-submenu-popup {
-  background: #e8eaed !important;
-  background-color: #e8eaed !important;
-  border-color: #d9d9d9 !important;
-}
+/* Navigation colors handled by aiser-navigation-unified.css */
+/* All submenu popup colors are now managed by aiser-navigation-unified.css */
 
-/* Dark mode dropdown */
-[data-theme="dark"] .ant-menu-submenu-popup {
-  background: #1a1a1a !important;
-  background-color: #1a1a1a !important;
-  border-color: #404040 !important;
-}
+/* Navigation colors handled by aiser-navigation-unified.css */
 
-/* Dropdown menu items */
-.ant-menu-submenu-popup .ant-menu-item {
-  background: var(--ant-color-bg-container) !important;
-  background-color: var(--ant-color-bg-container) !important;
-  color: var(--ant-color-text) !important;
-}
-
-/* Light mode dropdown items */
-[data-theme="light"] .ant-menu-submenu-popup .ant-menu-item {
-  background: #e8eaed !important;
-  background-color: #e8eaed !important;
-  color: #262626 !important;
-}
-
-/* Dark mode dropdown items */
-[data-theme="dark"] .ant-menu-submenu-popup .ant-menu-item {
-  background: #1a1a1a !important;
-  background-color: #1a1a1a !important;
-  color: #e5e5e5 !important;
-}
-
-/* Dropdown menu item hover */
-.ant-menu-submenu-popup .ant-menu-item:hover {
-  background: var(--ant-color-fill-secondary) !important;
-  background-color: var(--ant-color-fill-secondary) !important;
-}
-
-/* Light mode dropdown item hover */
-[data-theme="light"] .ant-menu-submenu-popup .ant-menu-item:hover {
-  background: #d1d5db !important;
-  background-color: #d1d5db !important;
-  color: #262626 !important;
-}
-
-/* Dark mode dropdown item hover */
-[data-theme="dark"] .ant-menu-submenu-popup .ant-menu-item:hover {
-  background: #2a2a2a !important;
-  background-color: #2a2a2a !important;
-  color: #ffffff !important;
-}
-
-/* Dropdown menu item selected */
-.ant-menu-submenu-popup .ant-menu-item-selected {
-  background: var(--ant-color-primary) !important;
-  background-color: var(--ant-color-primary) !important;
-  color: var(--ant-color-primary-foreground) !important;
-}
-
-/* Force Ant Design dropdown styling */
-.ant-menu-dark .ant-menu-submenu-popup {
-  background: #1a1a1a !important;
-  background-color: #1a1a1a !important;
-}
-
-.ant-menu-light .ant-menu-submenu-popup {
-  background: #e8eaed !important;
-  background-color: #e8eaed !important;
-}
-
-.ant-menu-dark .ant-menu-submenu-popup .ant-menu-item {
-  background: #1a1a1a !important;
-  background-color: #1a1a1a !important;
-  color: #e5e5e5 !important;
-}
-
-.ant-menu-light .ant-menu-submenu-popup .ant-menu-item {
-  background: #e8eaed !important;
-  background-color: #e8eaed !important;
-  color: #262626 !important;
-}
-
-.ant-menu-dark .ant-menu-submenu-popup .ant-menu-item:hover {
-  background: #2a2a2a !important;
-  background-color: #2a2a2a !important;
-  color: #ffffff !important;
-}
-
-.ant-menu-light .ant-menu-submenu-popup .ant-menu-item:hover {
-  background: #d1d5db !important;
-  background-color: #d1d5db !important;
-  color: #262626 !important;
-}
+/* Navigation colors handled by aiser-navigation-unified.css */
+/* All submenu popup colors are now managed by aiser-navigation-unified.css */
 
 
 /* ========================================
@@ -2850,15 +2413,15 @@ body {
 }
 
 [data-theme="dark"] .ant-dropdown {
-  background: #1a1a1a !important;
-  background-color: #1a1a1a !important;
-  border-color: #404040 !important;
+  background: var(--ant-color-bg-container) !important; /* #001529 - dark blue */
+  background-color: var(--ant-color-bg-container) !important;
+  border-color: var(--ant-color-border) !important;
 }
 
 [data-theme="light"] .ant-dropdown {
-  background: #e8eaed !important;
-  background-color: #e8eaed !important;
-  border-color: #d9d9d9 !important;
+  background: var(--ant-color-bg-container) !important; /* #fafafa - subtle off-white */
+  background-color: var(--ant-color-bg-container) !important;
+  border-color: var(--ant-color-border) !important;
 }
 
 /* Dropdown menu items */
@@ -2868,13 +2431,13 @@ body {
 }
 
 [data-theme="dark"] .ant-dropdown-menu {
-  background: #1a1a1a !important;
-  background-color: #1a1a1a !important;
+  background: var(--ant-color-bg-container) !important; /* #0f1b3d - Aiser brand-aligned dark blue */
+  background-color: var(--ant-color-bg-container) !important;
 }
 
 [data-theme="light"] .ant-dropdown-menu {
-  background: #e8eaed !important;
-  background-color: #e8eaed !important;
+  background: var(--ant-color-bg-container) !important; /* #fafafa - subtle off-white */
+  background-color: var(--ant-color-bg-container) !important;
 }
 
 .ant-dropdown-menu-item {
@@ -2917,124 +2480,26 @@ body {
    DARK BLUE THEME OVERRIDES
    ======================================== */
 
-/* Ensure dark blue theme is applied consistently */
-[data-theme="dark"] .ant-layout-sider,
-[data-theme="dark"] .ant-layout-sider-light,
-[data-theme="dark"] .ant-layout-sider-dark {
-  background: #001529 !important;
-  background-color: #001529 !important;
-}
-
-[data-theme="dark"] .ant-layout-header {
-  background: #001529 !important;
-  background-color: #001529 !important;
-  color: #ffffff !important;
-}
-
-[data-theme="dark"] .ant-menu,
-[data-theme="dark"] .ant-menu-light,
-[data-theme="dark"] .ant-menu-dark,
-[data-theme="dark"] .ant-menu-root,
-[data-theme="dark"] .ant-menu-inline,
-[data-theme="dark"] .ant-menu-vertical {
-  background: #001529 !important;
-  background-color: #001529 !important;
-}
-
-[data-theme="dark"] .ant-menu-item,
-[data-theme="dark"] .ant-menu-submenu-title,
-[data-theme="dark"] .ant-menu-item-only-child {
-  background: #001529 !important;
-  background-color: #001529 !important;
-  color: #ffffff !important;
-}
-
-[data-theme="dark"] .ant-menu-item:hover,
-[data-theme="dark"] .ant-menu-submenu-title:hover,
-[data-theme="dark"] .ant-menu-item-only-child:hover {
-  background: #002140 !important;
-  background-color: #002140 !important;
-  color: #ffffff !important;
-}
+/* Navigation colors handled by aiser-navigation-unified.css */
+/* All sidebar, header, and menu colors are now managed by aiser-navigation-unified.css */
 
 [data-theme="dark"] .ant-menu-item-selected,
 [data-theme="dark"] .ant-menu-item-selected:hover {
-  background: #1890ff !important;
-  background-color: #1890ff !important;
+  background: var(--ant-color-primary, #00c2cb) !important;
+  background-color: var(--ant-color-primary, #00c2cb) !important;
   color: #ffffff !important;
 }
 
-[data-theme="dark"] .ant-menu-submenu-popup {
-  background: #001529 !important;
-  background-color: #001529 !important;
-  border-color: #404040 !important;
-}
-
-[data-theme="dark"] .ant-menu-submenu-popup .ant-menu-item {
-  background: #001529 !important;
-  background-color: #001529 !important;
-  color: #ffffff !important;
-}
-
-[data-theme="dark"] .ant-menu-submenu-popup .ant-menu-item:hover {
-  background: #002140 !important;
-  background-color: #002140 !important;
-  color: #ffffff !important;
-}
-
-/* Force Ant Design's dark theme to use our dark blue */
-.ant-layout-sider-dark {
-  background: #001529 !important;
-  background-color: #001529 !important;
-}
-
-.ant-menu-dark {
-  background: #001529 !important;
-  background-color: #001529 !important;
-}
-
-.ant-menu-dark .ant-menu-item {
-  background: #001529 !important;
-  background-color: #001529 !important;
-  color: #ffffff !important;
-}
-
-.ant-menu-dark .ant-menu-item:hover {
-  background: #002140 !important;
-  background-color: #002140 !important;
-  color: #ffffff !important;
-}
-
-.ant-menu-dark .ant-menu-item-selected {
-  background: #1890ff !important;
-  background-color: #1890ff !important;
-  color: #ffffff !important;
-}
+/* Navigation colors handled by aiser-navigation-unified.css */
+/* All sidebar, menu, and submenu colors are now managed by aiser-navigation-unified.css */
 
 
 /* ========================================
    HEADER SIDEBAR COLOR MATCH
    ======================================== */
 
-/* Ensure header background exactly matches sidebar */
-.ant-layout-header {
-  background: var(--ant-color-bg-container) !important;
-  background-color: var(--ant-color-bg-container) !important;
-}
-
-/* Force header to use same color as sidebar in dark mode */
-[data-theme="dark"] .ant-layout-header {
-  background: #001529 !important;
-  background-color: #001529 !important;
-  color: #ffffff !important;
-}
-
-/* Force header to use same color as sidebar in light mode */
-[data-theme="light"] .ant-layout-header {
-  background: #e8eaed !important;
-  background-color: #e8eaed !important;
-  color: #262626 !important;
-}
+/* Navigation colors handled by aiser-navigation-unified.css */
+/* All header colors are now managed by aiser-navigation-unified.css */
 
 /* Ensure header content inherits proper colors */
 .ant-layout-header * {
@@ -3054,54 +2519,8 @@ body {
    ULTRA-AGGRESSIVE HEADER SIDEBAR MATCH
    ======================================== */
 
-/* Force header to match sidebar exactly - maximum specificity */
-.ant-layout-header,
-.LayoutHeader,
-.layout-header,
-div[class*="ant-layout-header"],
-div[class*="LayoutHeader"] {
-  background: var(--ant-color-bg-container) !important;
-  background-color: var(--ant-color-bg-container) !important;
-}
-
-/* Dark mode - force dark blue to match sidebar */
-[data-theme="dark"] .ant-layout-header,
-[data-theme="dark"] .LayoutHeader,
-[data-theme="dark"] .layout-header,
-[data-theme="dark"] div[class*="ant-layout-header"],
-[data-theme="dark"] div[class*="LayoutHeader"] {
-  background: #001529 !important;
-  background-color: #001529 !important;
-  color: #ffffff !important;
-}
-
-/* Light mode - force light grey to match sidebar */
-[data-theme="light"] .ant-layout-header,
-[data-theme="light"] .LayoutHeader,
-[data-theme="light"] .layout-header,
-[data-theme="light"] div[class*="ant-layout-header"],
-[data-theme="light"] div[class*="LayoutHeader"] {
-  background: #e8eaed !important;
-  background-color: #e8eaed !important;
-  color: #262626 !important;
-}
-
-/* Force all header content to use proper colors */
-[data-theme="dark"] .ant-layout-header *,
-[data-theme="dark"] .ant-layout-header .ant-btn,
-[data-theme="dark"] .ant-layout-header .ant-typography,
-[data-theme="dark"] .ant-layout-header span,
-[data-theme="dark"] .ant-layout-header div {
-  color: #ffffff !important;
-}
-
-[data-theme="light"] .ant-layout-header *,
-[data-theme="light"] .ant-layout-header .ant-btn,
-[data-theme="light"] .ant-layout-header .ant-typography,
-[data-theme="light"] .ant-layout-header span,
-[data-theme="light"] .ant-layout-header div {
-  color: #262626 !important;
-}
+/* Navigation colors handled by aiser-navigation-unified.css */
+/* All header colors are now managed by aiser-navigation-unified.css */
 
 /* Specific override for Aiser text */
 [data-theme="dark"] .ant-layout-header span[style*="fontWeight: bold"] {
@@ -3114,8 +2533,8 @@ div[class*="LayoutHeader"] {
 }
 
 [data-theme="dark"] .ant-layout-header .ant-btn-text:hover {
-  background: rgba(255, 255, 255, 0.1) !important;
-  color: #ffffff !important;
+  background: var(--ant-color-fill) !important;
+  color: var(--ant-color-text) !important;
 }
 
 [data-theme="light"] .ant-layout-header .ant-btn-text {
@@ -3123,8 +2542,8 @@ div[class*="LayoutHeader"] {
 }
 
 [data-theme="light"] .ant-layout-header .ant-btn-text:hover {
-  background: rgba(0, 0, 0, 0.1) !important;
-  color: #262626 !important;
+  background: var(--ant-color-fill-secondary) !important;
+  color: var(--ant-color-text) !important;
 }
 
 
@@ -3139,7 +2558,7 @@ span.aiser-text,
 [data-theme="dark"] .aiser-text,
 [data-theme="dark"] span.aiser-text,
 [data-theme="dark"] .ant-layout-header .aiser-text {
-  color: var(--color-text-primary) !important;
+  color: var(--ant-color-text) !important;
 }
 
 [data-theme="dark"] .aiser-text,
@@ -3503,11 +2922,11 @@ span.aiser-text,
 /* Force real-time updates for all custom properties */
 :root {
   /* Ensure all custom properties are reactive */
-  --color-brand-primary: #2563eb;
-  --color-brand-primary-hover: #1d4ed8;
-  --color-brand-primary-active: #1e40af;
-  --color-brand-primary-light: #dbeafe;
-  --color-brand-primary-dark: #1e3a8a;
+  --color-brand-primary: var(--color-primary, #00c2cb);
+  --color-brand-primary-hover: var(--color-primary-hover, #00a5af);
+  --color-brand-primary-active: var(--color-primary-active, #008b95);
+  --color-brand-primary-light: #ccf6f8;
+  --color-brand-primary-dark: #006b74;
   
   /* Layout colors with better contrast */
   --layout-background: #f8f9fa;
@@ -3540,7 +2959,7 @@ span.aiser-text,
   --color-functional-info: #1890ff;
   
   /* Component library integration */
-  --ant-color-primary: #2563eb;
+  --ant-color-primary: var(--color-primary, #00c2cb);
   --ant-color-success: #52c41a;
   --ant-color-warning: #faad14;
   --ant-color-error: #ff4d4f;
@@ -3554,7 +2973,7 @@ span.aiser-text,
 [data-theme="dark"] {
   --color-brand-primary: #3b82f6;
   --color-brand-primary-hover: #60a5fa;
-  --color-brand-primary-active: #2563eb;
+  --color-brand-primary-active: var(--color-primary-active, #008b95);
   --color-brand-primary-light: #1e3a8a;
   --color-brand-primary-dark: #1e40af;
   
@@ -3590,15 +3009,15 @@ span.aiser-text,
 
 /* Improved button styling */
 .ant-btn-primary {
-  background: var(--color-brand-primary) !important;
+  background: var(--ant-color-primary) !important;
   border-color: var(--color-brand-primary) !important;
   color: #ffffff !important;
   transition: all 0.2s ease !important;
 }
 
 .ant-btn-primary:hover {
-  background: var(--color-brand-primary-hover) !important;
-  border-color: var(--color-brand-primary-hover) !important;
+  background: var(--ant-color-primary-hover) !important;
+  border-color: var(--ant-color-primary-hover) !important;
   transform: translateY(-1px) !important;
   box-shadow: 0 4px 8px rgba(37, 99, 235, 0.3) !important;
 }
@@ -3614,22 +3033,22 @@ span.aiser-text,
 .ant-input-affix-wrapper,
 textarea.ant-input {
   background: var(--color-surface-base) !important;
-  border-color: var(--color-border-primary) !important;
-  color: var(--color-text-primary) !important;
+  border-color: var(--ant-color-border) !important;
+  color: var(--ant-color-text) !important;
   transition: all 0.2s ease !important;
 }
 
 .ant-input:focus,
 .ant-input-affix-wrapper:focus,
 textarea.ant-input:focus {
-  border-color: var(--color-brand-primary) !important;
-  box-shadow: 0 0 0 2px var(--color-brand-primary-light) !important;
+  border-color: var(--ant-color-primary) !important;
+  box-shadow: 0 0 0 2px var(--ant-color-primary-bg) !important;
 }
 
 /* Improved card styling */
 .ant-card {
-  background: var(--layout-panel-background) !important;
-  border-color: var(--color-border-primary) !important;
+  background: var(--ant-color-bg-container) !important;
+  border-color: var(--ant-color-border) !important;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
   transition: all 0.2s ease !important;
 }
@@ -3646,24 +3065,24 @@ textarea.ant-input:focus {
 
 .ant-select .ant-select-selector {
   background: var(--color-surface-base) !important;
-  border-color: var(--color-border-primary) !important;
-  color: var(--color-text-primary) !important;
+  border-color: var(--ant-color-border) !important;
+  color: var(--ant-color-text) !important;
 }
 
 .ant-select-focused .ant-select-selector {
-  border-color: var(--color-brand-primary) !important;
-  box-shadow: 0 0 0 2px var(--color-brand-primary-light) !important;
+  border-color: var(--ant-color-primary) !important;
+  box-shadow: 0 0 0 2px var(--ant-color-primary-bg) !important;
 }
 
 /* Improved dropdown styling */
 .ant-select-dropdown {
   background: var(--color-surface-overlay) !important;
-  border-color: var(--color-border-primary) !important;
+  border-color: var(--ant-color-border) !important;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15) !important;
 }
 
 .ant-select-item {
-  color: var(--color-text-primary) !important;
+  color: var(--ant-color-text) !important;
 }
 
 .ant-select-item:hover {
@@ -3671,14 +3090,14 @@ textarea.ant-input:focus {
 }
 
 .ant-select-item-option-selected {
-  background: var(--color-brand-primary-light) !important;
+  background: rgba(37, 99, 235, 0.1) !important;
   color: var(--color-brand-primary-dark) !important;
 }
 
 /* Enhanced modal styling */
 .ant-modal-content {
   background: var(--color-surface-overlay) !important;
-  border-color: var(--color-border-primary) !important;
+  border-color: var(--ant-color-border) !important;
 }
 
 .ant-modal-header {
@@ -3687,13 +3106,13 @@ textarea.ant-input:focus {
 }
 
 .ant-modal-title {
-  color: var(--color-text-primary) !important;
+  color: var(--ant-color-text) !important;
 }
 
 /* Improved tooltip styling */
 .ant-tooltip-inner {
   background: var(--color-surface-overlay) !important;
-  color: var(--color-text-primary) !important;
+  color: var(--ant-color-text) !important;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
 }
 
@@ -3703,7 +3122,7 @@ textarea.ant-input:focus {
 
 /* Enhanced progress styling */
 .ant-progress-bg {
-  background: var(--color-brand-primary) !important;
+  background: var(--ant-color-primary) !important;
 }
 
 .ant-progress-success-bg {
@@ -3713,12 +3132,12 @@ textarea.ant-input:focus {
 /* Improved notification styling */
 .ant-notification {
   background: var(--color-surface-overlay) !important;
-  border-color: var(--color-border-primary) !important;
+  border-color: var(--ant-color-border) !important;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15) !important;
 }
 
 .ant-notification-notice-message {
-  color: var(--color-text-primary) !important;
+  color: var(--ant-color-text) !important;
 }
 
 .ant-notification-notice-description {
@@ -3727,7 +3146,7 @@ textarea.ant-input:focus {
 
 /* Enhanced message styling */
 .ant-message {
-  color: var(--color-text-primary) !important;
+  color: var(--ant-color-text) !important;
 }
 
 .ant-message-success .anticon {
@@ -4259,10 +3678,10 @@ textarea.ant-input::placeholder {
 /* Override Ant Design tokens for better integration */
 :root {
   /* Ant Design Primary Colors */
-  --ant-primary-color: #2563eb;
-  --ant-primary-color-hover: #1d4ed8;
-  --ant-primary-color-active: #1e40af;
-  --ant-primary-color-outline: rgba(37, 99, 235, 0.2);
+  --ant-primary-color: var(--color-primary, #00c2cb);
+  --ant-primary-color-hover: var(--color-primary-hover, #00a5af);
+  --ant-primary-color-active: var(--color-primary-active, #008b95);
+  --ant-primary-color-outline: rgba(0, 194, 203, 0.22);
   
   /* Ant Design Background Colors */
   --ant-color-bg-base: #ffffff;
@@ -4321,7 +3740,7 @@ textarea.ant-input::placeholder {
 [data-theme="dark"] {
   --ant-primary-color: #3b82f6;
   --ant-primary-color-hover: #60a5fa;
-  --ant-primary-color-active: #2563eb;
+  --ant-primary-color-active: var(--color-primary-active, #008b95);
   --ant-primary-color-outline: rgba(59, 130, 246, 0.2);
   
   --ant-color-bg-base: #161b22;
@@ -4761,22 +4180,6 @@ textarea.ant-input::placeholder {
     margin: 12px !important;
   }
   
-  /* Enhanced tablet layout adjustments */
-  .ant-layout-sider,
-  .dashboard-studio .ant-layout-sider,
-  .unified-design-panel .ant-layout-sider,
-  .monaco-sql-editor .ant-layout-sider,
-  .chart-widget .ant-layout-sider {
-    width: 240px !important;
-  }
-  
-  .ant-layout-content,
-  .dashboard-studio .ant-layout-content,
-  .unified-design-panel .ant-layout-content,
-  .monaco-sql-editor .ant-layout-content,
-  .chart-widget .ant-layout-content {
-    margin-left: 240px !important;
-  }
 }
 
 /* Desktop enhancements */
@@ -4807,22 +4210,6 @@ textarea.ant-input::placeholder {
     transform: translateY(-1px) !important;
   }
   
-  /* Enhanced desktop layout */
-  .ant-layout-sider,
-  .dashboard-studio .ant-layout-sider,
-  .unified-design-panel .ant-layout-sider,
-  .monaco-sql-editor .ant-layout-sider,
-  .chart-widget .ant-layout-sider {
-    width: 280px !important;
-  }
-  
-  .ant-layout-content,
-  .dashboard-studio .ant-layout-content,
-  .unified-design-panel .ant-layout-content,
-  .monaco-sql-editor .ant-layout-content,
-  .chart-widget .ant-layout-content {
-    margin-left: 280px !important;
-  }
 }
 
 /* High DPI display optimizations */
@@ -5304,12 +4691,6 @@ textarea.ant-input::placeholder {
 .ant-menu {
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
-}
-
-/* Optimize image loading */
-img {
-  loading: lazy;
-  decoding: async;
 }
 
 /* Optimize font loading */

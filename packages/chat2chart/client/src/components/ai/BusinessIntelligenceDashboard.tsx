@@ -5,7 +5,6 @@ import {
   UserOutlined, 
   DollarOutlined, 
   BarChartOutlined,
-  RobotOutlined,
   BulbOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
@@ -13,6 +12,7 @@ import {
 } from '@ant-design/icons';
 import { unifiedAIService } from '@/services/unifiedAIService';
 import AgenticAnalysisPanel from './AgenticAnalysisPanel';
+import AiserAIIcon from '@/app/components/AiserAIIcon/AiserAIIcon';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -279,7 +279,7 @@ const BusinessIntelligenceDashboard: React.FC = () => {
           <Button
             type="primary"
             size="large"
-            icon={<RobotOutlined />}
+            icon={<AiserAIIcon size={20} />}
             onClick={() => setShowAgenticAnalysis(true)}
             className="bg-blue-600 hover:bg-blue-700"
           >

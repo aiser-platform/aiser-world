@@ -2,19 +2,29 @@
 
 import React, { useState } from 'react';
 import { useOrganization } from '@/context/OrganizationContext';
-import { Modal, Button, Card, Badge, List, Divider, Switch, message } from 'antd';
+import { Modal, Button, Card, List, Divider, Switch, message, Tag, Tooltip } from 'antd';
 import { CheckOutlined, CrownOutlined, TeamOutlined, RocketOutlined, StarOutlined } from '@ant-design/icons';
+import './PricingModal.css';
+
+interface PlanStat {
+  label: string;
+  value: string;
+}
+
+type PricingPlanKey = 'free' | 'pro' | 'team' | 'enterprise';
 
 interface PricingPlan {
   name: string;
-  plan_type: string;
+  plan_type: PricingPlanKey;
   price_monthly: number;
   price_yearly: number;
-  ai_credits: number;
+  stats: PlanStat[];
   features: string[];
   watermark: boolean;
   trial_days: number;
   popular?: boolean;
+  min_seats?: number;
+  price_per_seat?: number;
 }
 
 interface PricingModalProps {
@@ -40,29 +50,36 @@ const PricingModal: React.FC<PricingModalProps> = ({
       plan_type: 'free',
       price_monthly: 0,
       price_yearly: 0,
-      ai_credits: 50,
+      stats: [
+        { label: 'AI Credits', value: '30 / month' },
+        { label: 'Storage', value: '5 GB' },
+        { label: 'Data History', value: '7 days' },
+      ],
       features: [
-        'Limited access to core features',
-        'Basic AI analysis',
-        'Watermark on charts',
-        '1 project space'
+        '1 project workspace',
+        'Connect up to 2 data sources',
+        'Watermarked charts & exports',
+        'Community support'
       ],
       watermark: true,
-      trial_days: 14
+      trial_days: 0
     },
     {
       name: 'Pro',
       plan_type: 'pro',
-      price_monthly: 15,
-      price_yearly: 150,
-      ai_credits: 500,
+      price_monthly: 25,
+      price_yearly: 250,
+      stats: [
+        { label: 'AI Credits', value: '300 / month' },
+        { label: 'Storage', value: '90 GB' },
+        { label: 'Data History', value: '6 months' },
+      ],
       features: [
-        'Core AI analysis',
-        '1 Organization Workspace',
-        '1 Project Space',
-        'Deep Analysis Mode',
-        'Limited Theme & Brand Customization',
-        'No watermark'
+        'Unlimited workspaces & data sources',
+        'Watermark-free charts & dashboards',
+        'Theme & brand customization',
+        'API access & automation',
+        'Priority email & chat support'
       ],
       watermark: false,
       trial_days: 14,
@@ -71,18 +88,22 @@ const PricingModal: React.FC<PricingModalProps> = ({
     {
       name: 'Team',
       plan_type: 'team',
-      price_monthly: 29,
-      price_yearly: 290,
-      ai_credits: 1000,
+      price_monthly: 99,
+      price_yearly: 990,
+      stats: [
+        { label: 'AI Credits', value: '2,000 / month' },
+        { label: 'Storage', value: '500 GB' },
+        { label: 'Data History', value: '1 year' },
+        { label: 'Seats', value: '5 included' },
+      ],
+      min_seats: 5,
+      price_per_seat: 25,
       features: [
-        'Everything in Pro',
-        'Multiple Project Spaces',
-        'Multiple Users and Project Collaborations',
-        'Unlimited AI Commands',
-        'Full Theme & Brand Customization',
-        'Platform API Access',
-        'EChart MCP Server',
-        'Own AI Providers\' API Key'
+        'Advanced collaboration & approvals',
+        'Role-based permissions & governance',
+        'Shared asset libraries',
+        'Dedicated support channel',
+        '$25 per additional seat'
       ],
       watermark: false,
       trial_days: 14
@@ -92,34 +113,39 @@ const PricingModal: React.FC<PricingModalProps> = ({
       plan_type: 'enterprise',
       price_monthly: 0, // Custom pricing
       price_yearly: 0,
-      ai_credits: 5000,
+      stats: [
+        { label: 'AI Credits', value: 'Unlimited*' },
+        { label: 'Storage', value: 'Custom / multi-region' },
+        { label: 'Data History', value: 'Multi-year' },
+        { label: 'Seats', value: 'Custom' },
+      ],
       features: [
-        'Everything in Team',
-        'Full Integrations',
-        'White-Label Customization',
-        'Dedicated Support',
-        'Local AI Model',
-        'On-Premise Deployment',
-        'Custom AI Providers\' API Key',
-        'SLA & Priority Support'
+        'On-premise / Own-cloud deployment',
+        'White-label options',
+        'Custom AI models',
+        'SSO (Single Sign-On)',
+        '99.9% SLA with dedicated support',
+        'Compliance-ready (SOC 2, GDPR)',
+        'Dedicated customer success manager',
+        'Custom pricing & onboarding'
       ],
       watermark: false,
-      trial_days: 14
+      trial_days: 30
     }
   ];
 
   const getPlanIcon = (planType: string) => {
     switch (planType) {
       case 'free':
-        return <StarOutlined className="text-gray-500" />;
+        return <StarOutlined className="plan-icon plan-icon-free" />;
       case 'pro':
-        return <RocketOutlined className="text-blue-500" />;
+        return <RocketOutlined className="plan-icon plan-icon-pro" />;
       case 'team':
-        return <TeamOutlined className="text-purple-500" />;
+        return <TeamOutlined className="plan-icon plan-icon-team" />;
       case 'enterprise':
-        return <CrownOutlined className="text-yellow-500" />;
+        return <CrownOutlined className="plan-icon plan-icon-enterprise" />;
       default:
-        return <StarOutlined />;
+        return <StarOutlined className="plan-icon" />;
     }
   };
 
@@ -131,7 +157,17 @@ const PricingModal: React.FC<PricingModalProps> = ({
       return 'Free';
     }
     const price = isYearly ? plan.price_yearly / 12 : plan.price_monthly;
-    return `$${price}`;
+    return `$${price.toFixed(2)}`;
+  };
+
+  const formatYearlyPrice = (plan: PricingPlan) => {
+    if (plan.plan_type === 'enterprise') {
+      return 'Custom';
+    }
+    if (plan.price_yearly === 0) {
+      return 'Free';
+    }
+    return `$${plan.price_yearly.toFixed(2)}`;
   };
 
   const getYearlySavings = (plan: PricingPlan) => {
@@ -141,6 +177,13 @@ const PricingModal: React.FC<PricingModalProps> = ({
     const percentage = Math.round((savings / monthlyCost) * 100);
     return percentage;
   };
+
+  const creditPacks = [
+    { id: 'starter', label: 'Starter Boost', price: 10, credits: 1000, note: 'Perfect for pilots & proofs of concept.' },
+    { id: 'growth', label: 'Growth Pack', price: 25, credits: 2500, note: 'Ideal for ongoing team demos.' },
+    { id: 'scale', label: 'Scale Pack', price: 100, credits: 10000, note: 'Great for quarterly launch spikes.' },
+    { id: 'enterprise', label: 'Enterprise Surge', price: 500, credits: 50000, note: 'Designed for high-volume operations.' },
+  ];
 
   const { currentOrganization } = useOrganization();
 
@@ -177,35 +220,35 @@ const PricingModal: React.FC<PricingModalProps> = ({
   return (
     <Modal
       title={
-        <div className="text-center">
-          <h2 className="text-2xl font-bold mb-2">Choose Your Plan</h2>
-          <p className="text-gray-600">Upgrade to unlock more features and AI credits</p>
+        <div className="pricing-modal-header">
+          <h2 className="pricing-modal-title">Choose Your Plan</h2>
+          <p className="pricing-modal-subtitle">Upgrade to unlock more features and AI credits</p>
         </div>
       }
       open={visible}
       onCancel={onClose}
       footer={null}
-      width={1200}
+      width={1000}
       className="pricing-modal"
     >
-      <div className="mb-6 text-center">
-        <div className="inline-flex items-center bg-gray-100 rounded-lg p-1">
-          <span className={`px-3 py-1 text-sm ${!isYearly ? 'font-medium' : 'text-gray-600'}`}>
+      <div className="pricing-toggle-container">
+        <div className="pricing-toggle">
+          <span className={`pricing-toggle-label ${!isYearly ? 'pricing-toggle-active' : ''}`}>
             Monthly
           </span>
           <Switch
             checked={isYearly}
             onChange={setIsYearly}
-            className="mx-2"
+            className="pricing-toggle-switch"
           />
-          <span className={`px-3 py-1 text-sm ${isYearly ? 'font-medium' : 'text-gray-600'}`}>
+          <span className={`pricing-toggle-label ${isYearly ? 'pricing-toggle-active' : ''}`}>
             Yearly
           </span>
-          <Badge count="Save 17%" className="ml-2" />
+          <Tag color="green" className="pricing-savings-tag">Save 17%</Tag>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="pricing-cards-grid">
         {plans.map((plan) => {
           const savings = getYearlySavings(plan);
           const isCurrent = isCurrentPlan(plan.plan_type);
@@ -213,67 +256,75 @@ const PricingModal: React.FC<PricingModalProps> = ({
           return (
             <Card
               key={plan.plan_type}
-              className={`relative h-full ${
-                plan.popular ? 'border-blue-500 shadow-lg' : ''
-              } ${isCurrent ? 'border-green-500 bg-green-50' : ''}`}
-              bodyStyle={{ padding: '24px' }}
+              className={`pricing-card ${plan.popular ? 'pricing-card-popular' : ''} ${isCurrent ? 'pricing-card-current' : ''}`}
+              bodyStyle={{ padding: '20px' }}
             >
               {plan.popular && (
-                <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                  <Badge count="Most Popular" className="bg-blue-500" />
+                <div className="pricing-badge pricing-badge-popular">
+                  <Tag color="blue" className="pricing-badge-tag">Most Popular</Tag>
                 </div>
               )}
               
               {isCurrent && (
-                <div className="absolute -top-3 right-4">
-                  <Badge count="Current Plan" className="bg-green-500" />
+                <div className="pricing-badge pricing-badge-current">
+                  <Tag color="green" className="pricing-badge-tag">Current Plan</Tag>
                 </div>
               )}
 
-              <div className="text-center mb-4">
-                <div className="text-2xl mb-2">{getPlanIcon(plan.plan_type)}</div>
-                <h3 className="text-xl font-bold mb-2">{plan.name}</h3>
-                <div className="mb-2">
-                  <span className="text-3xl font-bold">{formatPrice(plan)}</span>
+              <div className="pricing-card-header">
+                <div className="pricing-card-icon">{getPlanIcon(plan.plan_type)}</div>
+                <h3 className="pricing-card-title">{plan.name}</h3>
+                <div className="pricing-card-price">
+                  <span className="pricing-price-amount">{formatPrice(plan)}</span>
                   {plan.price_monthly > 0 && plan.plan_type !== 'enterprise' && (
-                    <span className="text-gray-500 text-sm">/user/month</span>
+                    <span className="pricing-price-period">/month</span>
                   )}
                 </div>
-                {isYearly && savings && (
-                  <div className="text-green-600 text-sm font-medium">
-                    Save {savings}% yearly
-                  </div>
-                )}
-              </div>
-
-              <div className="mb-4">
-                <div className="text-center mb-3">
-                  <span className="font-semibold">{plan.ai_credits.toLocaleString()}</span>
-                  <span className="text-gray-500 text-sm"> AI credits/month</span>
+                <div className="pricing-card-meta">
+                  {isYearly && savings && (
+                    <div className="pricing-savings">
+                      Save ${(plan.price_monthly * 12 - plan.price_yearly).toFixed(2)} yearly
+                    </div>
+                  )}
+                  {plan.stats && (
+                    <div className="pricing-card-stats">
+                      {plan.stats.map((stat) => (
+                        <div className="pricing-stat" key={`${plan.plan_type}-${stat.label}`}>
+                          <span className="pricing-stat-label">{stat.label}</span>
+                          <span className="pricing-stat-value">{stat.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {plan.plan_type === 'team' && plan.min_seats && (
+                    <div className="pricing-card-footnote">
+                      Includes {plan.min_seats} seats · ${plan.price_per_seat}/additional seat
+                    </div>
+                  )}
+                  {plan.trial_days > 0 && !isCurrent && (
+                    <div className="pricing-trial-compact">
+                      {plan.trial_days}-day trial
+                    </div>
+                  )}
                 </div>
-                {plan.trial_days > 0 && !isCurrent && (
-                  <div className="text-center text-blue-600 text-sm font-medium mb-3">
-                    {plan.trial_days} days free trial
-                  </div>
-                )}
               </div>
 
-              <Divider />
+              <Divider className="pricing-divider" />
 
               <List
                 size="small"
                 dataSource={plan.features}
                 renderItem={(feature) => (
-                  <List.Item className="border-none px-0 py-1">
-                    <div className="flex items-start">
-                      <CheckOutlined className="text-green-500 mt-1 mr-2 flex-shrink-0" />
-                      <span className="text-sm">{feature}</span>
+                  <List.Item className="pricing-feature-item">
+                    <div className="pricing-feature">
+                      <CheckOutlined className="pricing-feature-icon" />
+                      <span className="pricing-feature-text">{feature}</span>
                     </div>
                   </List.Item>
                 )}
               />
 
-              <div className="mt-6">
+              <div className="pricing-card-action">
                 <Button
                   type={plan.popular ? 'primary' : 'default'}
                   size="large"
@@ -281,13 +332,7 @@ const PricingModal: React.FC<PricingModalProps> = ({
                   loading={loading}
                   disabled={isCurrent}
                   onClick={() => handleUpgrade(plan.plan_type)}
-                  className={
-                    isCurrent 
-                      ? 'bg-green-500 border-green-500 text-white cursor-not-allowed' 
-                      : plan.popular 
-                        ? 'bg-blue-500 border-blue-500' 
-                        : ''
-                  }
+                  className={`pricing-button ${isCurrent ? 'pricing-button-current' : ''} ${plan.popular ? 'pricing-button-popular' : ''}`}
                 >
                   {isCurrent 
                     ? 'Current Plan' 
@@ -304,18 +349,50 @@ const PricingModal: React.FC<PricingModalProps> = ({
         })}
       </div>
 
-      <div className="mt-8 text-center">
-        <div className="bg-gray-50 rounded-lg p-4">
-          <h4 className="font-semibold mb-2">Add-Ons Available</h4>
-          <p className="text-sm text-gray-600">
-            <strong>Additional AI Credits:</strong> $0.01 per token - Purchase additional AI tokens and credits as needed beyond your monthly allocation.
-          </p>
+      <div className="pricing-addons">
+        <div className="pricing-addons-card">
+          <div className="pricing-addons-info">
+            <h4 className="pricing-addons-title">💡 Need More?</h4>
+            <p className="pricing-addons-description">
+              Pre-purchase AI credit packs for peak demand without changing plans.
+            </p>
+          </div>
+          <div className="credit-pack-grid">
+            {creditPacks.map((pack) => (
+              <Tooltip key={pack.id} title={pack.note} placement="top">
+                <div className="credit-pack-card">
+                  <div className="credit-pack-price">${pack.price}</div>
+                  <div className="credit-pack-label">{pack.label}</div>
+                  <div className="credit-pack-credits">
+                    {pack.credits.toLocaleString()} credits
+                  </div>
+                  <div className="credit-pack-meta">
+                    ≈ ${(pack.price / pack.credits).toFixed(3)}/credit
+                  </div>
+                </div>
+              </Tooltip>
+            ))}
+          </div>
         </div>
       </div>
 
-      <div className="mt-6 text-center text-xs text-gray-500">
-        <p>All plans include 14 days free trial. No credit card required for Free plan.</p>
-        <p>Prices shown in USD. Cancel anytime.</p>
+      <p className="pricing-footnote-text">
+        *Unlimited credits available with dedicated enterprise or bring-your-own-model agreements.
+      </p>
+
+      <div className="pricing-footer">
+        <div className="pricing-footer-benefits">
+          <div className="pricing-footer-benefit">
+            <CheckOutlined /> 14-day free trial on all paid plans
+          </div>
+          <div className="pricing-footer-benefit">
+            <CheckOutlined /> Cancel anytime, no questions asked
+          </div>
+          <div className="pricing-footer-benefit">
+            <CheckOutlined /> All features unlocked during trial
+          </div>
+        </div>
+        <p className="pricing-footer-text">Prices shown in USD. Secure payment processing via Stripe.</p>
       </div>
     </Modal>
   );

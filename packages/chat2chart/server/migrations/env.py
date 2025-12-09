@@ -1,51 +1,37 @@
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
 from sqlalchemy import pool
+from sqlalchemy import engine_from_config
+
 from alembic import context
+import os
 
-
-# ---------------- added code here -------------------------#
-import os, sys
-
-# Base dir is the server package (contains `app/`)
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# Ensure server root and app package are on sys.path so Alembic can import models
-if BASE_DIR not in sys.path:
-    sys.path.insert(0, BASE_DIR)
-APP_DIR = os.path.join(BASE_DIR, 'app')
-if APP_DIR not in sys.path:
-    sys.path.insert(0, APP_DIR)
-from app.core.config import settings
-
-# ------------------------------------------------------------#
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
-# ---------------- added code here -------------------------#
-# this will overwrite the ini-file sqlalchemy.url path
-# with the path given in the config of the main code
-config.set_main_option("sqlalchemy.url", settings.SQLALCHEMY_DATABASE_URI)
-# ------------------------------------------------------------#
+
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
-fileConfig(config.config_file_name)
+if config.config_file_name is not None:
+    fileConfig(config.config_file_name)
+
+# Get DATABASE_URL from environment and convert to sync driver for Alembic
+database_url = os.environ.get("DATABASE_URL", "")
+if database_url:
+    # Convert asyncpg to psycopg2 for sync migrations
+    database_url = database_url.replace("postgresql+asyncpg", "postgresql+psycopg2")
+    config.set_main_option("sqlalchemy.url", database_url)
 
 # add your model's MetaData object here
 # for 'autogenerate' support
-# from myapp import mymodel
-# target_metadata = mymodel.Base.metadata
-# ---------------- added code here -------------------------#
-# Import model metadata for autogenerate support. Prefer explicit import from
-# the application's model module to avoid import errors during migrations.
-try:
-    # Import Base metadata from the application's common model module
-    from app.common.model import Base
-    target_metadata = Base.metadata
-except Exception as e:
-    target_metadata = None
-    print(f"Warning: Could not import migration models ({e}). Migrations may not work correctly.")
-# ------------------------------------------------------------#
+# Import all models so Alembic can detect them
+from app.common.model import Base
+target_metadata = Base.metadata
+
+# other values from the config, defined by the needs of env.py,
+# can be acquired:
+# my_important_option = config.get_main_option("my_important_option")
+# ... etc.
 
 
 def run_migrations_offline() -> None:
@@ -79,26 +65,16 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
-    # Override sqlalchemy.url with sync PostgreSQL URL
-    # Use explicit driver specification to avoid conflicts
-    async_url = settings.SQLALCHEMY_DATABASE_URI
-    if "postgresql+asyncpg://" in async_url:
-        sync_url = async_url.replace("postgresql+asyncpg://", "postgresql+psycopg2://")
-    else:
-        # Fallback to explicit psycopg2 driver
-        sync_url = f"postgresql+psycopg2://{settings.POSTGRES_USER}:{settings.POSTGRES_PASSWORD}@{settings.POSTGRES_SERVER}:{settings.POSTGRES_PORT}/{settings.POSTGRES_DB}"
-
-    configuration = config.get_section(config.config_ini_section)
-    configuration["sqlalchemy.url"] = sync_url
-
     connectable = engine_from_config(
-        configuration,
+        config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
 
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
+        context.configure(
+            connection=connection, target_metadata=target_metadata
+        )
 
         with context.begin_transaction():
             context.run_migrations()

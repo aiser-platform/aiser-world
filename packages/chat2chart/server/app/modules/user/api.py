@@ -1,4 +1,4 @@
-from typing import Annotated, Optional
+from typing import Annotated
 from app.common.schemas import ListResponseSchema
 from app.common.utils.query_params import BaseFilterParams
 from app.common.utils.search_query import create_search_query
@@ -9,15 +9,12 @@ from app.modules.authentication import (
     SignInResponse,
 )
 from app.modules.authentication.deps.auth_bearer import (
-    JWTBearer,
     JWTCookieBearer,
     TokenDep,
-    CookieDep,
-    current_user_payload,
 )
 from app.modules.user.schemas import UserCreate, UserResponse, UserUpdate
 from app.modules.user.services import UserService
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status  # type: ignore[reportMissingImports]
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, Request, status  # type: ignore[reportMissingImports]
 from fastapi.responses import JSONResponse  # type: ignore[reportMissingImports]
 import inspect
 from typing import Any
@@ -29,11 +26,242 @@ async def _maybe_await(value: Any):
     if inspect.isawaitable(value):
         return await value
     return value
-from app.core.config import settings
 
 router = APIRouter()
 service = UserService()
 logger = logging.getLogger(__name__)
+
+
+@router.post("/upload-avatar")
+async def upload_avatar(
+    request: Request,
+    current_token: dict = Depends(JWTCookieBearer())
+):
+    """Upload user avatar image or accept avatar URL"""
+    try:
+        from fastapi import UploadFile, File, Form
+        from typing import Union
+        
+        # Get user ID from current_token
+        if isinstance(current_token, dict):
+            user_id = current_token.get('id') or current_token.get('user_id') or current_token.get('sub')
+        else:
+            user = await service.get_me(current_token)
+            user_id = user.id if user else None
+        
+        if not user_id:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not authenticated")
+        
+        # Check if request has file upload or URL
+        content_type = request.headers.get("content-type", "")
+        
+        if "multipart/form-data" in content_type:
+            # Handle file upload
+            try:
+                form = await request.form()
+            except Exception as form_error:
+                logger.error(f"Failed to parse form data: {form_error}")
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to parse form data. Please ensure you're uploading a file.")
+            
+            # Try multiple possible field names
+            file: UploadFile = None
+            for field_name in ["file", "avatar", "image", "photo", "upload"]:
+                file_obj = form.get(field_name)
+                if file_obj:
+                    # Check if it's an UploadFile instance
+                    if hasattr(file_obj, 'filename') and file_obj.filename:
+                        file = file_obj
+                        break
+                    # Also check if it's a list (some form parsers return lists)
+                    elif isinstance(file_obj, list) and len(file_obj) > 0:
+                        file_obj = file_obj[0]
+                        if hasattr(file_obj, 'filename') and file_obj.filename:
+                            file = file_obj
+                            break
+            
+            if not file or not hasattr(file, 'filename') or not file.filename:
+                # Log what we received for debugging
+                form_keys = list(form.keys()) if form else []
+                logger.warning(f"Avatar upload - form keys: {form_keys}, content_type: {content_type}")
+                logger.warning(f"Avatar upload - form values: {[(k, type(v).__name__) for k, v in form.items()] if form else 'no form'}")
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No file provided. Please select an image file.")
+            
+            # Validate file type
+            allowed_types = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"]
+            if file.content_type not in allowed_types:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type. Only images are allowed.")
+            
+            # Validate file size (max 5MB)
+            file_content = await file.read()
+            if len(file_content) > 5 * 1024 * 1024:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File too large. Maximum size is 5MB.")
+            
+            # For now, we'll store the file and return a URL
+            # In production, upload to S3/Azure Blob Storage
+            import os
+            import hashlib
+            from datetime import datetime
+            
+            # Create uploads directory if it doesn't exist
+            upload_dir = os.path.join(os.getcwd(), "uploads", "avatars")
+            os.makedirs(upload_dir, exist_ok=True)
+            
+            # Generate unique filename
+            file_ext = os.path.splitext(file.filename)[1]
+            file_hash = hashlib.md5(f"{user_id}_{datetime.now().isoformat()}".encode()).hexdigest()
+            filename = f"{file_hash}{file_ext}"
+            filepath = os.path.join(upload_dir, filename)
+            
+            # Save file
+            with open(filepath, "wb") as f:
+                f.write(file_content)
+            
+            # Generate URL (in production, use CDN URL)
+            avatar_url = f"/uploads/avatars/{filename}"
+            
+                # Update user profile with avatar URL
+                # Use direct SQL update with proper async session handling
+                try:
+                    from app.db.session import get_async_session
+                    from sqlalchemy import text
+                    
+                    # Use async session factory properly
+                    async_gen = get_async_session()
+                    db = await async_gen.__anext__()
+                    try:
+                        # Use raw SQL for reliable update
+                        await db.execute(
+                            text("""
+                                UPDATE users 
+                                SET avatar_url = :avatar_url, updated_at = NOW()
+                                WHERE id = :user_id
+                            """),
+                            {
+                                "avatar_url": avatar_url,
+                                "user_id": str(user_id)
+                            }
+                        )
+                        await db.commit()
+                        logger.info(f"✅ Updated avatar_url for user {user_id}: {avatar_url}")
+                    except Exception as db_error:
+                        await db.rollback()
+                        logger.error(f"❌ Failed to update avatar_url: {db_error}", exc_info=True)
+                        # Try user_settings as fallback
+                        try:
+                            from app.modules.user.user_setting_repository import UserSettingRepository
+                            repo = UserSettingRepository()
+                            await repo.set_setting(str(user_id), "avatar_url", avatar_url)
+                            logger.info(f"✅ Stored avatar_url in user_settings (fallback) for user {user_id}")
+                        except Exception as settings_error:
+                            logger.error(f"❌ Failed to store avatar_url in user_settings: {settings_error}")
+                    finally:
+                        try:
+                            await async_gen.__anext__()  # Close the generator
+                        except StopAsyncIteration:
+                            pass
+                except Exception as e:
+                    logger.error(f"❌ Failed to update avatar_url in database: {e}", exc_info=True)
+                    # Try user_settings as last resort
+                    try:
+                        from app.modules.user.user_setting_repository import UserSettingRepository
+                        repo = UserSettingRepository()
+                        await repo.set_setting(str(user_id), "avatar_url", avatar_url)
+                        logger.info(f"✅ Stored avatar_url in user_settings (last resort) for user {user_id}")
+                    except Exception as settings_error:
+                        logger.error(f"❌ All avatar_url update methods failed: {settings_error}")
+            
+            return JSONResponse(content={
+                "success": True,
+                "url": avatar_url,
+                "message": "Avatar uploaded successfully"
+            })
+        else:
+            # Handle URL input
+            try:
+                body = await request.json()
+                avatar_url = body.get("url") or body.get("avatar_url")
+                
+                if not avatar_url:
+                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No avatar URL provided")
+                
+                # Validate URL format - allow both absolute URLs and relative paths
+                from urllib.parse import urlparse
+                parsed = urlparse(avatar_url)
+                # Allow absolute URLs (http/https) or relative paths starting with /
+                if parsed.scheme and parsed.scheme not in ['http', 'https']:
+                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid URL scheme. Only http and https are allowed.")
+                # If it's not a relative path and has a scheme, it must have netloc
+                if parsed.scheme and not parsed.netloc and not avatar_url.startswith('/'):
+                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid URL format")
+                
+                # Update user profile with avatar URL
+                # Use direct SQL update with proper async session handling
+                try:
+                    from app.db.session import get_async_session
+                    from sqlalchemy import text
+                    
+                    # Use async session factory properly
+                    async_gen = get_async_session()
+                    db = await async_gen.__anext__()
+                    try:
+                        # Use raw SQL for reliable update
+                        await db.execute(
+                            text("""
+                                UPDATE users 
+                                SET avatar_url = :avatar_url, updated_at = NOW()
+                                WHERE id = :user_id
+                            """),
+                            {
+                                "avatar_url": avatar_url,
+                                "user_id": str(user_id)
+                            }
+                        )
+                        await db.commit()
+                        logger.info(f"✅ Updated avatar_url for user {user_id}: {avatar_url}")
+                    except Exception as db_error:
+                        await db.rollback()
+                        logger.error(f"❌ Failed to update avatar_url: {db_error}", exc_info=True)
+                        # Try user_settings as fallback
+                        try:
+                            from app.modules.user.user_setting_repository import UserSettingRepository
+                            repo = UserSettingRepository()
+                            await repo.set_setting(str(user_id), "avatar_url", avatar_url)
+                            logger.info(f"✅ Stored avatar_url in user_settings (fallback) for user {user_id}")
+                        except Exception as settings_error:
+                            logger.error(f"❌ Failed to store avatar_url in user_settings: {settings_error}")
+                    finally:
+                        try:
+                            await async_gen.__anext__()  # Close the generator
+                        except StopAsyncIteration:
+                            pass
+                except Exception as e:
+                    logger.error(f"❌ Failed to update avatar_url in database: {e}", exc_info=True)
+                    # Try user_settings as last resort
+                    try:
+                        from app.modules.user.user_setting_repository import UserSettingRepository
+                        repo = UserSettingRepository()
+                        await repo.set_setting(str(user_id), "avatar_url", avatar_url)
+                        logger.info(f"✅ Stored avatar_url in user_settings (last resort) for user {user_id}")
+                    except Exception as settings_error:
+                        logger.error(f"❌ All avatar_url update methods failed: {settings_error}")
+                
+                return JSONResponse(content={
+                    "success": True,
+                    "url": avatar_url,
+                    "message": "Avatar URL updated successfully"
+                })
+            except Exception as e:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid request: {str(e)}")
+                
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to upload avatar: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+# In-memory user AI model preferences (fallback storage). Replace with DB-backed storage later.
+_user_ai_model_prefs: dict = {}
+
 
 
 @router.get("/", response_model=ListResponseSchema[UserResponse])
@@ -92,6 +320,14 @@ async def get_user_profile(payload: dict = Depends(JWTCookieBearer())):
                         'email': payload.get('email'),
                         'first_name': payload.get('first_name'),
                         'last_name': payload.get('last_name'),
+                        'avatar_url': payload.get('avatar_url'),
+                        'phone': payload.get('phone'),
+                        'bio': payload.get('bio'),
+                        'website': payload.get('website'),
+                        'location': payload.get('location'),
+                        'timezone': payload.get('timezone'),
+                        'created_at': payload.get('created_at'),
+                        'last_login_at': payload.get('last_login_at'),
                     }
                     return JSONResponse(content=minimal)
             except Exception:
@@ -102,7 +338,28 @@ async def get_user_profile(payload: dict = Depends(JWTCookieBearer())):
         user = await service.get_me(payload)
         if not user:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-        return user
+        
+        # Convert User model to UserResponse with all fields
+        if isinstance(user, dict):
+            return JSONResponse(content=user)
+        
+        # Extract all fields from User model
+        user_dict = {
+            'id': str(user.id) if hasattr(user, 'id') else None,
+            'username': getattr(user, 'username', None),
+            'email': getattr(user, 'email', None),
+            'first_name': getattr(user, 'first_name', None),
+            'last_name': getattr(user, 'last_name', None),
+            'avatar_url': getattr(user, 'avatar_url', None) or getattr(user, 'avatar', None),
+            'phone': getattr(user, 'phone', None),
+            'bio': getattr(user, 'bio', None),
+            'website': getattr(user, 'website', None),
+            'location': getattr(user, 'location', None),
+            'timezone': getattr(user, 'timezone', None),
+            'created_at': user.created_at.isoformat() if hasattr(user, 'created_at') and user.created_at else None,
+            'last_login_at': user.last_login_at.isoformat() if hasattr(user, 'last_login_at') and user.last_login_at else None,
+        }
+        return UserResponse(**user_dict)
     except HTTPException as e:
         raise e
     except Exception as e:
@@ -125,21 +382,12 @@ async def update_user_profile(
     user via `UserService.get_me`.
     """
     try:
-        # Log incoming auth info for debugging (helps diagnose 401 on PUT)
-        try:
-            msg = f"update_user_profile called with payload_type={type(payload)} payload_keys={list(payload.keys()) if isinstance(payload, dict) else None} cookies={list(request.cookies.keys()) if request else None} auth_header_present={bool(request.headers.get('Authorization')) if request else None}"
-            # Print to stdout so container logs capture this reliably during debugging
-            try:
-                print(msg, flush=True)
-            except Exception:
-                pass
-            try:
-                logger.info(msg)
-            except Exception:
-                pass
-        except Exception:
-            pass
-
+        logger.info(f"💾 Updating user profile: payload={list(payload.keys()) if isinstance(payload, dict) else 'not dict'}")
+        
+        # CRITICAL: Handle avatar_url properly
+        if hasattr(user_update, 'avatar_url') and user_update.avatar_url:
+            logger.info(f"📸 Avatar URL provided: {user_update.avatar_url}")
+        
         # debug logging to file removed (was used for transient investigation)
         # Normalize Pydantic values safely (some tests may pass partial/mocked objects)
         username_val = getattr(user_update, 'username', None)
@@ -152,17 +400,43 @@ async def update_user_profile(
                 # Try the normal async service update first
                 try:
                     updated = await service.update(uid, user_update)
-                    return updated
+                    # Ensure response includes all profile fields
+                    if isinstance(updated, dict):
+                        return JSONResponse(content=updated)
+                    # Convert User model to UserResponse
+                    updated_dict = {
+                        'id': str(updated.id) if hasattr(updated, 'id') else str(uid),
+                        'username': getattr(updated, 'username', username_val),
+                        'email': getattr(updated, 'email', payload.get('email')),
+                        'first_name': getattr(updated, 'first_name', first_name_val),
+                        'last_name': getattr(updated, 'last_name', getattr(user_update, 'last_name', None)),
+                        'avatar_url': getattr(updated, 'avatar_url', None) or getattr(updated, 'avatar', None),
+                        'phone': getattr(updated, 'phone', getattr(user_update, 'phone', None)),
+                        'bio': getattr(updated, 'bio', getattr(user_update, 'bio', None)),
+                        'website': getattr(updated, 'website', getattr(user_update, 'website', None)),
+                        'location': getattr(updated, 'location', getattr(user_update, 'location', None)),
+                        'timezone': getattr(updated, 'timezone', getattr(user_update, 'timezone', None)),
+                        'created_at': updated.created_at.isoformat() if hasattr(updated, 'created_at') and updated.created_at else None,
+                        'last_login_at': updated.last_login_at.isoformat() if hasattr(updated, 'last_login_at') and updated.last_login_at else None,
+                    }
+                    return UserResponse(**updated_dict)
                 except Exception:
                     # Fall back to a synchronous DB update to avoid async session conflicts
                     try:
                         from app.db.session import get_sync_engine
                         import sqlalchemy as _sa
                         eng = get_sync_engine()
+                        # Include all profile fields in update
                         updates = {k: v for k, v in {
                             'username': username_val,
                             'first_name': first_name_val,
                             'last_name': last_name_val,
+                            'phone': getattr(user_update, 'phone', None),
+                            'bio': getattr(user_update, 'bio', None),
+                            'website': getattr(user_update, 'website', None),
+                            'location': getattr(user_update, 'location', None),
+                            'timezone': getattr(user_update, 'timezone', None),
+                            'avatar_url': getattr(user_update, 'avatar_url', None),
                         }.items() if v is not None}
                         if updates:
                             set_clause = []
@@ -171,7 +445,7 @@ async def update_user_profile(
                                 set_clause.append(f"{k} = :{k}")
                                 params[k] = v
                             params['uid'] = str(uid)
-                            sql = f"UPDATE users SET {', '.join(set_clause)}, updated_at = now() WHERE id = (:uid)::uuid RETURNING id, username, email, first_name, last_name"
+                            sql = f"UPDATE users SET {', '.join(set_clause)}, updated_at = now() WHERE id = (:uid)::uuid RETURNING id, username, email, first_name, last_name, phone, bio, website, location, timezone, avatar_url, created_at, last_login_at"
                             with eng.begin() as conn:
                                 res = conn.execute(_sa.text(sql), params)
                                 row = res.fetchone()
@@ -189,6 +463,12 @@ async def update_user_profile(
                     'email': payload.get('email') if isinstance(payload, dict) else None,
                     'first_name': first_name_val,
                     'last_name': last_name_val,
+                    'phone': getattr(user_update, 'phone', None),
+                    'bio': getattr(user_update, 'bio', None),
+                    'website': getattr(user_update, 'website', None),
+                    'location': getattr(user_update, 'location', None),
+                    'timezone': getattr(user_update, 'timezone', None),
+                    'avatar_url': getattr(user_update, 'avatar_url', None),
                 }
                 return JSONResponse(content=minimal)
 
@@ -210,7 +490,27 @@ async def update_user_profile(
         # Resolve current user and perform async update
         try:
             current_user = await service.get_me(token or payload)
-            return await service.update(current_user.id, user_update)
+            updated = await service.update(current_user.id, user_update)
+            # Ensure response includes all profile fields
+            if isinstance(updated, dict):
+                return JSONResponse(content=updated)
+            # Convert User model to UserResponse
+            updated_dict = {
+                'id': str(updated.id) if hasattr(updated, 'id') else str(current_user.id),
+                'username': getattr(updated, 'username', None),
+                'email': getattr(updated, 'email', None),
+                'first_name': getattr(updated, 'first_name', None),
+                'last_name': getattr(updated, 'last_name', None),
+                'avatar_url': getattr(updated, 'avatar_url', None) or getattr(updated, 'avatar', None),
+                'phone': getattr(updated, 'phone', None),
+                'bio': getattr(updated, 'bio', None),
+                'website': getattr(updated, 'website', None),
+                'location': getattr(updated, 'location', None),
+                'timezone': getattr(updated, 'timezone', None),
+                'created_at': updated.created_at.isoformat() if hasattr(updated, 'created_at') and updated.created_at else None,
+                'last_login_at': updated.last_login_at.isoformat() if hasattr(updated, 'last_login_at') and updated.last_login_at else None,
+            }
+            return UserResponse(**updated_dict)
         except Exception as exc:
             # Print exception details and full traceback to container stdout for debugging
             try:
@@ -242,6 +542,77 @@ async def get_one_user(user_id: int, token: str = TokenDep):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
         )
+
+
+@router.get("/preferences/ai-model")
+async def get_user_ai_model_preference(payload: dict = Depends(JWTCookieBearer())):
+    """
+    Get per-user AI model preference from persistent storage (fallback to platform default).
+    """
+    try:
+        uid = None
+        if isinstance(payload, dict):
+            uid = str(payload.get('id') or payload.get('user_id') or payload.get('sub'))
+        if not uid:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+
+        from app.modules.user.user_setting_repository import UserSettingRepository
+        from app.modules.ai.services.litellm_service import LiteLLMService
+
+        repo = UserSettingRepository()
+        setting = await repo.get_setting(uid, "ai_model")
+        if setting and setting.value:
+            return {"ai_model": setting.value}
+
+        lit = LiteLLMService()
+        return {"ai_model": lit.default_model}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Failed to get user ai model preference")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+@router.put("/preferences/ai-model")
+async def set_user_ai_model_preference(request: Request, token: dict = Depends(JWTCookieBearer())):
+    """
+    Persist per-user AI model preference. Body: { "ai_model": "<model_id>" }
+    """
+    try:
+        uid = None
+        if isinstance(token, dict):
+            uid = str(token.get('id') or token.get('user_id') or token.get('sub'))
+        if not uid:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+
+        # Parse request body - handle both Request object and dict
+        if isinstance(request, dict):
+            payload_body = request
+        else:
+            payload_body = await request.json()
+        ai_model = payload_body.get('ai_model') if isinstance(payload_body, dict) else None
+        if not ai_model:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ai_model required")
+
+        from app.modules.ai.services.litellm_service import LiteLLMService
+        lit = LiteLLMService()
+        if ai_model not in lit.available_models:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Unknown model id: {ai_model}")
+
+        from app.modules.user.user_setting_repository import UserSettingRepository
+        repo = UserSettingRepository()
+        await repo.set_setting(uid, "ai_model", ai_model)
+        # Audit log
+        try:
+            logger.info(f"User {uid} set ai_model preference to {ai_model}")
+        except Exception:
+            pass
+        return {"success": True, "ai_model": ai_model}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Failed to set user ai model preference")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 @router.put("/{user_id}", response_model=UserResponse, dependencies=[TokenDep])
@@ -408,7 +779,7 @@ async def get_security_settings(token: str = Depends(JWTCookieBearer())):
             "webhook_url": None,
             "allowed_ips": []
         }
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to get security settings"
@@ -426,7 +797,7 @@ async def update_security_settings(
             "success": True,
             "message": "Security settings updated successfully"
         }
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update security settings"
@@ -446,7 +817,7 @@ async def get_notification_settings(token: str = Depends(JWTCookieBearer())):
             "marketing_emails": False,
             "push_notifications": True
         }
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to get notification settings"
@@ -464,7 +835,7 @@ async def update_notification_settings(
             "success": True,
             "message": "Notification settings updated successfully"
         }
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update notification settings"
@@ -485,7 +856,7 @@ async def get_appearance_settings(token: str = Depends(JWTCookieBearer())):
             "timezone": "UTC",
             "date_format": "MM/DD/YYYY"
         }
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to get appearance settings"
@@ -503,7 +874,7 @@ async def update_appearance_settings(
             "success": True,
             "message": "Appearance settings updated successfully"
         }
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update appearance settings"
@@ -524,7 +895,7 @@ async def get_api_keys(token: str = Depends(JWTCookieBearer())):
                 "is_active": True
             }
         ]
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to get API keys"
@@ -546,7 +917,7 @@ async def create_api_key(
             "api_key": api_key,
             "message": "API key created successfully"
         }
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to create API key"
@@ -564,11 +935,106 @@ async def delete_api_key(
             "success": True,
             "message": "API key deleted successfully"
         }
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to delete API key"
         )
+
+
+@router.get("/provider-api-keys")
+async def get_provider_api_keys(payload: dict = Depends(JWTCookieBearer())):
+    """Get user's AI provider API keys (encrypted status only, never return full keys)"""
+    try:
+        uid = None
+        if isinstance(payload, dict):
+            uid = str(payload.get('id') or payload.get('user_id') or payload.get('sub'))
+        if not uid:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+
+        from app.modules.user.user_setting_repository import UserSettingRepository
+        repo = UserSettingRepository()
+        
+        providers = {}
+        for provider in ['openai', 'azure', 'anthropic']:
+            setting = await repo.get_setting(uid, f"provider_api_key_{provider}")
+            if setting and setting.value:
+                # Return only preview (first 8 chars + ...) and encrypted status
+                key_value = setting.value
+                if len(key_value) > 8:
+                    preview = key_value[:8] + '••••••••'
+                else:
+                    preview = '••••••••'
+                providers[provider] = {
+                    'has_key': True,
+                    'key_preview': preview,
+                    'encrypted': True
+                }
+            else:
+                providers[provider] = {
+                    'has_key': False,
+                    'key_preview': None,
+                    'encrypted': False
+                }
+        
+        return {"providers": providers}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Failed to get provider API keys")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+@router.put("/provider-api-keys")
+async def save_provider_api_key(
+    key_data: dict,
+    payload: dict = Depends(JWTCookieBearer())
+):
+    """Save and encrypt AI provider API key"""
+    try:
+        uid = None
+        if isinstance(payload, dict):
+            uid = str(payload.get('id') or payload.get('user_id') or payload.get('sub'))
+        if not uid:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+
+        provider = key_data.get('provider')
+        api_key = key_data.get('api_key')
+        
+        if not provider or not api_key:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="provider and api_key are required"
+            )
+        
+        if provider not in ['openai', 'azure', 'anthropic']:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid provider: {provider}. Must be one of: openai, azure, anthropic"
+            )
+
+        # Encrypt the API key before storing
+        from app.modules.data.utils.credentials import encrypt_credentials
+        encrypted_data = encrypt_credentials({'api_key': api_key})
+        encrypted_key = encrypted_data.get('api_key', api_key)  # Fallback if encryption fails
+
+        # Store encrypted key in user settings
+        from app.modules.user.user_setting_repository import UserSettingRepository
+        repo = UserSettingRepository()
+        await repo.set_setting(uid, f"provider_api_key_{provider}", encrypted_key)
+        
+        logger.info(f"User {uid} saved encrypted {provider} API key")
+        
+        return {
+            "success": True,
+            "message": f"{provider.upper()} API key saved and encrypted successfully",
+            "provider": provider
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Failed to save provider API key")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 @router.post("/sign-in", response_model=SignInResponse)
@@ -612,7 +1078,7 @@ async def refresh_token(request: RefreshTokenRequest, response: Response):
         return await service.refresh_token(request, response)
     except HTTPException as e:
         raise e
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token"
         )

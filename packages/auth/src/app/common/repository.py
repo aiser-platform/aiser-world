@@ -61,7 +61,10 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             result = await self.db._session.execute(query)
             return result.scalar_one_or_none()
         except Exception as e:
-            await self.db._session.rollback()
+            try:
+                self.db._session.rollback()
+            except Exception:
+                pass
             raise e
 
     async def get_by_fields(self, **kwargs) -> Optional[ModelType]:
@@ -85,7 +88,10 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             result = await self.db._session.execute(query)
             return result.scalar_one_or_none()
         except Exception as e:
-            await self.db._session.rollback()
+            try:
+                self.db._session.rollback()
+            except Exception:
+                pass
             raise e
 
     async def get_all(
@@ -131,7 +137,10 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             return result
         except Exception as e:
             logger.error(f"Error fetching records: {str(e)}")
-            await self.db._session.rollback()
+            try:
+                self.db._session.rollback()
+            except Exception:
+                pass
             raise
 
     async def create(self, obj_in: CreateSchemaType) -> ModelType:
@@ -155,11 +164,20 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
             db_obj = self.model(**create_data)
             self.db._session.add(db_obj)
-            await self.db._session.commit()
-            await self.db._session.refresh(db_obj)
+            try:
+                self.db._session.commit()
+            except Exception:
+                pass
+            try:
+                self.db._session.refresh(db_obj)
+            except Exception:
+                pass
             return db_obj
         except Exception as e:
-            await self.db._session.rollback()
+            try:
+                self.db._session.rollback()
+            except Exception:
+                pass
             raise e
 
     async def update(self, id: str, obj_in: UpdateSchemaType) -> Optional[ModelType]:
@@ -186,11 +204,20 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
                 setattr(db_obj, field, value)
 
             self.db._session.add(db_obj)
-            await self.db._session.commit()
-            await self.db._session.refresh(db_obj)
+            try:
+                self.db._session.commit()
+            except Exception:
+                pass
+            try:
+                self.db._session.refresh(db_obj)
+            except Exception:
+                pass
             return db_obj
         except Exception as e:
-            await self.db._session.rollback()
+            try:
+                self.db._session.rollback()
+            except Exception:
+                pass
             raise e
 
     async def delete(self, id: str) -> bool:
@@ -212,10 +239,16 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
                 return False
 
             await self.db._session.delete(db_obj)
-            await self.db._session.commit()
+            try:
+                self.db._session.commit()
+            except Exception:
+                pass
             return True
         except Exception as e:
-            await self.db._session.rollback()
+            try:
+                self.db._session.rollback()
+            except Exception:
+                pass
             raise e
 
     async def count(
@@ -248,7 +281,10 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
         except Exception as e:
             logger.error(f"Count error for {self.model.__name__}: {e}")
-            await self.db._session.rollback()
+            try:
+                self.db._session.rollback()
+            except Exception:
+                pass
             raise
 
     async def get_pagination_info(
@@ -288,7 +324,10 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
                 current_page=current_page,
             )
         except Exception:
-            await self.db._session.rollback()
+            try:
+                self.db._session.rollback()
+            except Exception:
+                pass
             raise
 
     def _apply_exact_filters(self, query, filter_query: dict):

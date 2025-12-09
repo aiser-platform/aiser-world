@@ -1,7 +1,7 @@
 from typing import Optional, Iterable
 from sqlalchemy import select, text
 from app.modules.user.models import User
-from app.modules.projects.models import OrganizationUser, Project
+from app.modules.projects.models import Project
 from app.db.session import async_session
 import uuid
 import logging
@@ -133,7 +133,7 @@ async def has_dashboard_access(user_payload, dashboard_id: str) -> bool:
     uid = await _resolve_user_str(user_payload)
     async with async_session() as sdb:
         try:
-            from app.modules.charts.models import Dashboard
+            from app.modules.dashboards.models import Dashboard
             pres = await sdb.execute(select(Dashboard).where(Dashboard.id == dashboard_id))
             db_dash = pres.scalar_one_or_none()
             if not db_dash:

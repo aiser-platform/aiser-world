@@ -39,6 +39,8 @@ import {
 } from '@ant-design/icons';
 import { useRouter } from 'next/navigation';
 import LoadingStates from '@/app/components/LoadingStates';
+import { usePermissions, Permission } from '@/hooks/usePermissions';
+import { PermissionGuard } from '@/components/PermissionGuard';
 
 const { Title, Text } = Typography;
 const { Search } = Input;
@@ -70,6 +72,7 @@ const ChartsPage: React.FC = () => {
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const router = useRouter();
     const { user, isAuthenticated } = useAuth();
+    const { hasPermission } = usePermissions();
 
     // Redirect to login if not authenticated
     useEffect(() => {
@@ -434,16 +437,19 @@ const ChartsPage: React.FC = () => {
     }
 
     return (
-        <div className="page-wrapper">
-            <div className="page-header">
-                <Title level={2} className="page-title">Charts</Title>
-                <Text type="secondary" className="page-description">
+        <div className="page-wrapper" style={{ paddingLeft: '24px', paddingRight: '24px', paddingTop: '24px', paddingBottom: '24px' }}>
+            <div className="page-header" style={{ marginBottom: '24px' }}>
+                <Title level={2} className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                    <BarChartOutlined style={{ color: 'var(--ant-color-primary)', fontSize: '24px' }} />
+                    Charts
+                </Title>
+                <Text type="secondary" className="page-description" style={{ marginTop: '4px', marginBottom: '0' }}>
                     Create, manage, and share your data visualizations
                 </Text>
             </div>
 
             {/* Statistics Cards */}
-            <Row gutter={[16, 16]} style={{ marginBottom: 'var(--space-6)' }}>
+            <Row gutter={[24, 24]} style={{ marginTop: 0, marginBottom: '24px' }}>
                 <Col xs={24} sm={12} md={6}>
                     <Card className="stat-card">
                         <Statistic
@@ -486,7 +492,7 @@ const ChartsPage: React.FC = () => {
             </Row>
 
             {/* Chart Type Statistics */}
-            <Row gutter={[16, 16]} style={{ marginBottom: 'var(--space-6)' }}>
+            <Row gutter={[24, 24]} style={{ marginBottom: '24px' }}>
                 <Col xs={24} sm={12} md={6}>
                     <Card className="stat-card">
                         <Statistic
@@ -526,16 +532,18 @@ const ChartsPage: React.FC = () => {
             </Row>
 
             {/* Actions and Filters */}
-            <div className="page-toolbar">
-                <div className="toolbar-left">
-                    <Button
-                        type="primary"
-                        icon={<PlusOutlined />}
-                        onClick={handleCreateChart}
-                        className="action-button-primary"
-                    >
-                        Create Chart
-                    </Button>
+            <div className="page-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
+                <Space size="large" style={{ flex: '0 0 auto' }}>
+                    <PermissionGuard permission={Permission.CHART_EDIT}>
+                        <Button
+                            type="primary"
+                            icon={<PlusOutlined />}
+                            onClick={handleCreateChart}
+                            className="action-button-primary"
+                        >
+                            Create Chart
+                        </Button>
+                    </PermissionGuard>
                     <Button
                         icon={<ReloadOutlined />}
                         onClick={loadCharts}
@@ -544,8 +552,8 @@ const ChartsPage: React.FC = () => {
                     >
                         Refresh
                     </Button>
-                </div>
-                <div className="toolbar-right">
+                </Space>
+                <Space size="large" style={{ flex: '0 0 auto', marginLeft: 'auto' }}>
                     <Search
                         placeholder="Search charts..."
                         value={searchText}
@@ -577,7 +585,7 @@ const ChartsPage: React.FC = () => {
                         <Option value="draft">Draft</Option>
                         <Option value="archived">Archived</Option>
                     </Select>
-                </div>
+                </Space>
             </div>
 
             <Divider className="page-divider" />

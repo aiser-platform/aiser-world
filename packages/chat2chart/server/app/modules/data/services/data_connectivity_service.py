@@ -7,6 +7,7 @@ import logging
 import os
 import pandas as pd
 import json
+import re
 import sqlalchemy as sa
 from typing import Dict, List, Optional, Any, Union
 from datetime import datetime
@@ -79,7 +80,8 @@ class DataConnectivityService:
             'sqlserver': self._create_cube_connector,
             'snowflake': self._create_cube_connector,
             'bigquery': self._create_cube_connector,
-            'redshift': self._create_cube_connector
+            'redshift': self._create_cube_connector,
+            'clickhouse': self._create_cube_connector
         }
 
     async def test_database_connection(self, connection_request: Dict[str, Any]) -> Dict[str, Any]:
@@ -114,7 +116,7 @@ class DataConnectivityService:
                 'error': str(e)
             }
 
-    async def store_database_connection(self, connection_request: Dict[str, Any]) -> Dict[str, Any]:
+    async def store_database_connection(self, connection_request: Dict[str, Any], user_id: Optional[str] = None) -> Dict[str, Any]:
         """Store database connection configuration"""
         try:
             logger.info(f"💾 Storing database connection: {connection_request.get('type')}")
@@ -138,7 +140,6 @@ class DataConnectivityService:
             try:
                 from app.modules.data.models import DataSource
                 from app.db.session import async_session
-                from app.db.session import async_operation_lock
 
                 async with async_session() as db:
                     # Create new data source record
@@ -146,8 +147,17 @@ class DataConnectivityService:
                     try:
                         from app.modules.data.utils.credentials import encrypt_credentials
                         safe_config = encrypt_credentials(connection_request)
-                    except Exception:
+                        # Log encryption status for debugging
+                        if safe_config != connection_request:
+                            logger.info(f"✅ Credentials encrypted for {connection_request.get('type')} connection")
+                        else:
+                            logger.warning(f"⚠️ Credentials not encrypted (ENCRYPTION_KEY may not be set) for {connection_request.get('type')} connection")
+                    except Exception as encrypt_error:
+                        logger.error(f"❌ Failed to encrypt credentials: {encrypt_error}")
                         safe_config = connection_request
+                    
+                    # Extract tenant_id from connection_request or use organization_id
+                    tenant_id = connection_request.get('tenant_id') or connection_request.get('organization_id') or 'default'
 
                     new_source = DataSource(
                         id=connection_id,
@@ -173,6 +183,8 @@ class DataConnectivityService:
                             'status': 'connected',
                             'created_at': datetime.now().isoformat()
                         }),
+                        user_id=user_id if user_id else None,  # Set user_id if provided
+                        tenant_id=str(tenant_id),  # Set tenant_id from connection_request
                         is_active=True,
                         created_at=datetime.now(),
                         updated_at=datetime.now(),
@@ -476,10 +488,8 @@ class DataConnectivityService:
             from app.modules.data.models import DataSource
             from app.db.session import async_session
 
-            # Use a fresh async session context here rather than the FastAPI
-            # dependency generator. asyncpg does not support using an async
-            # generator as an async context manager, so use the sessionmaker
-            # directly.
+            # Use async_session() which returns a session that can be used as context manager
+            from app.db.session import async_session
             async with async_session() as db:
                 # Ensure a per-session operation lock exists when the caller used
                 # the async_session factory directly (not via get_async_session).
@@ -515,7 +525,32 @@ class DataConnectivityService:
                         'is_active': source.is_active,
                         'last_accessed': source.last_accessed.isoformat() if source.last_accessed else None
                     }
-                    logger.info(f"✅ Found data source {source_id} in database")
+                    
+                    # CRITICAL: Include connection_config for database/warehouse sources and decrypt credentials
+                    if (source.type == 'database' or source.type == 'warehouse') and source.connection_config:
+                        try:
+                            import json
+                            config = json.loads(source.connection_config) if isinstance(source.connection_config, str) else source.connection_config
+                            
+                            # CRITICAL: Decrypt credentials before returning
+                            try:
+                                from app.modules.data.utils.credentials import decrypt_credentials
+                                config = decrypt_credentials(config)
+                                logger.debug(f"✅ Decrypted credentials for data source {source_id}")
+                            except Exception as decrypt_error:
+                                logger.warning(f"⚠️ Could not decrypt credentials for {source_id} (may not be encrypted): {decrypt_error}")
+                            
+                            # Add to multiple keys for compatibility with query engine
+                            source_dict['connection_config'] = config
+                            source_dict['connection_info'] = config
+                            source_dict['config'] = config
+                            source_dict['metadata'] = config  # Also add as metadata for compatibility
+                        except Exception as config_error:
+                            logger.error(f"❌ Error parsing connection_config for {source_id}: {config_error}")
+                            source_dict['connection_config'] = {}
+                            source_dict['connection_info'] = {}
+                    
+                    logger.info(f"✅ Found data source {source_id} in database (type: {source.type}, has_config: {bool(source_dict.get('connection_config'))})")
                     return source_dict
                 
                 logger.warning(f"⚠️ Data source {source_id} not found in database or demo sources")
@@ -617,6 +652,10 @@ class DataConnectivityService:
                     logger.info(f"✅ Updated data source {data_source['id']} in database.")
                 else:
                     # Create new
+                    # Use user_id and tenant_id from data_source dict (passed from options)
+                    user_id = data_source.get('user_id')
+                    tenant_id = data_source.get('tenant_id')
+                    
                     new_data_source = DataSource(
                         id=data_source['id'],
                         name=data_source['name'],
@@ -627,11 +666,11 @@ class DataConnectivityService:
                         schema=data_source.get('schema'),
                         file_path=data_source.get('file_path'),
                         original_filename=data_source.get('original_filename'),
-                        user_id=self._get_current_user_id(),  # Get from auth context
-                        tenant_id='default'
+                        user_id=user_id if user_id else self._get_current_user_id(),  # Use from options or fallback
+                        tenant_id=tenant_id if tenant_id else 'default'  # Use from options or fallback
                     )
                     db.add(new_data_source)
-                    logger.info(f"✅ Saved new data source {data_source['id']} to database.")
+                    logger.info(f"✅ Saved new data source {data_source['id']} to database (user_id={user_id}, tenant_id={tenant_id}).")
                 
                 await db.commit()
                 return True
@@ -670,15 +709,31 @@ class DataConnectivityService:
             else:
                 raise ValueError(f"Unsupported file format: {file_extension}")
             
-            # Enhance schema with AI insights
-            enhanced_schema = await self.ai_schema_service.generate_enhanced_schema(
-                data, schema, original_filename, "file"
-            )
+            # Enhance schema with AI insights (skip for preview-only or if disabled for performance)
+            preview_only = options.get('preview_only', False)
+            skip_ai_enhancement = preview_only or options.get('skip_ai_enhancement', False)
+            
+            if skip_ai_enhancement:
+                # Use basic schema without AI enhancement for faster processing
+                enhanced_schema = schema
+                logger.info("⏩ Skipping AI schema enhancement for faster processing")
+            else:
+                # Only enhance schema for a sample of data to improve performance
+                sample_size = min(100, len(data))  # Use first 100 rows for schema enhancement
+                sample_data = data[:sample_size] if data else []
+                enhanced_schema = await self.ai_schema_service.generate_enhanced_schema(
+                    sample_data, schema, original_filename, "file"
+                )
+                logger.info(f"✅ AI schema enhancement completed using {sample_size} sample rows")
             
             # Generate data source metadata
+            user_id = options.get('user_id') if options else None
+            tenant_id = options.get('tenant_id') if options else None
+            name = options.get('name') if options else original_filename
+            
             data_source = {
                 'id': f"file_{int(datetime.now().timestamp())}",
-                'name': original_filename,
+                'name': name or original_filename,
                 'type': 'file',
                 'format': file_extension,
                 'size': os.path.getsize(file_path),
@@ -686,21 +741,38 @@ class DataConnectivityService:
                 'schema': enhanced_schema,
                 'row_count': len(data),
                 'file_path': file_path,
+                'original_filename': original_filename,
                 'preview': data[:10] if len(data) > 10 else data,  # First 10 rows for preview
                 # Add fields expected by frontend
                 'uuid_filename': f"file_{int(datetime.now().timestamp())}_{original_filename}",
                 'content_type': f"application/{file_extension}",
-                'storage_type': 'local'
+                'storage_type': 'local',
+                'user_id': user_id,  # Pass user_id from options
+                'tenant_id': tenant_id  # Pass tenant_id from options
             }
             
-            # Store in registry
+            # Store in registry (only store sample data for large files to save memory)
+            max_memory_rows = 1000  # Only keep first 1000 rows in memory
+            if len(data) > max_memory_rows:
+                logger.info(f"📊 Large file detected ({len(data)} rows), storing only sample data in memory")
+                data_source['sample_data'] = data[:max_memory_rows]
+                data_source['data'] = data[:max_memory_rows]  # Keep sample for quick access
+            else:
+                data_source['data'] = data
+                data_source['sample_data'] = data
+            
             self.data_sources[data_source['id']] = {
-                **data_source,
-                'data': data
+                **data_source
             }
             
-            # Save to database
-            await self._save_data_source_to_db(data_source)
+            # Save to database (only save sample_data, not full data for large files)
+            if preview_only:
+                logger.info("⏩ Skipping database save for preview-only mode")
+            else:
+                # For large files, only save sample_data to database
+                if len(data) > max_memory_rows:
+                    data_source['sample_data'] = data[:max_memory_rows]
+                await self._save_data_source_to_db(data_source)
             
             logger.info(f"✅ File processed successfully: {len(data)} rows, {len(enhanced_schema['columns'])} columns")
             
@@ -778,8 +850,10 @@ class DataConnectivityService:
             }
 
     async def _process_csv_file(self, file_path: str, delimiter: str = ',', encoding: str = 'utf-8') -> tuple:
-        """Process CSV/TSV files with enhanced auto-detection"""
+        """Process CSV/TSV files using DuckDB for fast, direct processing"""
         try:
+            import duckdb
+            
             # Try to auto-detect delimiter if not specified
             if delimiter == ',':
                 detected_delimiter = self._auto_detect_delimiter(file_path)
@@ -787,105 +861,313 @@ class DataConnectivityService:
                     delimiter = detected_delimiter
                     logger.info(f"🔍 Auto-detected delimiter: '{delimiter}'")
             
-            # Try to auto-detect encoding if not specified
-            if encoding == 'utf-8':
-                detected_encoding = self._auto_detect_encoding(file_path)
-                if detected_encoding:
-                    encoding = detected_encoding
-                    logger.info(f"🔍 Auto-detected encoding: {encoding}")
+            # Use DuckDB for direct CSV reading (10-100x faster than Pandas)
+            conn = duckdb.connect()
             
-            # Read CSV with pandas, handling newlines properly
-            df = pd.read_csv(file_path, delimiter=delimiter, encoding=encoding)
-            
-            # Convert to list of dictionaries
-            data = df.to_dict('records')
-            
-            # Clean data (convert NaN to None)
-            for row in data:
-                for key, value in row.items():
-                    if pd.isna(value):
-                        row[key] = None
-            
-            # Infer schema
-            schema = self._infer_schema_from_dataframe(df)
-            
-            return data, schema
+            # Read CSV directly into DuckDB (auto-detects types, handles encoding)
+            try:
+                # DuckDB's read_csv_auto uses 'delim' or 'sep', NOT 'delimiter'
+                # Escape single quotes in file path for SQL safety
+                safe_file_path = file_path.replace("'", "''")
+                conn.execute(f"""
+                    CREATE TABLE data AS 
+                    SELECT * FROM read_csv_auto('{safe_file_path}', 
+                        delim='{delimiter}',
+                        header=true,
+                        auto_detect=true
+                    )
+                """)
+                
+                # Get schema from DuckDB (faster and more accurate)
+                schema_result = conn.execute("DESCRIBE data").fetchall()
+                schema = {
+                    'columns': [{'name': col[0], 'type': col[1]} for col in schema_result],
+                    'row_count': conn.execute("SELECT COUNT(*) FROM data").fetchone()[0]
+                }
+                
+                # Get sample data (first 100 rows for preview/schema enhancement)
+                sample_result = conn.execute("SELECT * FROM data LIMIT 100").fetchall()
+                columns = [col[0] for col in schema_result]
+                
+                # Convert to list of dictionaries
+                data = [dict(zip(columns, row)) for row in sample_result]
+                
+                # Get full row count
+                total_rows = conn.execute("SELECT COUNT(*) FROM data").fetchone()[0]
+                schema['row_count'] = total_rows
+                
+                conn.close()
+                
+                logger.info(f"🦆 Processed CSV with DuckDB: {total_rows} rows, {len(columns)} columns")
+                
+                return data, schema
+                
+            except Exception as duckdb_error:
+                logger.warning(f"⚠️ DuckDB CSV read failed, falling back to Pandas: {duckdb_error}")
+                conn.close()
+                # Fallback to Pandas if DuckDB fails
+                df = pd.read_csv(file_path, delimiter=delimiter, encoding=encoding)
+                data = df.to_dict('records')
+                for row in data:
+                    for key, value in row.items():
+                        if pd.isna(value):
+                            row[key] = None
+                schema = self._infer_schema_from_dataframe(df)
+                return data, schema
             
         except Exception as error:
             raise Exception(f"CSV processing failed: {str(error)}")
 
     async def _process_parquet_file(self, file_path: str) -> tuple:
-        """Process Parquet files"""
+        """Process Parquet files using DuckDB for native, fast processing"""
         try:
-            # Read Parquet with pyarrow for better performance
-            import pyarrow.parquet as pq
+            import duckdb
             
-            # Read data directly
-            df = pq.read_table(file_path).to_pandas()
+            # Use DuckDB for direct Parquet reading (native format, fastest)
+            conn = duckdb.connect()
             
-            # Convert to list of dictionaries
-            data = df.to_dict('records')
-            
-            # Clean data (convert NaN to None)
-            for row in data:
-                for key, value in row.items():
-                    if pd.isna(value):
-                        row[key] = None
-            
-            # Infer schema
-            schema = self._infer_schema_from_dataframe(df)
-            
-            # Add basic parquet info if available
             try:
-                parquet_file = pq.ParquetFile(file_path)
-                metadata = parquet_file.metadata
-                schema['parquet_metadata'] = {
-                    'row_groups': getattr(metadata, 'num_row_groups', 0),
-                    'total_rows': getattr(metadata, 'num_rows', len(data)),
-                    'created_by': getattr(metadata, 'created_by', 'unknown'),
-                    'schema_version': getattr(metadata, 'schema_version', 'unknown')
+                # Read Parquet directly into DuckDB (native format, no conversion needed)
+                conn.execute(f"CREATE TABLE data AS SELECT * FROM read_parquet('{file_path}')")
+                
+                # Get schema from DuckDB
+                schema_result = conn.execute("DESCRIBE data").fetchall()
+                schema = {
+                    'columns': [{'name': col[0], 'type': col[1]} for col in schema_result],
+                    'row_count': conn.execute("SELECT COUNT(*) FROM data").fetchone()[0]
                 }
-            except Exception:
-                # If metadata access fails, add basic info
-                schema['parquet_metadata'] = {
-                    'row_groups': 1,
-                    'total_rows': len(data),
-                    'created_by': 'unknown',
-                    'schema_version': 'unknown'
-                }
-            
-            return data, schema
+                
+                # Get sample data (first 100 rows)
+                sample_result = conn.execute("SELECT * FROM data LIMIT 100").fetchall()
+                columns = [col[0] for col in schema_result]
+                
+                # Convert to list of dictionaries
+                data = [dict(zip(columns, row)) for row in sample_result]
+                
+                # Get full row count
+                total_rows = conn.execute("SELECT COUNT(*) FROM data").fetchone()[0]
+                schema['row_count'] = total_rows
+                
+                # Try to get Parquet metadata
+                try:
+                    import pyarrow.parquet as pq
+                    parquet_file = pq.ParquetFile(file_path)
+                    metadata = parquet_file.metadata
+                    schema['parquet_metadata'] = {
+                        'row_groups': getattr(metadata, 'num_row_groups', 0),
+                        'total_rows': total_rows,
+                        'created_by': getattr(metadata, 'created_by', 'unknown'),
+                        'schema_version': getattr(metadata, 'schema_version', 'unknown')
+                    }
+                except Exception:
+                    schema['parquet_metadata'] = {
+                        'row_groups': 1,
+                        'total_rows': total_rows,
+                        'created_by': 'unknown',
+                        'schema_version': 'unknown'
+                    }
+                
+                conn.close()
+                
+                logger.info(f"🦆 Processed Parquet with DuckDB: {total_rows} rows, {len(columns)} columns")
+                
+                return data, schema
+                
+            except Exception as duckdb_error:
+                logger.warning(f"⚠️ DuckDB Parquet read failed, falling back to PyArrow: {duckdb_error}")
+                conn.close()
+                # Fallback to PyArrow/Pandas if DuckDB fails
+                import pyarrow.parquet as pq
+                df = pq.read_table(file_path).to_pandas()
+                data = df.to_dict('records')
+                for row in data:
+                    for key, value in row.items():
+                        if pd.isna(value):
+                            row[key] = None
+                schema = self._infer_schema_from_dataframe(df)
+                return data, schema
             
         except Exception as error:
             raise Exception(f"Parquet processing failed: {str(error)}")
 
     async def _process_excel_file(self, file_path: str, sheet_name: Optional[str] = None) -> tuple:
-        """Process Excel files"""
+        """
+        Process Excel files with multi-sheet support using DuckDB.
+        Creates virtual tables for each sheet, enabling SQL queries across sheets.
+        """
         try:
-            # Read Excel with pandas
-            if sheet_name:
-                df = pd.read_excel(file_path, sheet_name=sheet_name)
-            else:
-                df = pd.read_excel(file_path)
+            import duckdb
+            import openpyxl  # For reading Excel sheet names
+            import re
             
-            # Convert to list of dictionaries
-            data = df.to_dict('records')
+            # Use DuckDB for Excel processing (supports multi-sheet)
+            conn = duckdb.connect()
             
-            # Clean data (convert NaN to None)
-            for row in data:
-                for key, value in row.items():
-                    if pd.isna(value):
-                        row[key] = None
-            
-            # Infer schema
-            schema = self._infer_schema_from_dataframe(df)
-            
-            return data, schema
+            try:
+                # Get all sheet names from Excel file
+                try:
+                    import openpyxl
+                    wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
+                    sheet_names = wb.sheetnames
+                    wb.close()
+                except Exception as e:
+                    logger.warning(f"Could not read Excel sheet names with openpyxl: {e}, using default")
+                    # Fallback: try to read with pandas to get sheet names
+                    try:
+                        xl_file = pd.ExcelFile(file_path)
+                        sheet_names = xl_file.sheet_names
+                    except:
+                        sheet_names = ['Sheet1']  # Default sheet name
+                
+                logger.info(f"📊 Found {len(sheet_names)} sheet(s) in Excel file: {sheet_names}")
+                
+                # Process each sheet and create a virtual table
+                all_schemas = {}
+                primary_data = None
+                primary_schema = None
+                
+                for idx, sheet in enumerate(sheet_names):
+                    try:
+                        # Read sheet into pandas DataFrame
+                        df = pd.read_excel(file_path, sheet_name=sheet, engine='openpyxl')
+                        
+                        # Clean data (convert NaN to None)
+                        df = df.replace({pd.NA: None, pd.NaT: None})
+                        df = df.where(pd.notnull(df), None)
+                        
+                        # Create sanitized table name (DuckDB-safe)
+                        table_name = f"sheet_{idx}_{sheet.replace(' ', '_').replace('-', '_').replace('.', '_')[:50]}"
+                        # Remove special characters that might break SQL
+                        table_name = re.sub(r'[^a-zA-Z0-9_]', '_', table_name)
+                        
+                        # Register DataFrame in DuckDB
+                        conn.register(f"_temp_{table_name}", df)
+                        
+                        # Create persistent table in DuckDB
+                        conn.execute(f"CREATE TABLE {table_name} AS SELECT * FROM _temp_{table_name}")
+                        
+                        # Get schema for this sheet
+                        schema_result = conn.execute(f"DESCRIBE {table_name}").fetchall()
+                        sheet_schema = {
+                            'columns': [{'name': col[0], 'type': col[1]} for col in schema_result],
+                            'row_count': conn.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]
+                        }
+                        
+                        all_schemas[sheet] = {
+                            'table_name': table_name,
+                            'schema': sheet_schema,
+                            'row_count': sheet_schema['row_count']
+                        }
+                        
+                        # Use first sheet as primary data (for backward compatibility)
+                        if idx == 0 or (sheet_name and sheet == sheet_name):
+                            primary_data = df.to_dict('records')
+                            primary_schema = self._infer_schema_from_dataframe(df)
+                            primary_schema['row_count'] = sheet_schema['row_count']
+                            primary_schema['table_name'] = table_name
+                            primary_schema['all_sheets'] = all_schemas
+                        
+                        logger.info(f"✅ Created DuckDB table '{table_name}' for sheet '{sheet}' ({sheet_schema['row_count']} rows)")
+                        
+                    except Exception as sheet_error:
+                        logger.warning(f"⚠️ Failed to process sheet '{sheet}': {sheet_error}")
+                        continue
+                
+                if not primary_data:
+                    raise Exception("No sheets could be processed from Excel file")
+                
+                # Store DuckDB connection info in schema for later use
+                primary_schema['duckdb_tables'] = {sheet: info['table_name'] for sheet, info in all_schemas.items()}
+                primary_schema['duckdb_connection'] = 'in_memory'  # Mark that tables are in DuckDB
+                
+                conn.close()
+                
+                logger.info(f"🦆 Processed Excel with DuckDB: {len(sheet_names)} sheets, primary: {primary_schema['row_count']} rows")
+                
+                return primary_data, primary_schema
+                
+            except Exception as duckdb_error:
+                logger.warning(f"⚠️ DuckDB Excel processing failed, falling back to Pandas: {duckdb_error}")
+                conn.close()
+                # Fallback to original Pandas approach
+                if sheet_name:
+                    df = pd.read_excel(file_path, sheet_name=sheet_name)
+                else:
+                    df = pd.read_excel(file_path)
+                
+                data = df.to_dict('records')
+                for row in data:
+                    for key, value in row.items():
+                        if pd.isna(value):
+                            row[key] = None
+                
+                schema = self._infer_schema_from_dataframe(df)
+                return data, schema
             
         except Exception as error:
             raise Exception(f"Excel processing failed: {str(error)}")
 
     async def _process_json_file(self, file_path: str) -> tuple:
+        """Process JSON files using DuckDB for fast, direct processing"""
+        try:
+            import duckdb
+            
+            # Use DuckDB for direct JSON reading
+            conn = duckdb.connect()
+            
+            try:
+                # Read JSON directly into DuckDB (handles nested structures)
+                conn.execute(f"CREATE TABLE data AS SELECT * FROM read_json_auto('{file_path}')")
+                
+                # Get schema from DuckDB
+                schema_result = conn.execute("DESCRIBE data").fetchall()
+                schema = {
+                    'columns': [{'name': col[0], 'type': col[1]} for col in schema_result],
+                    'row_count': conn.execute("SELECT COUNT(*) FROM data").fetchone()[0]
+                }
+                
+                # Get sample data (first 100 rows)
+                sample_result = conn.execute("SELECT * FROM data LIMIT 100").fetchall()
+                columns = [col[0] for col in schema_result]
+                
+                # Convert to list of dictionaries
+                data = [dict(zip(columns, row)) for row in sample_result]
+                
+                # Get full row count
+                total_rows = conn.execute("SELECT COUNT(*) FROM data").fetchone()[0]
+                schema['row_count'] = total_rows
+                
+                conn.close()
+                
+                logger.info(f"🦆 Processed JSON with DuckDB: {total_rows} rows, {len(columns)} columns")
+                
+                return data, schema
+                
+            except Exception as duckdb_error:
+                logger.warning(f"⚠️ DuckDB JSON read failed, falling back to Pandas: {duckdb_error}")
+                conn.close()
+                # Fallback to Pandas if DuckDB fails
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    import json
+                    json_data = json.load(f)
+                
+                if isinstance(json_data, list):
+                    data = json_data[:100]  # Sample
+                    # Convert to DataFrame for schema inference
+                    df = pd.DataFrame(data)
+                    schema = self._infer_schema_from_dataframe(df)
+                else:
+                    # Single object - wrap in list
+                    data = [json_data]
+                    df = pd.DataFrame(data)
+                    schema = self._infer_schema_from_dataframe(df)
+                
+                return data, schema
+            
+        except Exception as error:
+            raise Exception(f"JSON processing failed: {str(error)}")
+    
+    async def _process_json_file_old(self, file_path: str) -> tuple:
         """Process JSON files"""
         try:
             with open(file_path, 'r', encoding='utf-8') as file:
@@ -1132,7 +1414,27 @@ class DataConnectivityService:
         query: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Query file-based data source"""
+        # CRITICAL: Check if data is in memory first
         data = data_source.get('data', [])
+        
+        # If no in-memory data, try to load from file_path if available
+        if not data or len(data) == 0:
+            file_path = data_source.get('file_path') or data_source.get('config', {}).get('file_path')
+            if file_path and os.path.exists(file_path):
+                logger.info(f"📊 Loading file data from path: {file_path}")
+                file_format = data_source.get('format', 'csv')
+                try:
+                    data = await self._read_file_data(file_path, file_format, limit=query.get('limit', 10000))
+                    logger.info(f"✅ Loaded {len(data)} rows from file path")
+                except Exception as e:
+                    logger.error(f"❌ Failed to load file from path: {str(e)}")
+                    data = []
+        
+        # If still no data, check for sample_data or preview_data
+        if not data or len(data) == 0:
+            data = data_source.get('sample_data', []) or data_source.get('preview_data', [])
+            if data:
+                logger.info(f"📊 Using sample/preview data ({len(data)} rows)")
         
         # Apply filters
         filters = query.get('filters', [])
@@ -1218,21 +1520,103 @@ class DataConnectivityService:
             }
 
     async def get_data_source(self, data_source_id: str) -> Dict[str, Any]:
-        """Get a specific data source by ID"""
+        """Get a specific data source by ID - checks both in-memory and database"""
         try:
+            # First check in-memory cache
             data_source = self.data_sources.get(data_source_id)
             if data_source:
+                logger.info(f"✅ Found data source {data_source_id} in memory cache")
                 return {
                     'success': True,
                     'data_source': data_source
                 }
-            else:
-                return {
-                    'success': False,
-                    'error': 'Data source not found'
-                }
+            
+            # If not in memory, check database
+            logger.info(f"🔍 Data source {data_source_id} not in memory, checking database...")
+            from app.modules.data.models import DataSource
+            from app.db.session import async_session
+            import json
+
+            async with async_session() as db:
+                from sqlalchemy import select
+                
+                query = select(DataSource).where(
+                    DataSource.id == data_source_id,
+                    DataSource.is_active == True
+                )
+                result = await db.execute(query)
+                db_source = result.scalar_one_or_none()
+                
+                if db_source:
+                    logger.info(f"✅ Found data source {data_source_id} in database")
+                    # Convert database model to dict format
+                    data_source_dict = {
+                        'id': str(db_source.id),
+                        'name': db_source.name,
+                        'type': db_source.type,
+                        'format': db_source.format,
+                        'description': db_source.description,
+                        'user_id': str(db_source.user_id) if db_source.user_id else None,
+                        'tenant_id': str(db_source.tenant_id) if hasattr(db_source, 'tenant_id') and db_source.tenant_id else None,
+                        'organization_id': str(db_source.tenant_id) if hasattr(db_source, 'tenant_id') and db_source.tenant_id else None,  # Alias for compatibility
+                        'row_count': db_source.row_count,
+                        'size': db_source.size,
+                        'is_active': db_source.is_active,
+                        'created_at': db_source.created_at.isoformat() if db_source.created_at else None,
+                        'updated_at': db_source.updated_at.isoformat() if db_source.updated_at else None,
+                    }
+                    
+                    # Add file_path if available directly from model
+                    if hasattr(db_source, 'file_path') and db_source.file_path:
+                        data_source_dict['file_path'] = db_source.file_path
+                    
+                    # Parse config and schema if available
+                    try:
+                        if db_source.connection_config:
+                            config = json.loads(db_source.connection_config) if isinstance(db_source.connection_config, str) else db_source.connection_config
+                            data_source_dict['config'] = config
+                            # Extract file_path from config if available
+                            if isinstance(config, dict):
+                                data_source_dict['file_path'] = config.get('file_path') or config.get('file_location')
+                    except Exception as e:
+                        logger.warning(f"⚠️ Failed to parse connection_config: {e}")
+                    
+                    try:
+                        if db_source.schema:
+                            schema = json.loads(db_source.schema) if isinstance(db_source.schema, str) else db_source.schema
+                            data_source_dict['schema'] = schema
+                    except Exception as e:
+                        logger.warning(f"⚠️ Failed to parse schema: {e}")
+                    
+                    # For file sources, try to load data if file_path is available
+                    if db_source.type == 'file' and data_source_dict.get('file_path'):
+                        file_path = data_source_dict['file_path']
+                        if os.path.exists(file_path):
+                            try:
+                                file_format = db_source.format or 'csv'
+                                # Load a sample to verify file is accessible
+                                sample_data = await self._read_file_data(file_path, file_format, limit=10)
+                                if sample_data:
+                                    data_source_dict['data'] = sample_data  # Store sample in memory
+                                    logger.info(f"✅ Loaded sample data from file path: {file_path}")
+                            except Exception as e:
+                                logger.warning(f"⚠️ Could not load sample data from {file_path}: {e}")
+                    
+                    # Cache in memory for future access
+                    self.data_sources[data_source_id] = data_source_dict
+                    
+                    return {
+                        'success': True,
+                        'data_source': data_source_dict
+                    }
+                else:
+                    logger.warning(f"⚠️ Data source {data_source_id} not found in database or memory")
+                    return {
+                        'success': False,
+                        'error': 'Data source not found'
+                    }
         except Exception as e:
-            logger.error(f"❌ Failed to get data source: {str(e)}")
+            logger.error(f"❌ Failed to get data source: {str(e)}", exc_info=True)
             return {
                 'success': False,
                 'error': str(e)
@@ -1359,10 +1743,10 @@ class DataConnectivityService:
                         'error': 'Data source not found'
                     }
                 
-                if data_source.type != 'database':
+                if data_source.type != 'database' and data_source.type != 'warehouse':
                     return {
                         'success': False,
-                        'error': 'Data source is not a database connection'
+                        'error': 'Data source is not a database or warehouse connection'
                     }
                 
                 # Parse the stored schema/config
@@ -1373,17 +1757,33 @@ class DataConnectivityService:
                     config = {}
                     schema_info = {}
                 
+                # CRITICAL: Decrypt credentials before using for schema fetch
+                try:
+                    from app.modules.data.utils.credentials import decrypt_credentials
+                    config = decrypt_credentials(config)
+                    logger.debug(f"✅ Decrypted credentials for schema fetch: {data_source_id}")
+                except Exception as decrypt_error:
+                    logger.warning(f"⚠️ Could not decrypt credentials for schema fetch (may not be encrypted): {decrypt_error}")
+                
                 # Try to get live schema from the database
                 try:
+                    logger.info(f"🔍 Fetching live schema for {data_source_id}, db_type: {data_source.db_type}, type: {data_source.type}")
                     live_schema = await self._fetch_live_database_schema(config)
+                    logger.info(f"📊 Live schema result: success={live_schema.get('success')}, tables_count={len(live_schema.get('tables', []))}, schemas_count={len(live_schema.get('schemas', []))}")
+                    
                     if live_schema['success']:
+                        tables = live_schema.get('tables', [])
+                        schemas = live_schema.get('schemas', [])
+                        
                         # Update the stored schema with live data
                         updated_schema = {
                             **schema_info,
-                            'tables': live_schema.get('tables', []),
-                            'schemas': live_schema.get('schemas', []),
+                            'tables': tables,
+                            'schemas': schemas,
                             'last_updated': datetime.now().isoformat()
                         }
+                        
+                        logger.info(f"✅ Schema fetched successfully: {len(tables)} tables, {len(schemas)} schemas")
                         
                         # Update the database record
                         data_source.schema = json.dumps(updated_schema)
@@ -1443,6 +1843,14 @@ class DataConnectivityService:
     async def _fetch_live_database_schema(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """Fetch live schema from the database connection"""
         try:
+            # CRITICAL: Ensure credentials are decrypted before using
+            try:
+                from app.modules.data.utils.credentials import decrypt_credentials
+                config = decrypt_credentials(config)
+                logger.debug(f"✅ Decrypted credentials for schema fetch")
+            except Exception as decrypt_error:
+                logger.debug(f"Credentials may not be encrypted: {decrypt_error}")
+            
             db_type = config.get('type', '').lower()
             
             if db_type not in self.db_connectors:
@@ -1479,104 +1887,22 @@ class DataConnectivityService:
             }
 
     async def _get_enhanced_fallback_schema(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        """Get enhanced fallback schema with realistic database structure"""
+        """Get fallback schema - only returns empty schema, no mock data"""
         try:
             db_type = config.get('type', '').lower()
             db_name = config.get('database', 'unknown')
             
-            # Create realistic schema based on database type
-            if db_type == 'postgresql':
-                schemas = ['public', 'information_schema', 'pg_catalog']
-                tables = [
-                    {
-                        'name': 'users',
-                        'schema': 'public',
-                        'columns': [
-                            {'name': 'id', 'type': 'integer', 'nullable': False, 'primary_key': True},
-                            {'name': 'username', 'type': 'varchar(50)', 'nullable': False, 'unique': True},
-                            {'name': 'email', 'type': 'varchar(100)', 'nullable': False, 'unique': True},
-                            {'name': 'created_at', 'type': 'timestamp', 'nullable': False, 'default': 'now()'},
-                            {'name': 'is_active', 'type': 'boolean', 'nullable': False, 'default': 'true'}
-                        ],
-                        'rowCount': 0,
-                        'description': 'User accounts table'
-                    },
-                    {
-                        'name': 'orders',
-                        'schema': 'public',
-                        'columns': [
-                            {'name': 'id', 'type': 'integer', 'nullable': False, 'primary_key': True},
-                            {'name': 'user_id', 'type': 'integer', 'nullable': False, 'foreign_key': 'users.id'},
-                            {'name': 'order_date', 'type': 'timestamp', 'nullable': False, 'default': 'now()'},
-                            {'name': 'total_amount', 'type': 'decimal(10,2)', 'nullable': False},
-                            {'name': 'status', 'type': 'varchar(20)', 'nullable': False, 'default': 'pending'}
-                        ],
-                        'rowCount': 0,
-                        'description': 'Customer orders table'
-                    },
-                    {
-                        'name': 'products',
-                        'schema': 'public',
-                        'columns': [
-                            {'name': 'id', 'type': 'integer', 'nullable': False, 'primary_key': True},
-                            {'name': 'name', 'type': 'varchar(100)', 'nullable': False},
-                            {'name': 'description', 'type': 'text', 'nullable': True},
-                            {'name': 'price', 'type': 'decimal(10,2)', 'nullable': False},
-                            {'name': 'category', 'type': 'varchar(50)', 'nullable': True},
-                            {'name': 'stock_quantity', 'type': 'integer', 'nullable': False, 'default': '0'}
-                        ],
-                        'rowCount': 0,
-                        'description': 'Product catalog table'
-                    }
-                ]
-            elif db_type == 'mysql':
-                schemas = ['information_schema', 'mysql', 'performance_schema', 'sys']
-                tables = [
-                    {
-                        'name': 'customers',
-                        'schema': 'information_schema',
-                        'columns': [
-                            {'name': 'id', 'type': 'int', 'nullable': False, 'primary_key': True},
-                            {'name': 'first_name', 'type': 'varchar(50)', 'nullable': False},
-                            {'name': 'last_name', 'type': 'varchar(50)', 'nullable': False},
-                            {'name': 'email', 'type': 'varchar(100)', 'nullable': False, 'unique': True},
-                            {'name': 'phone', 'type': 'varchar(20)', 'nullable': True},
-                            {'name': 'created_at', 'type': 'datetime', 'nullable': False, 'default': 'CURRENT_TIMESTAMP'}
-                        ],
-                        'rowCount': 0,
-                        'description': 'Customer information table'
-                    }
-                ]
-            else:
-                # Generic schema for other database types
-                schemas = ['dbo', 'information_schema']
-                tables = [
-                    {
-                        'name': 'sample_table',
-                        'schema': 'dbo',
-                        'columns': [
-                            {'name': 'id', 'type': 'int', 'nullable': False, 'primary_key': True},
-                            {'name': 'name', 'type': 'varchar(100)', 'nullable': False},
-                            {'name': 'created_at', 'type': 'datetime', 'nullable': False}
-                        ],
-                        'rowCount': 0,
-                        'description': 'Sample table structure'
-                    }
-                ]
+            # CRITICAL: Do not return mock data - only return empty schema
+            # Real schema should be fetched via get_database_schema which uses SQLAlchemy
+            logger.warning(f"⚠️ Fallback schema called for {db_type} - returning empty schema. Real schema should be fetched via database connection.")
             
+            # Return empty schema - let the real connection path handle schema fetching
             return {
                 'success': True,
-                'tables': tables,
-                'schemas': schemas,
-                'total_rows': sum(table.get('rowCount', 0) for table in tables),
-                'database_info': {
-                    'name': db_name,
-                    'type': db_type,
-                    'host': config.get('host'),
-                    'port': config.get('port'),
-                    'username': config.get('username')
-                },
-                'warning': 'Using enhanced fallback schema - live database connection not fully configured'
+                'tables': [],
+                'schemas': [],
+                'total_rows': 0,
+                'warning': 'Schema could not be fetched. Please ensure database connection is valid and try again.'
             }
             
         except Exception as e:

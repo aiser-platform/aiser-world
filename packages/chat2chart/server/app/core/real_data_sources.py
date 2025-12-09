@@ -12,7 +12,6 @@ from dataclasses import dataclass
 
 import psycopg2
 import pymysql
-import pyodbc
 import redis
 try:
     import boto3

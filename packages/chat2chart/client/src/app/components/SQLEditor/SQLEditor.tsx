@@ -192,7 +192,7 @@ const SQLEditor: React.FC<SQLEditorProps> = ({
             
             if (result.success && result.sql_query) {
                 setQuery(result.sql_query);
-                message.success('🤖 AI generated SQL query!');
+                message.success('Aiser AI generated a SQL query!');
                 setAiPrompt('');
             } else {
                 // Fallback: generate a basic query structure
@@ -286,7 +286,7 @@ const SQLEditor: React.FC<SQLEditorProps> = ({
             
             {/* AI Prompt Section */}
             <Card 
-                title="🤖 AI-Powered SQL Generation" 
+                title="Aiser AI SQL Generation" 
                 size="small" 
                 style={{ marginBottom: 16 }}
             >

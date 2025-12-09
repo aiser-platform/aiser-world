@@ -94,8 +94,18 @@ class Auth:
             decoded_token = jwt.decode(
                 token, self.SECRET, algorithms=[self.JWT_ALGORITHM]
             )
-            return decoded_token if decoded_token["exp"] >= time.time() else None
-        except Exception:
+            # Check expiration
+            if decoded_token.get("exp", 0) >= time.time():
+                logger.debug(f"Auth.decodeJWT: Token decoded successfully with primary secret")
+                return decoded_token
+            else:
+                logger.warning(f"Auth.decodeJWT: Token expired (exp: {decoded_token.get('exp')}, now: {time.time()})")
+                return {}
+        except jwt.ExpiredSignatureError:
+            logger.warning(f"Auth.decodeJWT: Token signature expired")
+            return {}
+        except jwt.JWTError as jwt_error:
+            logger.warning(f"Auth.decodeJWT: JWT decode error with primary secret: {str(jwt_error)}")
             # Try alternate secrets (useful when auth-service and this service use
             # different env var names in some dev setups). Try these in order:
             # - settings.JWT_SECRET (config-level alternate)
@@ -119,11 +129,17 @@ class Auth:
                 for s in alt_secrets:
                     try:
                         decoded = jwt.decode(token, s, algorithms=[self.JWT_ALGORITHM])
-                        return decoded if decoded.get('exp', 0) >= time.time() else None
-                    except Exception:
+                        if decoded.get('exp', 0) >= time.time():
+                            logger.info(f"Auth.decodeJWT: Token decoded successfully with alternate secret")
+                            return decoded
+                        else:
+                            logger.warning(f"Auth.decodeJWT: Token expired with alternate secret")
+                    except Exception as alt_error:
+                        logger.debug(f"Auth.decodeJWT: Alternate secret failed: {str(alt_error)}")
                         continue
 
                 # In development, allow returning unverified claims to ease local flows
+                # ONLY if explicitly enabled via environment variable
                 allow_unverified_env = False
                 try:
                     import os as _os
@@ -131,23 +147,28 @@ class Auth:
                 except Exception:
                     allow_unverified_env = False
 
-                if (getattr(settings, 'ENVIRONMENT', 'development') == 'development') or allow_unverified_env:
+                env = getattr(settings, 'ENVIRONMENT', 'development')
+                if env == 'development' and allow_unverified_env:
                     try:
                         u = jwt.get_unverified_claims(token)
-                        logger.info(f"Auth.decodeJWT: returning unverified claims keys={list(u.keys()) if isinstance(u, dict) else None}")
-                        return u
+                        if isinstance(u, dict) and u and (u.get('id') or u.get('user_id') or u.get('sub')):
+                            logger.warning(f"Auth.decodeJWT: Returning unverified claims (dev mode) with user_id: {u.get('id') or u.get('user_id') or u.get('sub')}")
+                            return u
                     except Exception as e:
-                        logger.debug(f"Auth.decodeJWT: failed to extract unverified claims: {e}")
+                        logger.error(f"Auth.decodeJWT: Failed to extract unverified claims: {e}")
                         return {}
-            except Exception:
-                pass
+            except Exception as fallback_error:
+                logger.error(f"Auth.decodeJWT: Fallback logic failed: {fallback_error}")
+                return {}
+        except Exception as e:
+            logger.error(f"Auth.decodeJWT: Unexpected error: {str(e)}")
             return {}
 
     def decodeRefreshJWE(self, token: str) -> dict:
         try:
             decoded_token = jwe.decrypt(token, self.SECRET)
             return decoded_token
-        except:
+        except Exception:
             return {}
 
     def decodeRefreshJWT(self, token: str) -> dict:
@@ -158,5 +179,5 @@ class Auth:
             expired = decoded_token["exp"] >= time.time()
 
             return decoded_token if expired else None
-        except:
+        except Exception:
             return {}

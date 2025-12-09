@@ -1,5 +1,3 @@
-import asyncio
-import os
 import pytest
 
 from app.modules.data.services.real_cube_integration_service import RealCubeIntegrationService

@@ -1,0 +1,76 @@
+version: 2
+updates:
+  # npm packages (root)
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "npm"
+    commit-message:
+      prefix: "chore"
+      prefix-development: "chore"
+    reviewers:
+      - "bigstack-analytics/platform-team"
+
+  # Python packages - Chat2Chart Server
+  - package-ecosystem: "pip"
+    directory: "/packages/chat2chart/server"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "python"
+      - "chat2chart"
+    commit-message:
+      prefix: "chore"
+    reviewers:
+      - "bigstack-analytics/platform-team"
+
+  # Python packages - Auth Service
+  - package-ecosystem: "pip"
+    directory: "/packages/auth"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "python"
+      - "auth"
+    commit-message:
+      prefix: "chore"
+    reviewers:
+      - "bigstack-analytics/platform-team"
+
+  # Docker images
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "docker"
+    commit-message:
+      prefix: "chore"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "chore"
+

@@ -4,15 +4,18 @@
   "description": "AI-powered alternative to BI Tools with open source core chat2chart",
   "private": true,
   "workspaces": [
-    "packages/*"
+    "packages/chat2chart",
+    "packages/auth",
+    "packages/shared",
+    "packages/docs",
+    "packages/monitoring-service",
+    "packages/cube"
   ],
   "scripts": {
-    "dev": "npm run dev --workspaces",
+    "dev": "npm run dev --workspace=packages/chat2chart/client",
     "dev:chat2chart": "npm run dev --workspace=packages/chat2chart/client",
-    "dev:client": "npm run dev --workspace=packages/client/client",
     "build": "npm run build --workspaces",
     "build:chat2chart": "npm run build --workspace=packages/chat2chart/client",
-    "build:client": "npm run build --workspace=packages/client/client",
     "test": "npm run test --workspaces",
     "test:unit": "jest",
     "test:integration": "jest --config jest.integration.config.js",

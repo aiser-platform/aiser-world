@@ -219,9 +219,6 @@ const LoadingStates: React.FC<LoadingStatesProps> = ({
           }}>
             {getLoadingMessage()}
           </Text>
-          <Text type="secondary" style={{ fontSize: '14px' }}>
-            Please wait while we process your request...
-          </Text>
         </div>
         {progress !== undefined && (
           <Progress 

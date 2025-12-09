@@ -2,7 +2,7 @@ from app.common.service import BaseService
 from app.modules.projects.models import (
     Project,
     Organization,
-    OrganizationUser,
+    UserOrganization,
 )
 from app.modules.projects.schemas import (
     ProjectCreate,
@@ -13,10 +13,11 @@ from app.modules.projects.schemas import (
     OrganizationResponse,
 )
 from app.modules.projects.repository import ProjectRepository, OrganizationRepository
-from app.db.session import get_async_session
 from sqlalchemy import select
 from typing import List, Optional, Dict, Any
 import logging
+from fastapi import HTTPException, status
+from app.modules.pricing.rate_limiter import RateLimiter
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +69,11 @@ class ProjectService(
                     project_dict['updated_at'] = now
 
                 project = await self.repository.create(project_dict, db)
-                return ProjectResponse.model_validate(project.__dict__)
+                # Convert UUID fields to strings for Pydantic validation
+                project_dict = project.__dict__.copy()
+                if 'created_by' in project_dict and project_dict['created_by']:
+                    project_dict['created_by'] = str(project_dict['created_by'])
+                return ProjectResponse.model_validate(project_dict)
 
         except Exception as e:
             logger.error(f"Failed to create project: {str(e)}")
@@ -103,10 +108,10 @@ class ProjectService(
 
             query = (
                 select(Organization)
-                .join(OrganizationUser)
+                .join(UserOrganization)
                 .where(
-                    (OrganizationUser.user_id == _uid) if _uid is not None else (OrganizationUser.user_id == user_id),
-                    OrganizationUser.role == "owner",
+                    (UserOrganization.user_id == _uid) if _uid is not None else (UserOrganization.user_id == user_id),
+                    UserOrganization.role == "owner",
                     Organization.is_active,
                 )
             )
@@ -132,7 +137,7 @@ class ProjectService(
             organization = await self.__org_repository.create(org_data.model_dump(), db)
 
             # Add user as owner
-            user_org = OrganizationUser(
+            user_org = UserOrganization(
                 organization_id=organization.id, user_id=(int(user_id) if str(user_id).isdigit() else user_id), role="owner"
             )
             db.add(user_org)
@@ -150,7 +155,14 @@ class ProjectService(
             from app.db.session import async_session
             async with async_session() as db:
                 projects = await self.repository.get_user_projects(user_id, db)
-                return [ProjectResponse.model_validate(p.__dict__) for p in projects]
+                # Convert UUID fields to strings for Pydantic validation
+                result = []
+                for p in projects:
+                    project_dict = p.__dict__.copy()
+                    if 'created_by' in project_dict and project_dict['created_by']:
+                        project_dict['created_by'] = str(project_dict['created_by'])
+                    result.append(ProjectResponse.model_validate(project_dict))
+                return result
         except Exception as e:
             logger.error(f"Failed to get user projects: {str(e)}")
             raise e
@@ -161,7 +173,14 @@ class ProjectService(
             from app.db.session import async_session
             async with async_session() as db:
                 projects = await self.repository.get_all(db)
-                return [ProjectResponse.model_validate(p.__dict__) for p in projects]
+                # Convert UUID fields to strings for Pydantic validation
+                result = []
+                for p in projects:
+                    project_dict = p.__dict__.copy()
+                    if 'created_by' in project_dict and project_dict['created_by']:
+                        project_dict['created_by'] = str(project_dict['created_by'])
+                    result.append(ProjectResponse.model_validate(project_dict))
+                return result
         except Exception as e:
             logger.error(f"Failed to get all projects: {str(e)}")
             raise e
@@ -264,24 +283,44 @@ class ProjectService(
             return False
 
     async def _check_user_project_limit(
-        self, user_id: str, organization_id: str, db
+        self, user_id: str, organization_id: int, db
     ) -> bool:
         """Check if user can create more projects"""
         try:
-            # Get organization plan limits using the provided DB session to avoid
-            # calling repository.get() with an unexpected DB parameter.
-            from sqlalchemy import select
-            res = await db.execute(select(Organization).where(Organization.id == organization_id))
+            try:
+                org_id = int(organization_id)
+            except (TypeError, ValueError):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid organization id",
+                )
+
+            res = await db.execute(select(Organization).where(Organization.id == org_id))
             organization = res.scalar_one_or_none()
             if not organization:
-                return False
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Organization not found",
+                )
 
-            # TODO: enforce organization.max_projects vs current count
+            rate_limiter = RateLimiter(db)
+            allowed, message, _ = await rate_limiter.check_project_limit(org_id)
+            if not allowed:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=message,
+                )
+
             return True
 
+        except HTTPException:
+            raise
         except Exception as e:
             logger.error(f"Failed to check user project limit: {str(e)}")
-            return False
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Unable to verify project limit",
+            )
 
 
 class OrganizationService(
@@ -303,8 +342,11 @@ class OrganizationService(
                 from datetime import datetime
                 for org in organizations:
                     d = dict(getattr(org, "__dict__", {}) or {})
-                    # Coerce NULL/None values to sensible defaults expected by the schema
+                    # CRITICAL: Ensure plan_type is always included and not None
                     d["plan_type"] = d.get("plan_type") or "free"
+                    # Ensure plan_type is a string, not None
+                    if d["plan_type"] is None:
+                        d["plan_type"] = "free"
                     d["ai_credits_used"] = int(d.get("ai_credits_used") or 0)
                     d["ai_credits_limit"] = int(d.get("ai_credits_limit") or 0)
                     d["max_users"] = int(d.get("max_users") or 0)
@@ -329,7 +371,21 @@ class OrganizationService(
             async with async_session() as db:
                 organization = await self.repository.get(organization_id, db)
                 if organization:
-                    return OrganizationResponse.model_validate(organization.__dict__)
+                    d = dict(getattr(organization, "__dict__", {}) or {})
+                    # Coerce NULL/None values to sensible defaults expected by the schema
+                    d["plan_type"] = d.get("plan_type") or "free"
+                    d["ai_credits_used"] = int(d.get("ai_credits_used") or 0)
+                    d["ai_credits_limit"] = int(d.get("ai_credits_limit") or 0)
+                    d["max_users"] = int(d.get("max_users") or 0)
+                    d["max_projects"] = int(d.get("max_projects") or 0)
+                    d["max_storage_gb"] = int(d.get("max_storage_gb") or 0)
+                    d["is_active"] = bool(d.get("is_active") if d.get("is_active") is not None else True)
+                    d["is_deleted"] = bool(d.get("is_deleted") or False)
+                    d["is_trial_active"] = bool(d.get("is_trial_active") or False)
+                    from datetime import datetime
+                    d["created_at"] = d.get("created_at") or datetime.utcnow()
+                    d["updated_at"] = d.get("updated_at") or datetime.utcnow()
+                    return OrganizationResponse.model_validate(d)
                 return None
         except Exception as e:
             logger.error(f"Failed to get organization: {str(e)}")
@@ -357,10 +413,40 @@ class OrganizationService(
         try:
             from app.db.session import async_session
             async with async_session() as db:
+                # Convert organization_id to integer if it's a string
+                try:
+                    org_id_int = int(organization_id) if isinstance(organization_id, str) and organization_id.isdigit() else organization_id
+                except (ValueError, TypeError):
+                    org_id_int = organization_id
+                
                 organization = await self.repository.update(
-                    organization_id, organization_data.model_dump(), db
+                    org_id_int, organization_data.model_dump(), db
                 )
-                return OrganizationResponse.model_validate(organization.__dict__)
+                if not organization:
+                    raise HTTPException(status_code=404, detail="Organization not found")
+                
+                # Refresh the organization from DB to get all fields
+                refreshed = await self.repository.get(org_id_int, db)
+                if not refreshed:
+                    raise HTTPException(status_code=404, detail="Organization not found after update")
+                
+                d = dict(getattr(refreshed, "__dict__", {}) or {})
+                # Coerce NULL/None values to sensible defaults expected by the schema
+                d["plan_type"] = d.get("plan_type") or "free"
+                d["ai_credits_used"] = int(d.get("ai_credits_used") or 0) if d.get("ai_credits_used") is not None else 0
+                d["ai_credits_limit"] = int(d.get("ai_credits_limit") or 0) if d.get("ai_credits_limit") is not None else 0
+                d["max_users"] = int(d.get("max_users") or 0) if d.get("max_users") is not None else 0
+                d["max_projects"] = int(d.get("max_projects") or 0) if d.get("max_projects") is not None else 0
+                d["max_storage_gb"] = int(d.get("max_storage_gb") or 0) if d.get("max_storage_gb") is not None else 0
+                d["is_active"] = bool(d.get("is_active")) if d.get("is_active") is not None else True
+                d["is_deleted"] = bool(d.get("is_deleted")) if d.get("is_deleted") is not None else False
+                d["is_trial_active"] = bool(d.get("is_trial_active")) if d.get("is_trial_active") is not None else False
+                from datetime import datetime
+                d["created_at"] = d.get("created_at") or datetime.utcnow()
+                d["updated_at"] = d.get("updated_at") or datetime.utcnow()
+                return OrganizationResponse.model_validate(d)
+        except HTTPException:
+            raise
         except Exception as e:
             logger.error(f"Failed to update organization: {str(e)}")
             raise e
@@ -388,13 +474,13 @@ class OrganizationService(
                 # Add user as owner (simplified for now)
                 try:
                     if user_id:
-                        from app.modules.projects.models import OrganizationUser
+                        from app.modules.projects.models import UserOrganization
                         uid_val = None
                         try:
                             uid_val = int(user_id)
                         except Exception:
                             uid_val = user_id
-                        ou = OrganizationUser(organization_id=organization.id, user_id=uid_val, role="owner", is_active=True)
+                        ou = UserOrganization(organization_id=organization.id, user_id=uid_val, role="owner", is_active=True)
                         db.add(ou)
                         await db.commit()
                 except Exception:
@@ -442,15 +528,32 @@ class OrganizationService(
                                 if u:
                                     final_user_val = u.id
                     else:
+                        # Try to convert to UUID if it's a UUID string
                         try:
-                            _uid = int(user_id)
-                            final_user_val = _uid
+                            import uuid as uuid_lib
+                            # Try UUID first (most common case)
+                            try:
+                                final_user_val = uuid_lib.UUID(str(user_id))
+                            except (ValueError, TypeError):
+                                # If not UUID, try int
+                                try:
+                                    final_user_val = int(user_id)
+                                except (ValueError, TypeError):
+                                    final_user_val = str(user_id)
                         except Exception:
                             final_user_val = user_id
 
                 except Exception:
                     _uid = None
-                    final_user_val = user_id
+                    # Try to convert to UUID if it's a UUID string
+                    try:
+                        import uuid as uuid_lib
+                        try:
+                            final_user_val = uuid_lib.UUID(str(user_id))
+                        except (ValueError, TypeError):
+                            final_user_val = user_id
+                    except Exception:
+                        final_user_val = user_id
 
                 # If we couldn't resolve a usable user identifier, return empty
                 # list rather than passing 'None' into a UUID-typed query param.
@@ -458,21 +561,45 @@ class OrganizationService(
                     return []
 
                 # Build query using resolved value (int or UUID/string)
+                # user_id in UserOrganization is UUID type, so ensure proper comparison
                 query = (
                     select(Organization)
-                    .join(OrganizationUser)
+                    .join(UserOrganization)
                     .where(
-                        OrganizationUser.user_id == final_user_val,
-                        OrganizationUser.is_active,
+                        UserOrganization.user_id == final_user_val,
+                        UserOrganization.is_active == True,
                     )
                 )
                 result = await db.execute(query)
                 organizations = result.scalars().all()
 
-                return [
-                    OrganizationResponse.model_validate(org.__dict__)
-                    for org in organizations
-                ]
+                # Coerce organizations to ensure plan_type and other fields are properly set
+                coerced: List[OrganizationResponse] = []
+                from datetime import datetime
+                for org in organizations:
+                    d = dict(getattr(org, "__dict__", {}) or {})
+                    # CRITICAL: Only set default if plan_type is truly missing - don't override valid values
+                    # Log if we're defaulting to help debug
+                    original_plan_type = d.get("plan_type")
+                    if not original_plan_type or (isinstance(original_plan_type, str) and original_plan_type.strip() == ''):
+                        logger.warning(f"Organization {d.get('id')} ({d.get('name')}) missing plan_type, defaulting to 'free'")
+                        d["plan_type"] = "free"
+                    else:
+                        # Ensure it's a string and not None
+                        d["plan_type"] = str(original_plan_type) if original_plan_type else "free"
+                        logger.debug(f"Organization {d.get('id')} ({d.get('name')}) has plan_type: {d['plan_type']}")
+                    d["ai_credits_used"] = int(d.get("ai_credits_used") or 0)
+                    d["ai_credits_limit"] = int(d.get("ai_credits_limit") or 0)
+                    d["max_users"] = int(d.get("max_users") or 0)
+                    d["max_projects"] = int(d.get("max_projects") or 0)
+                    d["max_storage_gb"] = int(d.get("max_storage_gb") or 0)
+                    d["is_active"] = bool(d.get("is_active") if d.get("is_active") is not None else True)
+                    d["is_deleted"] = bool(d.get("is_deleted") or False)
+                    d["is_trial_active"] = bool(d.get("is_trial_active") or False)
+                    d["created_at"] = d.get("created_at") or datetime.utcnow()
+                    d["updated_at"] = d.get("updated_at") or datetime.utcnow()
+                    coerced.append(OrganizationResponse.model_validate(d))
+                return coerced
 
         except Exception as e:
             logger.error(f"Failed to get user organizations: {str(e)}")
