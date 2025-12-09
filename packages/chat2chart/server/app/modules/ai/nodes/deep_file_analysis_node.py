@@ -634,41 +634,56 @@ Return JSON:
                 logger.warning(f"⚠️ Failed to parse synthesis JSON: {e}")
                 synthesis["executive_summary"] = response["content"][:500]
         
-        # Generate charts for successful query results
-        # Note: IntelligentChartGenerationAgent requires session_factory, but we'll use a simpler approach
-        # For now, we'll generate basic chart configs programmatically
+        # Generate charts for successful query results via MultiEngineQueryService
         for qr in query_results:
-            if qr["result"].get("success") and qr["result"].get("data"):
-                try:
-                    chart_data = qr["result"]["data"]
-                    chart_type = qr.get("output_type", "bar_chart")
+            try:
+                # Handle result structure from MultiEngineQueryService
+                result = qr.get("result", {})
+                if not result or result.get("success") is False:
+                    logger.debug(f"⏭️ Skipping chart for failed query: {result.get('error', 'Unknown error')}")
+                    continue
+                
+                # Extract data from result (MultiEngineQueryService returns {"success": True, "data": [...], ...})
+                chart_data = result.get("data", [])
+                if not chart_data or len(chart_data) == 0:
+                    logger.debug(f"⏭️ Skipping chart - no data returned for: {qr.get('question', 'Unknown')}")
+                    continue
+                
+                chart_type = qr.get("output_type", "bar")
+                question = qr.get("question", "Analysis Result")
+                
+                # Convert output_type to ECharts type
+                if "line" in chart_type.lower():
+                    preferred_type = "line"
+                elif "scatter" in chart_type.lower():
+                    preferred_type = "scatter"
+                else:
+                    preferred_type = "bar"
+                
+                # Generate basic chart config using the data
+                logger.debug(f"📊 Generating {preferred_type} chart for: {question}")
+                chart_config = _generate_basic_chart_config(
+                    data=chart_data,
+                    title=question,
+                    chart_type=preferred_type
+                )
+                
+                if chart_config and isinstance(chart_config, dict) and chart_config.get("option"):
+                    synthesis["charts"].append(chart_config)
+                    logger.info(f"✅ Generated chart for: {question}")
+                else:
+                    logger.warning(f"⚠️ Invalid chart config generated for: {question}")
                     
-                    # Convert chart_type to ECharts type
-                    if "line" in chart_type:
-                        preferred_type = "line"
-                    elif "bar" in chart_type:
-                        preferred_type = "bar"
-                    else:
-                        preferred_type = "bar"
-                    
-                    # Generate basic chart config programmatically
-                    # This avoids the session_factory requirement
-                    chart_config = _generate_basic_chart_config(
-                        data=chart_data,
-                        title=qr.get("question", "Analysis Result"),
-                        chart_type=preferred_type
-                    )
-                    
-                    if chart_config and isinstance(chart_config, dict):
-                        synthesis["charts"].append(chart_config)
-                        
-                except Exception as e:
-                    logger.warning(f"⚠️ Failed to generate chart for question '{qr.get('question', '')}': {e}")
+            except Exception as e:
+                logger.error(f"❌ Failed to generate chart for '{qr.get('question', 'Unknown')}': {e}", exc_info=True)
         
-        # Combine all data
+        # Combine all data from successful queries
         for qr in query_results:
-            if qr["result"].get("success") and qr["result"].get("data"):
-                synthesis["combined_data"].extend(qr["result"]["data"])
+            result = qr.get("result", {})
+            if result.get("success") and result.get("data"):
+                data = result.get("data", [])
+                if isinstance(data, list):
+                    synthesis["combined_data"].extend(data)
         
         logger.info(f"✅ Synthesis complete: {len(synthesis['insights'])} insights, {len(synthesis['charts'])} charts")
         
@@ -689,43 +704,85 @@ def _generate_basic_chart_config(data: List[Dict[str, Any]], title: str, chart_t
     """
     Generate a basic ECharts configuration from data.
     This is a fallback when IntelligentChartGenerationAgent is not available.
+    
+    Returns dict with "option" key containing ECharts config
     """
     if not data or len(data) == 0:
+        logger.warning(f"Cannot generate chart - no data provided")
         return {}
     
-    # Get column names from first row
-    columns = list(data[0].keys()) if data else []
-    if len(columns) < 2:
-        return {}
-    
-    # Simple chart config
-    x_column = columns[0]
-    y_column = columns[1] if len(columns) > 1 else columns[0]
-    
-    x_data = [row.get(x_column) for row in data]
-    y_data = [row.get(y_column) for row in data]
-    
-    config = {
-        "title": {
-            "text": title,
-            "left": "center"
-        },
-        "tooltip": {
-            "trigger": "axis" if chart_type == "line" else "item"
-        },
-        "xAxis": {
-            "type": "category",
-            "data": x_data
-        },
-        "yAxis": {
-            "type": "value"
-        },
-        "series": [{
-            "name": y_column,
+    try:
+        # Get column names from first row
+        columns = list(data[0].keys()) if data else []
+        if len(columns) < 1:
+            logger.warning(f"Cannot generate chart - data has no columns")
+            return {}
+        
+        # Use first two columns for X and Y
+        x_column = columns[0]
+        y_column = columns[1] if len(columns) > 1 else columns[0]
+        
+        x_data = []
+        y_data = []
+        
+        for row in data:
+            x_val = row.get(x_column)
+            y_val = row.get(y_column)
+            # Convert to appropriate types
+            try:
+                if isinstance(y_val, (int, float)):
+                    y_data.append(y_val)
+                else:
+                    y_data.append(float(y_val) if y_val else 0)
+            except (ValueError, TypeError):
+                y_data.append(0)
+            x_data.append(str(x_val) if x_val else "")
+        
+        # Build ECharts configuration
+        echarts_option = {
+            "title": {
+                "text": title,
+                "left": "center",
+                "textStyle": {
+                    "fontSize": 14,
+                    "fontWeight": "bold"
+                }
+            },
+            "tooltip": {
+                "trigger": "axis" if chart_type == "line" else "item",
+                "formatter": "{b}: {c}"
+            },
+            "grid": {
+                "left": "10%",
+                "right": "10%",
+                "bottom": "10%",
+                "containLabel": True
+            },
+            "xAxis": {
+                "type": "category",
+                "data": x_data,
+                "name": x_column
+            },
+            "yAxis": {
+                "type": "value",
+                "name": y_column
+            },
+            "series": [{
+                "name": y_column,
+                "type": chart_type if chart_type in ["bar", "line", "scatter"] else "bar",
+                "data": y_data,
+                "smooth": True if chart_type == "line" else False
+            }],
+            "color": ["#5470c6", "#91cc75", "#fac858", "#ee6666", "#73c0de"]
+        }
+        
+        return {
+            "title": title,
             "type": chart_type,
-            "data": y_data
-        }]
-    }
-    
-    return config
+            "option": echarts_option
+        }
+        
+    except Exception as e:
+        logger.error(f"Error generating chart config: {e}", exc_info=True)
+        return {}
 
