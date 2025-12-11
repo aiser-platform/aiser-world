@@ -42,10 +42,42 @@ jobs:
         
       - name: Verify build output
         run: |
+          echo "=== Build Verification ==="
           echo "Checking build directory contents:"
           ls -la packages/docs/build/ | head -20
+          echo ""
           echo "Checking for index.html:"
-          test -f packages/docs/build/index.html && echo "✅ index.html exists" || echo "❌ index.html missing"
+          if [ -f packages/docs/build/index.html ]; then
+            echo "✅ index.html exists"
+            echo "File size: $(wc -c < packages/docs/build/index.html) bytes"
+          else
+            echo "❌ index.html missing"
+            exit 1
+          fi
+          echo ""
+          echo "Checking for CNAME:"
+          if [ -f packages/docs/build/CNAME ]; then
+            echo "✅ CNAME exists: $(cat packages/docs/build/CNAME)"
+            if grep -q "docs.aicser.com" packages/docs/build/CNAME; then
+              echo "✅ CNAME contains correct domain"
+            else
+              echo "❌ CNAME has wrong domain"
+              exit 1
+            fi
+          else
+            echo "❌ CNAME missing - creating it"
+            echo "docs.aicser.com" > packages/docs/build/CNAME
+          fi
+          echo ""
+          echo "Checking for .nojekyll:"
+          if [ -f packages/docs/build/.nojekyll ]; then
+            echo "✅ .nojekyll exists"
+          else
+            echo "⚠️ .nojekyll missing - creating it"
+            touch packages/docs/build/.nojekyll
+          fi
+          echo ""
+          echo "Build verification complete ✅"
           
       - name: Deploy to GitHub Pages
         if: github.ref == 'refs/heads/main'
@@ -56,11 +88,32 @@ jobs:
           # Deploy to root for custom domain (baseUrl: '/')
           # No destination_dir means deploy to root of gh-pages branch
           cname: docs.aicser.com
-          force_orphan: false
+          force_orphan: true
           # Ensure .nojekyll is created (for GitHub Pages)
           enable_jekyll: false
-          # Keep existing files (don't force orphan)
-          keep_files: false
+          # User information for commit
+          user_name: 'github-actions[bot]'
+          user_email: 'github-actions[bot]@users.noreply.github.com'
+          commit_message: 'docs: deploy documentation to GitHub Pages [skip ci]'
+          
+      - name: Verify deployment
+        if: github.ref == 'refs/heads/main'
+        run: |
+          echo "=== Deployment Verification ==="
+          echo "Waiting 10 seconds for GitHub Pages to process..."
+          sleep 10
+          echo ""
+          echo "⚠️ IMPORTANT: Check the following:"
+          echo "1. Go to: https://github.com/aiser-platform/aiser-world/settings/pages"
+          echo "2. Verify Source is set to 'GitHub Actions' (NOT 'Deploy from a branch')"
+          echo "3. Verify Custom domain shows: docs.aicser.com"
+          echo "4. Check gh-pages branch: https://github.com/aiser-platform/aiser-world/tree/gh-pages"
+          echo "5. Verify DNS CNAME record points to: aiser-platform.github.io."
+          echo ""
+          echo "If site still doesn't load after 5-10 minutes:"
+          echo "- Check GitHub Pages status in repository settings"
+          echo "- Verify DNS propagation: nslookup docs.aicser.com"
+          echo "- Wait for SSL certificate (can take 24-48 hours)"
           
       - name: Deploy to GitHub Pages (PR Preview)
         if: github.event_name == 'pull_request'
