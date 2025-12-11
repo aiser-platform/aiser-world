@@ -96,24 +96,66 @@ jobs:
           user_email: 'github-actions[bot]@users.noreply.github.com'
           commit_message: 'docs: deploy documentation to GitHub Pages [skip ci]'
           
+      - name: Verify gh-pages branch
+        if: github.ref == 'refs/heads/main'
+        run: |
+          echo "=== Verifying gh-pages Branch ==="
+          git fetch origin gh-pages:gh-pages || echo "gh-pages branch may not exist yet"
+          git checkout gh-pages 2>/dev/null || echo "Cannot checkout gh-pages (this is normal if branch doesn't exist)"
+          echo ""
+          echo "Checking if files were deployed:"
+          if [ -f index.html ]; then
+            echo "✅ index.html exists in gh-pages"
+            echo "File size: $(wc -c < index.html) bytes"
+          else
+            echo "❌ index.html NOT found in gh-pages branch"
+          fi
+          if [ -f CNAME ]; then
+            echo "✅ CNAME exists: $(cat CNAME)"
+          else
+            echo "❌ CNAME NOT found in gh-pages branch"
+          fi
+          git checkout main || true
+          
       - name: Verify deployment
         if: github.ref == 'refs/heads/main'
         run: |
-          echo "=== Deployment Verification ==="
-          echo "Waiting 10 seconds for GitHub Pages to process..."
-          sleep 10
           echo ""
-          echo "⚠️ IMPORTANT: Check the following:"
-          echo "1. Go to: https://github.com/aiser-platform/aiser-world/settings/pages"
-          echo "2. Verify Source is set to 'GitHub Actions' (NOT 'Deploy from a branch')"
-          echo "3. Verify Custom domain shows: docs.aicser.com"
-          echo "4. Check gh-pages branch: https://github.com/aiser-platform/aiser-world/tree/gh-pages"
-          echo "5. Verify DNS CNAME record points to: aiser-platform.github.io."
+          echo "=== ⚠️ CRITICAL: GitHub Pages Configuration ==="
           echo ""
-          echo "If site still doesn't load after 5-10 minutes:"
-          echo "- Check GitHub Pages status in repository settings"
-          echo "- Verify DNS propagation: nslookup docs.aicser.com"
-          echo "- Wait for SSL certificate (can take 24-48 hours)"
+          echo "The workflow completed successfully, but if the site is not accessible:"
+          echo ""
+          echo "1. 🔴 MOST IMPORTANT: Check GitHub Pages Source"
+          echo "   Go to: https://github.com/aiser-platform/aiser-world/settings/pages"
+          echo "   Source MUST be: 'GitHub Actions' (NOT 'Deploy from a branch')"
+          echo "   If it says 'Deploy from a branch', change it to 'GitHub Actions' and Save"
+          echo ""
+          echo "2. Check gh-pages branch:"
+          echo "   https://github.com/aiser-platform/aiser-world/tree/gh-pages"
+          echo "   Should see: index.html, CNAME, .nojekyll, assets/"
+          echo ""
+          echo "3. Verify DNS:"
+          echo "   Run: nslookup docs.aicser.com"
+          echo "   Should show: docs.aicser.com → aiser-platform.github.io."
+          echo ""
+          echo "4. Check GitHub Pages status:"
+          echo "   Repository Settings → Pages"
+          echo "   Should show: Source: GitHub Actions, Domain: docs.aicser.com"
+          echo ""
+          echo "5. SSL Certificate:"
+          echo "   May take 24-48 hours to be issued"
+          echo "   Check in: Repository Settings → Pages → Custom domain"
+          echo ""
+          echo "=== Next Steps ==="
+          echo "If Source is NOT 'GitHub Actions':"
+          echo "  1. Change it to 'GitHub Actions'"
+          echo "  2. Wait 2-5 minutes"
+          echo "  3. Site should become accessible"
+          echo ""
+          echo "If Source is already 'GitHub Actions' but site still doesn't work:"
+          echo "  - Wait 5-10 minutes for GitHub to process"
+          echo "  - Check DNS propagation (can take up to 48 hours)"
+          echo "  - Verify SSL certificate is issued"
           
       - name: Deploy to GitHub Pages (PR Preview)
         if: github.event_name == 'pull_request'
