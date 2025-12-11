@@ -1,14 +1,13 @@
 name: Deploy Documentation to GitHub Pages
 
+# Only trigger on docs changes to avoid unnecessary runs
 on:
   push:
     branches: [ main ]
     paths:
       - 'packages/docs/**'
-  pull_request:
-    branches: [ main ]
-    paths:
-      - 'packages/docs/**'
+      - '.github/workflows/deploy-docs.yml'
+  workflow_dispatch:  # Allow manual trigger
 
 # Add permissions for GitHub Pages deployment
 permissions:
@@ -28,12 +27,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: 'packages/docs/package-lock.json'
+          # No cache since package-lock.json doesn't exist in docs
           
       - name: Install dependencies
         working-directory: packages/docs
-        run: npm ci
+        run: npm install
         
       - name: Build documentation
         working-directory: packages/docs
