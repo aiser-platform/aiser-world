@@ -26,18 +26,19 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'  # Docusaurus 3.1.1 requires Node.js >= 20.0
           # No cache since package-lock.json doesn't exist in docs
           
       - name: Install dependencies
-        working-directory: packages/docs
         run: npm install
+        # Install from root to properly resolve workspace dependencies
         
       - name: Build documentation
         working-directory: packages/docs
         env:
           NODE_ENV: production
         run: npm run build
+        # Build from docs directory after root dependencies are installed
         
       - name: Verify build output
         run: |
@@ -55,9 +56,11 @@ jobs:
           # Deploy to root for custom domain (baseUrl: '/')
           # No destination_dir means deploy to root of gh-pages branch
           cname: docs.aicser.com
-          force_orphan: true
+          force_orphan: false
           # Ensure .nojekyll is created (for GitHub Pages)
           enable_jekyll: false
+          # Keep existing files (don't force orphan)
+          keep_files: false
           
       - name: Deploy to GitHub Pages (PR Preview)
         if: github.event_name == 'pull_request'

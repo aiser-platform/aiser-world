@@ -13,8 +13,8 @@ const config = {
   deploymentBranch: 'gh-pages', 
   
   // Organization and project names 
-  organizationName: 'aicser-platform',
-  projectName: 'aicser-world',
+  organizationName: 'aiser-platform',
+  projectName: 'aiser-world',
   
   // Custom fields (domain and port configuration)
   customFields: {
@@ -48,6 +48,8 @@ const config = {
         theme: {
           customCss: require.resolve('./src/css/custom.css'),
         },
+        // Search configuration - using local search (no Algolia required)
+        // To enable Algolia search, uncomment algolia config below and set environment variables
         sitemap: {
           changefreq: 'weekly',
           priority: 0.5,
