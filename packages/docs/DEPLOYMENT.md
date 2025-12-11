@@ -10,7 +10,7 @@ The documentation automatically deploys when you push to the `main` branch. The 
 
 1. **Build** the documentation
 2. **Deploy** to GitHub Pages
-3. **Configure** the custom domain `aiser-docs.dataticon.com`
+3. **Configure** the custom domain `docs.aicser.com`
 
 ### Manual Deployment
 
@@ -27,17 +27,20 @@ npm run deploy
 
 ### 1. DNS Configuration
 
-Configure your DNS provider (`dataticon.com`) with these records:
+Configure your DNS provider (`aicser.com`) with these records:
 
 ```dns
-# CNAME record
-aiser-docs.dataticon.com.  CNAME  your-username.github.io.
+# CNAME record (recommended for subdomain)
+docs.aicser.com.  CNAME  your-username.github.io.
 
-# Or A records (if using apex domain)
-aiser-docs.dataticon.com.  A      185.199.108.153
-aiser-docs.dataticon.com.  A      185.199.109.153
-aiser-docs.dataticon.com.  A      185.199.110.153
-aiser-docs.dataticon.com.  A      185.199.111.153
+# Or for organization GitHub Pages
+docs.aicser.com.  CNAME  aiser-platform.github.io.
+
+# Or A records (if using apex domain - not recommended for subdomain)
+docs.aicser.com.  A      185.199.108.153
+docs.aicser.com.  A      185.199.109.153
+docs.aicser.com.  A      185.199.110.153
+docs.aicser.com.  A      185.199.111.153
 ```
 
 ### 2. GitHub Repository Settings
@@ -58,7 +61,7 @@ GitHub Pages automatically provides SSL certificates for custom domains. Wait 24
 The build automatically detects the environment:
 
 - **Development**: `baseUrl: '/'` (localhost:3005)
-- **Production**: `baseUrl: '/'` (aiser-docs.dataticon.com)
+- **Production**: `baseUrl: '/'` (docs.aicser.com)
 
 ### Build Output
 
@@ -111,7 +114,7 @@ npm run build 2>&1 | grep -i "broken\|error"
 1. **Edit documentation** in `packages/docs/src/docs/`
 2. **Commit and push** to `main` branch
 3. **Automatic deployment** occurs within 5-10 minutes
-4. **Verify changes** at `https://aiser-docs.dataticon.com/docs`
+4. **Verify changes** at `https://docs.aicser.com`
 
 ### Rollback
 
@@ -138,7 +141,7 @@ Check deployment status in:
 1. **Push to main branch** to trigger first deployment
 2. **Configure DNS** with your domain provider
 3. **Wait for SSL certificate** (24-48 hours)
-4. **Test the live site** at `https://aiser-docs.dataticon.com/docs`
+4. **Test the live site** at `https://docs.aicser.com`
 
 ---
 

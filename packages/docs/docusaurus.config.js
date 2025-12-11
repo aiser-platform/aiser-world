@@ -4,7 +4,7 @@ const config = {
   favicon: '/favicon.ico',
   
   // Set the production url of your site here
-  url: 'https://aiser-docs.dataticon.com',
+  url: 'https://docs.aicser.com',
   // Set the /<baseUrl>/ pathname under which your site is served
   // For custom domain deployment, use '/' to serve from root
   baseUrl: '/',
@@ -12,19 +12,14 @@ const config = {
   // GitHub Pages deployment 
   deploymentBranch: 'gh-pages', 
   
-  // Trigger deployment - GitHub Actions will run on push
-  
-  // Fix deployment workflow - trigger new build
-  
-  // Fix publish_dir paths - trigger deployment
-  
   // Organization and project names 
   organizationName: 'Aiser',
   projectName: 'aiser-world',
   
-  // Custom domain
+  // Custom fields (domain and port configuration)
   customFields: {
-    domain: 'aiser-docs.dataticon.com'
+    domain: 'docs.aicser.com',
+    port: 3005  // Use port 3005 for docs
   },
   
   // Even if you don't use internalization, you can use this field to set useful
@@ -169,13 +164,6 @@ const config = {
       respectPrefersColorScheme: true,
     },
   },
-  
-  // Custom port configuration
-  customFields: {
-    port: 3005  // Use port 3005 for docs
-  },
-  
-  // Trigger deployment - GitHub Actions will run on push
 };
 
 module.exports = config;
