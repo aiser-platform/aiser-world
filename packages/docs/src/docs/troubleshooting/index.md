@@ -2,12 +2,12 @@
 id: troubleshooting-overview
 title: Troubleshooting Guide
 sidebar_label: Troubleshooting Overview
-description: Common issues, error resolution, and debugging techniques for Aiser Platform
+description: Common issues, error resolution, and debugging techniques for Aicser Platform
 ---
 
 # Troubleshooting Guide
 
-Encountering issues with Aiser Platform? This comprehensive troubleshooting guide will help you diagnose and resolve common problems, from installation issues to performance bottlenecks.
+Encountering issues with Aicser Platform? This comprehensive troubleshooting guide will help you diagnose and resolve common problems, from installation issues to performance bottlenecks.
 
 ## 🔍 Quick Diagnosis
 
@@ -82,7 +82,7 @@ docker-compose logs postgres
 
 # Reset database password
 docker-compose exec postgres psql -U postgres
-ALTER USER aiser_user PASSWORD 'new_password';
+ALTER USER aicser_user PASSWORD 'new_password';
 
 # Verify environment variables
 echo $POSTGRES_PASSWORD
@@ -103,7 +103,7 @@ docker-compose exec auth alembic downgrade base
 docker-compose exec auth alembic upgrade head
 
 # Check database schema
-docker-compose exec postgres psql -U aiser_user -d aiser_db -c "\dt"
+docker-compose exec postgres psql -U aicser_user -d aicser_db -c "\dt"
 ```
 
 ### 3. AI Service Issues
@@ -131,10 +131,10 @@ curl -H "Authorization: Bearer $OPENAI_API_KEY" \
 **Solutions**:
 ```bash
 # Check model cache
-ls -la /tmp/aiser_models/
+ls -la /tmp/aicser_models/
 
 # Clear model cache
-rm -rf /tmp/aiser_models/*
+rm -rf /tmp/aicser_models/*
 
 # Check available memory
 free -h
@@ -186,7 +186,7 @@ docker-compose exec nginx nginx -t
 **Solutions**:
 ```bash
 # Check database performance
-docker-compose exec postgres psql -U aiser_user -d aiser_db -c "
+docker-compose exec postgres psql -U aicser_user -d aicser_db -c "
 SELECT query, mean_time, calls 
 FROM pg_stat_statements 
 ORDER BY mean_time DESC 
@@ -271,7 +271,7 @@ telnet redis 6379
 ```bash
 # Check Docker network
 docker network ls
-docker network inspect aiser-world_default
+docker network inspect aicser-world_default
 
 # Inspect container networking
 docker inspect <container_id> | grep -A 20 "NetworkSettings"
@@ -282,7 +282,7 @@ docker inspect <container_id> | grep -A 20 "NetworkSettings"
 #### PostgreSQL Debugging
 ```bash
 # Connect to database
-docker-compose exec postgres psql -U aiser_user -d aiser_db
+docker-compose exec postgres psql -U aicser_user -d aicser_db
 
 # Check active connections
 SELECT * FROM pg_stat_activity;
@@ -340,7 +340,7 @@ done
 ```yaml
 # Prometheus health check configuration
 scrape_configs:
-  - job_name: 'aiser-health'
+  - job_name: 'aicser-health'
     static_configs:
       - targets: ['localhost:3005', 'localhost:8000', 'localhost:8001']
     metrics_path: /health
@@ -359,7 +359,7 @@ scrape_configs:
 ```yaml
 # Grafana alerting rules
 groups:
-  - name: aiser-alerts
+  - name: aicser-alerts
     rules:
       - alert: HighResponseTime
         expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
@@ -381,15 +381,15 @@ groups:
 - [Performance Guide](../performance/)
 
 #### Community Support
-- [GitHub Issues](https://github.com/aiser-platform/aiser-world/issues)
-- [GitHub Discussions](https://github.com/aiser-platform/aiser-world/discussions)
-- [Community Forum](https://community.aiser.com)
+- [GitHub Issues](https://github.com/aicser-platform/aicser-world/issues)
+- [GitHub Discussions](https://github.com/aicser-platform/aicser-world/discussions)
+- [Community Forum](https://community.aicser.com)
 
 ### 2. Professional Support
 
 #### Enterprise Support
-- **Email**: support@aiser.com
-- **Phone**: +1-800-AISER-HELP
+- **Email**: support@aicser.com
+- **Phone**: +1-800-AICSER-HELP
 - **Slack**: Enterprise customers only
 - **Response Time**: 4 hours (business hours)
 
@@ -408,9 +408,9 @@ groups:
 4. **Compliance Issues**: Security or regulatory concerns
 
 #### Escalation Contacts
-- **Technical Escalation**: tech-lead@aiser.com
-- **Management Escalation**: management@aiser.com
-- **Emergency**: emergency@aiser.com (24/7)
+- **Technical Escalation**: tech-lead@aicser.com
+- **Management Escalation**: management@aicser.com
+- **Emergency**: emergency@aicser.com (24/7)
 
 ## 📝 Issue Reporting
 
@@ -434,7 +434,7 @@ What actually happens
 ## Environment
 - OS: [e.g., Ubuntu 20.04]
 - Docker: [e.g., 20.10.0]
-- Aiser Version: [e.g., 1.0.0]
+- Aicser Version: [e.g., 1.0.0]
 
 ## Logs
 Relevant log output
@@ -465,7 +465,7 @@ Any other relevant information
 ---
 
 **Still Need Help?**
-- [Contact Support](mailto:support@aiser.com)
-- [Community Forum](https://community.aiser.com)
-- [GitHub Issues](https://github.com/aiser-platform/aiser-world/issues)
+- [Contact Support](mailto:support@aicser.com)
+- [Community Forum](https://community.aicser.com)
+- [GitHub Issues](https://github.com/aicser-platform/aicser-world/issues)
 - [Documentation Index](../)

@@ -1,4 +1,4 @@
-# Aiser Platform Documentation - Development Dockerfile
+# Aicser Platform Documentation - Development Dockerfile
 FROM node:18-alpine
 
 # Set working directory
@@ -17,7 +17,7 @@ RUN npm ci
 COPY . .
 
 # Create health check endpoint
-RUN echo '{"status":"healthy","service":"aiser-docs-dev"}' > /public/health
+RUN echo '{"status":"healthy","service":"aicser-docs-dev"}' > /public/health
 
 # Expose port
 EXPOSE 3005

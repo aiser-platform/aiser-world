@@ -2,39 +2,33 @@
 id: features
 title: Features Overview
 sidebar_label: Features
-description: Complete overview of Aiser Platform features and capabilities
+description: Complete overview of Aicser Platform features and capabilities
 ---
 
-# 🤖 Aiser Platform Features
+# 🤖 Aicser Platform Features
 
-**Discover the powerful capabilities that make Aiser the next-generation AI-first business intelligence platform.**
+**Discover the powerful capabilities that make Aicser the next-generation AI-first business intelligence platform.**
 
 ## 🚀 Core Features
 
-### **AI-Powered Analytics**
-- [AI Overview](./ai-overview) - Understanding AI capabilities
-- [Custom Prompts](./custom-prompts) - Tailor AI responses
-- [Conversation Memory](./conversation-memory) - Context-aware interactions
-- [Agent System](./agents) - Multi-agent workflows
+### **🤖 AI-Powered Analytics**
+- [AI Overview](./ai-overview) - Natural language queries, intelligent insights, and AI-driven analysis
+- **Multi-Agent System**: Specialized AI agents for different analysis types
+- **Conversation Memory**: Context-aware interactions that remember your previous questions
+- **Smart Chart Selection**: AI automatically chooses the best visualization for your data
 
-### **Data & Visualization**
-- [Charts Overview](./charts-overview) - Complete chart types guide
-- [Line Charts](./line-charts) - Time series and trend analysis
-- [Bar Charts](./bar-charts) - Categorical data visualization
-- [Heatmaps](./heatmaps) - Multi-dimensional data analysis
-- [ECharts Integration](./echarts-integration) - Advanced charting capabilities
+### **📊 Charts & Visualizations**
+- [Charts & Visualizations](./charts-overview) - Complete guide to chart types and ECharts integration
+- **30+ Chart Types**: Line, bar, pie, heatmaps, scatter plots, and more
+- **Interactive Features**: Zoom, pan, tooltips, and data filtering
+- **Custom Styling**: Themes, colors, and responsive design
 
-### **Data Sources**
-- [Data Sources Overview](./data-sources-overview) - Connect to any data source
-- [Database Connections](./databases) - SQL and NoSQL databases
-- [CSV/Excel Support](./csv-excel) - File-based data import
-- [Warehouses](./warehouses) - Data warehouse integration
-- [Real-time Streams](./real-time-streams) - Live data processing
-
-### **Advanced Analytics**
-- [Natural Language Queries](./natural-language-queries) - Ask questions in plain English
-- [Deep Analysis](./deep-analysis) - Advanced statistical analysis
-- [What-If Simulations](./what-if-simulations) - Scenario planning and modeling
+### **🔌 Data Sources**
+- [Data Sources](./data-sources-overview) - Connect to databases, files, and cloud storage
+- **Databases**: PostgreSQL, MySQL, SQL Server, MongoDB
+- **Data Warehouses**: Snowflake, BigQuery, Redshift, Databricks
+- **Files**: CSV, Excel, JSON, Parquet
+- **Cloud Storage**: S3, GCS, Azure Blob
 
 ## 🔧 Technical Features
 
@@ -56,10 +50,10 @@ description: Complete overview of Aiser Platform features and capabilities
 - SDKs for multiple languages
 - Plugin architecture for extensibility
 
-## 🌟 Why Choose Aiser?
+## 🌟 Why Choose Aicser?
 
 - **🤖 AI-First Design**: Built from the ground up for AI-powered analytics
-- **🌍 Open Source Core**: Transparent, community-driven development
+- **🚀 Coming Soon: Open Source**: Core platform will be open source - stay tuned!
 - **💼 Enterprise Ready**: Scale from startup to Fortune 500
 - **🔒 Privacy First**: Self-host or cloud with full data control
 - **📊 Natural Language**: Ask questions in plain English, get charts instantly

@@ -2,12 +2,12 @@
 id: ai-overview
 title: AI Overview
 sidebar_label: AI Overview
-description: Overview of AI-powered features in Aiser Platform
+description: Overview of AI-powered features in Aicser Platform
 ---
 
 # AI-Powered Analytics Overview
 
-Aiser Platform leverages cutting-edge artificial intelligence to transform how you interact with your data.
+Aicser Platform leverages cutting-edge artificial intelligence to transform how you interact with your data.
 
 ## 🤖 Core AI Capabilities
 
@@ -28,7 +28,7 @@ Aiser Platform leverages cutting-edge artificial intelligence to transform how y
 
 ## 🚀 Getting Started
 
-1. **Upload your data** to Aiser Platform
+1. **Upload your data** to Aicser Platform
 2. **Ask questions** in natural language
 3. **Explore AI-generated insights**
 4. **Refine your analysis** with follow-up questions

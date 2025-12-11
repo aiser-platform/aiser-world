@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AI-Powered Documentation Generator for Aiser Platform
+AI-Powered Documentation Generator for Aicser Platform
 Automatically generates comprehensive documentation from codebase
 """
 
@@ -255,7 +255,7 @@ sidebar_label: {base_name.replace("-", " ").title()}
 
 # {base_name.replace("-", " ").title()}
 
-Welcome to the {base_name.replace("-", " ").title()} section of Aiser Platform documentation.
+Welcome to the {base_name.replace("-", " ").title()} section of Aicser Platform documentation.
 
 ## Overview
 
@@ -272,7 +272,7 @@ This section provides comprehensive information about {base_name.replace("-", " 
 If you can't find what you're looking for, please:
 - Check our [FAQ](/docs/getting-started/faq)
 - Search the documentation
-- Open an issue on [GitHub](https://github.com/aiser-platform/aiser-world/issues)
+- Open an issue on [GitHub](https://github.com/aicser-platform/aicser-world/issues)
 """
 
         return f"""---

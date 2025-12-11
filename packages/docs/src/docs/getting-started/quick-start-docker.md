@@ -2,12 +2,12 @@
 id: quick-start-docker
 title: Quick Start with Docker
 sidebar_label: Docker Quick Start
-description: Get Aiser Platform running in 5 minutes with Docker - the fastest way to experience AI-powered analytics
+description: Get Aicser Platform running in 5 minutes with Docker - the fastest way to experience AI-powered analytics
 ---
 
 # 🐳 Quick Start with Docker
 
-**Get Aiser Platform running in 5 minutes with Docker - the fastest way to experience AI-powered analytics.**
+**Get Aicser Platform running in 5 minutes with Docker - the fastest way to experience AI-powered analytics.**
 
 ## ⚡ What You'll Get
 
@@ -30,8 +30,8 @@ In just a few minutes, you'll have:
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/aiser-platform/aiser-world
-cd aiser-world
+git clone https://github.com/aicser-platform/aicser-world
+cd aicser-world
 ```
 
 ### 2. Start All Services
@@ -58,7 +58,7 @@ docker-compose logs -f
 
 **⏱️ Expected startup time:** 2-3 minutes for first run
 
-### 4. Access Your Aiser Platform
+### 4. Access Your Aicser Platform
 
 Once all services show "Up" status, open your browser:
 
@@ -108,8 +108,8 @@ AZURE_OPENAI_API_KEY=your_azure_key_here
 GOOGLE_AI_API_KEY=your_google_key_here
 
 # Database Configuration
-POSTGRES_DB=aiser_platform
-POSTGRES_USER=aiser_user
+POSTGRES_DB=aicser_platform
+POSTGRES_USER=aicser_user
 POSTGRES_PASSWORD=secure_password
 
 # Security
@@ -156,7 +156,7 @@ docker-compose restart chat2chart-server
 #### 3. **Database Connection Issues**
 ```bash
 # Check database status
-docker-compose exec postgres psql -U aiser_user -d aiser_platform
+docker-compose exec postgres psql -U aicser_user -d aicser_platform
 
 # Reset database (⚠️ destroys data)
 docker-compose down -v
@@ -187,7 +187,7 @@ docker-compose --profile performance up -d
 
 ## 🚀 Next Steps
 
-Now that you have Aiser running locally:
+Now that you have Aicser running locally:
 
 1. **📊 [Create Your First Chart](./first-chart)** - Experience AI analytics
 2. **🎬 [Watch the Demo](./demo-walkthrough)** - Learn the interface
@@ -198,8 +198,8 @@ Now that you have Aiser running locally:
 ## 🆘 Still Having Issues?
 
 - **📖 [FAQ](./faq)** - Common solutions
-- **🐛 [GitHub Issues](https://github.com/aiser-platform/aiser-world/issues)** - Report bugs
-- **💬 [Discussions](https://github.com/aiser-platform/aiser-world/discussions)** - Community help
+- **🐛 [GitHub Issues](https://github.com/aicser-platform/aicser-world/issues)** - Report bugs
+- **💬 [Discussions](https://github.com/aicser-platform/aicser-world/discussions)** - Community help
 - **📧 [Email Support](mailto:support@dataticon.com)** - Direct support
 
 ## 🔄 Development Workflow
@@ -222,4 +222,4 @@ docker-compose -f docker-compose.dev.yml up -d
 
 ---
 
-**🎉 Congratulations!** You now have Aiser Platform running locally. [Create your first chart →](./first-chart) to experience the power of AI-powered analytics.
+**🎉 Congratulations!** You now have Aicser Platform running locally. [Create your first chart →](./first-chart) to experience the power of AI-powered analytics.

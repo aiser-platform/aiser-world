@@ -2,12 +2,12 @@
 id: demo-walkthrough
 title: Demo Walkthrough
 sidebar_label: Demo Walkthrough
-description: Follow along with our interactive demo to see Aiser Platform's AI-powered analytics in action
+description: Follow along with our interactive demo to see Aicser Platform's AI-powered analytics in action
 ---
 
 # 🎬 Demo Walkthrough
 
-**See Aiser Platform in action with our comprehensive demo walkthrough!**
+**See Aicser Platform in action with our comprehensive demo walkthrough!**
 
 This interactive guide demonstrates the full power of AI-powered analytics, from data upload to advanced insights. Follow along to experience how natural language transforms into actionable business intelligence.
 
@@ -270,8 +270,8 @@ AI: *Highlights Electronics with 23% growth*
 ### Need Help During Demo?
 
 - **📖 [FAQ](./faq)** - Common questions and solutions
-- **🐛 [GitHub Issues](https://github.com/aiser-platform/aiser-world/issues)** - Report bugs
-- **💬 [Discussions](https://github.com/aiser-platform/aiser-world/discussions)** - Community help
+- **🐛 [GitHub Issues](https://github.com/aicser-platform/aicser-world/issues)** - Report bugs
+- **💬 [Discussions](https://github.com/aicser-platform/aicser-world/discussions)** - Community help
 - **📧 [Email Support](mailto:support@dataticon.com)** - Direct assistance
 
 ### Demo Resources
@@ -283,4 +283,4 @@ AI: *Highlights Electronics with 23% growth*
 
 ---
 
-**🎉 Demo Complete!** You've experienced the future of business intelligence. [Start building with Aiser →](./first-chart)
+**🎉 Demo Complete!** You've experienced the future of business intelligence. [Start building with Aicser →](./first-chart)

@@ -2,14 +2,14 @@
 id: community-index
 title: Community & Contributing
 sidebar_label: Community
-description: Join the Aiser Platform community, contribute to development, and participate in shaping the future of AI-powered analytics
+description: Join the Aicser Platform community, contribute to development, and participate in shaping the future of AI-powered analytics
 ---
 
 # 🌍 Community & Contributing
 
-**Join the Aiser Platform community and help shape the future of AI-powered analytics!**
+**Join the Aicser Platform community and help shape the future of AI-powered analytics!**
 
-Aiser Platform is more than just software - it's a vibrant, growing community of developers, data scientists, business users, and enthusiasts who believe in the power of AI to democratize data analytics. Whether you're looking to contribute code, share ideas, or simply connect with like-minded individuals, there's a place for you in our community.
+Aicser Platform is more than just software - it's a vibrant, growing community of developers, data scientists, business users, and enthusiasts who believe in the power of AI to democratize data analytics. Whether you're looking to contribute code, share ideas, or simply connect with like-minded individuals, there's a place for you in our community.
 
 ## 🎯 Why Join Our Community?
 
@@ -35,16 +35,15 @@ Aiser Platform is more than just software - it's a vibrant, growing community of
 
 ### **1. Join the Conversation**
 
-**GitHub Discussions:**
-- [General Discussion](https://github.com/aiser-platform/aiser-world/discussions) - Ask questions, share ideas
-- [Feature Requests](https://github.com/aiser-platform/aiser-world/discussions/categories/feature-requests) - Suggest new features
-- [Show & Tell](https://github.com/aiser-platform/aiser-world/discussions/categories/show-and-tell) - Share your projects and use cases
-- [Help & Support](https://github.com/aiser-platform/aiser-world/discussions/categories/help-support) - Get help with issues
+**Community Channels:**
+- **💬 [Telegram Community](https://t.me/+XyM6Y-8MnWU2NTM1)** - Real-time chat and support
+- **🐦 [X.com (@Aicsertics)](https://x.com/Aicsertics)** - Latest updates and announcements
+- **💼 [LinkedIn (@Aicser)](https://www.linkedin.com/company/aicser)** - Professional networking
+- **📘 [Facebook (@Aicsertics)](https://www.facebook.com/Aicsertics)** - Community updates
 
-**Social Media:**
-- **Twitter**: [@AiserPlatform](https://twitter.com/AiserPlatform) - Latest updates and announcements
-- **LinkedIn**: [Aiser Platform](https://linkedin.com/company/aiser-platform) - Professional networking
-- **Discord**: [Join our server](https://discord.gg/aiser-platform) - Real-time chat and collaboration
+**GitHub:**
+- **⭐ [Repository](https://github.com/aiser-platform/aiser-world)** - Star us on GitHub
+- **🐛 [Issues](https://github.com/aiser-platform/aiser-world/issues)** - Report bugs and request features
 
 ### **2. Explore the Codebase**
 
@@ -52,12 +51,17 @@ Aiser Platform is more than just software - it's a vibrant, growing community of
 ```
 aiser-world/
 ├── packages/
-│   ├── chat2chart/          # Core AI analytics engine
-│   ├── auth/                # Authentication service
-│   ├── client/              # Enterprise frontend
-│   ├── cube/                # Analytics engine
-│   └── shared/              # Common utilities
-├── docs/                    # Documentation
+│   ├── chat2chart/          # Core AI analytics engine (Open Source)
+│   │   ├── client/         # Next.js frontend
+│   │   └── server/          # FastAPI backend
+│   ├── auth/                # Authentication service (Enterprise)
+│   ├── cube/                # Analytics semantic layer
+│   ├── shared/              # Common utilities (Open Source)
+│   ├── monitoring-service/  # Observability (Enterprise)
+│   ├── billing-service/     # Subscription management (Enterprise)
+│   ├── rate-limiting-service/ # API rate limiting (Enterprise)
+│   ├── backup-service/      # Data backup (Enterprise)
+│   └── docs/                # Documentation (Open Source)
 ├── scripts/                 # Development scripts
 └── tools/                   # Build and setup tools
 ```
@@ -183,8 +187,8 @@ refactor(frontend): optimize chart rendering performance
 
 ### **Ambassador Program**
 
-**Become an Aiser Ambassador:**
-- **Represent Aiser** in your local tech community
+**Become an Aicser Ambassador:**
+- **Represent Aicser** in your local tech community
 - **Organize meetups** and workshops
 - **Create content** (blog posts, tutorials, videos)
 - **Mentor new contributors** and users
@@ -261,7 +265,7 @@ refactor(frontend): optimize chart rendering performance
 ### **Special Events**
 
 **Annual Conference:**
-- **AiserCon**: Multi-day virtual conference
+- **AicserCon**: Multi-day virtual conference
 - **Keynotes**: Industry leaders and core team
 - **Workshops**: Hands-on learning sessions
 - **Networking**: Community building activities
@@ -305,10 +309,10 @@ refactor(frontend): optimize chart rendering performance
 - **Data Analytics**: SQL, Cube.js, visualization
 
 **Certification Program:**
-- **Aiser Developer**: Core platform development
-- **Aiser AI Specialist**: AI/ML integration and customization
-- **Aiser DevOps Engineer**: Deployment and infrastructure
-- **Aiser Community Leader**: Community building and leadership
+- **Aicser Developer**: Core platform development
+- **Aicser AI Specialist**: AI/ML integration and customization
+- **Aicser DevOps Engineer**: Deployment and infrastructure
+- **Aicser Community Leader**: Community building and leadership
 
 ## 🤝 Community Guidelines
 
@@ -362,14 +366,14 @@ refactor(frontend): optimize chart rendering performance
 
 **Technical Support:**
 - **GitHub Issues**: Bug reports and feature requests
-- **Stack Overflow**: Tagged with `aiser-platform`
+- **Stack Overflow**: Tagged with `aicser-platform`
 - **Developer Forums**: Specialized technical discussions
 - **Code Examples**: Sample implementations and patterns
 
 **Direct Support:**
-- **Email Support**: support@dataticon.com
-- **Developer Support**: dev-support@dataticon.com
-- **Enterprise Support**: enterprise-support@dataticon.com
+- **Email Support**: support@aicser.com
+- **Feedback Portal**: [feedback.aicser.com](https://feedback.aicser.com)
+- **Application**: [app.aicser.com](https://app.aicser.com)
 
 ### **Learning Resources**
 

@@ -2,19 +2,19 @@
 id: developer-index
 title: Developer Guide
 sidebar_label: Developer Guide
-description: Contribute to Aiser Platform development, understand the architecture, and build custom extensions
+description: Contribute to Aicser Platform development, understand the architecture, and build custom extensions
 ---
 
 # 🛠️ Developer Guide
 
-**Welcome to Aiser Platform development! Build, extend, and contribute to the world's most advanced AI-powered analytics platform.**
+**Welcome to Aicser Platform development! Build, extend, and contribute to the world's most advanced AI-powered analytics platform.**
 
 ## 🎯 Quick Start
 
 ### **Development Environment**
 ```bash
 # Prerequisites
-- Node.js 18+ and npm 9+
+- Node.js 20+ and npm 9+ (required for Docusaurus 3.1.1)
 - Python 3.11+ with pip
 - PostgreSQL 15+ and Redis 7+
 - Docker and Docker Compose
@@ -34,7 +34,19 @@ npm run build:shared
 - **AI/ML**: LiteLLM + Custom Models + AI Agents
 - **Analytics**: Cube.js for high-performance queries
 
-## 🏗️ Core Services
+## 🏗️ Platform Architecture
+
+### **Core Packages**
+
+| Package | Purpose | License | Technology |
+|---------|---------|---------|------------|
+| **chat2chart** | AI-powered chart generation (Open Source Core) | MIT | Next.js 14 + FastAPI |
+| **auth** | Authentication & authorization | Enterprise | FastAPI + JWT |
+| **shared** | Common utilities and types | MIT | TypeScript + Python |
+| **cube** | Analytics semantic layer | MIT | Cube.js |
+| **docs** | Documentation | MIT | Docusaurus |
+
+### **Enterprise Services**
 
 | Service | Purpose | Port | Technology |
 |---------|---------|------|------------|
@@ -42,6 +54,10 @@ npm run build:shared
 | **Chat2Chart Server** | AI analytics API | 8000 | FastAPI + Python |
 | **Auth Service** | Authentication | 5000 | FastAPI + JWT |
 | **Cube.js** | Analytics engine | 4000 | Node.js |
+| **Monitoring Service** | Observability & metrics | - | FastAPI |
+| **Billing Service** | Subscription management | - | FastAPI |
+| **Rate Limiting Service** | API rate limiting | - | FastAPI |
+| **Backup Service** | Data backup & restore | - | FastAPI |
 | **PostgreSQL** | Primary database | 5432 | Database |
 | **Redis** | Caching | 6379 | Cache |
 
@@ -211,8 +227,8 @@ def analyze_market_trends(data: pd.DataFrame, window_size: int = 30) -> Dict[str
 ### **Getting Help**
 - **📖 [Documentation](../)** - Comprehensive guides
 - **🐛 [GitHub Issues](https://github.com/aiser-platform/aiser-world/issues)** - Bug reports
-- **💬 [Discussions](https://github.com/aiser-platform/aiser-world/discussions)** - Questions
-- **📧 [Developer Support](mailto:dev-support@dataticon.com)** - Direct help
+- **💬 [Telegram Community](https://t.me/+XyM6Y-8MnWU2NTM1)** - Community support
+- **📧 [Developer Support](mailto:support@aicser.com)** - Direct help
 
 ## 📚 Next Steps
 

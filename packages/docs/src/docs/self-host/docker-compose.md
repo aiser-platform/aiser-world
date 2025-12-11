@@ -2,12 +2,12 @@
 id: docker-compose
 title: Docker Compose Deployment
 sidebar_label: Docker Compose
-description: Deploy Aiser Platform with Docker Compose for production-ready, scalable analytics infrastructure
+description: Deploy Aicser Platform with Docker Compose for production-ready, scalable analytics infrastructure
 ---
 
 # 🐳 Docker Compose Deployment
 
-**Deploy Aiser Platform in production with Docker Compose - the simplest way to get enterprise-grade analytics running.**
+**Deploy Aicser Platform in production with Docker Compose - the simplest way to get enterprise-grade analytics running.**
 
 ## 🎯 Quick Start
 
@@ -21,8 +21,8 @@ description: Deploy Aiser Platform with Docker Compose for production-ready, sca
 
 ### **2. Clone and Setup**
 ```bash
-git clone https://github.com/aiser-platform/aiser-world
-cd aiser-world
+git clone https://github.com/aicser-platform/aicser-world
+cd aicser-world
 cp env.example .env
 cp docker-compose.yml docker-compose.prod.yml
 ```
@@ -89,7 +89,7 @@ curl http://localhost:8000/health
 curl http://localhost:5000/health
 
 # Database
-docker-compose exec postgres psql -U aiser_user -d aiser_platform -c "SELECT 1;"
+docker-compose exec postgres psql -U aicser_user -d aicser_platform -c "SELECT 1;"
 ```
 
 ### **Metrics & Logs**
@@ -103,7 +103,7 @@ docker-compose exec postgres psql -U aiser_user -d aiser_platform -c "SELECT 1;"
 ### **Updates**
 ```bash
 # Backup database
-docker-compose exec postgres pg_dump -U aiser_user aiser_platform > backup.sql
+docker-compose exec postgres pg_dump -U aicser_user aicser_platform > backup.sql
 
 # Update and restart
 git pull origin main

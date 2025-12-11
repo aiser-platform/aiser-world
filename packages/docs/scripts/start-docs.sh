@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "🔧 Setting up Aiser Documentation..."
+echo "🔧 Setting up Aicser Documentation..."
 
 # Check if we're in the right directory
 if [ ! -f "docusaurus.config.js" ]; then
@@ -26,7 +26,7 @@ npm run build
 # Start the development server
 echo "🚀 Starting documentation server on port 3005..."
 echo "📖 Documentation will be available at: http://localhost:3005"
-echo "🌐 Custom domain: https://aiser-docs.dataticon.com"
+echo "🌐 Custom domain: https://aicser-docs.dataticon.com"
 echo ""
 echo "Press Ctrl+C to stop the server"
 echo ""

@@ -2,52 +2,52 @@
 id: faq
 title: Frequently Asked Questions
 sidebar_label: FAQ
-description: Find answers to common questions about Aiser Platform - from getting started to enterprise deployment
+description: Find answers to common questions about Aicser Platform - from getting started to enterprise deployment
 ---
 
 # ❓ Frequently Asked Questions
 
-**Quick answers to the most common questions about Aiser Platform.**
+**Quick answers to the most common questions about Aicser Platform.**
 
-Can't find what you're looking for? Check our [GitHub Discussions](https://github.com/aiser-platform/aiser-world/discussions) or [contact support](mailto:support@dataticon.com).
+Can't find what you're looking for? Check our [GitHub Discussions](https://github.com/aicser-platform/aicser-world/discussions) or [contact support](mailto:support@dataticon.com).
 
 ## 🚀 Getting Started
 
-### **Q: How quickly can I get Aiser running?**
-**A:** With Docker, you can have Aiser running in **5 minutes**:
+### **Q: How quickly can I get Aicser running?**
+**A:** With Docker, you can have Aicser running in **5 minutes**:
 ```bash
-git clone https://github.com/aiser-platform/aiser-world
-cd aiser-world
+git clone https://github.com/aicser-platform/aicser-world
+cd aicser-world
 docker-compose up -d
 ```
 Then visit [http://localhost:3000](http://localhost:3000) to start using it.
 
 ### **Q: What are the system requirements?**
-**A:** **Minimum**: 2 CPU cores, 4GB RAM, 20GB storage. **Recommended**: 4+ CPU cores, 8GB+ RAM, 100GB+ storage. Aiser runs on Linux, macOS, and Windows.
+**A:** **Minimum**: 2 CPU cores, 4GB RAM, 20GB storage. **Recommended**: 4+ CPU cores, 8GB+ RAM, 100GB+ storage. Aicser runs on Linux, macOS, and Windows.
 
-### **Q: Do I need to be technical to use Aiser?**
-**A:** **No!** Aiser is designed for everyone. The natural language interface means you can ask questions like "Show me sales by month" without any technical knowledge.
+### **Q: Do I need to be technical to use Aicser?**
+**A:** **No!** Aicser is designed for everyone. The natural language interface means you can ask questions like "Show me sales by month" without any technical knowledge.
 
-### **Q: What data formats does Aiser support?**
-**A:** Aiser supports CSV, Excel (.xlsx, .xls), JSON, and direct database connections (PostgreSQL, MySQL, SQL Server, etc.).
+### **Q: What data formats does Aicser support?**
+**A:** Aicser supports CSV, Excel (.xlsx, .xls), JSON, and direct database connections (PostgreSQL, MySQL, SQL Server, etc.).
 
 ## 🤖 AI & Analytics
 
 ### **Q: How does the AI understand my questions?**
-**A:** Aiser uses advanced natural language processing (NLP) to understand your intent, context, and data structure. It automatically converts questions like "Show me top products by revenue" into optimized database queries.
+**A:** Aicser uses advanced natural language processing (NLP) to understand your intent, context, and data structure. It automatically converts questions like "Show me top products by revenue" into optimized database queries.
 
-### **Q: Which AI models does Aiser use?**
-**A:** Aiser supports multiple AI providers:
+### **Q: Which AI models does Aicser use?**
+**A:** Aicser supports multiple AI providers:
 - **OpenAI GPT-4.1-mini** (default)
 - **Google Gemini 2.5**
 - **Azure OpenAI**
 - **Local models** (self-hosted)
 
 ### **Q: Can I train the AI on my specific domain?**
-**A:** **Yes!** Aiser supports custom AI model training for domain-specific terminology, business rules, and industry knowledge. Contact us for enterprise customization.
+**A:** **Yes!** Aicser supports custom AI model training for domain-specific terminology, business rules, and industry knowledge. Contact us for enterprise customization.
 
 ### **Q: How accurate are the AI-generated insights?**
-**A:** Aiser achieves **98%+ accuracy** through:
+**A:** Aicser achieves **98%+ accuracy** through:
 - Multi-model validation
 - Business context understanding
 - Automated quality checks
@@ -55,15 +55,15 @@ Then visit [http://localhost:3000](http://localhost:3000) to start using it.
 
 ## 📊 Charts & Visualizations
 
-### **Q: What chart types does Aiser support?**
-**A:** Aiser supports 20+ chart types including:
+### **Q: What chart types does Aicser support?**
+**A:** Aicser supports 20+ chart types including:
 - **Basic**: Line, bar, pie, scatter plots
 - **Advanced**: Heatmaps, treemaps, radar charts
 - **Interactive**: 3D visualizations, drill-downs
 - **Custom**: Domain-specific visualizations
 
 ### **Q: Can I customize the appearance of charts?**
-**A:** **Absolutely!** Customize colors, fonts, layouts, annotations, and branding. Aiser provides professional templates and custom design options.
+**A:** **Absolutely!** Customize colors, fonts, layouts, annotations, and branding. Aicser provides professional templates and custom design options.
 
 ### **Q: How do I export charts for presentations?**
 **A:** Export in multiple formats:
@@ -73,7 +73,7 @@ Then visit [http://localhost:3000](http://localhost:3000) to start using it.
 - **Interactive**: HTML for web embedding
 
 ### **Q: Can I create dashboards with multiple charts?**
-**A:** **Yes!** Aiser supports multi-chart dashboards with:
+**A:** **Yes!** Aicser supports multi-chart dashboards with:
 - Real-time updates
 - Interactive filtering
 - Responsive layouts
@@ -81,22 +81,22 @@ Then visit [http://localhost:3000](http://localhost:3000) to start using it.
 
 ## 🔐 Authentication & Security
 
-### **Q: Is Aiser secure for enterprise use?**
-**A:** **Absolutely!** Aiser provides enterprise-grade security:
+### **Q: Is Aicser secure for enterprise use?**
+**A:** **Absolutely!** Aicser provides enterprise-grade security:
 - **Authentication**: JWT, OAuth, SAML, SSO
 - **Authorization**: Role-based access control (RBAC)
 - **Encryption**: Data at-rest and in-transit
 - **Compliance**: SOC 2, GDPR, HIPAA ready
 
 ### **Q: Can I integrate with my existing SSO system?**
-**A:** **Yes!** Aiser supports:
+**A:** **Yes!** Aicser supports:
 - **SAML 2.0** for enterprise SSO
 - **OAuth 2.0** for modern authentication
 - **LDAP/Active Directory** integration
 - **Custom authentication** providers
 
-### **Q: How does Aiser handle data privacy?**
-**A:** Aiser is **privacy-first**:
+### **Q: How does Aicser handle data privacy?**
+**A:** Aicser is **privacy-first**:
 - **Self-hosted** option for full data control
 - **No data sent** to external services (optional)
 - **GDPR compliance** with data export/deletion
@@ -104,29 +104,29 @@ Then visit [http://localhost:3000](http://localhost:3000) to start using it.
 
 ## 🏠 Self-Hosting & Deployment
 
-### **Q: Can I self-host Aiser?**
-**A:** **Yes!** Aiser is open-source and designed for self-hosting:
+### **Q: Can I self-host Aicser?**
+**A:** **Yes!** Aicser is open-source and designed for self-hosting:
 - **Docker**: Simple containerized deployment
 - **Kubernetes**: Production-scale orchestration
 - **Cloud**: AWS, Azure, GCP deployment guides
 - **On-premises**: Traditional server deployment
 
-### **Q: What databases does Aiser support?**
-**A:** Aiser supports multiple databases:
+### **Q: What databases does Aicser support?**
+**A:** Aicser supports multiple databases:
 - **Primary**: PostgreSQL (recommended)
 - **Alternative**: MySQL, SQL Server
 - **NoSQL**: MongoDB, Redis (caching)
 - **Cloud**: Amazon RDS, Azure SQL, Google Cloud SQL
 
-### **Q: How do I scale Aiser for my team?**
-**A:** Scale Aiser with:
+### **Q: How do I scale Aicser for my team?**
+**A:** Scale Aicser with:
 - **Horizontal scaling**: Multiple server instances
 - **Load balancing**: Nginx, HAProxy
 - **Caching**: Redis, Memcached
 - **CDN**: Static asset optimization
 
 ### **Q: What's the performance like with large datasets?**
-**A:** Aiser handles **millions of records** efficiently:
+**A:** Aicser handles **millions of records** efficiently:
 - **Query optimization**: AI-powered query planning
 - **Caching**: Intelligent result caching
 - **Parallel processing**: Multi-threaded analysis
@@ -153,8 +153,8 @@ Then visit [http://localhost:3000](http://localhost:3000) to start using it.
 - Technical support
 - No credit card required
 
-### **Q: What compliance certifications does Aiser have?**
-**A:** Aiser provides:
+### **Q: What compliance certifications does Aicser have?**
+**A:** Aicser provides:
 - **SOC 2 Type II** compliance
 - **GDPR** data protection
 - **HIPAA** healthcare compliance
@@ -169,31 +169,31 @@ Then visit [http://localhost:3000](http://localhost:3000) to start using it.
 
 ## 🔌 API & Integration
 
-### **Q: Does Aiser provide APIs?**
-**A:** **Yes!** Aiser offers comprehensive APIs:
+### **Q: Does Aicser provide APIs?**
+**A:** **Yes!** Aicser offers comprehensive APIs:
 - **REST API**: Full platform functionality
 - **GraphQL**: Flexible data queries
 - **Webhooks**: Real-time notifications
 - **SDKs**: Python, JavaScript, Java
 
-### **Q: Can I integrate Aiser with my existing BI tools?**
-**A:** **Absolutely!** Aiser integrates with:
+### **Q: Can I integrate Aicser with my existing BI tools?**
+**A:** **Absolutely!** Aicser integrates with:
 - **Tableau**: Data source integration
 - **Power BI**: Custom connectors
 - **Looker**: API integration
 - **Custom tools**: REST API access
 
-### **Q: How do I embed Aiser charts in my application?**
+### **Q: How do I embed Aicser charts in my application?**
 **A:** Embed charts easily:
 ```html
-<iframe src="https://your-aiser-instance.com/embed/chart/123" 
+<iframe src="https://your-aicser-instance.com/embed/chart/123" 
         width="800" height="600"></iframe>
 ```
 Or use the JavaScript SDK for full control.
 
 ## 🌍 Community & Support
 
-### **Q: How can I contribute to Aiser?**
+### **Q: How can I contribute to Aicser?**
 **A:** Join our community:
 - **GitHub**: Code contributions, bug reports
 - **Discussions**: Feature requests, questions
@@ -208,7 +208,7 @@ Or use the JavaScript SDK for full control.
 - **Training**: Workshops and certification
 
 ### **Q: How often do you release updates?**
-**A:** Aiser follows a **monthly release cycle**:
+**A:** Aicser follows a **monthly release cycle**:
 - **Patch releases**: Weekly bug fixes
 - **Feature releases**: Monthly new features
 - **Major releases**: Quarterly major updates
@@ -223,7 +223,7 @@ Or use the JavaScript SDK for full control.
 
 ## 💰 Pricing & Licensing
 
-### **Q: How much does Aiser cost?**
+### **Q: How much does Aicser cost?**
 **A:** **Open source core is completely free!** Enterprise features have flexible pricing:
 - **Starter**: $99/month (up to 10 users)
 - **Professional**: $299/month (up to 50 users)
@@ -273,11 +273,11 @@ Or use the JavaScript SDK for full control.
 ## 🆘 Still Need Help?
 
 - **📖 [Documentation](../)** - Comprehensive guides
-- **🐛 [GitHub Issues](https://github.com/aiser-platform/aiser-world/issues)** - Report bugs
-- **💬 [Discussions](https://github.com/aiser-platform/aiser-world/discussions)** - Community help
+- **🐛 [GitHub Issues](https://github.com/aicser-platform/aicser-world/issues)** - Report bugs
+- **💬 [Discussions](https://github.com/aicser-platform/aicser-world/discussions)** - Community help
 - **📧 [Email Support](mailto:support@dataticon.com)** - Direct assistance
 - **📞 [Phone Support](tel:+1-555-0123)** - Enterprise customers
 
 ---
 
-**Can't find your answer?** [Ask the community →](https://github.com/aiser-platform/aiser-world/discussions)
+**Can't find your answer?** [Ask the community →](https://github.com/aicser-platform/aicser-world/discussions)

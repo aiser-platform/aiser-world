@@ -1,7 +1,7 @@
 {
-  "name": "@aiser/docs",
+  "name": "@aicser/docs",
   "version": "1.0.0",
-  "description": "Aiser Platform Documentation",
+  "description": "Aicser Platform Documentation",
   "private": true,
   "scripts": {
     "docusaurus": "npx docusaurus",
@@ -20,7 +20,6 @@
     "@docusaurus/plugin-client-redirects": "^3.8.1",
     "@docusaurus/plugin-sitemap": "3.1.1",
     "@docusaurus/preset-classic": "3.1.1",
-    "@docusaurus/theme-search-algolia": "3.1.1",
     "@mdx-js/react": "^3.0.0",
     "clsx": "^2.0.0",
     "prism-react-renderer": "^2.3.1",
@@ -46,6 +45,6 @@
     ]
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   }
 }

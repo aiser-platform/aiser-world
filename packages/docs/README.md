@@ -1,6 +1,6 @@
-# Aiser Platform Documentation
+# Aicser Platform Documentation
 
-Comprehensive documentation for the Aiser Platform - the next-generation AI-first business intelligence and visualization tool.
+Comprehensive documentation for the Aicser Platform - the next-generation AI-first business intelligence and visualization tool.
 
 ## 🚀 Quick Start
 
@@ -42,9 +42,11 @@ The documentation will be available at **http://localhost:3005**
 ## 🛠️ Development
 
 ### Prerequisites
-- Node.js 18+
-- npm 8+
+- **Node.js 20+** (required for Docusaurus 3.1.1)
+- npm 9+
 - Python 3.8+ (for documentation generation)
+
+**Note:** Docusaurus 3.1.1 requires Node.js >= 20.0. Check your version with `node --version`. If you have Node.js < 20, upgrade using `nvm install 20 && nvm use 20`.
 
 ### Development Commands
 ```bash
@@ -108,36 +110,38 @@ docker-compose -f docker-compose.docs.yml --profile dev up -d docs-dev
 
 ### Custom Domain Deployment
 The documentation is configured for deployment at:
-- **Production**: https://aiser-docs.dataticon.com/
+- **Production**: https://docs.aicser.com
 - **Development**: http://localhost:3005
 
-## 🚀 Deployment Scripts
+## 🚀 GitHub Pages Deployment
 
-### Automated Deployment
-```bash
-# Deploy to all targets (GitHub Pages, custom domain, Docker)
-./scripts/deploy-docs.sh
+### Automatic Deployment
+The documentation automatically deploys when you push to the `main` branch. The GitHub Actions workflow will:
+1. Build the documentation (using Node.js 20)
+2. Deploy to GitHub Pages
+3. Configure the custom domain `docs.aicser.com`
 
-# Deploy to specific target
-./scripts/deploy-docs.sh github    # GitHub Pages only
-./scripts/deploy-docs.sh custom    # Custom domain only
-./scripts/deploy-docs.sh docker    # Docker only
-
-# Deploy to staging environment
-DEPLOY_ENV=staging ./scripts/deploy-docs.sh
-```
+### GitHub Pages Configuration
+**Critical:** Ensure GitHub Pages source is set to **"GitHub Actions"** (not "Deploy from a branch"):
+1. Go to: Repository Settings → Pages
+2. Set **Source** to **"GitHub Actions"**
+3. Custom domain: `docs.aicser.com`
+4. Save
 
 ### Manual Deployment
 ```bash
-# GitHub Pages
+# Build for production
+cd packages/docs
+npm install
+npm run build
+
+# Deploy using Docusaurus deploy command
 npm run deploy
+```
 
-# Custom domain
-# 1. Build documentation: npm run build
-# 2. Upload build/ directory to your web server
-# 3. Configure DNS for aiser-docs.dataticon.com
-
-# Docker
+### Docker Deployment
+```bash
+# Build and start
 docker-compose -f docker-compose.docs.yml up -d --build
 ```
 
@@ -149,7 +153,7 @@ docker-compose -f docker-compose.docs.yml up -d --build
 NODE_ENV=production
 PORT=3005
 BASE_URL=/
-CUSTOM_DOMAIN=aiser-docs.dataticon.com
+CUSTOM_DOMAIN=aicser-docs.dataticon.com
 
 # AI service configuration
 OPENAI_API_KEY=your_openai_key
@@ -159,8 +163,8 @@ GOOGLE_AI_KEY=your_google_key
 # Database configuration
 POSTGRES_HOST=localhost
 POSTGRES_PORT=5432
-POSTGRES_DB=aiser_db
-POSTGRES_USER=aiser_user
+POSTGRES_DB=aicser_db
+POSTGRES_USER=aicser_user
 POSTGRES_PASSWORD=your_password
 ```
 
@@ -212,10 +216,43 @@ curl -w "@curl-format.txt" -o /dev/null -s http://localhost:3005/
 ## 🚨 Troubleshooting
 
 ### Common Issues
-1. **Port already in use**: Change port in `package.json` or kill existing process
-2. **Build failures**: Clear cache with `npm run clear` and reinstall dependencies
-3. **Docker issues**: Check Docker service and container logs
-4. **Performance issues**: Review caching configuration and resource limits
+
+1. **Node.js Version Error**
+   - **Error**: "Minimum Node.js version not met" or "Unsupported engine"
+   - **Fix**: Docusaurus 3.1.1 requires Node.js >= 20.0
+   ```bash
+   node --version  # Check current version
+   nvm install 20 && nvm use 20  # Upgrade if needed
+   ```
+
+2. **Build Fails with Module Not Found**
+   - **Error**: "Can't resolve '@docsearch/css'"
+   - **Fix**: Dependencies may be missing. Run:
+   ```bash
+   cd packages/docs
+   rm -rf node_modules package-lock.json
+   npm install
+   ```
+
+3. **Port Already in Use**
+   - **Fix**: Change port in `package.json` or kill existing process
+   ```bash
+   # Use different port
+   npx docusaurus serve --port 3006
+   ```
+
+4. **GitHub Pages Shows 404**
+   - **Fix**: Ensure GitHub Pages source is set to **"GitHub Actions"** (not "Deploy from a branch")
+   - Go to: Repository Settings → Pages → Source = "GitHub Actions"
+
+5. **Build Failures**
+   - **Fix**: Clear cache and reinstall dependencies
+   ```bash
+   npm run clear
+   rm -rf node_modules
+   npm install
+   npm run build
+   ```
 
 ### Debug Commands
 ```bash
@@ -226,6 +263,10 @@ docker-compose -f docker-compose.docs.yml logs --tail=50
 # Debug build process
 npm run build --verbose
 
+# Verify build output
+test -f build/index.html && echo "✅ Success" || echo "❌ Failed"
+cat build/CNAME  # Should show: docs.aicser.com
+
 # Check file permissions
 ls -la scripts/
 chmod +x scripts/*.sh
@@ -233,8 +274,8 @@ chmod +x scripts/*.sh
 
 ### Getting Help
 - **Documentation**: [Troubleshooting Guide](troubleshooting/)
-- **Community**: [GitHub Issues](https://github.com/aiser-platform/aiser-world/issues)
-- **Support**: support@aiser.com
+- **Community**: [GitHub Issues](https://github.com/aicser-platform/aicser-world/issues)
+- **Support**: support@aicser.com
 
 ## 🔮 Roadmap
 
@@ -277,19 +318,19 @@ chmod +x scripts/*.sh
 
 ## 📄 License
 
-This documentation is part of the Aiser Platform and is licensed under the [MIT License](../../LICENSE) along with the [Enterprise License](../../ENTERPRISE-LICENSE-AGREEMENT.md).
+This documentation is part of the Aicser Platform and is licensed under the [MIT License](../../LICENSE) along with the [Enterprise License](../../ENTERPRISE-LICENSE-AGREEMENT.md).
 
 ## 🆘 Support
 
 ### Community Support
-- **GitHub Issues**: [Report bugs and request features](https://github.com/aiser-platform/aiser-world/issues)
-- **GitHub Discussions**: [Community Q&A](https://github.com/aiser-platform/aiser-world/discussions)
-- **Community Forum**: [Join the conversation](https://community.aiser.com)
+- **GitHub Issues**: [Report bugs and request features](https://github.com/aicser-platform/aicser-world/issues)
+- **GitHub Discussions**: [Community Q&A](https://github.com/aicser-platform/aicser-world/discussions)
+- **Community Forum**: [Join the conversation](https://community.aicser.com)
 
 ### Professional Support
-- **Email**: support@aiser.com
+- **Email**: support@aicser.com
 - **Documentation**: [Complete documentation](.)
-- **Training**: [Custom training programs](mailto:training@aiser.com)
+- **Training**: [Custom training programs](mailto:training@aicser.com)
 
 ---
 

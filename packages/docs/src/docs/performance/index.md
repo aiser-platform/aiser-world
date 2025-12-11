@@ -2,12 +2,12 @@
 id: performance-overview
 title: Performance & Optimization
 sidebar_label: Performance Overview
-description: Performance optimization, scaling strategies, and monitoring for Aiser Platform
+description: Performance optimization, scaling strategies, and monitoring for Aicser Platform
 ---
 
 # Performance & Optimization
 
-Aiser Platform is engineered for high-performance analytics at any scale, from startup dashboards to enterprise data warehouses. Learn how to optimize, monitor, and scale your deployment for maximum efficiency.
+Aicser Platform is engineered for high-performance analytics at any scale, from startup dashboards to enterprise data warehouses. Learn how to optimize, monitor, and scale your deployment for maximum efficiency.
 
 ## 🚀 Performance Architecture
 
@@ -102,12 +102,12 @@ proxy_busy_buffers_size 8k;
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: aiser-api
+  name: aicser-api
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: aiser-api
+    name: aicser-api
   minReplicas: 3
   maxReplicas: 20
   metrics:
@@ -213,12 +213,12 @@ CACHE_CONFIG = {
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: aiser-performance-dashboard
+  name: aicser-performance-dashboard
 data:
   dashboard.json: |
     {
       "dashboard": {
-        "title": "Aiser Performance Metrics",
+        "title": "Aicser Performance Metrics",
         "panels": [
           {
             "title": "Response Time",
@@ -312,4 +312,4 @@ python scripts/benchmark_ai_models.py --models --latency --throughput
 - [Performance Tuning Guide](tuning/)
 - [Scaling Strategies](scaling/)
 - [Monitoring Setup](monitoring/)
-- [Performance Support](mailto:performance@aiser.com)
+- [Performance Support](mailto:performance@aicser.com)

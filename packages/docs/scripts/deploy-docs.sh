@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Aiser Platform Documentation Deployment Script
+# Aicser Platform Documentation Deployment Script
 # This script handles building, testing, and deploying the documentation
 
 set -e  # Exit on any error
@@ -9,8 +9,8 @@ set -e  # Exit on any error
 DOCS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_ROOT="$(cd "$DOCS_DIR/../.." && pwd)"
 DEPLOY_ENV="${DEPLOY_ENV:-production}"
-CUSTOM_DOMAIN="aiser-docs.dataticon.com"
-GITHUB_REPO="aiser-platform/aiser-world"
+CUSTOM_DOMAIN="aicser-docs.dataticon.com"
+GITHUB_REPO="aicser-platform/aicser-world"
 GITHUB_BRANCH="main"
 
 # Colors for output
@@ -239,7 +239,7 @@ health_check() {
 main_deploy() {
     local target="${1:-all}"
     
-    log_info "Starting Aiser Platform documentation deployment..."
+    log_info "Starting Aicser Platform documentation deployment..."
     log_info "Target: $target"
     log_info "Environment: $DEPLOY_ENV"
     log_info "Documentation directory: $DOCS_DIR"

@@ -2,14 +2,14 @@
 id: self-host-index
 title: Self-Host & Enterprise Deployment
 sidebar_label: Self-Host & Enterprise
-description: Deploy Aiser Platform in your own infrastructure with enterprise-grade security, scalability, and customization options
+description: Deploy Aicser Platform in your own infrastructure with enterprise-grade security, scalability, and customization options
 ---
 
 # 🏠 Self-Host & Enterprise Deployment
 
-**Deploy Aiser Platform in your own infrastructure with enterprise-grade security, scalability, and customization.**
+**Deploy Aicser Platform in your own infrastructure with enterprise-grade security, scalability, and customization.**
 
-Self-hosting Aiser Platform gives you complete control over your data, infrastructure, and deployment while maintaining all the AI-powered analytics capabilities. Whether you're deploying for a small team or scaling to enterprise levels, we provide comprehensive deployment guides and best practices.
+Self-hosting Aicser Platform gives you complete control over your data, infrastructure, and deployment while maintaining all the AI-powered analytics capabilities. Whether you're deploying for a small team or scaling to enterprise levels, we provide comprehensive deployment guides and best practices.
 
 ## 🎯 Why Self-Host?
 
@@ -223,8 +223,8 @@ sudo chmod +x /usr/local/bin/docker-compose
 **Deployment:**
 ```bash
 # Clone repository
-git clone https://github.com/aiser-platform/aiser-world
-cd aiser-world
+git clone https://github.com/aicser-platform/aicser-world
+cd aicser-world
 
 # Configure environment
 cp env.example .env
@@ -272,9 +272,9 @@ cp nginx/nginx.conf.example nginx/nginx.conf
 **Database Setup:**
 ```bash
 # Create production database
-docker-compose exec postgres psql -U aiser_user -d postgres
-CREATE DATABASE aiser_platform_prod;
-GRANT ALL PRIVILEGES ON DATABASE aiser_platform_prod TO aiser_user;
+docker-compose exec postgres psql -U aicser_user -d postgres
+CREATE DATABASE aicser_platform_prod;
+GRANT ALL PRIVILEGES ON DATABASE aicser_platform_prod TO aicser_user;
 ```
 
 ## 🔒 Security & Compliance
@@ -374,7 +374,7 @@ GRANT ALL PRIVILEGES ON DATABASE aiser_platform_prod TO aiser_user;
 **Update Process:**
 ```bash
 # Backup current deployment
-docker-compose exec postgres pg_dump -U aiser_user aiser_platform > backup.sql
+docker-compose exec postgres pg_dump -U aicser_user aicser_platform > backup.sql
 
 # Update code
 git pull origin main
@@ -405,7 +405,7 @@ curl http://localhost:3000/health
 **Recovery Procedures:**
 ```bash
 # Database recovery
-docker-compose exec postgres psql -U aiser_user -d aiser_platform < backup.sql
+docker-compose exec postgres psql -U aicser_user -d aicser_platform < backup.sql
 
 # Configuration recovery
 git checkout v1.2.3
@@ -504,8 +504,8 @@ sudo iptables -L
 
 **Support Resources:**
 - **📖 [Documentation](../)** - Comprehensive guides
-- **🐛 [GitHub Issues](https://github.com/aiser-platform/aiser-world/issues)** - Bug reports
-- **💬 [Discussions](https://github.com/aiser-platform/aiser-world/discussions)** - Community help
+- **🐛 [GitHub Issues](https://github.com/aicser-platform/aicser-world/issues)** - Bug reports
+- **💬 [Discussions](https://github.com/aicser-platform/aicser-world/discussions)** - Community help
 - **📧 [Enterprise Support](mailto:enterprise-support@dataticon.com)** - Professional support
 
 **Professional Services:**
@@ -516,4 +516,4 @@ sudo iptables -L
 
 ---
 
-**Ready to deploy Aiser in your infrastructure?** [Start with Docker Compose →](./docker-compose)
+**Ready to deploy Aicser in your infrastructure?** [Start with Docker Compose →](./docker-compose)

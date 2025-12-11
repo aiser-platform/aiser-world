@@ -2,12 +2,12 @@
 id: config-reference
 title: Configuration Reference
 sidebar_label: Configuration
-description: Complete configuration reference for Aiser Platform - environment variables, settings, and customization options
+description: Complete configuration reference for Aicser Platform - environment variables, settings, and customization options
 ---
 
 # ⚙️ Configuration Reference
 
-**Configure Aiser Platform for your specific needs with comprehensive configuration options.**
+**Configure Aicser Platform for your specific needs with comprehensive configuration options.**
 
 ## 🚀 Quick Configuration
 
@@ -83,8 +83,8 @@ ENCRYPTION_ALGORITHM=AES-256-GCM
 ```bash
 POSTGRES_HOST=localhost
 POSTGRES_PORT=5432
-POSTGRES_DB=aiser_platform
-POSTGRES_USER=aiser_user
+POSTGRES_DB=aicser_platform
+POSTGRES_USER=aicser_user
 POSTGRES_PASSWORD=your_secure_database_password_here
 POSTGRES_SSL_MODE=prefer
 ```
@@ -118,9 +118,9 @@ CORS_ALLOW_METHODS=GET,POST,PUT,DELETE,OPTIONS
 
 ### **Frontend Configuration**
 ```bash
-NEXT_PUBLIC_API_URL=https://your-aiser-instance.com/api/v1
-NEXT_PUBLIC_AUTH_URL=https://your-aiser-instance.com/api/v1
-NEXT_PUBLIC_CUBE_URL=https://your-aiser-instance.com
+NEXT_PUBLIC_API_URL=https://your-aicser-instance.com/api/v1
+NEXT_PUBLIC_AUTH_URL=https://your-aicser-instance.com/api/v1
+NEXT_PUBLIC_CUBE_URL=https://your-aicser-instance.com
 ```
 
 ## 📊 Performance Configuration
@@ -183,7 +183,7 @@ SAML_CERT_FILE=path/to/cert.pem
 LOG_LEVEL=INFO
 LOG_FORMAT=json
 LOG_FILE_ENABLED=true
-LOG_FILE_PATH=logs/aiser.log
+LOG_FILE_PATH=logs/aicser.log
 LOG_FILE_MAX_SIZE=100MB
 LOG_FILE_BACKUP_COUNT=5
 ```
@@ -239,7 +239,7 @@ ALLOWED_HOSTS=localhost,127.0.0.1,::1
 ### **Testing Configuration**
 ```bash
 TESTING_ENABLED=true
-TEST_DATABASE_URL=postgresql://test_user:test_pass@localhost:5432/aiser_test
+TEST_DATABASE_URL=postgresql://test_user:test_pass@localhost:5432/aicser_test
 TEST_REDIS_URL=redis://localhost:6379/1
 TEST_AI_PROVIDER=mock
 ```
@@ -290,8 +290,8 @@ ENCRYPTION_ALGORITHM=AES-256-GCM
 # PostgreSQL Configuration
 POSTGRES_HOST=localhost
 POSTGRES_PORT=5432
-POSTGRES_DB=aiser_platform
-POSTGRES_USER=aiser_user
+POSTGRES_DB=aicser_platform
+POSTGRES_USER=aicser_user
 POSTGRES_PASSWORD=your_secure_database_password_here
 POSTGRES_SSL_MODE=prefer
 
@@ -324,7 +324,7 @@ CORS_ORIGINS=https://your-domain.com,https://app.your-domain.com
 LOG_LEVEL=INFO
 LOG_FORMAT=json
 LOG_FILE_ENABLED=true
-LOG_FILE_PATH=logs/aiser.log
+LOG_FILE_PATH=logs/aicser.log
 
 # Metrics Settings
 METRICS_ENABLED=true
@@ -377,7 +377,7 @@ ALLOWED_HOSTS=your-domain.com,app.your-domain.com
 #!/bin/bash
 # validate-config.sh
 
-echo "🔍 Validating Aiser Platform configuration..."
+echo "🔍 Validating Aicser Platform configuration..."
 
 # Check required environment variables
 required_vars=(

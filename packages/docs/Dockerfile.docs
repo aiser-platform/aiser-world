@@ -1,4 +1,4 @@
-# Aiser Platform Documentation - Production Dockerfile
+# Aicser Platform Documentation - Production Dockerfile
 FROM node:18-alpine AS builder
 
 # Set working directory
@@ -29,7 +29,7 @@ COPY --from=builder /app/build /usr/share/nginx/html
 COPY nginx.docs.conf /etc/nginx/conf.d/default.conf
 
 # Create health check endpoint
-RUN echo '{"status":"healthy","service":"aiser-docs"}' > /usr/share/nginx/html/health
+RUN echo '{"status":"healthy","service":"aicser-docs"}' > /usr/share/nginx/html/health
 
 # Expose port
 EXPOSE 3005

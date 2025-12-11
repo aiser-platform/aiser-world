@@ -1,5 +1,5 @@
 const config = {
-  title: 'Aiser Platform Documentation',
+  title: 'Aicser Documentation',
   tagline: 'AI-Powered Analytics Platform',
   favicon: '/favicon.ico',
   
@@ -13,8 +13,8 @@ const config = {
   deploymentBranch: 'gh-pages', 
   
   // Organization and project names 
-  organizationName: 'Aiser',
-  projectName: 'aiser-world',
+  organizationName: 'aicser-platform',
+  projectName: 'aicser-world',
   
   // Custom fields (domain and port configuration)
   customFields: {
@@ -38,7 +38,7 @@ const config = {
           path: 'src/docs',
           sidebarPath: require.resolve('./sidebars.js'),
           // Remove this to remove the "edit this page" links.
-          editUrl: 'https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/',
+          editUrl: 'https://github.com/aiser-platform/aiser-world/edit/main/packages/docs/src/docs/',
           // Show last update time
           showLastUpdateTime: true,
           // Serve docs from root of baseUrl to avoid double /docs/docs/ paths
@@ -62,10 +62,10 @@ const config = {
   // Theme configuration
   themeConfig: {
     // Replace with project's social card
-    image: 'img/aiser-docs-social-card.jpg',
+    image: 'img/aicser-docs-social-card.jpg',
     navbar: {
       logo: {
-        alt: 'Aiser Platform',
+        alt: 'Aicser Platform',
         src: 'img/logo.jpg',
       },
       items: [
@@ -77,13 +77,18 @@ const config = {
         },
         // REMOVED: Reference sidebar that doesn't exist
         {
-          href: 'https://github.com/aiser-platform/aiser-world',
-          label: 'GitHub',
+          href: 'https://aicser.com',
+          label: 'Website',
           position: 'right',
         },
         {
-          href: 'https://aiser-platform.vercel.app/',
-          label: 'Website',
+          href: 'https://app.aicser.com',
+          label: 'App',
+          position: 'right',
+        },
+        {
+          href: 'https://github.com/aiser-platform/aiser-world',
+          label: 'GitHub',
           position: 'right',
         },
       ],
@@ -107,8 +112,8 @@ const config = {
               to: '/features',
             },
             {
-              label: 'API Reference',
-              to: '/reference/api-reference',
+              label: 'Troubleshooting',
+              to: '/troubleshooting/troubleshooting-overview',
             },
           ],
         },
@@ -116,20 +121,41 @@ const config = {
           title: 'Community',
           items: [
             {
+              label: 'Telegram Community',
+              href: 'https://t.me/+XyM6Y-8MnWU2NTM1',
+            },
+            {
               label: 'GitHub',
               href: 'https://github.com/aiser-platform/aiser-world',
             },
             {
-              label: 'Telegram (Aisertics)',
-              href: 'https://t.me/dataticon_ai',
+              label: 'X.com (@Aicsertics)',
+              href: 'https://x.com/Aicsertics',
             },
             {
-              label: 'Discussions',
-              href: 'https://github.com/bigstack-analytics/aiser-world/discussions',
+              label: 'LinkedIn (@Aicser)',
+              href: 'https://www.linkedin.com/company/aicser',
             },
             {
-              label: 'Issues',
-              href: 'https://github.com/bigstack-analytics/aiser-world/issues',
+              label: 'Facebook (@Aicsertics)',
+              href: 'https://www.facebook.com/Aicsertics',
+            },
+          ],
+        },
+        {
+          title: 'Resources',
+          items: [
+            {
+              label: 'Application',
+              href: 'https://app.aicser.com',
+            },
+            {
+              label: 'Feedback',
+              href: 'https://feedback.aicser.com',
+            },
+            {
+              label: 'Website',
+              href: 'https://aicser.com',
             },
           ],
         },
@@ -137,26 +163,34 @@ const config = {
           title: 'Legal',
           items: [
             {
-              label: 'License (MIT) + Enterprise License',
-              href: 'https://github.com/aiser-platform/aiser-world/blob/main/LICENSE',
+              label: 'Privacy Policy',
+              href: 'https://aicser.com/privacy',
             },
             {
-              label: 'Privacy Policy',
-              href: 'https://aiser.com/privacy',
+              label: 'Terms of Service',
+              href: 'https://aicser.com/terms',
             },
           ],
         },
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} Aiser Platform.`,
+      copyright: `Copyright © ${new Date().getFullYear()} Aicser. All rights reserved.`,
     },
-    // Algolia search configuration
-    algolia: {
-      appId: process.env.ALGOLIA_APP_ID || 'test',
-      apiKey: process.env.ALGOLIA_API_KEY || 'test',
-      indexName: process.env.ALGOLIA_INDEX_NAME || 'test',
-      contextualSearch: true,
-      searchParameters: {},
-    },
+    // Search configuration
+    // Algolia search is disabled - Docusaurus will use local search instead
+    // To enable Algolia search in the future:
+    // 1. Create Algolia account at https://www.algolia.com/
+    // 2. Create a new application and index
+    // 3. Set environment variables: ALGOLIA_APP_ID, ALGOLIA_API_KEY, ALGOLIA_INDEX_NAME
+    // 4. Uncomment the algolia config below
+    // 5. Run: npm run write-heading-ids
+    // 6. Run: npm run docusaurus algolia (to index content)
+    // algolia: {
+    //   appId: process.env.ALGOLIA_APP_ID,
+    //   apiKey: process.env.ALGOLIA_API_KEY,
+    //   indexName: process.env.ALGOLIA_INDEX_NAME,
+    //   contextualSearch: true,
+    //   searchParameters: {},
+    // },
     // Color mode
     colorMode: {
       defaultMode: 'light',

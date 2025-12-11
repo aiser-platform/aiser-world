@@ -2,12 +2,12 @@
 id: security-overview
 title: Security Overview
 sidebar_label: Security Overview
-description: Comprehensive security features, compliance, and best practices for Aiser Platform
+description: Comprehensive security features, compliance, and best practices for Aicser Platform
 ---
 
 # Security & Compliance
 
-Aiser Platform is built with enterprise-grade security at its core, ensuring your data and analytics remain protected while maintaining the flexibility and power of AI-driven insights.
+Aicser Platform is built with enterprise-grade security at its core, ensuring your data and analytics remain protected while maintaining the flexibility and power of AI-driven insights.
 
 ## 🔐 Security Architecture
 
@@ -182,4 +182,4 @@ add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsaf
 - [Security Documentation](security/)
 - [Compliance Guide](compliance/)
 - [Security Best Practices](best-practices/)
-- [Contact Security Team](mailto:security@aiser.com)
+- [Contact Security Team](mailto:security@aicser.com)

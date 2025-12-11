@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# Aiser Platform Documentation Deployment Test Script
+# Aicser Platform Documentation Deployment Test Script
 # This script tests the local build and deployment configuration
 
 set -e
 
-echo "🚀 Testing Aiser Platform Documentation Deployment Configuration"
+echo "🚀 Testing Aicser Platform Documentation Deployment Configuration"
 echo "================================================================"
 
 # Colors for output
@@ -130,7 +130,7 @@ if curl -s -f http://localhost:3005/docs/ > /dev/null 2>&1; then
     print_status "OK" "Local server accessible at http://localhost:3005/docs/"
     
     # Test main page content
-    if curl -s http://localhost:3005/docs/ | grep -q "Aiser Platform"; then
+    if curl -s http://localhost:3005/docs/ | grep -q "Aicser Platform"; then
         print_status "OK" "Main page content loaded correctly"
     else
         print_status "WARN" "Main page content may not be loading properly"
@@ -165,7 +165,7 @@ if [ -f ".github/workflows/deploy-docs.yml" ]; then
     print_status "OK" "GitHub Actions workflow found"
     
     # Check workflow configuration
-    if grep -q "cname: aiser-docs.dataticon.com" .github/workflows/deploy-docs.yml; then
+    if grep -q "cname: aicser-docs.dataticon.com" .github/workflows/deploy-docs.yml; then
         print_status "OK" "Custom domain configured in workflow"
     else
         print_status "ERROR" "Custom domain not configured in workflow"
@@ -198,13 +198,13 @@ if [ -f "build/docs/index.html" ] && [ -f "build/CNAME" ] && [ -d "build/docs" ]
     echo "📋 Next Steps:"
     echo "1. Commit and push your changes to the main branch"
     echo "2. GitHub Actions will automatically deploy to GitHub Pages"
-    echo "3. Configure DNS for aiser-docs.dataticon.com to point to your-username.github.io"
+    echo "3. Configure DNS for aicser-docs.dataticon.com to point to your-username.github.io"
     echo "4. Wait 24-48 hours for SSL certificate to be issued"
     echo ""
     echo "🔗 Expected URLs:"
-    echo "  - GitHub Pages: https://your-username.github.io/aiser-world/"
-    echo "  - Custom Domain: https://aiser-docs.dataticon.com/"
-    echo "  - Documentation: https://aiser-docs.dataticon.com/getting-started/"
+    echo "  - GitHub Pages: https://your-username.github.io/aicser-world/"
+    echo "  - Custom Domain: https://aicser-docs.dataticon.com/"
+    echo "  - Documentation: https://aicser-docs.dataticon.com/getting-started/"
 else
     print_status "ERROR" "❌ Documentation is NOT ready for deployment"
     echo "Please fix the issues above before deploying"
@@ -217,7 +217,7 @@ echo "==============================="
 
 echo "1. Ensure your GitHub repository has GitHub Pages enabled"
 echo "2. Set GitHub Pages source to 'GitHub Actions'"
-echo "3. Verify DNS configuration for aiser-docs.dataticon.com"
+echo "3. Verify DNS configuration for aicser-docs.dataticon.com"
 echo "4. Check that the gh-pages branch is created after first deployment"
 echo "5. Monitor GitHub Actions for deployment status"
 

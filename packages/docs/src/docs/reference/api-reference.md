@@ -2,33 +2,33 @@
 id: api-reference
 title: API Reference
 sidebar_label: API Reference
-description: Complete API documentation for Aiser Platform - integrate AI-powered analytics into your applications
+description: Complete API documentation for Aicser Platform - integrate AI-powered analytics into your applications
 ---
 
 # 🔌 API Reference
 
-**Integrate Aiser Platform's AI-powered analytics into your applications with our comprehensive REST API.**
+**Integrate Aicser Platform's AI-powered analytics into your applications with our comprehensive REST API.**
 
-The Aiser Platform API provides programmatic access to all platform features, from AI-powered chart generation to user management and data analysis. Built with FastAPI and following REST principles, our API is designed for performance, reliability, and ease of integration.
+The Aicser Platform API provides programmatic access to all platform features, from AI-powered chart generation to user management and data analysis. Built with FastAPI and following REST principles, our API is designed for performance, reliability, and ease of integration.
 
 ## 🚀 Quick Start
 
 ### **Base URL**
 ```
-Production: https://your-aiser-instance.com/api/v1
+Production: https://your-aicser-instance.com/api/v1
 Development: http://localhost:8000/api/v1
 ```
 
 ### **Authentication**
 ```bash
 # Get access token
-curl -X POST "https://your-aiser-instance.com/api/v1/auth/login" \
+curl -X POST "https://your-aicser-instance.com/api/v1/auth/login" \
   -H "Content-Type: application/json" \
   -d '{"email": "user@example.com", "password": "password123"}'
 
 # Use token in requests
 curl -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
-  "https://your-aiser-instance.com/api/v1/analytics/charts"
+  "https://your-aicser-instance.com/api/v1/analytics/charts"
 ```
 
 ### **Response Format**
@@ -136,7 +136,7 @@ POST /api/v1/analytics/chart
   "success": true,
   "data": {
     "chart_id": "chart_abc123",
-    "chart_url": "https://your-aiser-instance.com/chart/abc123",
+    "chart_url": "https://your-aicser-instance.com/chart/abc123",
     "chart_data": {
       "type": "line",
       "data": {
@@ -817,7 +817,7 @@ POST /api/v1/webhooks
 ```json
 {
   "name": "Chart Creation Notifications",
-  "url": "https://your-app.com/webhooks/aiser",
+  "url": "https://your-app.com/webhooks/aicser",
   "events": ["chart.created", "chart.updated"],
   "secret": "webhook_secret_123",
   "active": true
@@ -925,15 +925,15 @@ GET /api/v1/metrics/user/{user_id}
 
 **Installation:**
 ```bash
-npm install @aiser/sdk
+npm install @aicser/sdk
 ```
 
 **Usage:**
 ```typescript
-import { AiserClient } from '@aiser/sdk';
+import { AicserClient } from '@aicser/sdk';
 
-const client = new AiserClient({
-  baseUrl: 'https://your-aiser-instance.com/api/v1',
+const client = new AicserClient({
+  baseUrl: 'https://your-aicser-instance.com/api/v1',
   apiKey: 'your_api_key'
 });
 
@@ -954,15 +954,15 @@ const insights = await client.ai.intelligentAnalysis({
 
 **Installation:**
 ```bash
-pip install aiser-sdk
+pip install aicser-sdk
 ```
 
 **Usage:**
 ```python
-from aiser_sdk import AiserClient
+from aicser_sdk import AicserClient
 
-client = AiserClient(
-    base_url="https://your-aiser-instance.com/api/v1",
+client = AicserClient(
+    base_url="https://your-aicser-instance.com/api/v1",
     api_key="your_api_key"
 )
 
@@ -984,18 +984,18 @@ insights = client.ai.intelligent_analysis(
 **cURL Examples:**
 ```bash
 # Generate chart
-curl -X POST "https://your-aiser-instance.com/api/v1/analytics/chart" \
+curl -X POST "https://your-aicser-instance.com/api/v1/analytics/chart" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"query": "Show me sales by month"}'
 
 # Get chart
 curl -H "Authorization: Bearer YOUR_TOKEN" \
-  "https://your-aiser-instance.com/api/v1/analytics/chart/chart_id"
+  "https://your-aicser-instance.com/api/v1/analytics/chart/chart_id"
 
 # Export chart as PNG
 curl -H "Authorization: Bearer YOUR_TOKEN" \
-  "https://your-aiser-instance.com/api/v1/export/chart/chart_id?format=png" \
+  "https://your-aicser-instance.com/api/v1/export/chart/chart_id?format=png" \
   --output chart.png
 ```
 

@@ -27,9 +27,6 @@ const sidebars = {
       items: [
         'self-host/self-host-index',
         'self-host/docker-compose',
-        'self-host/backups',
-        'self-host/config-reference',
-        'self-host/ssl-certificates'
       ]
     },
 
@@ -38,23 +35,10 @@ const sidebars = {
       type: 'category',
       label: '🤖 Features',
       items: [
+        'features/features',
         'features/ai-overview',
-        'features/agents',
-        'features/bar-charts',
         'features/charts-overview',
-        'features/conversation-memory',
-        'features/csv-excel',
-        'features/custom-prompts',
         'features/data-sources-overview',
-        'features/databases',
-        'features/deep-analysis',
-        'features/echarts-integration',
-        'features/heatmaps',
-        'features/line-charts',
-        'features/natural-language-queries',
-        'features/real-time-streams',
-        'features/warehouses',
-        'features/what-if-simulations'
       ]
     },
 
@@ -85,11 +69,6 @@ const sidebars = {
       collapsed: true,
       items: [
         'developer/developer-index',
-        'developer/architecture',
-        'developer/local-dev',
-        'developer/plugin-architecture',
-        'developer/release-process',
-        'developer/writing-tests'
       ]
     },
 
@@ -100,22 +79,6 @@ const sidebars = {
       collapsed: true,
       items: [
         'community/community-index',
-        'community/ambassador-program',
-        'community/bi-weekly-calls',
-        'community/code-of-conduct',
-        'community/contributing',
-        'community/roadmap'
-      ]
-    },
-
-    // Reference
-    {
-      type: 'category',
-      label: '📖 Reference',
-      collapsed: true,
-      items: [
-        'reference/api-reference',
-        'reference/config-reference'
       ]
     },
 

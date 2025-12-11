@@ -2,21 +2,21 @@
 id: getting-started
 title: Getting Started
 sidebar_label: Getting Started
-description: Quick start guide for Aiser Platform
+description: Quick start guide for Aicser Platform
 ---
 
-# 🚀 Getting Started with Aiser Platform
+# 🚀 Getting Started with Aicser Platform
 
-**Get up and running with Aiser Platform in minutes - the AI-first business intelligence platform.**
+**Get up and running with Aicser Platform in minutes - the AI-first business intelligence platform.**
 
 ## 🎯 Quick Start Options
 
 ### **🐳 Docker Quick Start (Recommended)**
-Get Aiser running in **5 minutes** with Docker:
+Get Aicser running in **5 minutes** with Docker:
 
 ```bash
-git clone https://github.com/aiser-platform/aiser-world
-cd aiser-world
+git clone https://github.com/aicser-platform/aicser-world
+cd aicser-world
 docker-compose up -d
 ```
 
@@ -49,7 +49,7 @@ Take a guided tour of the platform:
 
 ## 🚀 What You'll Learn
 
-1. **Platform Setup** - Get Aiser running on your machine
+1. **Platform Setup** - Get Aicser running on your machine
 2. **First Chart** - Create AI-powered visualizations
 3. **Data Connection** - Connect to your data sources
 4. **AI Features** - Use natural language queries
@@ -58,11 +58,11 @@ Take a guided tour of the platform:
 ## 🆘 Need Help?
 
 - **📖 [FAQ](./faq)** - Common questions and solutions
-- **🐛 [GitHub Issues](https://github.com/aiser-platform/aiser-world/issues)** - Report bugs
-- **💬 [Discussions](https://github.com/aiser-platform/aiser-world/discussions)** - Community support
+- **🐛 [GitHub Issues](https://github.com/aicser-platform/aicser-world/issues)** - Report bugs
+- **💬 [Discussions](https://github.com/aicser-platform/aicser-world/discussions)** - Community support
 - **📧 [Email Support](mailto:support@dataticon.com)** - Enterprise support
 
-## 🌟 Why Aiser?
+## 🌟 Why Aicser?
 
 - **🤖 AI-First Design**: Built from the ground up for AI-powered analytics
 - **🌍 Open Source Core**: Transparent, community-driven development

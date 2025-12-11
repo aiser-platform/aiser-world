@@ -1,6 +1,6 @@
-# Aiser Platform Documentation Deployment Guide
+# Aicser Platform Documentation Deployment Guide
 
-This guide covers deploying the Aiser Platform documentation to GitHub Pages with a custom domain.
+This guide covers deploying the Aicser Platform documentation to GitHub Pages with a custom domain.
 
 ## 🚀 Quick Deployment
 
@@ -34,7 +34,7 @@ Configure your DNS provider (`aicser.com`) with these records:
 docs.aicser.com.  CNAME  your-username.github.io.
 
 # Or for organization GitHub Pages
-docs.aicser.com.  CNAME  aiser-platform.github.io.
+docs.aicser.com.  CNAME  aicser-platform.github.io.
 
 # Or A records (if using apex domain - not recommended for subdomain)
 docs.aicser.com.  A      185.199.108.153
@@ -72,7 +72,7 @@ The production build creates:
 ## 📱 Preview Deployments
 
 Pull requests automatically create preview deployments at:
-`https://your-username.github.io/aiser-world/preview/PR-NUMBER/`
+`https://your-username.github.io/aicser-world/preview/PR-NUMBER/`
 
 ## 🚨 Troubleshooting
 
@@ -129,12 +129,12 @@ If you need to rollback:
 ### GitHub Actions
 
 Monitor deployment status in:
-`https://github.com/your-username/aiser-world/actions`
+`https://github.com/your-username/aicser-world/actions`
 
 ### GitHub Pages
 
 Check deployment status in:
-`https://github.com/your-username/aiser-world/settings/pages`
+`https://github.com/your-username/aicser-world/settings/pages`
 
 ## 🎯 Next Steps
 

@@ -9,11 +9,11 @@ description: Experience the power of AI-powered analytics by creating your first
 
 **Experience the magic of AI-powered analytics in just 2 minutes!**
 
-This guide will walk you through creating your first chart using Aiser Platform's AI capabilities. You'll see how natural language queries transform into beautiful, insightful visualizations.
+This guide will walk you through creating your first chart using Aicser Platform's AI capabilities. You'll see how natural language queries transform into beautiful, insightful visualizations.
 
 ## 🎯 What You'll Learn
 
-- ✅ **Upload data** to Aiser Platform
+- ✅ **Upload data** to Aicser Platform
 - ✅ **Ask questions** in natural language
 - ✅ **Generate charts** with AI assistance
 - ✅ **Customize visualizations** to your needs
@@ -44,7 +44,7 @@ We'll use the included sample data file: `demo_sales_data.csv`
 3. **Wait** for the AI to analyze and process your data
 4. **Review** the data preview and schema detection
 
-**💡 AI Insight:** Aiser automatically detects data types, relationships, and suggests analysis opportunities.
+**💡 AI Insight:** Aicser automatically detects data types, relationships, and suggests analysis opportunities.
 
 ### Step 3: Ask Your First Question
 
@@ -199,7 +199,7 @@ We'll use the included sample data file: `demo_sales_data.csv`
 
 **You've successfully created your first AI-powered chart!** 
 
-This demonstrates the core value of Aiser Platform:
+This demonstrates the core value of Aicser Platform:
 - **Natural language** to insights in seconds
 - **AI-powered** chart selection and optimization
 - **Professional quality** visualizations
