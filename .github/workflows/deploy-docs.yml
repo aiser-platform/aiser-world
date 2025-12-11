@@ -29,7 +29,7 @@ jobs:
         with:
           node-version: '18'
           cache: 'npm'
-          cache-dependency-path: 'package-lock.json'
+          cache-dependency-path: 'packages/docs/package-lock.json'
           
       - name: Install dependencies
         working-directory: packages/docs
@@ -41,16 +41,25 @@ jobs:
           NODE_ENV: production
         run: npm run build
         
+      - name: Verify build output
+        run: |
+          echo "Checking build directory contents:"
+          ls -la packages/docs/build/ | head -20
+          echo "Checking for index.html:"
+          test -f packages/docs/build/index.html && echo "✅ index.html exists" || echo "❌ index.html missing"
+          
       - name: Deploy to GitHub Pages
         if: github.ref == 'refs/heads/main'
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: packages/docs/build
+          publish_dir: ./packages/docs/build
           # Deploy to root for custom domain (baseUrl: '/')
-          # Remove destination_dir to deploy to root of gh-pages branch
+          # No destination_dir means deploy to root of gh-pages branch
           cname: docs.aicser.com
           force_orphan: true
+          # Ensure .nojekyll is created (for GitHub Pages)
+          enable_jekyll: false
           
       - name: Deploy to GitHub Pages (PR Preview)
         if: github.event_name == 'pull_request'
