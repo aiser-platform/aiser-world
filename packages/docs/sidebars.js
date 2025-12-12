@@ -88,7 +88,7 @@ const sidebars = {
       label: '🛠️ Troubleshooting',
       collapsed: true,
       items: [
-        'troubleshooting/troubleshooting-overview'
+        'troubleshooting/troubleshooting-overview'  // File: troubleshooting/index.md with id: troubleshooting-overview
       ]
     }
   ]
