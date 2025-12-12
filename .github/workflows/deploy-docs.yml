@@ -44,14 +44,22 @@ jobs:
         run: |
           echo "=== Build Verification ==="
           echo "Checking build directory contents:"
-          ls -la packages/docs/build/ | head -20
+          ls -la packages/docs/build/ | head -30
+          echo ""
+          echo "Full directory structure:"
+          find packages/docs/build -type f -name "*.html" | head -20
           echo ""
           echo "Checking for index.html:"
           if [ -f packages/docs/build/index.html ]; then
-            echo "✅ index.html exists"
+            echo "✅ index.html exists at root"
             echo "File size: $(wc -c < packages/docs/build/index.html) bytes"
+            echo "First 200 chars:"
+            head -c 200 packages/docs/build/index.html
+            echo ""
           else
-            echo "❌ index.html missing"
+            echo "❌ index.html missing at root"
+            echo "Searching for index.html in subdirectories:"
+            find packages/docs/build -name "index.html" -type f
             exit 1
           fi
           echo ""
@@ -77,6 +85,10 @@ jobs:
             touch packages/docs/build/.nojekyll
           fi
           echo ""
+          echo "Checking build structure:"
+          echo "Assets directory:"
+          ls -la packages/docs/build/assets/ 2>/dev/null | head -10 || echo "⚠️ assets/ directory not found"
+          echo ""
           echo "Build verification complete ✅"
           
       - name: Deploy to GitHub Pages
@@ -95,47 +107,78 @@ jobs:
           user_name: 'github-actions[bot]'
           user_email: 'github-actions[bot]@users.noreply.github.com'
           commit_message: 'docs: deploy documentation to GitHub Pages [skip ci]'
-          # Full history for better debugging
-          full_history: false
+          # Allow empty commits (in case nothing changed)
+          allow_empty_commit: true
         continue-on-error: false
+        id: deploy
+          
+      - name: Verify deployment succeeded
+        if: github.ref == 'refs/heads/main' && steps.deploy.outcome == 'success'
+        run: |
+          echo "=== Deployment Step Completed ==="
+          echo "✅ Deploy to GitHub Pages step finished successfully"
+          echo ""
+          echo "Waiting 10 seconds for GitHub to process the push..."
+          sleep 10
           
       - name: Verify gh-pages branch after deployment
         if: github.ref == 'refs/heads/main'
         run: |
           echo "=== Verifying gh-pages Branch After Deployment ==="
-          echo "Waiting 5 seconds for GitHub to process the push..."
-          sleep 5
           echo ""
-          echo "Fetching gh-pages branch..."
-          git fetch origin gh-pages:gh-pages 2>&1 || echo "⚠️ Could not fetch gh-pages (may not exist yet)"
+          echo "Fetching all branches..."
+          git fetch --all --prune
           echo ""
           echo "Checking if gh-pages branch exists:"
-          if git show-ref --verify --quiet refs/remotes/origin/gh-pages; then
-            echo "✅ gh-pages branch exists"
+          if git ls-remote --heads origin gh-pages | grep -q gh-pages; then
+            echo "✅ gh-pages branch exists on remote"
+            echo ""
+            echo "Fetching gh-pages branch..."
+            git fetch origin gh-pages:gh-pages-ref 2>&1 || echo "⚠️ Could not fetch gh-pages"
             echo ""
             echo "Checking branch contents:"
-            git ls-tree -r --name-only origin/gh-pages | head -20
-            echo ""
-            echo "Checking for critical files:"
-            if git cat-file -e origin/gh-pages:index.html 2>/dev/null; then
-              echo "✅ index.html exists in gh-pages"
-            else
-              echo "❌ index.html NOT found in gh-pages branch"
-            fi
-            if git cat-file -e origin/gh-pages:CNAME 2>/dev/null; then
-              echo "✅ CNAME exists: $(git cat-file blob origin/gh-pages:CNAME)"
-            else
-              echo "❌ CNAME NOT found in gh-pages branch"
-            fi
-            if git cat-file -e origin/gh-pages:.nojekyll 2>/dev/null; then
-              echo "✅ .nojekyll exists"
-            else
-              echo "⚠️ .nojekyll NOT found (may cause issues)"
+            if git show-ref --verify --quiet refs/remotes/origin/gh-pages; then
+              echo "Branch files:"
+              git ls-tree -r --name-only origin/gh-pages | head -30
+              echo ""
+              echo "Checking for critical files:"
+              if git cat-file -e origin/gh-pages:index.html 2>/dev/null; then
+                echo "✅ index.html exists in gh-pages"
+                echo "   Size: $(git cat-file -s origin/gh-pages:index.html) bytes"
+              else
+                echo "❌ index.html NOT found in gh-pages branch"
+              fi
+              if git cat-file -e origin/gh-pages:CNAME 2>/dev/null; then
+                echo "✅ CNAME exists: $(git cat-file blob origin/gh-pages:CNAME)"
+              else
+                echo "❌ CNAME NOT found in gh-pages branch"
+              fi
+              if git cat-file -e origin/gh-pages:.nojekyll 2>/dev/null; then
+                echo "✅ .nojekyll exists"
+              else
+                echo "⚠️ .nojekyll NOT found (may cause issues)"
+              fi
+              echo ""
+              echo "Recent commits in gh-pages:"
+              git log origin/gh-pages --oneline -5 || echo "Could not get commit history"
             fi
           else
-            echo "❌ gh-pages branch does NOT exist!"
-            echo "This means the deployment action did not create the branch."
-            echo "Check the 'Deploy to GitHub Pages' step for errors."
+            echo "❌❌❌ CRITICAL: gh-pages branch does NOT exist on remote!"
+            echo ""
+            echo "This means the deployment action failed to create/push the branch."
+            echo ""
+            echo "Possible causes:"
+            echo "1. GITHUB_TOKEN doesn't have 'pages: write' permission"
+            echo "2. Repository Pages is not enabled"
+            echo "3. Organization Pages is not enabled"
+            echo "4. Deployment action encountered an error"
+            echo ""
+            echo "Check:"
+            echo "- Repository Settings → Actions → General → Workflow permissions"
+            echo "- Repository Settings → Pages → Source should be 'GitHub Actions'"
+            echo "- Organization Settings → Pages → Should be enabled"
+            echo "- Workflow logs for 'Deploy to GitHub Pages' step errors"
+            exit 1
           fi
           
       - name: Critical diagnosis - 404 on GitHub Pages URL
