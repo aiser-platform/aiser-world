@@ -88,9 +88,6 @@ jobs:
           
       - name: Setup Pages
         uses: actions/configure-pages@v5
-        with:
-          # Configure for static site (Docusaurus generates static HTML)
-          static_site_generator: none
           
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
