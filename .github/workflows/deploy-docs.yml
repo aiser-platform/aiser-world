@@ -95,67 +95,93 @@ jobs:
           user_name: 'github-actions[bot]'
           user_email: 'github-actions[bot]@users.noreply.github.com'
           commit_message: 'docs: deploy documentation to GitHub Pages [skip ci]'
+          # Full history for better debugging
+          full_history: false
+        continue-on-error: false
           
-      - name: Verify gh-pages branch
+      - name: Verify gh-pages branch after deployment
         if: github.ref == 'refs/heads/main'
         run: |
-          echo "=== Verifying gh-pages Branch ==="
-          git fetch origin gh-pages:gh-pages || echo "gh-pages branch may not exist yet"
-          git checkout gh-pages 2>/dev/null || echo "Cannot checkout gh-pages (this is normal if branch doesn't exist)"
+          echo "=== Verifying gh-pages Branch After Deployment ==="
+          echo "Waiting 5 seconds for GitHub to process the push..."
+          sleep 5
           echo ""
-          echo "Checking if files were deployed:"
-          if [ -f index.html ]; then
-            echo "✅ index.html exists in gh-pages"
-            echo "File size: $(wc -c < index.html) bytes"
+          echo "Fetching gh-pages branch..."
+          git fetch origin gh-pages:gh-pages 2>&1 || echo "⚠️ Could not fetch gh-pages (may not exist yet)"
+          echo ""
+          echo "Checking if gh-pages branch exists:"
+          if git show-ref --verify --quiet refs/remotes/origin/gh-pages; then
+            echo "✅ gh-pages branch exists"
+            echo ""
+            echo "Checking branch contents:"
+            git ls-tree -r --name-only origin/gh-pages | head -20
+            echo ""
+            echo "Checking for critical files:"
+            if git cat-file -e origin/gh-pages:index.html 2>/dev/null; then
+              echo "✅ index.html exists in gh-pages"
+            else
+              echo "❌ index.html NOT found in gh-pages branch"
+            fi
+            if git cat-file -e origin/gh-pages:CNAME 2>/dev/null; then
+              echo "✅ CNAME exists: $(git cat-file blob origin/gh-pages:CNAME)"
+            else
+              echo "❌ CNAME NOT found in gh-pages branch"
+            fi
+            if git cat-file -e origin/gh-pages:.nojekyll 2>/dev/null; then
+              echo "✅ .nojekyll exists"
+            else
+              echo "⚠️ .nojekyll NOT found (may cause issues)"
+            fi
           else
-            echo "❌ index.html NOT found in gh-pages branch"
+            echo "❌ gh-pages branch does NOT exist!"
+            echo "This means the deployment action did not create the branch."
+            echo "Check the 'Deploy to GitHub Pages' step for errors."
           fi
-          if [ -f CNAME ]; then
-            echo "✅ CNAME exists: $(cat CNAME)"
-          else
-            echo "❌ CNAME NOT found in gh-pages branch"
-          fi
-          git checkout main || true
           
-      - name: Verify deployment
+      - name: Critical diagnosis - 404 on GitHub Pages URL
         if: github.ref == 'refs/heads/main'
         run: |
           echo ""
-          echo "=== ⚠️ CRITICAL: GitHub Pages Configuration ==="
+          echo "=== 🚨 CRITICAL: 404 on GitHub Pages URL ==="
           echo ""
-          echo "The workflow completed successfully, but if the site is not accessible:"
+          echo "If https://aiser-platform.github.io/aiser-world/ returns 404:"
           echo ""
-          echo "1. 🔴 MOST IMPORTANT: Check GitHub Pages Source"
-          echo "   Go to: https://github.com/aiser-platform/aiser-world/settings/pages"
-          echo "   Source MUST be: 'GitHub Actions' (NOT 'Deploy from a branch')"
-          echo "   If it says 'Deploy from a branch', change it to 'GitHub Actions' and Save"
-          echo ""
-          echo "2. Check gh-pages branch:"
+          echo "1. 🔴 CHECK: Does gh-pages branch exist?"
           echo "   https://github.com/aiser-platform/aiser-world/tree/gh-pages"
+          echo "   If branch doesn't exist, deployment failed"
+          echo ""
+          echo "2. 🔴 CHECK: Are files in gh-pages branch?"
           echo "   Should see: index.html, CNAME, .nojekyll, assets/"
+          echo "   If files are missing, check 'Deploy to GitHub Pages' step logs"
           echo ""
-          echo "3. Verify DNS:"
-          echo "   Run: nslookup docs.aicser.com"
-          echo "   Should show: docs.aicser.com → aiser-platform.github.io."
+          echo "3. 🔴 CHECK: Is GitHub Pages enabled for organization?"
+          echo "   Organization Settings → Pages"
+          echo "   For organization repos, Pages must be enabled at org level"
           echo ""
-          echo "4. Check GitHub Pages status:"
-          echo "   Repository Settings → Pages"
-          echo "   Should show: Source: GitHub Actions, Domain: docs.aicser.com"
+          echo "4. 🔴 CHECK: Repository Pages settings"
+          echo "   https://github.com/aiser-platform/aiser-world/settings/pages"
+          echo "   Source MUST be: 'GitHub Actions'"
+          echo "   If 'None' or disabled, enable it"
           echo ""
-          echo "5. SSL Certificate:"
-          echo "   May take 24-48 hours to be issued"
-          echo "   Check in: Repository Settings → Pages → Custom domain"
+          echo "5. 🔴 CHECK: Organization Pages URL format"
+          echo "   For organization repos, URL is:"
+          echo "   https://ORGANIZATION.github.io/REPOSITORY-NAME/"
+          echo "   NOT: https://ORGANIZATION.github.io/"
+          echo ""
+          echo "6. ⚠️ CHECK: Deployment action permissions"
+          echo "   Verify GITHUB_TOKEN has 'pages: write' permission"
+          echo "   Check workflow permissions in repository settings"
+          echo ""
+          echo "7. ⚠️ CHECK: Workflow logs for 'Deploy to GitHub Pages' step"
+          echo "   Look for any errors or warnings"
+          echo "   Check if action actually pushed to gh-pages branch"
           echo ""
           echo "=== Next Steps ==="
-          echo "If Source is NOT 'GitHub Actions':"
-          echo "  1. Change it to 'GitHub Actions'"
-          echo "  2. Wait 2-5 minutes"
-          echo "  3. Site should become accessible"
-          echo ""
-          echo "If Source is already 'GitHub Actions' but site still doesn't work:"
-          echo "  - Wait 5-10 minutes for GitHub to process"
-          echo "  - Check DNS propagation (can take up to 48 hours)"
-          echo "  - Verify SSL certificate is issued"
+          echo "1. Verify gh-pages branch exists and has files"
+          echo "2. Check organization Pages settings"
+          echo "3. Verify repository Pages is enabled"
+          echo "4. Check workflow permissions"
+          echo "5. Review deployment step logs for errors"
           
       - name: Deploy to GitHub Pages (PR Preview)
         if: github.event_name == 'pull_request'
