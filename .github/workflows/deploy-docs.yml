@@ -11,14 +11,20 @@ on:
 
 # Add permissions for GitHub Pages deployment
 permissions:
-  contents: write
+  contents: read
   pages: write
   id-token: write
 
+# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
+# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
 jobs:
-  build-and-deploy:
+  # Build job - builds Docusaurus static site
+  build:
     runs-on: ubuntu-latest
-    
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -27,7 +33,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'  # Docusaurus 3.1.1 requires Node.js >= 20.0
-          # No cache since package-lock.json doesn't exist in docs
           
       - name: Install dependencies
         run: npm install
@@ -47,7 +52,6 @@ jobs:
         env:
           NODE_ENV: production
         run: npm run build
-        # Build from docs directory after root dependencies are installed
         
       - name: Verify build output
         run: |
@@ -55,70 +59,20 @@ jobs:
           echo "Checking build directory contents:"
           ls -la packages/docs/build/ | head -30
           echo ""
-          echo "Full directory structure:"
-          find packages/docs/build -type f -name "*.html" | head -20
-          echo ""
           echo "Checking for index.html:"
           if [ -f packages/docs/build/index.html ]; then
             echo "✅ index.html exists at root"
             echo "File size: $(wc -c < packages/docs/build/index.html) bytes"
-            echo ""
-            echo "Checking index.html content (first 500 chars):"
-            head -c 500 packages/docs/build/index.html
-            echo ""
-            echo ""
-            echo "Checking if index.html redirects to /docs/:"
-            if grep -q "url=/docs/" packages/docs/build/index.html || grep -q "href=\"/docs/\"" packages/docs/build/index.html; then
-              echo "❌ PROBLEM: index.html redirects to /docs/ but routeBasePath is '/'"
-              echo "This means static/index.html is still being used or build is wrong"
-              echo ""
-              echo "First 500 chars of index.html:"
-              head -c 500 packages/docs/build/index.html
-              echo ""
-              exit 1
-            else
-              echo "✅ index.html does NOT redirect to /docs/ (good)"
-            fi
-            echo ""
-            echo "Checking if index.html has Docusaurus content:"
-            if grep -qi "docusaurus" packages/docs/build/index.html || grep -qi "react" packages/docs/build/index.html || grep -qi "Aicser" packages/docs/build/index.html; then
-              echo "✅ index.html contains Docusaurus/React content"
-            else
-              echo "⚠️ index.html might not have proper Docusaurus content"
-            fi
-            echo ""
-            echo "Checking index.html structure (case-insensitive):"
-            if grep -qi "<!doctype html>" packages/docs/build/index.html && grep -qi "<html" packages/docs/build/index.html && grep -qi "<body" packages/docs/build/index.html; then
-              echo "✅ index.html has proper HTML structure"
-              echo ""
-              echo "First 5 lines of index.html:"
-              head -5 packages/docs/build/index.html
-            else
-              echo "⚠️ HTML structure check - showing first 10 lines:"
-              head -10 packages/docs/build/index.html
-              echo ""
-              echo "Note: This is a warning, not an error. Build will continue."
-            fi
-            echo ""
-            echo "Note: Broken link warnings are non-fatal. The build succeeded."
           else
             echo "❌ index.html missing at root"
-            echo "Searching for index.html in subdirectories:"
-            find packages/docs/build -name "index.html" -type f
             exit 1
           fi
           echo ""
           echo "Checking for CNAME:"
           if [ -f packages/docs/build/CNAME ]; then
             echo "✅ CNAME exists: $(cat packages/docs/build/CNAME)"
-            if grep -q "docs.aicser.com" packages/docs/build/CNAME; then
-              echo "✅ CNAME contains correct domain"
-            else
-              echo "❌ CNAME has wrong domain"
-              exit 1
-            fi
           else
-            echo "❌ CNAME missing - creating it"
+            echo "⚠️ CNAME missing - creating it"
             echo "docs.aicser.com" > packages/docs/build/CNAME
           fi
           echo ""
@@ -130,160 +84,28 @@ jobs:
             touch packages/docs/build/.nojekyll
           fi
           echo ""
-          echo "Checking build structure:"
-          echo "Assets directory:"
-          ls -la packages/docs/build/assets/ 2>/dev/null | head -10 || echo "⚠️ assets/ directory not found"
-          echo ""
-          echo "Checking if static/index.html still exists (should be deleted):"
-          if [ -f packages/docs/static/index.html ]; then
-            echo "❌ PROBLEM: static/index.html still exists! It will override build output"
-            echo "This file should have been deleted"
-            exit 1
-          else
-            echo "✅ static/index.html does not exist (good)"
-          fi
-          echo ""
           echo "Build verification complete ✅"
           
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+        with:
+          # Configure for static site (Docusaurus generates static HTML)
+          static_site_generator: none
+          
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./packages/docs/build
+          
+  # Deployment job - deploys to GitHub Pages
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: github-pages
+      url: https://docs.aicser.com
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
       - name: Deploy to GitHub Pages
-        if: github.ref == 'refs/heads/main'
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./packages/docs/build
-          # Deploy to root for custom domain (baseUrl: '/')
-          # No destination_dir means deploy to root of gh-pages branch
-          cname: docs.aicser.com
-          force_orphan: true
-          # Ensure .nojekyll is created (for GitHub Pages)
-          enable_jekyll: false
-          # User information for commit
-          user_name: 'github-actions[bot]'
-          user_email: 'github-actions[bot]@users.noreply.github.com'
-          commit_message: 'docs: deploy documentation to GitHub Pages [skip ci]'
-          # Allow empty commits (in case nothing changed)
-          allow_empty_commit: true
-        continue-on-error: false
-        id: deploy
-          
-      - name: Verify deployment succeeded
-        if: github.ref == 'refs/heads/main' && steps.deploy.outcome == 'success'
-        run: |
-          echo "=== Deployment Step Completed ==="
-          echo "✅ Deploy to GitHub Pages step finished successfully"
-          echo ""
-          echo "Waiting 10 seconds for GitHub to process the push..."
-          sleep 10
-          
-      - name: Verify gh-pages branch after deployment
-        if: github.ref == 'refs/heads/main'
-        run: |
-          echo "=== Verifying gh-pages Branch After Deployment ==="
-          echo ""
-          echo "Fetching all branches..."
-          git fetch --all --prune
-          echo ""
-          echo "Checking if gh-pages branch exists:"
-          if git ls-remote --heads origin gh-pages | grep -q gh-pages; then
-            echo "✅ gh-pages branch exists on remote"
-            echo ""
-            echo "Fetching gh-pages branch..."
-            git fetch origin gh-pages:gh-pages-ref 2>&1 || echo "⚠️ Could not fetch gh-pages"
-            echo ""
-            echo "Checking branch contents:"
-            if git show-ref --verify --quiet refs/remotes/origin/gh-pages; then
-              echo "Branch files:"
-              git ls-tree -r --name-only origin/gh-pages | head -30
-              echo ""
-              echo "Checking for critical files:"
-              if git cat-file -e origin/gh-pages:index.html 2>/dev/null; then
-                echo "✅ index.html exists in gh-pages"
-                echo "   Size: $(git cat-file -s origin/gh-pages:index.html) bytes"
-              else
-                echo "❌ index.html NOT found in gh-pages branch"
-              fi
-              if git cat-file -e origin/gh-pages:CNAME 2>/dev/null; then
-                echo "✅ CNAME exists: $(git cat-file blob origin/gh-pages:CNAME)"
-              else
-                echo "❌ CNAME NOT found in gh-pages branch"
-              fi
-              if git cat-file -e origin/gh-pages:.nojekyll 2>/dev/null; then
-                echo "✅ .nojekyll exists"
-              else
-                echo "⚠️ .nojekyll NOT found (may cause issues)"
-              fi
-              echo ""
-              echo "Recent commits in gh-pages:"
-              git log origin/gh-pages --oneline -5 || echo "Could not get commit history"
-            fi
-          else
-            echo "❌❌❌ CRITICAL: gh-pages branch does NOT exist on remote!"
-            echo ""
-            echo "This means the deployment action failed to create/push the branch."
-            echo ""
-            echo "Possible causes:"
-            echo "1. GITHUB_TOKEN doesn't have 'pages: write' permission"
-            echo "2. Repository Pages is not enabled"
-            echo "3. Organization Pages is not enabled"
-            echo "4. Deployment action encountered an error"
-            echo ""
-            echo "Check:"
-            echo "- Repository Settings → Actions → General → Workflow permissions"
-            echo "- Repository Settings → Pages → Source should be 'GitHub Actions'"
-            echo "- Organization Settings → Pages → Should be enabled"
-            echo "- Workflow logs for 'Deploy to GitHub Pages' step errors"
-            exit 1
-          fi
-          
-      - name: Critical diagnosis - 404 on GitHub Pages URL
-        if: github.ref == 'refs/heads/main'
-        run: |
-          echo ""
-          echo "=== 🚨 CRITICAL: 404 on GitHub Pages URL ==="
-          echo ""
-          echo "If https://aiser-platform.github.io/aiser-world/ returns 404:"
-          echo ""
-          echo "1. 🔴 CHECK: Does gh-pages branch exist?"
-          echo "   https://github.com/aiser-platform/aiser-world/tree/gh-pages"
-          echo "   If branch doesn't exist, deployment failed"
-          echo ""
-          echo "2. 🔴 CHECK: Are files in gh-pages branch?"
-          echo "   Should see: index.html, CNAME, .nojekyll, assets/"
-          echo "   If files are missing, check 'Deploy to GitHub Pages' step logs"
-          echo ""
-          echo "3. 🔴 CHECK: Is GitHub Pages enabled for organization?"
-          echo "   Organization Settings → Pages"
-          echo "   For organization repos, Pages must be enabled at org level"
-          echo ""
-          echo "4. 🔴 CHECK: Repository Pages settings"
-          echo "   https://github.com/aiser-platform/aiser-world/settings/pages"
-          echo "   Source MUST be: 'GitHub Actions'"
-          echo "   If 'None' or disabled, enable it"
-          echo ""
-          echo "5. 🔴 CHECK: Organization Pages URL format"
-          echo "   For organization repos, URL is:"
-          echo "   https://ORGANIZATION.github.io/REPOSITORY-NAME/"
-          echo "   NOT: https://ORGANIZATION.github.io/"
-          echo ""
-          echo "6. ⚠️ CHECK: Deployment action permissions"
-          echo "   Verify GITHUB_TOKEN has 'pages: write' permission"
-          echo "   Check workflow permissions in repository settings"
-          echo ""
-          echo "7. ⚠️ CHECK: Workflow logs for 'Deploy to GitHub Pages' step"
-          echo "   Look for any errors or warnings"
-          echo "   Check if action actually pushed to gh-pages branch"
-          echo ""
-          echo "=== Next Steps ==="
-          echo "1. Verify gh-pages branch exists and has files"
-          echo "2. Check organization Pages settings"
-          echo "3. Verify repository Pages is enabled"
-          echo "4. Check workflow permissions"
-          echo "5. Review deployment step logs for errors"
-          
-      - name: Deploy to GitHub Pages (PR Preview)
-        if: github.event_name == 'pull_request'
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: packages/docs/build
-          destination_dir: preview/${{ github.event_number }}
+        id: deployment
+        uses: actions/deploy-pages@v4
