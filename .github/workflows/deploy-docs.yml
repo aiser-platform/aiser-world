@@ -33,6 +33,15 @@ jobs:
         run: npm install
         # Install from root to properly resolve workspace dependencies
         
+      - name: Clear build cache
+        working-directory: packages/docs
+        run: |
+          echo "Clearing Docusaurus build cache..."
+          npm run clear || echo "Clear command not available, continuing..."
+          # Also remove build directory to ensure clean build
+          rm -rf build .docusaurus
+          echo "Cache cleared ✅"
+        
       - name: Build documentation
         working-directory: packages/docs
         env:
@@ -53,9 +62,46 @@ jobs:
           if [ -f packages/docs/build/index.html ]; then
             echo "✅ index.html exists at root"
             echo "File size: $(wc -c < packages/docs/build/index.html) bytes"
-            echo "First 200 chars:"
-            head -c 200 packages/docs/build/index.html
             echo ""
+            echo "Checking index.html content (first 500 chars):"
+            head -c 500 packages/docs/build/index.html
+            echo ""
+            echo ""
+          echo "Checking if index.html redirects to /docs/:"
+          if grep -q "url=/docs/" packages/docs/build/index.html || grep -q "href=\"/docs/\"" packages/docs/build/index.html; then
+            echo "❌ PROBLEM: index.html redirects to /docs/ but routeBasePath is '/'"
+            echo "This means static/index.html is still being used or build is wrong"
+            echo ""
+            echo "First 500 chars of index.html:"
+            head -c 500 packages/docs/build/index.html
+            echo ""
+            exit 1
+          else
+            echo "✅ index.html does NOT redirect to /docs/ (good)"
+          fi
+          echo ""
+          echo "Checking if index.html has Docusaurus content:"
+          if grep -qi "docusaurus" packages/docs/build/index.html || grep -qi "react" packages/docs/build/index.html || grep -qi "Aicser" packages/docs/build/index.html; then
+            echo "✅ index.html contains Docusaurus/React content"
+            echo ""
+            echo "Sample content (first 300 chars):"
+            head -c 300 packages/docs/build/index.html
+            echo ""
+          else
+            echo "⚠️ index.html might not have proper Docusaurus content"
+            echo ""
+            echo "First 500 chars of index.html:"
+            head -c 500 packages/docs/build/index.html
+            echo ""
+          fi
+          echo ""
+          echo "Checking index.html structure:"
+          if grep -q "<!DOCTYPE html>" packages/docs/build/index.html && grep -q "<html" packages/docs/build/index.html && grep -q "<body" packages/docs/build/index.html; then
+            echo "✅ index.html has proper HTML structure"
+          else
+            echo "❌ index.html missing proper HTML structure"
+            exit 1
+          fi
           else
             echo "❌ index.html missing at root"
             echo "Searching for index.html in subdirectories:"
@@ -88,6 +134,15 @@ jobs:
           echo "Checking build structure:"
           echo "Assets directory:"
           ls -la packages/docs/build/assets/ 2>/dev/null | head -10 || echo "⚠️ assets/ directory not found"
+          echo ""
+          echo "Checking if static/index.html still exists (should be deleted):"
+          if [ -f packages/docs/static/index.html ]; then
+            echo "❌ PROBLEM: static/index.html still exists! It will override build output"
+            echo "This file should have been deleted"
+            exit 1
+          else
+            echo "✅ static/index.html does not exist (good)"
+          fi
           echo ""
           echo "Build verification complete ✅"
           

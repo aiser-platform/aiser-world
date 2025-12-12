@@ -3,18 +3,20 @@ const config = {
   tagline: 'AI-Powered Analytics Platform',
   favicon: '/favicon.ico',
   
-  // Set the production url of your site here
+  // Production URL - custom domain
   url: 'https://docs.aicser.com',
-  // Set the /<baseUrl>/ pathname under which your site is served
-  // For custom domain deployment, use '/' to serve from root
+  // Base URL - use '/' for custom domain (root deployment)
   baseUrl: '/',
   
-  // GitHub Pages deployment 
-  deploymentBranch: 'gh-pages', 
+  // GitHub Pages deployment configuration
+  deploymentBranch: 'gh-pages',
   
-  // Organization and project names 
+  // GitHub organization and repository (for edit links)
   organizationName: 'aiser-platform',
   projectName: 'aiser-world',
+  
+  // Trailing slash configuration - important for GitHub Pages
+  trailingSlash: false,
   
   // Custom fields (domain and port configuration)
   customFields: {
@@ -60,6 +62,7 @@ const config = {
   
   // Global configuration
   onBrokenLinks: 'warn',
+  onBrokenMarkdownLinks: 'warn',
   
   // Theme configuration
   themeConfig: {
