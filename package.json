@@ -256,7 +256,7 @@
     "istanbul-lib-coverage": "^3.2.2",
     "istanbul-lib-instrument": "^6.0.3",
     "istanbul-lib-report": "^3.0.1",
-    "istanbul-lib-source-maps": "^4.0.1",
+    "istanbul-lib-source-maps": "^5.0.6",
     "istanbul-reports": "^3.1.7",
     "iterator.prototype": "^1.1.5",
     "jake": "^10.9.2",
