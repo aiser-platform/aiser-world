@@ -336,19 +336,22 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
     };
 
     // Database types
+    // NOTE: The core relational/warehouse options mirror `CubeConnectorService.supported_databases`.
+    // Additional data lake / cloud storage options are backed by dedicated connectors.
     const databaseTypes = [
-        { value: 'postgresql', label: 'PostgreSQL', port: 5432, isDataLake: false, isCloudStorage: false },
-        { value: 'mysql', label: 'MySQL', port: 3306, isDataLake: false, isCloudStorage: false },
-        { value: 'sqlserver', label: 'SQL Server', port: 1433, isDataLake: false, isCloudStorage: false },
-        { value: 'clickhouse', label: 'ClickHouse', port: 8123, isDataLake: false, isCloudStorage: false },
-        { value: 'snowflake', label: 'Snowflake', port: 443, isDataLake: false, isCloudStorage: false },
-        { value: 'bigquery', label: 'BigQuery', port: null, isDataLake: false, isCloudStorage: false },
-        { value: 'redshift', label: 'Redshift', port: 5439, isDataLake: false, isCloudStorage: false },
-        { value: 'delta_lake', label: 'Delta Lake', port: null, isDataLake: true, isCloudStorage: false },
-        { value: 'iceberg', label: 'Apache Iceberg', port: null, isDataLake: true, isCloudStorage: false },
-        { value: 's3_parquet', label: 'S3 Cloud Storage', port: null, isDataLake: false, isCloudStorage: true },
-        { value: 'azure_blob', label: 'Azure Blob Storage', port: null, isDataLake: false, isCloudStorage: true },
-        { value: 'gcp_cloud_storage', label: 'GCP Cloud Storage', port: null, isDataLake: false, isCloudStorage: true }
+        { value: 'postgresql', label: 'PostgreSQL', port: 5432, isDataLake: false, isCloudStorage: false, disabled: false },
+        { value: 'mysql', label: 'MySQL', port: 3306, isDataLake: false, isCloudStorage: false, disabled: false },
+        // SQL Server support depends on OS-level ODBC libraries; mark as "coming soon" to avoid surprises.
+        { value: 'sqlserver', label: 'SQL Server (coming soon)', port: 1433, isDataLake: false, isCloudStorage: false, disabled: true },
+        { value: 'clickhouse', label: 'ClickHouse', port: 8123, isDataLake: false, isCloudStorage: false, disabled: false },
+        { value: 'snowflake', label: 'Snowflake', port: 443, isDataLake: false, isCloudStorage: false, disabled: false },
+        { value: 'bigquery', label: 'BigQuery', port: null, isDataLake: false, isCloudStorage: false, disabled: false },
+        { value: 'redshift', label: 'Redshift', port: 5439, isDataLake: false, isCloudStorage: false, disabled: false },
+        { value: 'delta_lake', label: 'Delta Lake', port: null, isDataLake: true, isCloudStorage: false, disabled: false },
+        { value: 'iceberg', label: 'Apache Iceberg', port: null, isDataLake: true, isCloudStorage: false, disabled: false },
+        { value: 's3_parquet', label: 'S3 Cloud Storage', port: null, isDataLake: false, isCloudStorage: true, disabled: false },
+        { value: 'azure_blob', label: 'Azure Blob Storage', port: null, isDataLake: false, isCloudStorage: true, disabled: false },
+        { value: 'gcp_cloud_storage', label: 'GCP Cloud Storage', port: null, isDataLake: false, isCloudStorage: true, disabled: false }
     ];
     
     const [selectedDatabaseType, setSelectedDatabaseType] = useState('postgresql');
@@ -1644,14 +1647,18 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
                                     style={{ width: '100%' }}
                                     size="large"
                                 >
-                                {databaseTypes.map(db => (
-                                    <Option key={db.value} value={db.value}>
-                                        <Space>
-                                            <DatabaseLogo dbType={db.value} size={18} />
-                                            <span>{db.label}</span>
-                                        </Space>
-                                    </Option>
-                                ))}
+                                    {databaseTypes.map(db => (
+                                        <Option
+                                            key={db.value}
+                                            value={db.value}
+                                            disabled={db.disabled}
+                                        >
+                                            <Space>
+                                                <DatabaseLogo dbType={db.value} size={18} />
+                                                <span>{db.label}</span>
+                                            </Space>
+                                        </Option>
+                                    ))}
                                 </Select>
                             </Form.Item>
                         </Col>

@@ -117,10 +117,34 @@ class DataConnectivityService:
             }
 
     async def store_database_connection(self, connection_request: Dict[str, Any], user_id: Optional[str] = None) -> Dict[str, Any]:
-        """Store database connection configuration"""
+        """Store database connection configuration
+        
+        NOTE: This method validates the connection BEFORE encrypting credentials.
+        This ensures the validation works with plain credentials, and also provides
+        safety for users who skip the test step and directly click save.
+        """
         try:
             logger.info(f"💾 Storing database connection: {connection_request.get('type')}")
-            
+
+            # ALWAYS validate the connection first with PLAIN credentials.
+            # This prevents persisting phantom data sources when credentials or networking are invalid,
+            # and provides safety for users who skip the test step.
+            try:
+                test_result = await self.cube_connector.test_connection(connection_request)
+                if not test_result.get('success'):
+                    error_msg = test_result.get('error') or 'Database connection test failed'
+                    logger.warning(f"❌ Connection validation failed; not storing data source: {error_msg}")
+                    return {
+                        'success': False,
+                        'error': error_msg
+                    }
+            except Exception as validation_error:
+                logger.error(f"❌ Unexpected error while validating connection before store: {validation_error}")
+                return {
+                    'success': False,
+                    'error': f'Connection validation failed: {validation_error}'
+                }
+
             # Generate unique ID for the connection
             connection_id = f"db_{connection_request.get('type')}_{int(datetime.now().timestamp())}"
             
@@ -211,6 +235,10 @@ class DataConnectivityService:
                 cube_result = await self.cube_connector.create_cube_data_source(connection_request)
                 if cube_result['success']:
                     logger.info(f"✅ Database connection registered with Cube.js: {connection_id}")
+                else:
+                    logger.warning(
+                        f"⚠️ Cube.js integration reported failure for {connection_id}: {cube_result.get('error')}"
+                    )
             except Exception as cube_error:
                 logger.warning(f"⚠️ Cube.js integration failed for {connection_id}: {str(cube_error)}")
             

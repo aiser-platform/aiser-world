@@ -408,20 +408,14 @@ async def connect_database(request: DatabaseConnectionRequest, current_token: Un
         if not test_result['success']:
             raise HTTPException(status_code=400, detail=f"Connection failed: {test_result.get('error')}")
         
-        # Store the connection (ensure credentials are encrypted before persist)
-        try:
-            from app.modules.data.utils.credentials import encrypt_credentials
-            connection_config_safe = encrypt_credentials(connection_config)
-        except Exception:
-            connection_config_safe = connection_config
-
         # Attach organization/tenant information so it is persisted with the data source
         # NOTE: DataConnectivityService.store_database_connection expects to find organization_id/tenant_id
         #       in the connection config and will map it to data_sources.tenant_id.
-        connection_config_safe["organization_id"] = str(organization_id)
+        connection_config["organization_id"] = str(organization_id)
 
         # Store the connection via service with user ownership
-        connection_result = await data_service.store_database_connection(connection_config_safe, user_id=user_id)
+        # NOTE: Pass plain credentials - store_database_connection will validate and encrypt them
+        connection_result = await data_service.store_database_connection(connection_config, user_id=user_id)
         if not connection_result or not connection_result.get('success'):
             err = (connection_result or {}).get('error') if isinstance(connection_result, dict) else 'Unknown error'
             raise HTTPException(status_code=500, detail=f"Failed to store connection: {err}")
@@ -657,7 +651,8 @@ async def create_project_connection(
         except Exception:
             pass
         
-        # Store encrypted via existing store_database_connection (it will encrypt again defensively)
+        # Store via existing store_database_connection (will validate and encrypt)
+        # NOTE: Pass plain credentials - store_database_connection will validate and encrypt them
         stored = await data_service.store_database_connection(conn, user_id=user_id)
         if not stored.get('success'):
             raise HTTPException(status_code=500, detail=f"Failed to store connection: {stored.get('error')}")
@@ -1064,9 +1059,8 @@ async def connect_database(
             # Also store with user ownership
             if result.get('success') and result.get('data_source_id'):
                 try:
-                    from app.modules.data.utils.credentials import encrypt_credentials
-                    connection_config_safe = encrypt_credentials({'uri': request.uri, 'name': request.name})
-                    await data_service.store_database_connection(connection_config_safe, user_id=user_id)
+                    # NOTE: Pass plain credentials - store_database_connection will validate and encrypt them
+                    await data_service.store_database_connection({'uri': request.uri, 'name': request.name}, user_id=user_id)
                 except Exception as e:
                     logger.warning(f"Failed to store connection with user ownership: {e}")
             return result
@@ -1088,15 +1082,9 @@ async def connect_database(
         if not test_result['success']:
             raise HTTPException(status_code=400, detail=f"Connection failed: {test_result.get('error')}")
         
-        # Store the connection with user ownership (encrypt credentials)
-        try:
-            from app.modules.data.utils.credentials import encrypt_credentials
-            connection_config_safe = encrypt_credentials(config)
-        except Exception:
-            connection_config_safe = config
-        
         # Store the connection via service with user ownership
-        connection_result = await data_service.store_database_connection(connection_config_safe, user_id=user_id)
+        # NOTE: Pass plain credentials - store_database_connection will validate and encrypt them
+        connection_result = await data_service.store_database_connection(config, user_id=user_id)
         if not connection_result or not connection_result.get('success'):
             err = (connection_result or {}).get('error') if isinstance(connection_result, dict) else 'Unknown error'
             raise HTTPException(status_code=500, detail=f"Failed to store connection: {err}")
@@ -1993,15 +1981,9 @@ async def connect_enterprise_warehouse_legacy(request: Dict[str, Any], current_t
         if not test_result.get('success'):
             raise HTTPException(status_code=400, detail=f"Connection test failed: {test_result.get('error', 'Unknown error')}")
         
-        # Store the connection with user ownership
-        try:
-            from app.modules.data.utils.credentials import encrypt_credentials
-            connection_config_safe = encrypt_credentials(connection_config)
-        except Exception:
-            connection_config_safe = connection_config
-
         # Store the connection via service with user ownership
-        connection_result = await data_service.store_database_connection(connection_config_safe, user_id=user_id)
+        # NOTE: Pass plain credentials - store_database_connection will validate and encrypt them
+        connection_result = await data_service.store_database_connection(connection_config, user_id=user_id)
         if not connection_result or not connection_result.get('success'):
             err = (connection_result or {}).get('error') if isinstance(connection_result, dict) else 'Unknown error'
             raise HTTPException(status_code=500, detail=f"Failed to store connection: {err}")

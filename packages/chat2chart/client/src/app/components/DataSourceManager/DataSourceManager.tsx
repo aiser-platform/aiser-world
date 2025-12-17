@@ -120,10 +120,13 @@ const DataSourceManager: React.FC<DataSourceManagerProps> = ({
     const handleDatabaseConnect = async (connection: DatabaseConnection) => {
         try {
             setLoading(true);
-            
-            // Call the backend to create database connection
-            const response = await fetch('/api/data/connect-database', {
+
+            // Call the modern backend endpoint to create & persist a database connection.
+            // This endpoint will re-validate the connection server-side and only persist
+            // genuinely valid connections.
+            const response = await fetch('/api/data/database/connect', {
                 method: 'POST',
+                credentials: 'include',
                 headers: {
                     'Content-Type': 'application/json',
                 },
@@ -135,7 +138,7 @@ const DataSourceManager: React.FC<DataSourceManagerProps> = ({
             }
 
             const result = await response.json();
-            
+
             if (result.success) {
                 const newSource: DataSource = {
                     id: result.data_source.id,
@@ -173,23 +176,38 @@ const DataSourceManager: React.FC<DataSourceManagerProps> = ({
         try {
             const response = await fetch('/api/data/connect-database', {
                 method: 'POST',
+                credentials: 'include',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    ...connection,
-                    test_only: true
+                    type: connection.type,
+                    host: connection.host,
+                    port: connection.port,
+                    database: connection.database,
+                    username: connection.username,
+                    password: connection.password,
+                    name: connection.name,
                 }),
             });
 
-            if (!response.ok) {
+            const result = await response.json();
+
+            if (!response.ok || !result.success) {
+                const detail = result.error || result.message || 'Unknown error';
+                message.error(`Database test failed: ${detail}`);
                 return false;
             }
 
-            const result = await response.json();
-            return result.success;
-        } catch (error) {
+            message.success('Database connection test succeeded');
+            return true;
+        } catch (error: any) {
             console.error('Database test error:', error);
+            message.error(
+                `Database test failed: ${
+                    error?.message || 'Network or server error'
+                }`,
+            );
             return false;
         }
     };
@@ -214,11 +232,19 @@ const DataSourceManager: React.FC<DataSourceManagerProps> = ({
                 setPreviewData({ schema: cols, data: [] });
                 setPreviewVisible(true);
             } else {
-                message.warning('Schema not available for preview');
+                const detail =
+                    res.error ||
+                    res.warning ||
+                    'Schema not available for preview. The connection may be misconfigured or unreachable.';
+                message.warning(
+                    `Unable to load schema for this data source. Details: ${detail}`,
+                );
             }
         } catch (err) {
             console.error('Failed to load schema preview:', err);
-            message.error('Failed to load schema preview');
+            message.error(
+                'Failed to load schema preview. Please verify your data source configuration and try again.',
+            );
         } finally {
             setLoading(false);
         }

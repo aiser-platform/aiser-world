@@ -191,10 +191,10 @@ class CubeConnectorService:
         """Test database connection through Cube.js"""
         try:
             logger.info(
-                f"🧪 Testing Cube.js connection: {connection_config.get('type')}"
+                f"🧪 Testing database connection: {connection_config.get('type')}"
             )
 
-            db_type = connection_config.get("type")
+            db_type = (connection_config.get("type") or "").lower()
             if db_type not in self.supported_databases:
                 return {
                     "success": False,
@@ -207,10 +207,70 @@ class CubeConnectorService:
             except ValueError as e:
                 return {"success": False, "error": str(e)}
 
+            # First, perform a direct low-level connectivity check using real drivers.
+            # This avoids reporting success when credentials/host/port are invalid,
+            # even if Cube.js is misconfigured or unavailable.
+            try:
+                from app.modules.data.services.real_cube_integration_service import (
+                    RealCubeIntegrationService,
+                )
+
+                real_cube = RealCubeIntegrationService()
+                direct_test = await real_cube._test_direct_connection(
+                    {
+                        "type": db_type,
+                        "host": connection_config.get("host"),
+                        "port": connection_config.get(
+                            "port", self.supported_databases[db_type]["port"]
+                        ),
+                        "database": connection_config.get("database"),
+                        "username": connection_config.get("username"),
+                        "password": connection_config.get("password"),
+                        # Optional fields some drivers expect; safe to pass through.
+                        "account": connection_config.get("account"),
+                        "project_id": connection_config.get("project_id"),
+                        "schema": connection_config.get("schema", "public"),
+                        "warehouse": connection_config.get("warehouse"),
+                    }
+                )
+
+                if not direct_test.get("success"):
+                    # Surface the low-level driver error so the UI can show a helpful message.
+                    return {
+                        "success": False,
+                        "error": direct_test.get(
+                            "error", "Direct connection test failed"
+                        ),
+                    }
+                
+                # For ClickHouse, the direct HTTP connection test is sufficient.
+                # Skip Cube.js validation since ClickHouse works via HTTP API directly.
+                if db_type == "clickhouse":
+                    logger.info(f"✅ ClickHouse direct connection test passed, skipping Cube.js validation")
+                    return {
+                        "success": True,
+                        "connection_info": {
+                            "type": db_type,
+                            "host": connection_config.get("host"),
+                            "port": connection_config.get("port"),
+                            "database": connection_config.get("database"),
+                            "status": "connected",
+                            "driver": self.supported_databases[db_type]["driver"],
+                        },
+                    }
+                    
+            except Exception as driver_error:
+                # Log but do not immediately fail; we'll still attempt a Cube.js-based check below.
+                logger.warning(
+                    f"⚠️ Direct driver-based connection test failed or unavailable: {driver_error}"
+                )
+
             # Generate Cube.js environment variables for this connection
             cube_env = self._generate_cube_env_config(connection_config, tenant_id)
 
-            # Test connection through Cube.js
+            # Test connection/health through Cube.js. This validates that:
+            #   - Cube.js API is reachable
+            #   - The underlying connection for this tenant is healthy (where configured)
             connection_test = await self._test_cube_connection(cube_env, tenant_id)
 
             if connection_test["success"]:
@@ -314,22 +374,46 @@ class CubeConnectorService:
     async def _test_cube_connection(
         self, cube_env: Dict[str, str], tenant_id: str
     ) -> Dict[str, Any]:
-        """Test connection through Cube.js"""
+        """
+        Test connection through Cube.js by making a lightweight `/meta` call.
+
+        NOTE: At the moment, `cube_env` is not forwarded to Cube.js from here; it is
+        primarily useful for logging/diagnostics. This still provides a real health
+        check instead of always returning success.
+        """
         try:
-            # This would typically involve calling a Cube.js connection test endpoint
-            # For now, we simulate a successful connection test
-            logger.info(f"🧪 Testing Cube.js connection for tenant: {tenant_id}")
+            logger.info(f"🧪 Testing Cube.js API health for tenant: {tenant_id}")
 
-            # In production, this would make an actual test query to Cube.js
-            # await self._make_test_query(cube_env, tenant_id)
+            async with aiohttp.ClientSession() as session:
+                headers = {
+                    "Authorization": f"Bearer {self.cube_api_secret}",
+                    "x-tenant-id": tenant_id,
+                }
 
-            return {
-                "success": True,
-                "message": "Connection test successful",
-                "tenant_id": tenant_id,
-            }
+                async with session.get(
+                    f"{self.cube_api_url}/meta", headers=headers
+                ) as response:
+                    if response.status == 200:
+                        # We don't need the full schema here; any 200 response is enough
+                        # to confirm Cube.js is available and the API token works.
+                        return {
+                            "success": True,
+                            "message": "Cube.js meta endpoint reachable",
+                            "tenant_id": tenant_id,
+                        }
+
+                    error_text = await response.text()
+                    logger.error(
+                        f"❌ Cube.js /meta health check failed: {response.status} - {error_text}"
+                    )
+                    return {
+                        "success": False,
+                        "error": f"Cube.js /meta health check failed: {response.status} - {error_text}",
+                        "tenant_id": tenant_id,
+                    }
 
         except Exception as error:
+            logger.error(f"❌ Cube.js connection test failed: {error}")
             return {"success": False, "error": str(error), "tenant_id": tenant_id}
 
     async def _get_cube_schema_info(self, tenant_id: str) -> Dict[str, Any]:

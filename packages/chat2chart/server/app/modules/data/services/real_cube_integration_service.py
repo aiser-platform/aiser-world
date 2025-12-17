@@ -491,6 +491,48 @@ class RealCubeIntegrationService:
                 query = "SELECT 1 as test"
                 client.query(query).result()
 
+            elif db_type == "clickhouse":
+                # ClickHouse uses HTTP interface for queries
+                import aiohttp
+                
+                host = config.get("host", "localhost")
+                port = config.get("port", driver_info["default_port"])
+                database = config.get("database")
+                username = config.get("username")
+                password = config.get("password")
+                
+                http_url = f"http://{host}:{port}"
+                
+                # Test connection with a simple query
+                # ClickHouse HTTP interface: POST query to /?database=db_name
+                query = "SELECT 1 as test FORMAT JSON"
+                
+                async with aiohttp.ClientSession() as session:
+                    auth = aiohttp.BasicAuth(username, password) if username else None
+                    params = {"database": database} if database else {}
+                    
+                    async with session.post(
+                        f"{http_url}/",
+                        data=query,
+                        auth=auth,
+                        params=params,
+                        timeout=aiohttp.ClientTimeout(total=10)
+                    ) as resp:
+                        if resp.status != 200:
+                            error_text = await resp.text()
+                            raise Exception(
+                                f"ClickHouse HTTP connection failed (HTTP {resp.status}): {error_text}"
+                            )
+                        
+                        # Verify response is valid JSON
+                        result = await resp.json()
+                        
+                        # ClickHouse should return {"data": [{"test": 1}]}
+                        if not result.get("data"):
+                            raise Exception(
+                                "ClickHouse connection succeeded but returned unexpected format"
+                            )
+
             return {
                 "success": True,
                 "message": f"Direct {db_type} connection test successful",
