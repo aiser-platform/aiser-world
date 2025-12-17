@@ -13,9 +13,10 @@ from typing import Dict, List, Optional, Any, Union
 from datetime import datetime
 import tempfile
 from pathlib import Path
-from .cube_connector_service import CubeConnectorService
+from .database_connector_service import DatabaseConnectorService
 from app.modules.data.services.ai_schema_service import AISchemaService
 from app.db.session import async_operation_lock
+from app.modules.data.utils.credentials import encrypt_credentials, decrypt_credentials
 
 logger = logging.getLogger(__name__)
 
@@ -69,20 +70,9 @@ class DataConnectivityService:
         # Initialize demo data for testing
         self._initialize_demo_data()
         
-        # Initialize Cube.js connector service
-        self.cube_connector = CubeConnectorService()
+        # Initialize database connector service
+        self.database_connector = DatabaseConnectorService()
         self.ai_schema_service = AISchemaService()  # Add AI schema service
-        
-        # Database connector configurations (now using Cube.js)
-        self.db_connectors = {
-            'postgresql': self._create_cube_connector,
-            'mysql': self._create_cube_connector,
-            'sqlserver': self._create_cube_connector,
-            'snowflake': self._create_cube_connector,
-            'bigquery': self._create_cube_connector,
-            'redshift': self._create_cube_connector,
-            'clickhouse': self._create_cube_connector
-        }
 
     async def test_database_connection(self, connection_request: Dict[str, Any]) -> Dict[str, Any]:
         """Test database connection without storing credentials"""
@@ -91,15 +81,18 @@ class DataConnectivityService:
             
             db_type = connection_request.get('type', '').lower()
             
-            if db_type not in self.db_connectors:
+            # Get supported databases from DatabaseConnectorService
+            supported_dbs = self.database_connector.get_supported_databases()
+            
+            if db_type not in supported_dbs:
                 return {
                     'success': False,
-                    'error': f'Unsupported database type: {db_type}'
+                    'error': f'Unsupported database type: {db_type}. Supported: {supported_dbs}'
                 }
             
-            # Test connection using Cube.js connector directly
+            # Test connection using DatabaseConnectorService
             try:
-                test_result = await self.cube_connector.test_connection(connection_request)
+                test_result = await self.database_connector.test_connection(connection_request)
                 return test_result
                     
             except Exception as e:
@@ -130,7 +123,7 @@ class DataConnectivityService:
             # This prevents persisting phantom data sources when credentials or networking are invalid,
             # and provides safety for users who skip the test step.
             try:
-                test_result = await self.cube_connector.test_connection(connection_request)
+                test_result = await self.database_connector.test_connection(connection_request)
                 if not test_result.get('success'):
                     error_msg = test_result.get('error') or 'Database connection test failed'
                     logger.warning(f"❌ Connection validation failed; not storing data source: {error_msg}")
@@ -230,17 +223,13 @@ class DataConnectivityService:
                 # Fallback to memory storage (connection_data already prepared)
             self.data_sources[connection_id] = connection_data
             
-            # Also register with Cube.js if available
+            # Create connection in DatabaseConnectorService for future queries
             try:
-                cube_result = await self.cube_connector.create_cube_data_source(connection_request)
-                if cube_result['success']:
-                    logger.info(f"✅ Database connection registered with Cube.js: {connection_id}")
-                else:
-                    logger.warning(
-                        f"⚠️ Cube.js integration reported failure for {connection_id}: {cube_result.get('error')}"
-                    )
-            except Exception as cube_error:
-                logger.warning(f"⚠️ Cube.js integration failed for {connection_id}: {str(cube_error)}")
+                conn_result = await self.database_connector.create_connection(connection_request)
+                if conn_result.get('success'):
+                    logger.info(f"✅ Database connection engine created: {connection_id}")
+            except Exception as conn_error:
+                logger.warning(f"⚠️ Connection engine creation failed (queries may not work): {str(conn_error)}")
             
             logger.info(f"✅ Database connection stored: {connection_id}")
             
@@ -1323,17 +1312,16 @@ class DataConnectivityService:
                 config = {**parsed_config, **{k: v for k, v in config.items() if k != 'uri'}}
                 logger.info(f"🔌 Parsed URI to: {config.get('type')} at {config.get('host')}:{config.get('port')}")
             
-            logger.info(f"🔌 Creating database connection via Cube.js: {config.get('type')}")
+            logger.info(f"🔌 Creating database connection: {config.get('type')}")
             
             db_type = config.get('type')
-            if db_type not in self.db_connectors:
-                # Get supported databases from Cube.js
-                supported = self.cube_connector.get_supported_databases()
-                supported_types = [db['type'] for db in supported['supported_databases']]
-                raise ValueError(f"Unsupported database type: {db_type}. Supported: {supported_types}")
+            supported_dbs = self.database_connector.get_supported_databases()
             
-            # Create connection using Cube.js connector
-            cube_result = await self.cube_connector.create_cube_data_source(config, tenant_id)
+            if db_type not in supported_dbs:
+                raise ValueError(f"Unsupported database type: {db_type}. Supported: {supported_dbs}")
+            
+            # Create connection using DatabaseConnectorService
+            cube_result = await self.database_connector.create_connection(config)
             
             if not cube_result['success']:
                 raise Exception(cube_result['error'])
@@ -1528,20 +1516,19 @@ class DataConnectivityService:
                     'error': 'Cube.js data source not found'
                 }
             
-            # Convert our query format to Cube.js query format
-            cube_query = self._convert_to_cube_query(query, cube_data_source)
+            # Execute query through DatabaseConnectorService
+            # Note: query should be a SQL string, not a structured query
+            sql_query = query.get('sql') or query.get('query') if isinstance(query, dict) else str(query)
             
-            # Execute query through Cube.js
-            result = await self.cube_connector.query_cube_data_source(
+            result = await self.database_connector.execute_query(
                 data_source['id'],
-                cube_query,
-                data_source.get('tenant_id', 'default')
+                sql_query
             )
             
             return result
             
         except Exception as error:
-            logger.error(f"❌ Database query through Cube.js failed: {str(error)}")
+            logger.error(f"❌ Database query failed: {str(error)}")
             return {
                 'success': False,
                 'error': str(error)
@@ -1881,15 +1868,18 @@ class DataConnectivityService:
             
             db_type = config.get('type', '').lower()
             
-            if db_type not in self.db_connectors:
+            # Get supported databases from DatabaseConnectorService
+            supported_dbs = self.database_connector.get_supported_databases()
+            
+            if db_type not in supported_dbs:
                 return {
                     'success': False,
-                    'error': f'Unsupported database type: {db_type}'
+                    'error': f'Unsupported database type: {db_type}. Supported: {supported_dbs}'
                 }
             
-            # Use Cube.js connector to get schema
+            # Use DatabaseConnectorService to get schema
             try:
-                schema_result = await self.cube_connector.get_database_schema(config)
+                schema_result = await self.database_connector.get_schema(config)
                 if schema_result['success']:
                     return {
                         'success': True,
@@ -1898,12 +1888,12 @@ class DataConnectivityService:
                         'total_rows': schema_result.get('total_rows', 0)
                     }
                 else:
-                    logger.warning(f"⚠️ Cube.js schema fetch failed: {schema_result.get('error')}")
+                    logger.warning(f"⚠️ Schema fetch failed: {schema_result.get('error')}")
                     # Enhanced fallback with more realistic schema structure
                     return await self._get_enhanced_fallback_schema(config)
                     
-            except Exception as cube_error:
-                logger.warning(f"⚠️ Cube.js schema fetch failed: {str(cube_error)}")
+            except Exception as schema_error:
+                logger.warning(f"⚠️ Schema fetch failed: {str(schema_error)}")
                 # Enhanced fallback with more realistic schema structure
                 return await self._get_enhanced_fallback_schema(config)
                 
@@ -1950,11 +1940,11 @@ class DataConnectivityService:
         """Get file extension"""
         return Path(filename).suffix.lower().lstrip('.')
 
-    # Cube.js connector methods
-    async def _create_cube_connector(self, config: Dict[str, Any]):
-        """Create database connector through Cube.js"""
-        # This is handled by the cube_connector service
-        return await self.cube_connector.create_cube_data_source(config)
+    # Database connector methods
+    async def _create_database_connector(self, config: Dict[str, Any]):
+        """Create database connector"""
+        # This is handled by the database_connector service
+        return await self.database_connector.create_connection(config)
 
     def _convert_to_cube_query(self, query: Dict[str, Any], cube_data_source: Dict[str, Any]) -> Dict[str, Any]:
         """Convert our query format to Cube.js query format"""
@@ -2013,8 +2003,19 @@ class DataConnectivityService:
         return operator_mapping.get(operator, 'equals')
 
     async def get_supported_databases(self) -> Dict[str, Any]:
-        """Get supported database types from Cube.js"""
-        return self.cube_connector.get_supported_databases()
+        """Get supported database types"""
+        supported_dbs = self.database_connector.get_supported_databases()
+        return {
+            'success': True,
+            'supported_databases': [
+                {
+                    'type': db_type,
+                    'name': db_type.title(),
+                    'driver': 'sqlalchemy',
+                }
+                for db_type in supported_dbs
+            ]
+        }
 
     def _auto_detect_delimiter(self, file_path: str) -> str:
         """Auto-detect CSV delimiter"""

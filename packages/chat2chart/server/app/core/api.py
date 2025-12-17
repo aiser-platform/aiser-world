@@ -8,7 +8,6 @@ from app.modules.user import user_router
 from app.modules.data.api import router as data_router
 from app.modules.ai.api import router as ai_router
 from app.modules.ai.api_streaming import router as ai_streaming_router
-from app.modules.cube.api import router as cube_router
 from app.modules.projects.api import router as projects_router
 from app.modules.onboarding.api import router as onboarding_router
 from app.modules.queries.api import router as queries_router
@@ -121,12 +120,6 @@ api_router.include_router(
     responses={404: {"description": "Not found"}},
 )
 
-api_router.include_router(
-    router=cube_router,
-    prefix="/cube",
-    tags=["cube", "schema", "analytics"],
-    responses={404: {"description": "Not found"}},
-)
 
 api_router.include_router(
     router=projects_router,

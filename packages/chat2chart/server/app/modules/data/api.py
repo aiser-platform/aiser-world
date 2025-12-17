@@ -21,14 +21,10 @@ from app.modules.authentication.rbac.permissions import Permission
 from .services.rbac_service import rbac_service, DataSourceRBACService
 from .services.data_connectivity_service import DataConnectivityService
 from .services.intelligent_data_modeling_service import IntelligentDataModelingService
-from .services.cube_integration_service import CubeIntegrationService
-from .services.cube_data_modeling_service import CubeDataModelingService
-from .services.cube_connector_service import CubeConnectorService
-from .services.real_cube_integration_service import RealCubeIntegrationService
+from .services.database_connector_service import DatabaseConnectorService
 from .services.data_retention_service import DataRetentionService
 from app.modules.data.services.multi_engine_query_service import MultiEngineQueryService, QueryEngine
 from app.modules.data.services.enterprise_connectors_service import EnterpriseConnectorsService, ConnectionConfig, ConnectorType
-from app.modules.data.services.yaml_schema_service import YAMLSchemaService
 from app.modules.data.services.delta_iceberg_connector import DeltaIcebergConnector
 import sqlalchemy as sa
 from app.modules.authentication.deps.auth_bearer import current_user_payload
@@ -144,14 +140,10 @@ data_crud_service = DataSourcesCRUD()
 rbac_service = DataSourceRBACService()
 project_service = ProjectService()
 organization_service = OrganizationService()
-cube_modeling_service = CubeDataModelingService()
+database_connector = DatabaseConnectorService()
 intelligent_data_modeling_service = IntelligentDataModelingService()
-cube_integration_service = CubeIntegrationService()
-cube_connector_service = CubeConnectorService()
-real_cube_integration_service = RealCubeIntegrationService()
 multi_engine_service = MultiEngineQueryService()
 enterprise_connectors_service = EnterpriseConnectorsService()
-yaml_schema_service = YAMLSchemaService()
 delta_iceberg_connector = DeltaIcebergConnector()
 
 
@@ -2175,10 +2167,13 @@ async def deploy_cube_schema(request: dict):
         if not data_source or not schema:
             raise HTTPException(status_code=400, detail="Missing data_source or schema")
         
-        cube_service = CubeIntegrationService()
-        deployment_result = await cube_service.deploy_cube_schema(schema, data_source)
+        # Cube.js is no longer supported
+        raise HTTPException(
+            status_code=501,
+            detail="Cube.js deployment has been removed. Schema deployment is no longer available."
+        )
         
-        if deployment_result['success']:
+        if False:
             return {
                 "success": True,
                 "deployment": deployment_result,
@@ -2209,34 +2204,12 @@ async def generate_chart_from_cube(request: Dict[str, Any]):
         if not query:
             raise HTTPException(status_code=400, detail="query is required")
 
-        # Execute Cube query via integration service
-        from .services.cube_integration_service import CubeIntegrationService
-
-        ci = CubeIntegrationService()
-        result = await ci.execute_cube_query(query)
-        if not result.get("success"):
-            raise HTTPException(status_code=400, detail=result.get("error", "Query failed"))
-
-        # Cube returns nested structure; try to extract rows
-        data = result.get("data", {})
-        # typical Cube load returns {data: [...]} or nested payloads; try to find rows
-        rows = []
-        if isinstance(data, dict) and "data" in data:
-            rows = data.get("data") or []
-        elif isinstance(data, list):
-            rows = data
-        else:
-            # fallback: try to extract first list field
-            if isinstance(data, dict):
-                for v in data.values():
-                    if isinstance(v, list):
-                        rows = v
-                        break
-
-        # Convert to ECharts option
-        option_payload = ci.convert_cube_result_to_echarts(rows, chart_type=chart_type)
-
-        return {"success": True, "echarts_option": option_payload.get("option"), "meta": option_payload.get("meta")}
+        # Cube.js is no longer supported (not deployed)
+        # This endpoint is deprecated
+        raise HTTPException(
+            status_code=501,
+            detail="Cube.js integration has been removed. Please use direct database queries instead."
+        )
 
     except HTTPException:
         raise
@@ -2257,11 +2230,12 @@ async def preview_chart_from_rows(request: Dict[str, Any]):
         if not rows or not isinstance(rows, list):
             raise HTTPException(status_code=400, detail='rows (array) is required')
 
-        from .services.cube_integration_service import CubeIntegrationService
-        ci = CubeIntegrationService()
-        option_payload = ci.convert_cube_result_to_echarts(rows, chart_type=chart_type)
-
-        return {"success": True, "echarts_option": option_payload.get('option'), "meta": option_payload.get('meta')}
+        # Cube.js is no longer supported (not deployed)
+        # This endpoint needs to be reimplemented with a different charting library
+        raise HTTPException(
+            status_code=501,
+            detail="Cube.js chart conversion has been removed. Please use client-side charting instead."
+        )
 
     except HTTPException:
         raise
@@ -2273,8 +2247,11 @@ async def preview_chart_from_rows(request: Dict[str, Any]):
 async def get_deployed_cubes():
     """Get list of deployed cubes from real Cube.js server"""
     try:
-        cube_service = CubeIntegrationService()
-        cubes_result = await cube_service.get_deployed_cubes()
+        # Cube.js is no longer supported
+        raise HTTPException(
+            status_code=501,
+            detail="Cube.js has been removed. No cubes are available."
+        )
         
         if cubes_result['success']:
             return {

@@ -17,7 +17,7 @@ from sqlalchemy.orm import selectinload
 from fastapi import HTTPException, status
 
 from app.db.session import get_async_session
-from app.modules.data.models import DataSource, DataQuery, DataConnection
+from app.modules.data.models import DataSource, DataQuery
 from app.modules.projects.models import Organization, Project
 from app.core.real_data_sources import real_data_source_manager
 from app.modules.data.utils.credentials import encrypt_credentials
