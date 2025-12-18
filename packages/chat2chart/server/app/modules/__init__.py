@@ -12,6 +12,9 @@ from .chats.node_memory import models
 from .charts import models
 # Import dashboards LAST to ensure all dependencies are loaded first
 from .dashboards import models
+from .dashboards import models
+from .data import models 
+from .chats.assets import models 
 
 from app.common.model import Base
 import logging

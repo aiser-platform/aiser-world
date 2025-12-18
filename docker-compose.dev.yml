@@ -186,9 +186,10 @@ services:
             sleep 2;
         done;
         
-        echo "PostgreSQL is up - starting chat2chart-server...";
-        echo "Note: Database schema will be auto-created by SQLAlchemy on first use";
-        /root/.cache/pypoetry/virtualenvs/aiser-world-chat2chart-9TtSrW0h-py3.11/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000;
+        echo "PostgreSQL is up - running migrations...";
+        poetry run alembic -c alembic.ini upgrade head || echo "Migration failed or already applied";
+        echo "Starting chat2chart-server...";
+        poetry run uvicorn app.main:app --host 0.0.0.0 --port 8000;
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 10s

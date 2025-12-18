@@ -101,15 +101,39 @@ async def startup_event():
         logger.info("Running startup: Creating database tables if they don't exist...")
         from app.common.model import Base
         from app.db.session import async_engine
+        from sqlalchemy import text
         
         # Import all models to ensure they're registered with Base.metadata
-        # Ensure user settings model is imported so its table is created
         try:
-            import app.modules.user.models_user_setting  # noqa: F401
-        except Exception:
-            pass
+            import app.modules  # noqa: F401
+            logger.info("✅ All database models imported successfully")
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to import some models: {e}")
         
+        # Add missing columns to existing tables (safe for existing databases)
         async with async_engine.begin() as conn:
+            # Fix conversation table - add all missing BaseModel columns one by one
+            conversation_columns = [
+                ("json_metadata", "TEXT"),
+                ("deleted_at", "TIMESTAMP WITHOUT TIME ZONE"),
+                ("is_active", "BOOLEAN DEFAULT TRUE"),
+                ("is_deleted", "BOOLEAN DEFAULT FALSE"),
+                ("created_at", "TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP"),
+                ("updated_at", "TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP"),
+            ]
+            
+            for col_name, col_type in conversation_columns:
+                try:
+                    await conn.execute(text(f"""
+                        ALTER TABLE conversation 
+                        ADD COLUMN IF NOT EXISTS {col_name} {col_type};
+                    """))
+                except Exception as e:
+                    logger.debug(f"Column {col_name} may already exist: {e}")
+            
+            logger.info("✅ Added missing columns to conversation table (if needed)")
+            
+            # Create any missing tables
             await conn.run_sync(Base.metadata.create_all)
         
         logger.info("Database tables created successfully")
