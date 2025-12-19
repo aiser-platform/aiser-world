@@ -29,13 +29,13 @@ class BaseService(
         - Type safety with generics
 
     Example:
-        class UserService(BaseService[User, UserCreate, UserUpdate]):
-            async def validate_email(self, email: str) -> bool:
+        class MyService(BaseService[MyModel, MyCreate, MyUpdate]):
+            async def validate_data(self, data: str) -> bool:
                 # Custom business logic
                 pass
 
-        user_service = UserService(user_repository)
-        users = await user_service.get_all(limit=10)
+        my_service = MyService(my_repository)
+        items = await my_service.get_all(limit=10)
     """
 
     def __init__(

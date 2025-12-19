@@ -14,7 +14,8 @@ from fastapi import APIRouter, UploadFile, File, HTTPException, Form, Depends, s
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.authentication.deps.auth_bearer import JWTCookieBearer
-from app.modules.authentication.auth import Auth
+# Auth class removed - using extract_user_payload helper instead
+# from app.modules.authentication.auth import Auth
 from app.db.session import get_async_session
 from app.modules.authentication.rbac.decorators import require_permission
 from app.modules.authentication.rbac.permissions import Permission
@@ -359,7 +360,7 @@ async def connect_database(request: DatabaseConnectionRequest, current_token: Un
                 user_payload = current_token
             else:
                 # If it's a string token, decode it
-                user_payload = Auth().decodeJWT(current_token) or {}
+                user_payload = extract_user_payload(current_token)
             
             # Extract user_id from various possible fields
             user_id = str(user_payload.get('id') or user_payload.get('user_id') or user_payload.get('sub') or '')
@@ -451,7 +452,7 @@ async def get_data_sources(
     try:
         # Extract user ID from JWT token
         try:
-            user_payload = current_token if isinstance(current_token, dict) else Auth().decodeJWT(current_token) or {}
+            user_payload = extract_user_payload(current_token)
             user_id = str(user_payload.get('id') or user_payload.get('sub') or '')
         except Exception:
             user_id = ''
@@ -488,7 +489,7 @@ async def get_project_data_sources(
     try:
         # Extract user ID from JWT token - CRITICAL for security
         try:
-            user_payload = current_token if isinstance(current_token, dict) else Auth().decodeJWT(current_token) or {}
+            user_payload = extract_user_payload(current_token)
             user_id = str(user_payload.get('id') or user_payload.get('user_id') or user_payload.get('sub') or '')
         except Exception:
             user_id = ''
@@ -633,10 +634,10 @@ async def create_project_connection(
         try:
             # Try to get user from auth context
             from app.modules.authentication.deps.auth_bearer import JWTCookieBearer
-            from app.modules.authentication.auth import Auth
+            from app.modules.authentication.helpers import extract_user_payload
             try:
                 token = await JWTCookieBearer()(request_obj)
-                user_payload = token if isinstance(token, dict) else Auth().decodeJWT(token) or {}
+                user_payload = extract_user_payload(token)
                 user_id = str(user_payload.get('id') or user_payload.get('sub') or '')
             except Exception:
                 pass
@@ -891,7 +892,7 @@ async def upload_file(
                 user_payload = current_token
             else:
                 # If it's a string token, decode it
-                user_payload = Auth().decodeJWT(current_token) or {}
+                user_payload = extract_user_payload(current_token)
             
             # Extract user_id from various possible fields
             user_id = str(user_payload.get('id') or user_payload.get('user_id') or user_payload.get('sub') or '')
@@ -1032,7 +1033,7 @@ async def connect_database(
     try:
         # Extract user ID from JWT token
         try:
-            user_payload = current_token if isinstance(current_token, dict) else Auth().decodeJWT(current_token) or {}
+            user_payload = extract_user_payload(current_token)
             user_id = str(user_payload.get('id') or user_payload.get('sub') or '')
         except Exception:
             user_id = ''
@@ -1123,7 +1124,7 @@ async def get_data_source(
     try:
         # Extract user ID from JWT token - CRITICAL for security
         try:
-            user_payload = current_token if isinstance(current_token, dict) else Auth().decodeJWT(current_token) or {}
+            user_payload = extract_user_payload(current_token)
             user_id = str(user_payload.get('id') or user_payload.get('user_id') or user_payload.get('sub') or '')
         except Exception:
             user_id = ''
@@ -1194,7 +1195,7 @@ async def query_data_source(
     try:
         # Extract user ID from JWT token - CRITICAL for security
         try:
-            user_payload = current_token if isinstance(current_token, dict) else Auth().decodeJWT(current_token) or {}
+            user_payload = extract_user_payload(current_token)
             user_id = str(user_payload.get('id') or user_payload.get('user_id') or user_payload.get('sub') or '')
         except Exception:
             user_id = ''
@@ -1271,7 +1272,7 @@ async def delete_data_source(data_source_id: str, current_token: Union[str, dict
     try:
         # Extract user ID from JWT token
         try:
-            user_payload = current_token if isinstance(current_token, dict) else Auth().decodeJWT(current_token) or {}
+            user_payload = extract_user_payload(current_token)
             user_id = str(user_payload.get('id') or user_payload.get('sub') or '')
         except Exception:
             user_id = ''
@@ -1330,7 +1331,7 @@ async def chat_to_chart_workflow(
         
         # Extract user ID from JWT token
         try:
-            user_payload = current_token if isinstance(current_token, dict) else Auth().decodeJWT(current_token) or {}
+            user_payload = extract_user_payload(current_token)
             user_id = str(user_payload.get('id') or user_payload.get('sub') or '')
             organization_id = str(user_payload.get('organization_id') or 'default-org')
         except Exception:
@@ -1548,7 +1549,7 @@ async def execute_cube_query(
             user_id = current_token.get('id') or current_token.get('user_id') or current_token.get('sub')
             organization_id = current_token.get('organization_id')
         elif isinstance(current_token, str):
-            user_payload = Auth().decodeJWT(current_token) or {}
+            user_payload = extract_user_payload(current_token)
             user_id = user_payload.get('id') or user_payload.get('user_id') or user_payload.get('sub')
             organization_id = user_payload.get('organization_id')
         
@@ -1626,7 +1627,7 @@ async def get_data_source_data(
     try:
         # Extract user ID from JWT token - CRITICAL for security
         try:
-            user_payload = current_token if isinstance(current_token, dict) else Auth().decodeJWT(current_token) or {}
+            user_payload = extract_user_payload(current_token)
             user_id = str(user_payload.get('id') or user_payload.get('user_id') or user_payload.get('sub') or '')
         except Exception:
             user_id = ''
@@ -1903,7 +1904,7 @@ async def connect_enterprise_warehouse_legacy(request: Dict[str, Any], current_t
             if isinstance(current_token, dict):
                 user_payload = current_token
             else:
-                user_payload = Auth().decodeJWT(current_token) or {}
+                user_payload = extract_user_payload(current_token)
             
             user_id = str(user_payload.get('id') or user_payload.get('user_id') or user_payload.get('sub') or '')
             logger.info(f"🔍 Extracted user_id: {user_id} from payload keys: {list(user_payload.keys()) if isinstance(user_payload, dict) else 'not dict'}")
@@ -3231,7 +3232,7 @@ async def cleanup_data_retention(
             if isinstance(current_token, dict):
                 user_id = current_token.get('id') or current_token.get('user_id') or current_token.get('sub')
             elif isinstance(current_token, str):
-                user_payload = Auth().decodeJWT(current_token) or {}
+                user_payload = extract_user_payload(current_token)
                 user_id = user_payload.get('id') or user_payload.get('user_id') or user_payload.get('sub')
         except Exception:
             pass  # Allow cron/system calls without user context
@@ -3311,7 +3312,7 @@ async def connect_delta_iceberg(
             if isinstance(current_token, dict):
                 user_payload = current_token
             else:
-                user_payload = Auth().decodeJWT(current_token) or {}
+                user_payload = extract_user_payload(current_token)
             
             user_id = str(user_payload.get('id') or user_payload.get('user_id') or user_payload.get('sub') or '')
             organization_id = user_payload.get('organization_id')

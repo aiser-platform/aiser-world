@@ -23,7 +23,7 @@ from sqlalchemy.sql import func
 from datetime import datetime
 from sqlalchemy import select
 from app.modules.authentication.deps.auth_bearer import JWTCookieBearer
-from app.modules.authentication.auth import Auth
+from app.modules.authentication.helpers import extract_user_payload
 from app.core.config import settings
 from fastapi import APIRouter, Depends, HTTPException, Body, UploadFile, File, Request, status
 from typing import Union
@@ -45,7 +45,7 @@ async def use_session(db: AsyncSession | None):
     else:
         async with async_session() as s:
             yield s
-from app.modules.user.models import User
+# User model removed - user management will be handled by Supabase
 from app.modules.authentication.rbac import has_dashboard_access
 from app.modules.authentication.rbac.decorators import require_permission
 from app.modules.authentication.rbac.permissions import Permission
@@ -188,7 +188,7 @@ async def generate_chart(
         if isinstance(current_token, dict):
             user_payload = current_token
         else:
-            user_payload = Auth().decodeJWT(current_token) or {}
+            user_payload = extract_user_payload(current_token)
         
         user_id = str(user_payload.get('id') or user_payload.get('user_id') or user_payload.get('sub') or '')
         plan_type = None
@@ -657,7 +657,7 @@ async def get_project_dashboard(
         if isinstance(current_token, dict):
             user_payload = current_token
         else:
-            user_payload = Auth().decodeJWT(current_token) or {}
+            user_payload = extract_user_payload(current_token)
         try:
             user_id = int(user_payload.get('id') or user_payload.get('sub') or 0)
         except Exception:
@@ -796,7 +796,7 @@ async def create_dashboard(
             if isinstance(current_token, dict):
                 user_payload = current_token
             else:
-                user_payload = Auth().decodeJWT(current_token) if current_token else {}
+                user_payload = extract_user_payload(current_token) if current_token else {}
         except Exception:
             user_payload = {}
 
@@ -827,30 +827,12 @@ async def create_dashboard(
 
         # Try to resolve user to canonical UUID from DB (best-effort) to avoid datatype mismatches
         resolved_user = None
+        # Users table removed - use user_id directly from token payload
+        # User lookup will be handled by Supabase integration
         try:
-            async with async_session() as sdb:
-                # prefer email, then username, then numeric id
-                if user_payload.get('email'):
-                    q = select(User).where(User.email == user_payload.get('email'))
-                elif user_payload.get('username'):
-                    q = select(User).where(User.username == user_payload.get('username'))
-                else:
-                    # fallback: if payload contains numeric id, try legacy lookup
-                    maybe = user_payload.get('user_id') or user_payload.get('id') or user_payload.get('sub')
-                    try:
-                        maybe_int = int(maybe)
-                    except Exception:
-                        maybe_int = None
-                    if maybe_int is not None:
-                        q = select(User).where(User.legacy_id == maybe_int)
-                    else:
-                        q = None
-
-                if q is not None:
-                    pres = await sdb.execute(q)
-                    u = pres.scalar_one_or_none()
-                    if u:
-                        resolved_user = u.id
+            resolved_user = user_payload.get('user_id') or user_payload.get('id') or user_payload.get('sub')
+            if resolved_user:
+                resolved_user = str(resolved_user)
         except Exception:
             resolved_user = None
 
@@ -931,7 +913,7 @@ async def debug_create_dashboard(
         if isinstance(current_token, dict):
             user_payload = current_token
         else:
-            user_payload = Auth().decodeJWT(current_token) or {}
+            user_payload = extract_user_payload(current_token)
 
         dashboard_service = DashboardService(db)
         resolved = await dashboard_service._resolve_user_uuid(user_payload)
@@ -995,7 +977,7 @@ async def get_dashboard(
     logger.info(f"📊 Getting dashboard: {dashboard_id}")
 
     token = await _optional_token(request)
-    caller_payload = Auth().decodeJWT(token) if token else {}
+    caller_payload = extract_user_payload(token) if token else {}
 
     # 1) Try raw SQL fast path (tolerant).
     # Prefer the request-scoped `db` session to avoid concurrent operations on
@@ -1151,7 +1133,7 @@ async def update_dashboard(
         if isinstance(current_token, dict):
             user_payload = current_token
         else:
-            user_payload = Auth().decodeJWT(current_token) or {}
+            user_payload = extract_user_payload(current_token)
 
         # Dev/CI safe inline update via sync engine in a background thread to
         # avoid asyncpg "another operation is in progress" issues during tests.
@@ -1580,7 +1562,7 @@ async def create_widget(dashboard_id: str, widget: Dict[str, Any] = Body(...), c
         if isinstance(current_token, dict):
             user_payload = current_token
         else:
-            user_payload = Auth().decodeJWT(current_token) or {}
+            user_payload = extract_user_payload(current_token)
         try:
             user_id = int(user_payload.get('id') or user_payload.get('sub') or 0)
         except Exception:
@@ -1595,7 +1577,7 @@ async def create_widget(dashboard_id: str, widget: Dict[str, Any] = Body(...), c
 
         # Permission: caller must be able to access the dashboard (creator or org owner/admin)
         try:
-            user_payload = Auth().decodeJWT(current_token) if not isinstance(current_token, dict) else current_token
+            user_payload = extract_user_payload(current_token)
             allowed = await has_dashboard_access(user_payload, dashboard_id,)
             if not allowed:
                 raise HTTPException(status_code=403, detail="Access denied to create widget on this dashboard")
@@ -1621,7 +1603,7 @@ async def list_widgets(dashboard_id: str, current_token: str = Depends(JWTCookie
         if isinstance(current_token, dict):
             user_payload = current_token
         else:
-            user_payload = Auth().decodeJWT(current_token) or {}
+            user_payload = extract_user_payload(current_token)
         try:
             user_id = int(user_payload.get('id') or user_payload.get('sub') or 0)
         except Exception:
@@ -1629,7 +1611,7 @@ async def list_widgets(dashboard_id: str, current_token: str = Depends(JWTCookie
 
         # Permission: caller must have access to the dashboard
         try:
-            user_payload = Auth().decodeJWT(current_token) if not isinstance(current_token, dict) else current_token
+            user_payload = extract_user_payload(current_token)
             allowed = await has_dashboard_access(user_payload, dashboard_id)
             if not allowed:
                 raise HTTPException(status_code=403, detail="Access denied to list widgets for this dashboard")
@@ -1660,14 +1642,14 @@ async def update_widget(dashboard_id: str, widget_id: str, widget: DashboardWidg
             if isinstance(current_token, dict):
                 user_payload = current_token
             else:
-                user_payload = Auth().decodeJWT(current_token) or {}
+                user_payload = extract_user_payload(current_token)
             try:
                 user_id = int(user_payload.get('id') or user_payload.get('sub') or 0)
             except Exception:
                 user_id = 0
 
             # Permission: caller must have access to modify widgets on this dashboard
-            user_payload = Auth().decodeJWT(current_token) if not isinstance(current_token, dict) else current_token
+            user_payload = extract_user_payload(current_token)
             allowed = await has_dashboard_access(user_payload, dashboard_id)
             if not allowed:
                 raise HTTPException(status_code=403, detail="Access denied to update widget on this dashboard")
@@ -1698,14 +1680,14 @@ async def delete_widget(dashboard_id: str, widget_id: str, current_token: str = 
             if isinstance(current_token, dict):
                 user_payload = current_token
             else:
-                user_payload = Auth().decodeJWT(current_token) or {}
+                user_payload = extract_user_payload(current_token)
             try:
                 user_id = int(user_payload.get('id') or user_payload.get('sub') or 0)
             except Exception:
                 user_id = 0
 
             # Permission: caller must have access to delete widgets on this dashboard
-            user_payload = Auth().decodeJWT(current_token) if not isinstance(current_token, dict) else current_token
+            user_payload = extract_user_payload(current_token)
             allowed = await has_dashboard_access(user_payload, dashboard_id)
             if not allowed:
                 raise HTTPException(status_code=403, detail="Access denied to delete widget on this dashboard")
@@ -1842,7 +1824,7 @@ async def share_dashboard(dashboard_id: str, share_request: DashboardShareCreate
 async def publish_dashboard(dashboard_id: str, make_public: bool = True, current_token: str = Depends(JWTCookieBearer()), db: AsyncSession = Depends(get_async_session)):
     """Publish or unpublish a dashboard (toggle public visibility). Enforces auth."""
     try:
-        user_payload = current_token if isinstance(current_token, dict) else (Auth().decodeJWT(current_token) or {})
+        user_payload = extract_user_payload(current_token)
 
         # Load dashboard and enforce RBAC via central helper
         from app.db.session import async_session
@@ -1883,7 +1865,7 @@ async def publish_dashboard(dashboard_id: str, make_public: bool = True, current
 async def create_dashboard_embed(dashboard_id: str, options: Dict[str, Any] = Body({}), current_token: str = Depends(JWTCookieBearer())):
     """Create an embeddable token/URL for a dashboard. In production, persist tokens and validate scopes."""
     try:
-        user_payload = current_token if isinstance(current_token, dict) else (Auth().decodeJWT(current_token) or {})
+        user_payload = extract_user_payload(current_token)
 
         # Permission: only users with dashboard access can create embed
         from app.modules.dashboards.models import DashboardEmbed, Dashboard

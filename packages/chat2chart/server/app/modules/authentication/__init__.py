@@ -1,4 +1,2 @@
-from .schemas import SignInRequest, SignInResponse, RefreshTokenRequest, RefreshTokenResponse
-from .services import AuthService
-from .auth import *
-
+# Authentication module - Auth logic removed, ready for Supabase integration
+# All auth-related code has been removed for clean slate

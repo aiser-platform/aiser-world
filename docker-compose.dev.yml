@@ -71,57 +71,6 @@ services:
     networks:
       - default
 
-  # Authentication Service
-  auth-service:
-    build:
-      context: ./packages/auth
-      dockerfile: Dockerfile.dev
-    container_name: aiser-auth-dev
-    working_dir: /app
-    env_file: .env  # Moved here
-    ports:
-      - "5000:5000"
-    environment:
-      - POSTGRES_SERVER=postgres
-      - POSTGRES_DB=${POSTGRES_DB:-aiser_world}
-      - POSTGRES_USER=${POSTGRES_USER:-aiser}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-aiser_password}
-      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
-      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-aiser}:${POSTGRES_PASSWORD:-aiser_password}@postgres:${POSTGRES_PORT:-5432}/aiser_world
-      - SECRET_KEY=${SECRET_KEY:-dev-secret-key}
-      - DEBUG=${DEBUG:-True}
-      - ENVIRONMENT=${ENVIRONMENT:-development}
-      - CHAT2CHART_PROVISION_URL=http://chat2chart-server:8000/internal/provision-user
-      - INTERNAL_PROVISION_SECRET=dev-internal-secret
-      - PYTHONPATH=/app/src
-    networks:
-      - default
-    depends_on:
-      postgres:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:5000/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    volumes:
-      - ./packages/auth/src:/app/src
-      - ./packages/auth/alembic.ini:/app/alembic.ini
-      - auth_poetry_cache:/root/.cache/poetry
-    entrypoint:
-      - /bin/sh
-      - -c
-      - |
-        set -ex;
-        echo 'Waiting for PostgreSQL to be ready...';
-        until nc -z postgres 5432; do echo "PostgreSQL is unavailable - sleeping"; sleep 2; done;
-        
-        echo 'PostgreSQL is up. Starting auth service...';
-        # Note: Database schema is now managed by SQLAlchemy create_all() on startup
-        # Migrations can be run manually when needed with: poetry run alembic upgrade head
-        poetry run uvicorn app.main:app --host 0.0.0.0 --port 5000;
-    restart: unless-stopped
-
   # Chat2Chart Server
   chat2chart-server:
     build:
@@ -208,10 +157,8 @@ services:
       - "3000:3000"
     environment:
       - NEXT_PUBLIC_API_URL=http://chat2chart-server:8000
-      - NEXT_PUBLIC_AUTH_URL=http://auth-service:5000
       - NEXT_PUBLIC_BACKEND_URL=http://chat2chart-server:8000
       - NODE_ENV=development
-      - AUTH_TARGET=http://auth-service:5000
       - API_TARGET=http://chat2chart-server:8000
     volumes:
       - ./packages/chat2chart/client:/app
@@ -253,10 +200,6 @@ services:
           echo "Waiting for chat2chart-server..."
           sleep 5
         done
-        until nc -z auth-service 5000; do
-          echo "Waiting for auth-service..."
-          sleep 5
-        done
         echo "Dependencies ready. Installing npm packages..."
         cd /app
         npm install
@@ -267,15 +210,12 @@ services:
     depends_on:
       chat2chart-server:
         condition: service_started
-      auth-service:
-        condition: service_healthy
     restart: unless-stopped
 
 volumes:
   postgres_dev_data:
   redis_dev_data:
   clickhouse_dev_data:
-  auth_poetry_cache:
   chat2chart_poetry_cache:
   aiser-world_chat2chart_poetry_cache:
   client_node_modules:

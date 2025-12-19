@@ -12,7 +12,7 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 from app.modules.authentication.deps.auth_bearer import JWTCookieBearer
-from app.modules.authentication.auth import Auth
+from app.modules.authentication.helpers import extract_user_payload
 from app.modules.pricing.rate_limiter import RateLimiter
 from app.modules.pricing.plans import is_feature_available
 from fastapi import status
@@ -34,7 +34,7 @@ def _resolve_user_payload(token_or_dict: Any) -> Dict[str, Any]:
     if isinstance(token_or_dict, dict):
         return token_or_dict
     try:
-        return Auth().decodeJWT(token_or_dict) or {}
+        return extract_user_payload(token_or_dict)
     except Exception:
         return {}
 
@@ -348,7 +348,7 @@ async def create_snapshot(
     if isinstance(current_token, dict):
         user_payload = current_token
     else:
-        user_payload = Auth().decodeJWT(current_token) or {}
+        user_payload = extract_user_payload(current_token)
     try:
         from app.core.config import settings as _settings
         if not user_payload and getattr(_settings, 'ENVIRONMENT', 'development') == 'development':
@@ -668,7 +668,7 @@ async def list_snapshots(
     if isinstance(current_token, dict):
         user_payload = current_token
     else:
-        user_payload = Auth().decodeJWT(current_token) or {}
+        user_payload = extract_user_payload(current_token)
     # Use integer user_id consistently to match DB schema
     try:
         user_id = int(user_payload.get("id") or user_payload.get('sub') or 1)
@@ -714,7 +714,7 @@ async def delete_snapshot(
     if isinstance(current_token, dict):
         user_payload = current_token
     else:
-        user_payload = Auth().decodeJWT(current_token) or {}
+        user_payload = extract_user_payload(current_token)
     try:
         user_id = int(user_payload.get("id") or user_payload.get('sub') or 1)
     except Exception:
@@ -759,7 +759,7 @@ async def get_snapshot(snapshot_id: int,
     if isinstance(current_token, dict):
         user_payload = current_token
     else:
-        user_payload = Auth().decodeJWT(current_token) or {}
+        user_payload = extract_user_payload(current_token)
     user_id = str(user_payload.get("id") or user_payload.get("email") or user_payload.get('sub') or "guest")
     user_roles = user_payload.get('roles', []) or []
     # In development tests, allow missing auth to map to the default dev user id

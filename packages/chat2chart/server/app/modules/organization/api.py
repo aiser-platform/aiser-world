@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from app.db.session import get_async_session
 from app.core.deps import get_current_user
 from app.modules.projects.models import Organization, UserOrganization
-from app.modules.user.models import User
+# User model removed - user management will be handled by Supabase
 from app.modules.authentication.deps.auth_bearer import JWTCookieBearer
 from app.modules.authentication.rbac.decorators import require_permission
 from app.modules.authentication.rbac.permissions import Permission
@@ -57,7 +57,7 @@ async def get_organization_settings(token: str = Depends(JWTCookieBearer())):
 @require_permission(Permission.ORG_EDIT)
 async def update_organization_settings(
     org_update: OrganizationUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user = Depends(get_current_user),  # Returns minimal user object (User model removed)
     session: AsyncSession = Depends(get_async_session)
 ):
     """Update organization settings"""
@@ -137,7 +137,7 @@ async def update_organization_settings(
 
 @router.get("/members")
 async def get_organization_members(
-    current_user: User = Depends(get_current_user),
+    current_user = Depends(get_current_user),  # Returns minimal user object (User model removed)
     session: AsyncSession = Depends(get_async_session)
 ):
     """Get organization members"""
@@ -156,11 +156,9 @@ async def get_organization_members(
                 detail="User not associated with any organization"
             )
         
-        # Get all organization members
+        # Get all organization members (users table removed - user info will come from Supabase)
         members = await session.execute(
-            select(UserOrganization, User).join(
-                User, UserOrganization.user_id == User.id
-            ).where(
+            select(UserOrganization).where(
                 and_(
                     UserOrganization.organization_id == org_user.organization_id,
                     UserOrganization.is_active == True
@@ -169,16 +167,17 @@ async def get_organization_members(
         )
         
         member_list = []
-        for member_data, user in members:
+        for member_data in members:
+            # User details will be fetched from Supabase when integrated
             member_list.append({
-                "user_id": user.id,
-                "username": user.username,
-                "email": user.email,
-                "full_name": user.full_name,
+                "user_id": member_data.user_id,
+                "username": None,  # Will be fetched from Supabase
+                "email": None,  # Will be fetched from Supabase
+                "full_name": None,  # Will be fetched from Supabase
                 "role": member_data.role,
                 "is_active": member_data.is_active,
-                "joined_at": member_data.joined_at,
-                "last_accessed": user.last_login
+                "joined_at": member_data.created_at.isoformat() if member_data.created_at else None,
+                "last_accessed": None  # Will be fetched from Supabase
             })
         
         return member_list
@@ -194,7 +193,7 @@ async def get_organization_members(
 @router.post("/invite")
 async def invite_organization_member(
     invite_data: Dict[str, Any],
-    current_user: User = Depends(get_current_user),
+    current_user = Depends(get_current_user),  # Returns minimal user object (User model removed)
     session: AsyncSession = Depends(get_async_session)
 ):
     """Invite member to organization"""
@@ -245,7 +244,8 @@ async def request_access(
         organization_id = payload.get('organization_id')
         reason = payload.get('reason')
 
-        user_payload = Auth().decodeJWT(token) or {}
+        from app.modules.authentication.helpers import extract_user_payload
+        user_payload = extract_user_payload(token)
         requester = user_payload.get('email') or user_payload.get('id') or 'unknown'
 
         logger.info(f"Access request for org {organization_id} by {requester} (contact: {email}) reason={reason}")
@@ -259,7 +259,7 @@ async def request_access(
 
 @router.get("/usage")
 async def get_organization_usage(
-    current_user: User = Depends(get_current_user),
+    current_user = Depends(get_current_user),  # Returns minimal user object (User model removed)
     session: AsyncSession = Depends(get_async_session)
 ):
     """Get organization usage statistics"""

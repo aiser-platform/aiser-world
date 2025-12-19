@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.common.schemas import ListResponseSchema, PaginationSchema
 from app.common.utils.query_params import BaseFilterParams
-from app.modules.authentication.auth import Auth
+from app.modules.authentication.helpers import extract_user_payload
 
 from .schemas import (
     ProjectCreate,
@@ -22,9 +22,9 @@ from .schemas import (
 )
 from .services import ProjectService, OrganizationService
 from app.modules.authentication.deps.auth_bearer import JWTCookieBearer
-from app.modules.authentication.auth import Auth
+from app.modules.authentication.helpers import extract_user_payload
 from app.core.deps import get_current_user
-from app.modules.user.models import User
+# User model removed - user management will be handled by Supabase
 from app.modules.authentication.rbac.decorators import require_permission
 from app.modules.authentication.rbac.permissions import Permission
 from app.db.session import get_async_session
@@ -45,13 +45,13 @@ async def get_organizations(
     """Get all organizations for the authenticated user"""
     try:
         # Extract user_id from token
-        from app.modules.authentication.auth import Auth
+        from app.modules.authentication.helpers import extract_user_payload
         user_id = ''
         try:
             if isinstance(current_token, dict):
                 user_payload = current_token
             else:
-                user_payload = Auth().decodeJWT(current_token) or {}
+                user_payload = extract_user_payload(current_token)
             user_id = str(user_payload.get('id') or user_payload.get('user_id') or user_payload.get('sub') or '')
         except Exception as e:
             logger.warning(f"Failed to extract user info from token: {e}")
@@ -132,13 +132,13 @@ async def update_organization(
     """Update organization - only if user is a member"""
     try:
         # Extract user_id from token
-        from app.modules.authentication.auth import Auth
+        from app.modules.authentication.helpers import extract_user_payload
         user_id = ''
         try:
             if isinstance(current_token, dict):
                 user_payload = current_token
             else:
-                user_payload = Auth().decodeJWT(current_token) or {}
+                user_payload = extract_user_payload(current_token)
             user_id = str(user_payload.get('id') or user_payload.get('user_id') or user_payload.get('sub') or '')
         except Exception as e:
             logger.warning(f"Failed to extract user info from token: {e}")
@@ -194,7 +194,7 @@ async def create_project(
     """Create a new project deriving user from JWT cookie"""
     try:
         try:
-            user_payload = current_token if isinstance(current_token, dict) else Auth().decodeJWT(current_token) or {}
+            user_payload = extract_user_payload(current_token)
             user_id = str(user_payload.get('id') or user_payload.get('sub') or '')
         except Exception:
             user_id = ''
@@ -223,7 +223,7 @@ async def get_projects(
     try:
         # Resolve user id from JWT token
         try:
-            user_payload = current_token if isinstance(current_token, dict) else Auth().decodeJWT(current_token) or {}
+            user_payload = extract_user_payload(current_token)
             # Handle both integer and UUID string user IDs
             user_id_raw = user_payload.get('id') or user_payload.get('sub') or user_payload.get('user_id')
             if user_id_raw:
@@ -275,7 +275,7 @@ async def get_project(project_id: str, current_token: str = Depends(JWTCookieBea
     """Get project by ID with data source counts, using authenticated user"""
     try:
         try:
-            user_payload = current_token if isinstance(current_token, dict) else Auth().decodeJWT(current_token) or {}
+            user_payload = extract_user_payload(current_token)
             user_id = str(user_payload.get('id') or user_payload.get('sub') or '')
         except Exception:
             user_id = ''
@@ -330,7 +330,7 @@ async def add_data_source_to_project(
     """Add a data source to a project deriving user from JWT"""
     try:
         try:
-            user_payload = current_token if isinstance(current_token, dict) else Auth().decodeJWT(current_token) or {}
+            user_payload = extract_user_payload(current_token)
             user_id = str(user_payload.get('id') or user_payload.get('sub') or '')
         except Exception:
             user_id = ''
@@ -362,7 +362,7 @@ async def get_project_data_sources(project_id: str, current_token: str = Depends
     """Get all data sources in a project deriving user from JWT"""
     try:
         try:
-            user_payload = current_token if isinstance(current_token, dict) else Auth().decodeJWT(current_token) or {}
+            user_payload = extract_user_payload(current_token)
             user_id = str(user_payload.get('id') or user_payload.get('sub') or '')
         except Exception:
             user_id = ''
@@ -386,7 +386,7 @@ async def remove_data_source_from_project(project_id: str, data_source_id: str, 
     """Remove a data source from a project deriving user from JWT"""
     try:
         try:
-            user_payload = current_token if isinstance(current_token, dict) else Auth().decodeJWT(current_token) or {}
+            user_payload = extract_user_payload(current_token)
             user_id = str(user_payload.get('id') or user_payload.get('sub') or '')
         except Exception:
             user_id = ''
@@ -451,12 +451,12 @@ async def get_organization_members(
     try:
         from app.db.session import async_session
         from app.modules.projects.models import UserOrganization
-        from app.modules.user.models import User
+        # User model removed - user management will be handled by Supabase
         from sqlalchemy import select
         
         # Extract user ID from token for access control
         try:
-            user_payload = current_token if isinstance(current_token, dict) else Auth().decodeJWT(current_token) or {}
+            user_payload = extract_user_payload(current_token)
             user_id = str(user_payload.get('id') or user_payload.get('user_id') or user_payload.get('sub') or '')
         except Exception:
             user_id = ''
@@ -478,10 +478,9 @@ async def get_organization_members(
                 if not org_user.scalar_one_or_none():
                     raise HTTPException(status_code=403, detail="Access denied to this organization")
             
-            # Query UserOrganization joined with User to get member details
+            # Query UserOrganization (users table removed - user info will come from Supabase)
             query = (
-                select(UserOrganization, User)
-                .join(User, UserOrganization.user_id == User.id)
+                select(UserOrganization)
                 .where(
                     UserOrganization.organization_id == org_id_int,
                     UserOrganization.is_active == True
@@ -491,18 +490,20 @@ async def get_organization_members(
             rows = result.all()
             
             members = []
-            for uo, user in rows:
+            for uo in rows:
+                # User details will be fetched from Supabase when integrated
+                # For now, return minimal info from user_organizations table
                 members.append({
-                    "id": str(user.id),
-                    "user_id": str(user.id),
-                    "username": user.username or (user.email.split('@')[0] if user.email else 'user'),
-                    "name": f"{user.first_name or ''} {user.last_name or ''}".strip() or user.username or (user.email.split('@')[0] if user.email else 'User'),
-                    "email": user.email or '',
+                    "id": str(uo.user_id),
+                    "user_id": str(uo.user_id),
+                    "username": None,  # Will be fetched from Supabase
+                    "name": None,  # Will be fetched from Supabase
+                    "email": None,  # Will be fetched from Supabase
                     "role": uo.role or 'member',
                     "status": "active" if uo.is_active else "inactive",
                     "joined_at": uo.created_at.isoformat() if uo.created_at else None,
                     "joinDate": uo.created_at.isoformat() if uo.created_at else None,
-                    "avatar_url": getattr(user, 'avatar_url', None)
+                    "avatar_url": None  # Will be fetched from Supabase
                 })
             
             return members
@@ -521,7 +522,7 @@ async def add_organization_member(organization_id: str, member_data: dict):
     try:
         from app.db.session import async_session
         from app.modules.projects.models import UserOrganization
-        from app.modules.user.models import User
+        # User model removed - user management will be handled by Supabase
         from sqlalchemy import select
         
         email = member_data.get('email')
@@ -534,21 +535,19 @@ async def add_organization_member(organization_id: str, member_data: dict):
             )
         
         async with async_session() as db:
-            # Find user by email
-            user_query = select(User).where(User.email == email)
-            user_result = await db.execute(user_query)
-            user = user_result.scalar_one_or_none()
-            
-            if not user:
+            # Users table removed - user lookup will be done via Supabase
+            # For now, we'll need the user_id to be provided or looked up from Supabase
+            user_id = member_data.get('user_id')
+            if not user_id:
                 raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"User with email {email} not found. They must sign up first."
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="user_id is required. User lookup will be handled by Supabase integration."
                 )
             
             # Check if user is already a member
             existing_query = select(UserOrganization).where(
                 UserOrganization.organization_id == int(organization_id),
-                UserOrganization.user_id == user.id,
+                UserOrganization.user_id == user_id,
                 UserOrganization.is_active == True
             )
             existing_result = await db.execute(existing_query)
@@ -563,7 +562,7 @@ async def add_organization_member(organization_id: str, member_data: dict):
             # Create new UserOrganization entry
             new_member = UserOrganization(
                 organization_id=int(organization_id),
-                user_id=user.id,
+                user_id=user_id,
                 role=role,
                 is_active=True
             )
@@ -650,7 +649,7 @@ async def get_organization_usage(
             
             # Extract user ID from token
             try:
-                user_payload = current_token if isinstance(current_token, dict) else Auth().decodeJWT(current_token) or {}
+                user_payload = extract_user_payload(current_token)
                 user_id = str(user_payload.get('id') or user_payload.get('user_id') or user_payload.get('sub') or '')
             except Exception:
                 user_id = ''

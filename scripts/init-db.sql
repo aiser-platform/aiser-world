@@ -4,28 +4,8 @@
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Create users table with tenant isolation
-CREATE TABLE IF NOT EXISTS users (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    legacy_id INTEGER UNIQUE,
-    email VARCHAR(255) UNIQUE NOT NULL,
-    username VARCHAR(100) UNIQUE,
-    password VARCHAR(255) DEFAULT '',
-    first_name VARCHAR(100),
-    last_name VARCHAR(100),
-    role VARCHAR(50) DEFAULT 'user',
-    status VARCHAR(50) DEFAULT 'active',
-    tenant_id VARCHAR(50) DEFAULT 'default',
-    is_active BOOLEAN DEFAULT TRUE,
-    is_deleted BOOLEAN DEFAULT FALSE,
-    deleted_at TIMESTAMP NULL,
-    is_verified BOOLEAN DEFAULT FALSE,
-    verification_attempts INTEGER DEFAULT 0,
-    verification_sent_at TIMESTAMP NULL,
-    last_login_at TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+-- Note: Users table removed - user management will be handled by Supabase
+-- User IDs in other tables are stored as plain UUID (no foreign key constraints)
 
 -- Create conversations table
 CREATE TABLE IF NOT EXISTS conversation (
@@ -34,7 +14,7 @@ CREATE TABLE IF NOT EXISTS conversation (
     description TEXT,
     status VARCHAR(50) DEFAULT 'active',
     type VARCHAR(50) DEFAULT 'chat2chart',
-    user_id UUID REFERENCES users(id),
+    user_id UUID,
     tenant_id VARCHAR(50) DEFAULT 'default',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -49,7 +29,7 @@ CREATE TABLE IF NOT EXISTS charts (
     status VARCHAR(50) DEFAULT 'pending',
     complexity_score INTEGER DEFAULT 5,
     data_source VARCHAR(255),
-    user_id UUID REFERENCES users(id),
+    user_id UUID,
     conversation_id UUID REFERENCES conversation(id),
     tenant_id VARCHAR(50) DEFAULT 'default',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -57,10 +37,6 @@ CREATE TABLE IF NOT EXISTS charts (
 );
 
 -- Create indexes for performance
-CREATE INDEX IF NOT EXISTS idx_users_tenant_id ON users(tenant_id);
-CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
-CREATE INDEX IF NOT EXISTS idx_users_created_at ON users(created_at);
-
 CREATE INDEX IF NOT EXISTS idx_conversation_tenant_id ON conversation(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_conversation_user_id ON conversation(user_id);
 CREATE INDEX IF NOT EXISTS idx_conversation_created_at ON conversation(created_at);
@@ -71,54 +47,8 @@ CREATE INDEX IF NOT EXISTS idx_charts_conversation_id ON charts(conversation_id)
 CREATE INDEX IF NOT EXISTS idx_charts_created_at ON charts(created_at);
 CREATE INDEX IF NOT EXISTS idx_charts_type ON charts(chart_type);
 
--- Insert sample data for development
-INSERT INTO users (email, username, first_name, last_name, role, tenant_id) 
-VALUES 
-    ('admin@aiser.app', 'admin', 'Admin', 'User', 'admin', 'default'),
-    ('user@aiser.app', 'user', 'Test', 'User', 'user', 'default'),
-    ('analyst@aiser.app', 'analyst', 'Data', 'Analyst', 'analyst', 'default')
-ON CONFLICT (email) DO NOTHING;
-
--- Insert sample conversations
-INSERT INTO conversation (id, title, description, user_id, tenant_id)
-SELECT 
-    uuid_generate_v4(),
-    'Sample Chart Analysis',
-    'Analyzing sales data with AI-powered insights',
-    u.id,
-    'default'
-FROM users u 
-WHERE u.email = 'user@aiser.app'
-ON CONFLICT DO NOTHING;
-
--- Insert sample charts
-INSERT INTO charts (title, chart_type, chart_library, status, complexity_score, data_source, user_id, tenant_id)
-SELECT 
-    'Sales Performance Dashboard',
-    'line',
-    'echarts',
-    'completed',
-    7,
-    'postgresql',
-    u.id,
-    'default'
-FROM users u 
-WHERE u.email = 'user@aiser.app'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO charts (title, chart_type, chart_library, status, complexity_score, data_source, user_id, tenant_id)
-SELECT 
-    'User Growth Analysis',
-    'bar',
-    'echarts',
-    'completed',
-    5,
-    'postgresql',
-    u.id,
-    'default'
-FROM users u 
-WHERE u.email = 'analyst@aiser.app'
-ON CONFLICT DO NOTHING;
+-- Note: Sample data inserts removed - users table no longer exists
+-- Sample data will be created through application logic when Supabase auth is integrated
 
 -- Create pre-aggregations schema for Cube.js
 CREATE SCHEMA IF NOT EXISTS pre_aggregations;
@@ -139,9 +69,6 @@ END;
 $$ language 'plpgsql';
 
 -- Create triggers for updated_at
-CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
 CREATE TRIGGER update_conversation_updated_at BEFORE UPDATE ON conversation
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 

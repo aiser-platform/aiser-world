@@ -18,7 +18,7 @@ from .services.ai_orchestrator import AIOrchestrator
 from .services.litellm_service import LiteLLMService
 from app.core.deps import get_current_user
 from app.core.cache import cache
-from app.modules.user.models import User
+# User model removed - user management will be handled by Supabase
 from app.modules.authentication.deps.auth_bearer import JWTCookieBearer
 from typing import Union
 
@@ -572,7 +572,7 @@ async def analyze_chat_query(
 
 @router.post("/chat", response_model=Dict)
 async def chat_completion(
-    request: ChatRequest, current_user: User = Depends(get_current_user)
+    request: ChatRequest, current_user = Depends(get_current_user)  # User model removed
 ):
     """Standard chat completion endpoint"""
     try:
@@ -601,7 +601,7 @@ async def chat_completion(
 
 @router.post("/analyze", response_model=AnalysisResponse)
 async def enhanced_data_analysis(
-    request: EnhancedAnalysisRequest, current_user: User = Depends(get_current_user)
+    request: EnhancedAnalysisRequest, current_user = Depends(get_current_user)  # User model removed
 ):
     """Enhanced data analysis with full context awareness"""
     try:
@@ -731,7 +731,7 @@ async def stream_chat_analysis(request: ChatAnalysisRequest):
 @router.post("/echarts/generate")
 async def generate_echarts(
     request: EChartsGenerationRequest,
-    current_user: User = Depends(get_current_user),
+    current_user = Depends(get_current_user),  # User model removed
 ) -> Dict[str, Any]:
     """
     Generate ECharts configuration based on query and data
@@ -1166,7 +1166,7 @@ async def test_ai_configuration() -> Dict[str, Any]:
 
 
 @router.get("/models")
-async def get_available_models(current_user: User = Depends(get_current_user)):
+async def get_available_models(current_user = Depends(get_current_user)):  # User model removed
     """Get available AI models"""
     try:
         litellm_service = LiteLLMService()

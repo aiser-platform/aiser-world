@@ -4,7 +4,7 @@ from app.modules.chats.api import router as chat_router
 from app.modules.chats.conversations.api import router as conversation_router
 from app.modules.chats.assets.api import router as assets_router
 from app.modules.files import file_router
-from app.modules.user import user_router
+# User router removed - user management will be handled by Supabase
 from app.modules.data.api import router as data_router
 from app.modules.ai.api import router as ai_router
 from app.modules.ai.api_streaming import router as ai_streaming_router
@@ -30,12 +30,7 @@ async def root():
     }
 
 
-api_router.include_router(
-    router=user_router,
-    prefix="/users",
-    tags=["users"],
-    responses={404: {"description": "Not found"}},
-)
+# User router removed - user management will be handled by Supabase
 
 api_router.include_router(
     router=file_router,
@@ -92,12 +87,11 @@ async def get_data_source_proxy(
 ):
     """Proxy endpoint for /data/sources/{id} with /api prefix"""
     from app.modules.data.api import get_project_data_source
-    from app.modules.authentication.auth import Auth
     from fastapi import HTTPException, status
     
     try:
         # Extract organization_id and project_id from token or use defaults
-        user_payload = current_token if isinstance(current_token, dict) else Auth().decodeJWT(current_token) or {}
+        user_payload = current_token if isinstance(current_token, dict) else {}
         organization_id = str(user_payload.get('organization_id') or '1')
         project_id = str(user_payload.get('project_id') or '1')
         
@@ -153,56 +147,6 @@ async def get_models_proxy(current_token: dict = Depends(JWTCookieBearer())):
     return await get_available_models()  # get_available_models doesn't take parameters 
 
 
-# Proxy user profile endpoints for frontend compatibility (/api/ prefix)
-@api_router.get("/api/users/profile")
-async def get_user_profile_proxy(current_token: dict = Depends(JWTCookieBearer())):
-    """Proxy endpoint for /users/profile with /api prefix"""
-    from app.modules.user.api import get_user_profile
-    return await get_user_profile(current_token)
-
-@api_router.put("/api/users/profile")
-async def update_user_profile_proxy(
-    user_update: dict,
-    request: Request,
-    current_token: dict = Depends(JWTCookieBearer())
-):
-    """Proxy endpoint for /users/profile with /api prefix"""
-    from app.modules.user.api import update_user_profile
-    from app.modules.user.schemas import UserUpdate
-    from pydantic import ValidationError
-    try:
-        # Convert dict to UserUpdate schema
-        update_schema = UserUpdate(**user_update)
-        return await update_user_profile(update_schema, request, current_token)
-    except ValidationError as e:
-        from fastapi import HTTPException, status
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-
-@api_router.post("/api/users/upload-avatar")
-async def upload_avatar_proxy(
-    request: Request,
-    current_token: dict = Depends(JWTCookieBearer())
-):
-    """Proxy endpoint for /users/upload-avatar with /api prefix
-    
-    CRITICAL: Must forward the entire request including multipart/form-data
-    """
-    from app.modules.user.api import upload_avatar
-    # The upload_avatar function expects the full Request object with form data
-    # FastAPI will handle multipart/form-data automatically
-    return await upload_avatar(request, current_token)
-
-# Proxy user preferences AI-model endpoints for frontend compatibility (/api/ prefix)
-@api_router.get("/api/users/preferences/ai-model")
-async def get_user_ai_model_pref_proxy(current_token: dict = Depends(JWTCookieBearer())):
-    from app.modules.user.api import get_user_ai_model_preference
-    return await get_user_ai_model_preference(current_token)
-
-
-@api_router.put("/api/users/preferences/ai-model")
-async def set_user_ai_model_pref_proxy(request: Request, current_token: dict = Depends(JWTCookieBearer())):
-    from app.modules.user.api import set_user_ai_model_preference
-    # Pass the request object directly, not the body
-    return await set_user_ai_model_preference(request, current_token)
+# User profile endpoints removed - user management will be handled by Supabase
 
 
