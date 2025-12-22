@@ -18,15 +18,15 @@ export async function GET(
     }
 
     const backendBase = getBackendUrlForApi();
-    const cookies = request.cookies;
-    const accessToken = cookies.get('access_token')?.value;
     
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
     
-    if (accessToken) {
-      headers['Authorization'] = `Bearer ${accessToken}`;
+    // Forward Authorization header if present
+    const authHeader = request.headers.get('Authorization');
+    if (authHeader) {
+      headers['Authorization'] = authHeader;
     }
     
     const response = await fetch(`${backendBase}/assets/${assetId}`, {
@@ -71,15 +71,15 @@ export async function DELETE(
     }
 
     const backendBase = getBackendUrlForApi();
-    const cookies = request.cookies;
-    const accessToken = cookies.get('access_token')?.value;
     
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
     
-    if (accessToken) {
-      headers['Authorization'] = `Bearer ${accessToken}`;
+    // Forward Authorization header if present
+    const authHeader = request.headers.get('Authorization');
+    if (authHeader) {
+      headers['Authorization'] = authHeader;
     }
     
     const response = await fetch(`${backendBase}/assets/${assetId}`, {

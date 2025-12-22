@@ -89,7 +89,11 @@ class Settings(BaseSettings):
         "http://localhost:3000,http://127.0.0.1:3000,http://aiser:3000",
     )
 
-    # Auth service removed - user provisioning will be handled by Supabase integration
+    # Supabase Settings
+    SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
+    SUPABASE_ANON_KEY: str = os.getenv("SUPABASE_ANON_KEY", "")
+    # Note: For RS256 tokens, we use JWKS (public keys) instead of JWT secret
+    # JWKS is fetched from: https://<project-id>.supabase.co/auth/v1/.well-known/jwks.json
 
     # File Upload Settings (Additional)
     MAX_FILE_SIZE_MB: int = int(os.getenv("MAX_FILE_SIZE_MB", "50"))

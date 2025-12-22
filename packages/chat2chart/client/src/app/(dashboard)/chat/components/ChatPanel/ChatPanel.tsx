@@ -70,7 +70,7 @@ interface ChatPanelProps {
 const ChatPanel: React.FC<ChatPanelProps> = (props) => {
     // CRITICAL: All hooks must be called unconditionally at the top level
     // This prevents "Rendered more hooks than during the previous render" errors
-    const { isAuthenticated, authLoading, user } = useAuth();
+    const { isAuthenticated, authLoading, user, session } = useAuth();
     const { hasFeature, canPerformAction, showUpgradePrompt, UpgradeModal } = usePlanRestrictions();
     const { currentOrganization, getOrganizationUsage } = useOrganization();
     const [prompt, setPrompt] = useState('');
@@ -174,7 +174,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                 const response = await fetch('/api/models', {
                     method: 'GET',
                     credentials: 'include',
-                    headers: getSecureAuthHeaders(false) // Prefer cookies for auth
+                    headers: getSecureAuthHeaders(session)
                 });
                 const result = await response.json();
                 if (result.success && result.models) {
@@ -198,7 +198,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                 const resp = await fetch('/api/users/preferences/ai-model', {
                     method: 'GET',
                     credentials: 'include',
-                    headers: getSecureAuthHeaders(false) // Prefer cookies for auth
+                    headers: getSecureAuthHeaders(session)
                 });
                 if (resp.ok) {
                     const data = await resp.json();
@@ -498,7 +498,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                             setIsLoading(false);
                             
                             // Then refresh from API in background (merge with cache, don't replace)
-                            conversationSessionManager.loadMessages(props.conversationId, false).then(apiMessages => {
+                            conversationSessionManager.loadMessages(props.conversationId, false, session?.access_token).then(apiMessages => {
                                 if (apiMessages && apiMessages.length > 0) {
                                     // Merge API messages with cache (API takes precedence, but don't lose cache messages)
                                     const apiMessageIds = new Set(apiMessages.map((m: any) => m.id));
@@ -559,7 +559,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                 
                 // If no cache, load from API
                 try {
-                    const loadedMessages = await conversationSessionManager.loadMessages(props.conversationId, false);
+                    const loadedMessages = await conversationSessionManager.loadMessages(props.conversationId, false, session?.access_token);
                     
                     if (loadedMessages && loadedMessages.length > 0) {
                         // Filter out ONLY truly empty generic error messages (be less aggressive)
@@ -909,7 +909,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                 
                 // Only reload if truly stale or no charts
                 try {
-                    const loadedMessages = await conversationSessionManager.loadMessages(props.conversationId, false);
+                    const loadedMessages = await conversationSessionManager.loadMessages(props.conversationId, false, session?.access_token);
                     
                     if (loadedMessages && loadedMessages.length > 0) {
                         const sanitized = sanitizeMessages(loadedMessages);
@@ -2078,7 +2078,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
         let conversationId = props.conversationId;
         if (!conversationId) {
             try {
-                const newConv = await conversationSessionManager.createNewConversation();
+                const newConv = await conversationSessionManager.createNewConversation('New Conversation', session?.access_token);
                 conversationId = newConv.id || undefined;
                 if (conversationId) {
                     props.callback?.({ conversation: newConv });
@@ -2147,7 +2147,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                 // Type assertion needed because json_metadata can be string or object
                 conversationSessionManager.updateConversationMetadata(conversationId, {
                     json_metadata: JSON.stringify(metadataObj) as any
-                }).catch(e => console.warn('Failed to update conversation metadata:', e));
+                }, session?.access_token).catch(e => console.warn('Failed to update conversation metadata:', e));
                 
                 // Also save to localStorage for immediate persistence
                 try {
@@ -2375,14 +2375,20 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
             // Use streaming endpoint if enabled
             // CRITICAL: Use correct endpoint path - /api/ai/chat/analyze routes to backend /ai/chat/analyze
             const endpoint = streamingEnabled ? '/api/ai/chat/analyze/stream' : '/api/ai/chat/analyze';
+            const headers: Record<string, string> = {
+                'Accept': streamingEnabled ? 'text/event-stream' : 'application/json',
+                'Content-Type': 'application/json'
+            };
+            
+            // Add Bearer token if available
+            if (session?.access_token) {
+                headers['Authorization'] = `Bearer ${session.access_token}`;
+            }
+            
             const response = await fetch(endpoint, {
                 method: 'POST',
                 credentials: 'include',
-                headers: {
-                    ...getSecureAuthHeaders(false), // Prefer cookies for auth
-                    'Accept': streamingEnabled ? 'text/event-stream' : 'application/json',
-                    'Content-Type': 'application/json'
-                },
+                headers,
                 body: JSON.stringify({
                     query: query,
                     data_source_id: dataSourceId,
@@ -3145,7 +3151,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                 // Type assertion needed because json_metadata can be string or object
                 conversationSessionManager.updateConversationMetadata(props.conversationId, {
                     json_metadata: JSON.stringify(metadata) as any
-                }).catch(e => console.warn('Failed to update conversation metadata:', e));
+                }, session?.access_token).catch(e => console.warn('Failed to update conversation metadata:', e));
             }
             
             // CRITICAL: Immediately save to localStorage to prevent loss on navigation
@@ -3195,10 +3201,16 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                 if (!conversationTitle || conversationTitle === 'New Conversation') {
                     // Auto-generate title from first user message
                     const title = query.length > 50 ? query.substring(0, 50) + '...' : query;
+                    const headers: Record<string, string> = {
+                        'Content-Type': 'application/json',
+                    };
+                    if (session?.access_token) {
+                        headers['Authorization'] = `Bearer ${session.access_token}`;
+                    }
                     fetch(`/api/conversations/${props.conversationId}`, {
                         method: 'PUT',
                         credentials: 'include',
-                        headers: getSecureAuthHeaders(false), // Prefer cookies for auth
+                        headers,
                         body: JSON.stringify({ title })
                     }).then(() => {
                         console.log('✅ Auto-named conversation:', title);

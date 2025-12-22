@@ -9,6 +9,7 @@ import { AuthError, Session, User } from '@supabase/supabase-js';
 interface AuthContextType {
   isAuthenticated: boolean;
   user: User | null;
+  session: Session | null;
   authLoading: boolean;
   actionLoading: boolean;
   loginError: string | null;
@@ -94,6 +95,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       value={{
         isAuthenticated: !!user,
         user,
+        session,
         authLoading,
         actionLoading,
         loginError,
@@ -123,6 +125,7 @@ export const useAuth = (): AuthContextType => {
     return {
       isAuthenticated: false,
       user: null,
+      session: null,
       authLoading: true,
       actionLoading: false,
       loginError: null,

@@ -6,6 +6,7 @@ import { HistoryOutlined, PlusOutlined, DeleteOutlined, EditOutlined, CheckOutli
 import { IConversation } from '../../types';
 import { fetchApi } from '@/utils/api';
 import { conversationSessionManager } from '@/services/conversationSessionManager';
+import { useAuth } from '@/context/AuthContext';
 import './styles.css'; // Import styles for consistent scrollbar design
 
 const { Text } = Typography;
@@ -152,7 +153,7 @@ const SessionHistoryDropdown: React.FC<SessionHistoryDropdownProps> = ({
                 
                 // Also update in conversationSessionManager
                 try {
-                    await conversationSessionManager.updateConversationMetadata(conversationId, { title: newName.trim() });
+                    await conversationSessionManager.updateConversationMetadata(conversationId, { title: newName.trim() }, session?.access_token);
                 } catch (e) {
                     console.warn('Failed to update conversation in session manager:', e);
                 }

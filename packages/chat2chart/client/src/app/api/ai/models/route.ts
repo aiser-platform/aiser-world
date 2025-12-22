@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getBackendUrlForApi } from '@/utils/backendUrl';
-import { extractAccessToken } from '@/utils/cookieParser';
 
 /**
  * Proxy route for /api/ai/models
@@ -11,25 +10,14 @@ export async function GET(request: NextRequest) {
     const backendBase = getBackendUrlForApi();
     const backendUrl = `${backendBase}/ai/models`;
     
-    // Extract access token
-    const accessToken = extractAccessToken({
-      cookies: request.cookies,
-      headers: request.headers
-    });
-    
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
     
-    // Forward authorization
-    if (accessToken) {
-      headers['Authorization'] = `Bearer ${accessToken}`;
-    }
-    
-    // Forward cookies
-    const cookieHeader = request.headers.get('Cookie');
-    if (cookieHeader) {
-      headers['Cookie'] = cookieHeader;
+    // Forward Authorization header if present
+    const authHeader = request.headers.get('Authorization');
+    if (authHeader) {
+      headers['Authorization'] = authHeader;
     }
     
     const response = await fetch(backendUrl, {

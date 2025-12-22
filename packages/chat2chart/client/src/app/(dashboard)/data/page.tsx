@@ -42,6 +42,8 @@ import { useOrganization } from '@/context/OrganizationContext';
 import { usePlanRestrictions } from '@/hooks/usePlanRestrictions';
 import { usePermissions, Permission } from '@/hooks/usePermissions';
 import { PermissionGuard } from '@/components/PermissionGuard';
+import { useDataSources, useDeleteDataSource } from '@/queries/dataSources';
+import { useAuth } from '@/context/AuthContext';
 
 const { Title, Text } = Typography;
 
@@ -64,43 +66,35 @@ const DataSourcesPage: React.FC = () => {
     const { hasPermission } = usePermissions({
         organizationId: currentOrganization?.id,
     });
+    const { session } = useAuth();
     const [dataSources, setDataSources] = useState<DataSource[]>([]);
     const [loading, setLoading] = useState(false);
+    const deleteDataSourceMutation = useDeleteDataSource();
     const [modalVisible, setModalVisible] = useState(false);
     const [selectedDataSource, setSelectedDataSource] = useState<DataSource | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<'all' | DataSource['status']>('all');
     const [typeFilter, setTypeFilter] = useState<'all' | DataSource['type']>('all');
 
-    useEffect(() => {
-        loadDataSources();
-    }, []);
+    // Use React Query hook for data sources
+    const { data: dataSourcesData, isLoading: dataSourcesLoading, error: dataSourcesError } = useDataSources();
 
-    const loadDataSources = async () => {
-        setLoading(true);
-        try {
-            // Use API proxy for proper auth handling
-            const response = await fetch('/api/data/sources', {
-                credentials: 'include'
-            });
-            const result = await response.json();
-            
-            if (result.success || Array.isArray(result)) {
-                // API returns { success, data_sources } but fallback handles direct arrays
-                setDataSources(result.data_sources || result.data || result || []);
-                if (currentOrganization?.id) {
-                    await getOrganizationUsage(currentOrganization.id);
-                }
-            } else {
-                message.error(`Failed to load data sources: ${result.error || 'Unknown error'}`);
+    useEffect(() => {
+        if (dataSourcesData) {
+            const sources = dataSourcesData.data_sources || dataSourcesData.data || dataSourcesData || [];
+            setDataSources(Array.isArray(sources) ? sources : []);
+            if (currentOrganization?.id) {
+                getOrganizationUsage(currentOrganization.id);
             }
-        } catch (error) {
-            message.error('Failed to load data sources');
-            console.error('Error loading data sources:', error);
-        } finally {
-            setLoading(false);
         }
-    };
+        if (dataSourcesError) {
+            message.error('Failed to load data sources');
+        }
+    }, [dataSourcesData, dataSourcesError, currentOrganization?.id]);
+
+    useEffect(() => {
+        setLoading(dataSourcesLoading);
+    }, [dataSourcesLoading]);
 
     const handleAddDataSource = () => {
         if (!canAddDataSource) {
@@ -120,7 +114,7 @@ const DataSourcesPage: React.FC = () => {
     const handleModalClose = () => {
         setModalVisible(false);
         setSelectedDataSource(null);
-        loadDataSources(); // Refresh the list
+        // React Query will automatically refetch data sources
         if (currentOrganization?.id) {
             getOrganizationUsage(currentOrganization.id);
         }
@@ -135,21 +129,12 @@ const DataSourcesPage: React.FC = () => {
             cancelText: 'Cancel',
             onOk: async () => {
                 try {
-                    // Use API proxy with proper auth
-                    const response = await fetch(`/api/data/sources/${dataSource.id}`, {
-                        method: 'DELETE',
-                        credentials: 'include'
-                    });
-                    
-                    if (response.ok) {
-                        message.success('Data source deleted successfully');
-                        loadDataSources(); // Refresh the list
-                    } else {
-                        const result = await response.json();
-                        message.error(`Failed to delete data source: ${result.detail || result.error || 'Unknown error'}`);
-                    }
+                    await deleteDataSourceMutation.mutateAsync(dataSource.id);
+                    message.success('Data source deleted successfully');
+                    // React Query will automatically refetch data sources
                 } catch (error) {
-                    message.error('Failed to delete data source');
+                    const errorMessage = error instanceof Error ? error.message : 'Failed to delete data source';
+                    message.error(errorMessage);
                     console.error('Error deleting data source:', error);
                 }
             },

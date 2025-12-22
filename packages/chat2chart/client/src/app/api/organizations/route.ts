@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { extractAccessToken } from '@/utils/cookieParser';
 
 const getBackendUrl = () => {
   const env = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL;
@@ -14,18 +13,10 @@ export async function GET(request: NextRequest) {
       'Content-Type': 'application/json',
     };
     
-    const cookieHeader = request.headers.get('Cookie');
-    if (cookieHeader) {
-      headers['Cookie'] = cookieHeader;
-    }
-    
-    const accessToken = extractAccessToken({
-      cookies: request.cookies,
-      headers: request.headers
-    });
-    
-    if (accessToken && accessToken !== 'null' && accessToken.length > 50) {
-      headers['Authorization'] = `Bearer ${accessToken}`;
+    // Forward Authorization header if present
+    const authHeader = request.headers.get('Authorization');
+    if (authHeader) {
+      headers['Authorization'] = authHeader;
     }
     
     const response = await fetch(`${backendUrl}/api/organizations`, {

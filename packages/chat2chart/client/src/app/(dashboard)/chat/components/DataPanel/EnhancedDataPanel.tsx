@@ -40,6 +40,7 @@ import CubeSchemaPanel from './CubeSchemaPanel';
 import './styles.css';
 import '../HistoryPanel/styles.css';
 import { getBackendUrlForApi } from '@/utils/backendUrl';
+import { useAuth } from '@/context/AuthContext';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -157,6 +158,7 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
     onCollapse,
     compact = false
 }) => {
+    const { session } = useAuth();
     const [dataSources, setDataSources] = useState<DataSource[]>([]);
     const [loading, setLoading] = useState(false);
     const [showDataSourceModal, setShowDataSourceModal] = useState(false);
@@ -179,9 +181,14 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
         try {
             setLoading(true);
             // Use API proxy for proper auth
-            const res = await fetch(`/api/data/sources/${dataSourceId}`, { 
+            const headers: Record<string, string> = {};
+            if (session?.access_token) {
+                headers['Authorization'] = `Bearer ${session.access_token}`;
+            }
+            const res = await fetch(`/api/data/sources/${dataSourceId}`, {
+                headers,
                 method: 'DELETE',
-                credentials: 'include'
+                credentials: 'include',
             });
             // reload list regardless
             try {
@@ -208,8 +215,13 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
         setLoading(true);
         try {
             // Use API proxy for proper auth handling
+            const headers: Record<string, string> = {};
+            if (session?.access_token) {
+                headers['Authorization'] = `Bearer ${session.access_token}`;
+            }
             const response = await fetch('/api/data/sources', {
-                credentials: 'include'
+                credentials: 'include',
+                headers
             });
             const result = await response.json();
             
@@ -339,7 +351,12 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
         try {
             if (dataSource.type === 'file') {
                 // For file sources, get schema from the schema endpoint (uses 'data' table name)
+                const headers: Record<string, string> = {};
+                if (session?.access_token) {
+                    headers['Authorization'] = `Bearer ${session.access_token}`;
+                }
                 const response = await fetch(`/api/data/sources/${dataSourceId}/schema`, {
+                    headers,
                     credentials: 'include'
                 });
                 const result = await response.json();
@@ -384,7 +401,12 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
                 }
             } else if (dataSource.type === 'database' || dataSource.type === 'warehouse') {
                 // For database and warehouse sources, get real schema information
+                const headers: Record<string, string> = {};
+                if (session?.access_token) {
+                    headers['Authorization'] = `Bearer ${session.access_token}`;
+                }
                 const response = await fetch(`/api/data/sources/${dataSourceId}/schema`, {
+                    headers,
                     credentials: 'include'
                 });
                 const result = await response.json();

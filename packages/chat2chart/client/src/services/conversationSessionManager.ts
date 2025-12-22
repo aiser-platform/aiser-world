@@ -56,18 +56,23 @@ class ConversationSessionManager {
     /**
      * Load conversations from API
      */
-    async loadConversations(): Promise<IConversation[]> {
+    async loadConversations(accessToken?: string): Promise<IConversation[]> {
         this.state.isLoading = true;
         this.state.lastError = null;
         this.notify();
 
         try {
+            const headers: Record<string, string> = {
+                'Content-Type': 'application/json'
+            };
+            if (accessToken) {
+                headers['Authorization'] = `Bearer ${accessToken}`;
+            }
+            
             const response = await fetch('/api/conversations?limit=50', {
                 method: 'GET',
                 credentials: 'include',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
+                headers
             });
 
             if (!response.ok) {
@@ -88,12 +93,12 @@ class ConversationSessionManager {
             // Restore current conversation if exists
             const savedId = localStorage.getItem('current_conversation_id');
             if (savedId && conversations.find((c: IConversation) => c.id === savedId)) {
-                await this.setCurrentConversation(savedId);
+                await this.setCurrentConversation(savedId, false, accessToken);
             } else if (conversations.length > 0) {
-                await this.setCurrentConversation(conversations[0].id);
+                await this.setCurrentConversation(conversations[0].id, false, accessToken);
             } else {
                 // Create new conversation if none exist
-                await this.createNewConversation();
+                await this.createNewConversation('New Conversation', accessToken);
             }
 
             return conversations;
@@ -109,16 +114,21 @@ class ConversationSessionManager {
     /**
      * Create a new conversation
      */
-    async createNewConversation(title: string = 'New Conversation'): Promise<IConversation> {
+    async createNewConversation(title: string = 'New Conversation', accessToken?: string): Promise<IConversation> {
         try {
             console.log('🆕 Creating new conversation with title:', title);
+            
+            const headers: Record<string, string> = {
+                'Content-Type': 'application/json'
+            };
+            if (accessToken) {
+                headers['Authorization'] = `Bearer ${accessToken}`;
+            }
             
             const response = await fetch('/api/conversations', {
                 method: 'POST',
                 credentials: 'include',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers,
                 body: JSON.stringify({
                     title,
                     json_metadata: '{}'
@@ -185,7 +195,7 @@ class ConversationSessionManager {
     /**
      * Set current conversation and load its messages
      */
-    async setCurrentConversation(conversationId: string, skipMessageLoad: boolean = false): Promise<void> {
+    async setCurrentConversation(conversationId: string, skipMessageLoad: boolean = false, accessToken?: string): Promise<void> {
         try {
             // Clear previous conversation's save queue
             this.flushSaveQueue();
@@ -207,7 +217,7 @@ class ConversationSessionManager {
                         if (isNewConversation && retryCount > 0) {
                             await new Promise(resolve => setTimeout(resolve, 200 * retryCount)); // 200ms, 400ms, 600ms
                         }
-                        await this.loadMessages(conversationId);
+                        await this.loadMessages(conversationId, false, accessToken);
                         break; // Success, exit retry loop
                     } catch (error) {
                         retryCount++;
@@ -238,16 +248,21 @@ class ConversationSessionManager {
     /**
      * Load messages for a conversation
      */
-    async loadMessages(conversationId: string, useCache: boolean = false): Promise<IChatMessage[]> {
+    async loadMessages(conversationId: string, useCache: boolean = false, accessToken?: string): Promise<IChatMessage[]> {
         // CRITICAL: Always load from API first to ensure we have the latest messages
         // Cache is only used as a fallback if API fails
         try {
+            const headers: Record<string, string> = {
+                'Content-Type': 'application/json'
+            };
+            if (accessToken) {
+                headers['Authorization'] = `Bearer ${accessToken}`;
+            }
+            
             const response = await fetch(`/api/conversations/${conversationId}?limit=100`, {
                 method: 'GET',
                 credentials: 'include',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
+                headers
             });
 
             if (!response.ok) {
@@ -519,14 +534,19 @@ class ConversationSessionManager {
     /**
      * Update conversation metadata (e.g., title, last message time)
      */
-    async updateConversationMetadata(conversationId: string, updates: Partial<IConversation>): Promise<void> {
+    async updateConversationMetadata(conversationId: string, updates: Partial<IConversation>, accessToken?: string): Promise<void> {
         try {
+            const headers: Record<string, string> = {
+                'Content-Type': 'application/json'
+            };
+            if (accessToken) {
+                headers['Authorization'] = `Bearer ${accessToken}`;
+            }
+            
             const response = await fetch(`/api/conversations/${conversationId}`, {
                 method: 'PUT',
                 credentials: 'include',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers,
                 body: JSON.stringify(updates)
             });
 
@@ -569,14 +589,19 @@ class ConversationSessionManager {
     /**
      * Delete conversation
      */
-    async deleteConversation(conversationId: string): Promise<void> {
+    async deleteConversation(conversationId: string, accessToken?: string): Promise<void> {
         try {
+            const headers: Record<string, string> = {
+                'Content-Type': 'application/json'
+            };
+            if (accessToken) {
+                headers['Authorization'] = `Bearer ${accessToken}`;
+            }
+            
             const response = await fetch(`/api/conversations/${conversationId}`, {
                 method: 'DELETE',
                 credentials: 'include',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
+                headers
             });
 
             if (!response.ok) {
@@ -595,7 +620,7 @@ class ConversationSessionManager {
                 if (this.state.conversations.length > 0) {
                     const nextConvId = this.state.conversations[0].id;
                     if (nextConvId) {
-                        await this.setCurrentConversation(nextConvId);
+                        await this.setCurrentConversation(nextConvId, false, accessToken);
                     } else {
                         this.state.currentConversationId = null;
                         localStorage.removeItem('current_conversation_id');

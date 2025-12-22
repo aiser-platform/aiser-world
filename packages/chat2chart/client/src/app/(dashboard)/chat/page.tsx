@@ -15,6 +15,7 @@ import { ExtendedTable, IConversation, IDatabase } from './types';
 import { IFileUpload } from '@/app/components/FileUpload/types';
 import { useSearchParams } from 'next/navigation';
 import { conversationSessionManager } from '@/services/conversationSessionManager';
+import { useAuth } from '@/context/AuthContext';
 
 interface DataSource {
     id: string;
@@ -37,6 +38,7 @@ const { Text } = Typography;
 
 const ChatToChart = () => {
     const searchParams = useSearchParams();
+    const { session } = useAuth();
     // State management for conversations
     const [conversations, setConversations] = useState<IConversation[]>([]);
     const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
@@ -77,7 +79,7 @@ const ChatToChart = () => {
                 const savedConversationId = localStorage.getItem('current_conversation_id');
                 
                 // Load conversations using session manager
-                const loadedConversations = await conversationSessionManager.loadConversations();
+                const loadedConversations = await conversationSessionManager.loadConversations(session?.access_token);
                 setConversations(loadedConversations);
                 
                 // Restore current conversation from localStorage if available
@@ -90,7 +92,7 @@ const ChatToChart = () => {
                         
                         // CRITICAL: Load messages for the saved conversation (don't skip)
                         // This ensures messages are loaded when returning to the page
-                        await conversationSessionManager.setCurrentConversation(savedConversationId, false);
+                        await conversationSessionManager.setCurrentConversation(savedConversationId, false, session?.access_token);
                         console.log('✅ Restored conversation and loaded messages:', savedConversationId);
                         
                         // CRITICAL: Restore data source from conversation metadata AND localStorage
@@ -209,13 +211,16 @@ const ChatToChart = () => {
                 
                 // Also save to current conversation metadata (per-conversation)
                 if (currentConversationId) {
+                    const headers: Record<string, string> = {
+                        'Content-Type': 'application/json'
+                    };
+                    if (session?.access_token) {
+                        headers['Authorization'] = `Bearer ${session.access_token}`;
+                    }
                     fetch(`/api/conversations/${currentConversationId}`, {
                         method: 'PUT',
                         credentials: 'include',
-                        headers: {
-                            'Content-Type': 'application/json'
-                            // Rely on cookies for auth (more secure)
-                        },
+                        headers,
                         body: JSON.stringify({
                             json_metadata: JSON.stringify({
                                 last_data_source_id: selectedDataSource.id,
@@ -313,10 +318,14 @@ const ChatToChart = () => {
     // Load conversations from API (not localStorage)
     const loadConversations = async () => {
         try {
+            const headers: Record<string, string> = {};
+            if (session?.access_token) {
+                headers['Authorization'] = `Bearer ${session.access_token}`;
+            }
             const response = await fetch('/api/conversations?limit=50', {
                 method: 'GET',
                 credentials: 'include',
-                // Rely on cookies for auth (more secure)
+                headers
             });
             
             if (response.ok) {
@@ -356,13 +365,17 @@ const ChatToChart = () => {
                 // If no conversations exist, create a default one
                 if (!conversationToUse && loadedConversations.length === 0) {
                     try {
+                        const headers: Record<string, string> = {
+                            'Content-Type': 'application/json',
+                        };
+                        if (session?.access_token) {
+                            headers['Authorization'] = `Bearer ${session.access_token}`;
+                        }
+                        
                         const createResponse = await fetch('/api/conversations', {
                             method: 'POST',
                             credentials: 'include',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Authorization': `Bearer ${localStorage.getItem('token')}`
-                            },
+                            headers,
                             body: JSON.stringify({
                                 title: 'New Conversation',
                                 json_metadata: '{}'
@@ -484,13 +497,16 @@ const ChatToChart = () => {
         if (currentConversationId && selectedDataSource) {
             try {
                 // Update conversation metadata with current data source
+                const headers: Record<string, string> = {
+                    'Content-Type': 'application/json',
+                };
+                if (session?.access_token) {
+                    headers['Authorization'] = `Bearer ${session.access_token}`;
+                }
                 await fetch(`/api/conversations/${currentConversationId}`, {
                     method: 'PUT',
                     credentials: 'include',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        // Rely on cookies for auth (more secure)
-                    },
+                    headers,
                     body: JSON.stringify({
                         json_metadata: JSON.stringify({
                             last_data_source_id: selectedDataSource.id,
@@ -504,7 +520,7 @@ const ChatToChart = () => {
         }
         
         // Use session manager to switch conversation (CRITICAL: don't skip message loading)
-        await conversationSessionManager.setCurrentConversation(conversationId, false);
+        await conversationSessionManager.setCurrentConversation(conversationId, false, session?.access_token);
         
         // Set conversation state immediately
         setConversationState(conversation);
@@ -516,10 +532,14 @@ const ChatToChart = () => {
         
         // Load conversation details with messages from API
         try {
+            const headers: Record<string, string> = {};
+            if (session?.access_token) {
+                headers['Authorization'] = `Bearer ${session.access_token}`;
+            }
             const response = await fetch(`/api/conversations/${conversationId}?limit=100`, {
                 method: 'GET',
-                credentials: 'include'
-                // Rely on cookies for auth (more secure)
+                credentials: 'include',
+                headers
             });
             
             if (response.ok) {
@@ -604,7 +624,7 @@ const ChatToChart = () => {
             console.log('🆕 Creating new conversation...');
             
             // Use session manager to create new conversation
-            const newConversation = await conversationSessionManager.createNewConversation();
+            const newConversation = await conversationSessionManager.createNewConversation('New Conversation', session?.access_token);
             
             if (!newConversation || !newConversation.id) {
                 throw new Error('Failed to create conversation - no ID returned');
