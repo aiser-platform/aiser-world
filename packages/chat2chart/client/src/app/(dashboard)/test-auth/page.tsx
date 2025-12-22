@@ -4,20 +4,20 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 
 export default function TestAuthPage() {
-  const { user, isAuthenticated, loading, authError, initialized } = useAuth();
+  const { user, isAuthenticated, authLoading, actionLoading, loginError } = useAuth();
   const [testResults, setTestResults] = useState<string[]>([]);
 
   useEffect(() => {
     const results = [
-      `Initialized: ${initialized}`,
-      `Loading: ${loading}`,
+      `Auth Loading: ${authLoading}`,
+      `Action Loading: ${actionLoading}`,
       `Is Authenticated: ${isAuthenticated}`,
       `User: ${user ? JSON.stringify(user) : 'null'}`,
-      `Auth Error: ${authError || 'none'}`,
+      `Login Error: ${loginError || 'none'}`,
       `Cookies: ${typeof document !== 'undefined' ? document.cookie : 'N/A'}`,
     ];
     setTestResults(results);
-  }, [user, isAuthenticated, loading, authError, initialized]);
+  }, [user, isAuthenticated, authLoading, actionLoading, loginError]);
 
   const testAuthEndpoint = async () => {
     try {

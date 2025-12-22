@@ -18,24 +18,20 @@ export const dynamic = 'force-dynamic';
 
 export default function LoginPage() {
     const [isSignUp, setIsSignUp] = useState(false);
-    const [loading, setLoading] = useState(false);
     const [showForgotPassword, setShowForgotPassword] = useState(false);
-    const { login, signup, verifyAuth } = useAuth();
+    const { login, signup, actionLoading: loading } = useAuth();
     const router = useRouter();
 
     const onFinish = async (values: FormValues) => {
-        setLoading(true);
         try {
             if (isSignUp) {
                 // Signup flow
                 if (!values.username) {
                     message.error('Username is required for signup');
-                    setLoading(false);
                     return;
                 }
                 if (values.password !== values.confirmPassword) {
                     message.error('Passwords do not match');
-                    setLoading(false);
                     return;
                 }
                 const signupResult = await signup(values.identifier, values.username, values.password);
@@ -44,7 +40,7 @@ export default function LoginPage() {
                 if (signupResult?.is_verified) {
                     // User is verified - auto-login and redirect to chat
                     message.success('Account created successfully! Logging you in...');
-                    await verifyAuth();
+                    // await verifyAuth();
                     router.push('/chat');
                 } else {
                     // User needs email verification - redirect to login with message
@@ -88,20 +84,16 @@ export default function LoginPage() {
                 }
             }
         } finally {
-            setLoading(false);
         }
     };
 
     const handleForgotPassword = async (email: string) => {
-        setLoading(true);
         try {
             // TODO: Implement forgot password API call
             message.success('Password reset instructions sent to your email!');
             setShowForgotPassword(false);
         } catch (error) {
             message.error('Failed to send reset instructions. Please try again.');
-        } finally {
-            setLoading(false);
         }
     };
 

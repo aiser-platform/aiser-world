@@ -94,7 +94,7 @@ interface OrganizationProviderProps {
 }
 
 export const OrganizationProvider: React.FC<OrganizationProviderProps> = ({ children }) => {
-  const { user, isAuthenticated, initialized } = useAuth();
+  const { user, isAuthenticated, authLoading: loading } = useAuth();
   
   // State
   const [currentOrganization, setCurrentOrganization] = useState<Organization | null>(null);
@@ -102,7 +102,6 @@ export const OrganizationProvider: React.FC<OrganizationProviderProps> = ({ chil
   const [projects, setProjects] = useState<Project[]>([]);
   const [usageStats, setUsageStats] = useState<UsageStats | null>(null);
   const [pricingPlans, setPricingPlans] = useState<PricingPlan[]>([]);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // CRITICAL: Install watermark plugin early (client-side only)
@@ -123,32 +122,28 @@ export const OrganizationProvider: React.FC<OrganizationProviderProps> = ({ chil
     }
   }, [currentOrganization?.plan_type]);
 
-  // Load initial data only after auth initialization and when user is authenticated
   useEffect(() => {
-    if (initialized && isAuthenticated && user) {
+    if (user) {
       // Add a small delay to ensure authentication cookies are properly set
       const timer = setTimeout(() => {
         loadInitialData();
       }, 150); // slight delay
       
       return () => clearTimeout(timer);
-    } else if (initialized && !isAuthenticated) {
+    } else if (!loading && !isAuthenticated) {
       // Clear organization state when user logs out
       clear();
     }
-  }, [initialized, isAuthenticated, user]);
+  }, [loading, isAuthenticated, user]);
 
   const loadInitialData = async () => {
     try {
-      setLoading(true);
       await Promise.all([
         getOrganizations(),
         getPricingPlans(),
       ]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load initial data');
-    } finally {
-      setLoading(false);
     }
   };
 

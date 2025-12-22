@@ -22,16 +22,16 @@ class ErrorBoundary extends React.Component<any, { error: any }>{
 }
 
 export default function DashStudioPage() {
-  const { isAuthenticated, loading, initialized } = useAuth();
+  const { isAuthenticated, authLoading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (initialized && !loading && !isAuthenticated) {
+    if (!authLoading && !isAuthenticated) {
       router.push('/login');
     }
-  }, [isAuthenticated, loading, initialized, router]);
+  }, [isAuthenticated, authLoading, router]);
 
-  if (!initialized || loading) {
+  if (authLoading) {
     return <LoadingScreen />;
   }
 

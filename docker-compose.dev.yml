@@ -160,6 +160,8 @@ services:
       - NEXT_PUBLIC_BACKEND_URL=http://chat2chart-server:8000
       - NODE_ENV=development
       - API_TARGET=http://chat2chart-server:8000
+      - NEXT_PUBLIC_SUPABASE_URL=https://hzlprtotvfdnbirmvohw.supabase.co
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh6bHBydG90dmZkbmJpcm12b2h3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4MTg0MzAsImV4cCI6MjA4MDM5NDQzMH0.VZYDAeaTtoEPk7KEBNAxdxSE57Utgowprto3iQNaryM
     volumes:
       - ./packages/chat2chart/client:/app
       - client_node_modules:/app/node_modules # Use named volume for node_modules to avoid conflicts

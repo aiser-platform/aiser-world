@@ -1,6 +1,6 @@
 'use client';
 
-import { AuthProvider, AuthInitFlag } from '@/context/AuthContext';
+import { AuthProvider } from '@/context/AuthContext';
 import { OnboardingProvider } from '@/context/OnboardingContext';
 import { AntdRegistry } from '@ant-design/nextjs-registry';
 import { ReactNode } from 'react';
@@ -30,7 +30,6 @@ export function Providers({ children }: { children: ReactNode }) {
                 <ThemeProvider>
                     <BrandThemeProvider>
                         <AuthProvider>
-                            <AuthInitFlag />
                             <OnboardingProvider>
                                 {children}
                                 <ClientDebugOverlay />

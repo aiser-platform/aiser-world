@@ -70,7 +70,7 @@ interface ChatPanelProps {
 const ChatPanel: React.FC<ChatPanelProps> = (props) => {
     // CRITICAL: All hooks must be called unconditionally at the top level
     // This prevents "Rendered more hooks than during the previous render" errors
-    const { isAuthenticated, loading: authLoading, user } = useAuth();
+    const { isAuthenticated, authLoading, user } = useAuth();
     const { hasFeature, canPerformAction, showUpgradePrompt, UpgradeModal } = usePlanRestrictions();
     const { currentOrganization, getOrganizationUsage } = useOrganization();
     const [prompt, setPrompt] = useState('');
@@ -978,7 +978,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                             <Avatar 
                                 size={40}
                                 icon={<UserOutlined />}
-                                src={user?.avatar_url}
+                                src={''}
                                 style={{ 
                                     backgroundColor: 'var(--ant-color-primary)',
                                     flexShrink: 0
@@ -1003,13 +1003,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                             {msg.query ? (
                                 <>
                                     <span className="message-author">
-                                        {(() => {
-                                            const displayName = user?.username || 
-                                                              (user?.first_name && user?.last_name ? `${user.first_name} ${user.last_name}`.trim() : null) ||
-                                                              (user?.first_name || user?.firstName || null) ||
-                                                              (user?.email?.split('@')[0] || 'You');
-                                            return displayName;
-                                        })()}
+                                        {user?.email ? user.email.split('@')[0] : 'You'}
                                     </span>
                                     <span className="message-time">{formatTime(msg.created_at || new Date())}</span>
                                 </>
