@@ -39,6 +39,7 @@ import {
     InfoCircleOutlined,
     EditOutlined
 } from '@ant-design/icons';
+import { useAuthenticatedFetch } from '@/hooks/useAuthenticatedFetch';
 
 const { Step } = Steps;
 const { Option } = Select;
@@ -114,6 +115,7 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
     const [testResult, setTestResult] = useState<any>(null);
     const [connectionUrlEditable, setConnectionUrlEditable] = useState(true); // Editable by default
     const [customConnectionUrl, setCustomConnectionUrl] = useState('');
+    const authenticatedFetch = useAuthenticatedFetch();
     
     // Data source configuration
     const [dataSourceConfig, setDataSourceConfig] = useState<DataSourceConfig>({
@@ -735,9 +737,8 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
                         ...(connectionConfig.snapshotId && { snapshot_id: connectionConfig.snapshotId })
                     };
                     
-                    const response = await fetch('/api/data/delta-iceberg/test', {
+                    const response = await authenticatedFetch('/api/data/delta-iceberg/test', {
                         method: 'POST',
-                        credentials: 'include',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(testRequest)
                     });
@@ -806,9 +807,8 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
             // All databases use the same test endpoint - no need for special handling
             // The backend /data/database/test handles all database types including warehouses
             
-            const response = await fetch(endpoint, {
+            const response = await authenticatedFetch(endpoint, {
                 method: 'POST',
-                credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(requestBody)
             });
@@ -1066,9 +1066,8 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
                     }
                 }
                 
-                response = await fetch(endpoint, {
+                response = await authenticatedFetch(endpoint, {
                     method: 'POST',
-                    credentials: 'include',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(requestBody)
                 });
