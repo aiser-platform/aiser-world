@@ -132,7 +132,6 @@ async def analyze_chat_query(
                 # Extract user info from token (already decoded by JWTCookieBearer)
                 user_payload = current_token if isinstance(current_token, dict) else {}
                 user_id = str(user_payload.get('id') or user_payload.get('user_id') or user_payload.get('sub') or '')
-                organization_id = str(user_payload.get('organization_id') or user_payload.get('org_id') or '')
                 
                 # Initialize services
                 from app.modules.data.services.multi_engine_query_service import MultiEngineQueryService
@@ -151,11 +150,13 @@ async def analyze_chat_query(
                 )
                 
                 logger.info(f"🚀 Starting LangGraph file analysis for data source: {request.data_source_id}")
+                # Organization context removed - use default value
+                organization_id = '1'
                 result = await orchestrator.execute(
                     query=request.query,
                     conversation_id=request.conversation_id or "",
                     user_id=user_id,
-                    organization_id=organization_id or None,
+                    organization_id=organization_id,  # Default value since organization context removed
                     data_source_id=request.data_source_id,
                     analysis_mode=analysis_mode,
                     model=request.model  # Pass model from request
@@ -198,7 +199,6 @@ async def analyze_chat_query(
                 # Extract user info from token
                 user_payload = current_token if isinstance(current_token, dict) else {}
                 user_id = str(user_payload.get('id') or user_payload.get('user_id') or user_payload.get('sub') or '')
-                organization_id = str(user_payload.get('organization_id') or user_payload.get('org_id') or '')
                 
                 # Initialize services
                 from app.modules.data.services.multi_engine_query_service import MultiEngineQueryService
@@ -217,11 +217,13 @@ async def analyze_chat_query(
                 )
                 
                 logger.info(f"🚀 Starting LangGraph data analysis for data source: {request.data_source_id}")
+                # Organization context removed - use default value
+                organization_id = '1'
                 result = await orchestrator.execute(
                     query=request.query,
                     conversation_id=request.conversation_id or "",
                     user_id=user_id,
-                    organization_id=organization_id or None,
+                    organization_id=organization_id,  # Default value since organization context removed
                     data_source_id=request.data_source_id,
                     analysis_mode=analysis_mode,
                     model=request.model  # Pass model from request
@@ -264,7 +266,6 @@ async def analyze_chat_query(
                 # Extract user info from token
                 user_payload = current_token if isinstance(current_token, dict) else {}
                 user_id = str(user_payload.get('id') or user_payload.get('user_id') or user_payload.get('sub') or '')
-                organization_id = str(user_payload.get('organization_id') or user_payload.get('org_id') or '')
                 
                 # Initialize services
                 from app.modules.data.services.multi_engine_query_service import MultiEngineQueryService
@@ -283,11 +284,13 @@ async def analyze_chat_query(
                 )
                 
                 logger.info(f"💬 No data_source_id - routing to LangGraph conversational mode")
+                # Organization context removed - use default value
+                organization_id = '1'
                 result = await orchestrator.execute(
                     query=request.query,
                     conversation_id=request.conversation_id or "",
                     user_id=user_id,
-                    organization_id=organization_id or None,
+                    organization_id=organization_id,  # Default value since organization context removed
                     model=request.model,  # Pass model from request
                     data_source_id=None,  # Explicitly None for conversational mode
                     analysis_mode="standard"

@@ -13,7 +13,7 @@ class ChatConversation(BaseModel):
     # CRITICAL: user_id column for tenant isolation
     user_id = Column(PostgreSQLUUID(as_uuid=True), nullable=False, index=True)
     
-    # tenant_id for additional isolation layer
+    # tenant_id column ignored - migration will drop it (organization context removed)
     tenant_id = Column(String(50), nullable=True, index=True)
 
     # Basic information

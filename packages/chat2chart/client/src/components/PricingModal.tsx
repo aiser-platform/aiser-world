@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useOrganization } from '@/context/OrganizationContext';
 import { Modal, Button, Card, List, Divider, Switch, message, Tag, Tooltip } from 'antd';
 import { CheckOutlined, CrownOutlined, TeamOutlined, RocketOutlined, StarOutlined } from '@ant-design/icons';
 import './PricingModal.css';
@@ -185,32 +184,15 @@ const PricingModal: React.FC<PricingModalProps> = ({
     { id: 'enterprise', label: 'Enterprise Surge', price: 500, credits: 50000, note: 'Designed for high-volume operations.' },
   ];
 
-  const { currentOrganization } = useOrganization();
-
   const handleUpgrade = async (planType: string) => {
     if (planType === 'enterprise') {
       message.info('Please contact our sales team for Enterprise pricing');
       return;
     }
 
-    try {
-      const orgId = currentPlan === 'free' ? (currentOrganization?.id || 1) : (currentOrganization?.id || 1);
-      const payload = { plan_type: planType, payment_method_id: 'pm_mock_payment_method' };
-      const res = await fetch(`/api/v1/organizations/${orgId}/upgrade`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) throw new Error('Upgrade failed');
-
-      const data = await res.json();
-      message.success('Plan upgraded successfully');
-      onUpgrade(planType, isYearly);
-    } catch (err) {
-      console.error(err);
-      message.error('Failed to upgrade plan. Please try again.');
-    }
+    // Organization context removed - upgrade functionality disabled
+    message.info('Plan upgrade functionality is currently unavailable. Please contact support.');
+    onUpgrade(planType, isYearly);
   };
 
   const isCurrentPlan = (planType: string) => {

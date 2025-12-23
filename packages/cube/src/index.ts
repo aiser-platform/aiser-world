@@ -10,7 +10,8 @@ import helmet from 'helmet';
 import winston from 'winston';
 import dotenv from 'dotenv';
 import path from 'path';
-import { createTenantContext, validateTenantAccess, TenantRequest } from './middleware/tenant';
+// Tenant validation removed - organization context removed
+// import { createTenantContext, validateTenantAccess, TenantRequest } from './middleware/tenant';
 import { createSecurityContext } from './middleware/security';
 import { DatabaseDriverFactory } from './drivers/database-factory';
 import { CacheManager } from './cache/cache-manager';
@@ -81,11 +82,11 @@ const connectionTester = new ConnectionTester();
 
 // Cube.js server configuration
 const cubeConfig = {
-  // Multi-tenant configuration
+  // Multi-tenant configuration removed - always return 'default'
   contextToAppId: ({ securityContext }: any) => {
-    const tenantId = securityContext?.tenantId || 'default';
-    logger.info(`Context to App ID: ${tenantId}`);
-    return tenantId;
+    // Organization context removed - always return 'default'
+    logger.info(`Context to App ID: default`);
+    return 'default';
   },
 
   // Multi-tenant database configuration
@@ -94,35 +95,17 @@ const cubeConfig = {
     return factory.createDriver(dataSource);
   },
 
-  // Security context for tenant isolation
+  // Security context for tenant isolation removed - always return 'default'
   contextToOrchestratorId: ({ securityContext }: any) => {
-    const tenantId = securityContext?.tenantId || 'default';
-    logger.info(`Context to Orchestrator ID: ${tenantId}`);
-    return tenantId;
+    // Organization context removed - always return 'default'
+    logger.info(`Context to Orchestrator ID: default`);
+    return 'default';
   },
 
-  // Query rewrite for tenant isolation
+  // Query rewrite for tenant isolation removed
   queryRewrite: (query: any, { securityContext }: any) => {
-    if (securityContext?.tenantId) {
-      // Add tenant_id filter to all queries for data isolation
-      query.filters = query.filters || [];
-      
-      // Check if tenant_id filter already exists
-      const hasTenantFilter = query.filters.some((filter: any) => 
-        filter.member && filter.member.includes('tenant_id')
-      );
-      
-      if (!hasTenantFilter) {
-        query.filters.push({
-          member: 'tenant_id',
-          operator: 'equals',
-          values: [securityContext.tenantId]
-        });
-        
-        logger.info(`Added tenant isolation filter: ${securityContext.tenantId}`);
-      }
-    }
-    
+    // Tenant filtering removed - organization context removed
+    // Queries are now user-scoped only (filtered by user_id in application layer)
     return query;
   },
 
@@ -132,10 +115,9 @@ const cubeConfig = {
       // Create security context from request
       const securityContext = await createSecurityContext(req);
       
-      // Validate tenant access
-      await validateTenantAccess(req, securityContext);
+      // Tenant validation removed - organization context removed
       
-      logger.info(`Request context created for tenant: ${securityContext.tenantId}`);
+      logger.info(`Request context created for user: ${securityContext.userId || 'anonymous'}`);
       
       return {
         securityContext,
@@ -247,8 +229,8 @@ app.use((req, res, next) => {
   next();
 });
 
-// Tenant context middleware
-app.use(createTenantContext);
+// Tenant context middleware removed - organization context removed
+// app.use(createTenantContext);
 
 // Schema approval API routes
 app.use('/api/v1', schemaApprovalAPI.getRouter());
@@ -279,14 +261,11 @@ app.get('/metrics', async (req, res) => {
   }
 });
 
-// Connection testing endpoints
-app.get('/api/v1/connection/test', async (req: TenantRequest, res) => {
+// Connection testing endpoints - tenant context removed
+app.get('/api/v1/connection/test', async (req: express.Request, res) => {
   try {
-    const tenantId = req.tenant?.tenantId;
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID required' });
-    }
-
+    // Tenant context removed - use default tenant
+    const tenantId = 'default';
     const result = await connectionTester.testTenantConnection(tenantId);
     res.json(result);
   } catch (error) {
@@ -295,13 +274,10 @@ app.get('/api/v1/connection/test', async (req: TenantRequest, res) => {
   }
 });
 
-app.get('/api/v1/connection/health', async (req: TenantRequest, res) => {
+app.get('/api/v1/connection/health', async (req: express.Request, res) => {
   try {
-    const tenantId = req.tenant?.tenantId;
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID required' });
-    }
-
+    // Tenant context removed - use default tenant
+    const tenantId = 'default';
     const report = await connectionTester.generateHealthReport([tenantId]);
     res.json(report);
   } catch (error) {

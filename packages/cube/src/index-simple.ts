@@ -8,7 +8,8 @@ const cors = require('cors');
 const helmet = require('helmet');
 const CubejsServerCore = require('@cubejs-backend/server-core');
 const { DatabaseDriverFactory } = require('./drivers/database-factory');
-const { createTenantContext, validateTenantAccess } = require('./middleware/tenant');
+// Tenant context removed - organization context removed
+// const { createTenantContext, validateTenantAccess } = require('./middleware/tenant');
 
 // Core types and interfaces
 interface SecurityContext {
@@ -70,8 +71,8 @@ export class MultiTenantCubeServer {
     app.use(express.json({ limit: '10mb' }));
     app.use(express.urlencoded({ extended: true, limit: '10mb' }));
     
-    // Tenant context middleware
-    app.use('/cubejs-api', createTenantContext);
+    // Tenant context middleware removed - organization context removed
+    // app.use('/cubejs-api', createTenantContext);
     
     // Health check endpoint
     app.get('/health', (req: any, res: any) => {
@@ -88,58 +89,35 @@ export class MultiTenantCubeServer {
 
   private createCubeConfig(): CubeConfig {
     return {
-      // Multi-tenant app ID generation
+      // Multi-tenant app ID generation removed - always return 'default'
       contextToAppId: ({ securityContext }) => {
-        const tenantId = securityContext?.tenantId || 'default';
-        console.log(`🏢 Context to App ID: ${tenantId}`);
-        return tenantId;
+        // Organization context removed - always return 'default'
+        console.log(`🏢 Context to App ID: default`);
+        return 'default';
       },
 
-      // Query rewrite for tenant isolation
+      // Query rewrite for tenant isolation removed
       queryRewrite: (query, { securityContext }) => {
-        if (securityContext?.tenantId && securityContext.tenantId !== 'default') {
-          query.filters = query.filters || [];
-          
-          // Check if tenant filter already exists
-          const hasTenantFilter = query.filters.some((filter: any) => 
-            filter.member && filter.member.includes('tenant_id')
-          );
-          
-          if (!hasTenantFilter) {
-            query.filters.push({
-              member: 'tenant_id',
-              operator: 'equals',
-              values: [securityContext.tenantId]
-            });
-            
-            console.log(`🔒 Added tenant isolation filter: ${securityContext.tenantId}`);
-          }
-        }
-        
+        // Tenant filtering removed - organization context removed
+        // Queries are now user-scoped only
         return query;
       },
 
       // Request context creation
       requestContext: async (req) => {
-        const tenantId = this.extractTenantId(req);
+        // Tenant extraction removed - organization context removed
         
         const securityContext: SecurityContext = {
-          tenantId: tenantId || 'default',
+          tenantId: 'default',  // Always 'default' - organization context removed
           userId: req.headers['x-user-id'] as string,
           roles: ['user'],
           permissions: ['read:own'],
           isAuthenticated: true
         };
 
-        // Validate tenant access
-        try {
-          await validateTenantAccess(req, securityContext);
-        } catch (error) {
-          console.error('❌ Tenant validation failed:', error);
-          throw error;
-        }
+        // Tenant validation removed - organization context removed
 
-        console.log(`✅ Request context created for tenant: ${securityContext.tenantId}`);
+        console.log(`✅ Request context created for user: ${securityContext.userId || 'anonymous'}`);
         
         return { securityContext };
       },
@@ -170,26 +148,9 @@ export class MultiTenantCubeServer {
   }
 
   private extractTenantId(req: any): string | null {
-    // Extract tenant ID from various sources
-    if (req.headers && req.headers['x-tenant-id']) {
-      return req.headers['x-tenant-id'];
-    }
-    
-    if (req.query && req.query.tenantId) {
-      return req.query.tenantId;
-    }
-    
-    // Check subdomain (e.g., tenant1.aiser.app)
-    const host = req.headers.host;
-    if (host && host.includes('.')) {
-      const subdomain = host.split('.')[0];
-      if (subdomain && subdomain !== 'www' && subdomain !== 'api') {
-        return subdomain;
-      }
-    }
-    
-    // Default for development
-    return 'default';
+    // Tenant extraction removed - organization context removed
+    // Always return null (will default to 'default' in securityContext)
+    return null;
   }
 
   public async start(port: number = 4000): Promise<void> {

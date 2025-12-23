@@ -129,20 +129,4 @@ export const useProjects = () => {
   )
 }
 
-export const useOrganizations = () => {
-  return useAuthenticatedQuery(
-    ['organizations'],
-    async (token) => {
-      const response = await fetch('/api/organizations', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      })
-      if (!response.ok) throw new Error('Failed to fetch organizations')
-      return response.json()
-    },
-    {
-      staleTime: 5 * 60 * 1000,
-    }
-  )
-}
+// useOrganizations hook removed - organizations no longer supported

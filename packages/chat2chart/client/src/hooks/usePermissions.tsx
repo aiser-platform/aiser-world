@@ -7,7 +7,6 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { useOrganization } from '@/context/OrganizationContext';
 
 export enum Permission {
   // Organization permissions
@@ -91,18 +90,14 @@ interface UsePermissionsReturn {
  */
 export function usePermissions(options: UsePermissionsOptions = {}): UsePermissionsReturn {
   const { user, isAuthenticated } = useAuth();
-  const { currentOrganization } = useOrganization();
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Organization context removed - use provided organizationId or undefined
   const organizationId = useMemo(() => {
-    return options.organizationId 
-      ? String(options.organizationId)
-      : currentOrganization?.id 
-        ? String(currentOrganization.id)
-        : undefined;
-  }, [options.organizationId, currentOrganization?.id]);
+    return options.organizationId ? String(options.organizationId) : undefined;
+  }, [options.organizationId]);
 
   const projectId = useMemo(() => {
     return options.projectId ? String(options.projectId) : undefined;

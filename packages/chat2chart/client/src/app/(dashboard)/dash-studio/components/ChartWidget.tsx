@@ -20,7 +20,6 @@ import {
   MoreOutlined, LockOutlined, UnlockOutlined, CloseOutlined, CopyOutlined,
   DownloadOutlined, SaveOutlined, BarChartOutlined
 } from '@ant-design/icons';
-import { useOrganization } from '@/context/OrganizationContext';
 import { addWatermarkToChart } from '@/utils/watermark';
 
 const { Title } = Typography;
@@ -158,7 +157,7 @@ const ChartWidget: React.FC<ChartWidgetProps> = ({
   onTitleChange,
   onChartCreate
 }) => {
-  const { currentOrganization } = useOrganization();
+  // Organization context removed
 
   // Ensure optional callbacks have safe defaults to simplify callers
   const _onConfigUpdate = onConfigUpdate ?? (() => {});
@@ -732,8 +731,8 @@ const colorPalettes = {
             : getSampleDataForChartType(chartType);
           let options = generateChartOptions(chartType, config, effectiveData);
           
-          // Apply watermark for free plan users
-          const planType = currentOrganization?.plan_type || 'free';
+          // Apply watermark for free plan users (organization context removed - default to free)
+          const planType = 'free';
           options = addWatermarkToChart(options, planType);
             
             if (options && typeof options === 'object' && options.series && Array.isArray(options.series)) {
@@ -843,8 +842,8 @@ const colorPalettes = {
             : getSampleDataForChartType(chartType);
           let options = generateChartOptions(chartType, config, effectiveData);
           
-          // Apply watermark for free plan users
-          const planType = currentOrganization?.plan_type || 'free';
+          // Apply watermark for free plan users (organization context removed - default to free)
+          const planType = 'free';
           options = addWatermarkToChart(options, planType);
           
           if (options && typeof options === 'object' && options.series && Array.isArray(options.series)) {

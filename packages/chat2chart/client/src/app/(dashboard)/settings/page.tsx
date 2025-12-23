@@ -53,7 +53,6 @@ import {
   ArrowUpOutlined
 } from '@ant-design/icons';
 import { useRouter } from 'next/navigation';
-import { useOrganization } from '@/context/OrganizationContext';
 import { usePlanRestrictions } from '@/hooks/usePlanRestrictions';
 import { useAuth } from '@/context/AuthContext';
 
@@ -75,7 +74,6 @@ const PLAN_SUMMARY_META: Record<PlanKey, { tagColor: string; dataHistoryDays: nu
 const SettingsPage: React.FC<SettingsPageProps> = () => {
   const router = useRouter();
   const { user } = useAuth();
-  const { currentOrganization, usageStats } = useOrganization();
   const { planType, hasFeature, getRequiredPlan, showUpgradePrompt, UpgradeModal } = usePlanRestrictions();
 
   // State
@@ -118,14 +116,15 @@ const SettingsPage: React.FC<SettingsPageProps> = () => {
     apiKeys: apiKeys.length,
   }), [teamMembers, dataSources, apiKeys]);
   const planUsage = useMemo(() => {
-    const aiLimit = usageStats?.ai_queries_limit ?? 0;
-    const storageLimitMb = usageStats?.storage_limit_mb ?? 0;
+    // Organization context removed - use defaults
+    const aiLimit = 0;
+    const storageLimitMb = 0;
     const storageLimitGb = storageLimitMb > 0 ? storageLimitMb / 1024 : storageLimitMb;
-    const projectLimit = usageStats?.projects_limit ?? 0;
+    const projectLimit = 0;
 
-    const aiUsed = usageStats?.ai_queries_used ?? 0;
-    const storageUsedGb = (usageStats?.storage_used_mb ?? 0) / 1024;
-    const projectsUsed = usageStats?.projects_count ?? 0;
+    const aiUsed = 0;
+    const storageUsedGb = 0;
+    const projectsUsed = 0;
 
     const aiPercent = aiLimit > 0 ? Math.min(100, (aiUsed / aiLimit) * 100) : 0;
     const storagePercent = storageLimitGb > 0 ? Math.min(100, (storageUsedGb / storageLimitGb) * 100) : 0;
@@ -137,7 +136,7 @@ const SettingsPage: React.FC<SettingsPageProps> = () => {
       storage: { used: storageUsedGb, limit: storageLimitGb, percent: storagePercent },
       projects: { used: projectsUsed, limit: projectLimit, percent: projectPercent },
     };
-  }, [usageStats, planType]);
+  }, [planType]);
 
   const planKey: PlanKey = (['free', 'pro', 'team', 'enterprise'].includes(planType || '')
     ? (planType as PlanKey)
@@ -223,7 +222,7 @@ const SettingsPage: React.FC<SettingsPageProps> = () => {
       console.log('Profile form populated from user context:', userValues);
     }
     loadAllSettings();
-  }, [currentOrganization, user]);
+  }, [user]);
 
   const loadAllSettings = async () => {
     setFetching(true);
@@ -309,42 +308,13 @@ const SettingsPage: React.FC<SettingsPageProps> = () => {
   };
 
   const loadOrganization = async () => {
-    // CRITICAL: Initialize form from currentOrganization immediately if available
-    if (currentOrganization) {
-      console.log('[SettingsPage] Initializing org form from currentOrganization:', currentOrganization);
-      orgForm.setFieldsValue({
-        name: currentOrganization.name || '',
-        description: currentOrganization.description || '',
-        website: currentOrganization.website || ''
-      });
-    }
-    
-    // Also fetch from API to get latest data
-    if (!currentOrganization?.id) {
-      console.warn('[SettingsPage] No currentOrganization.id, cannot fetch from API');
-      return;
-    }
-    
-    try {
-      const res = await fetch(`/api/organizations/${currentOrganization.id}`, {
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' }
-      });
-      if (res.ok) {
-        const org = await res.json();
-        console.log('[SettingsPage] Loaded organization from API:', org);
-        orgForm.setFieldsValue({
-          name: org.name || currentOrganization.name || '',
-          description: org.description || currentOrganization.description || '',
-          website: org.website || currentOrganization.website || ''
-        });
-      } else {
-        console.warn('[SettingsPage] Failed to load organization from API, using currentOrganization data');
-      }
-    } catch (error) {
-      console.error('[SettingsPage] Failed to load organization:', error);
-      // Form already initialized from currentOrganization above
-    }
+    // Organization context removed - organization management disabled
+    console.warn('[SettingsPage] Organization management disabled - organization context removed');
+    orgForm.setFieldsValue({
+      name: '',
+      description: '',
+      website: ''
+    });
   };
 
   const loadSecurity = async () => {
@@ -460,7 +430,8 @@ const SettingsPage: React.FC<SettingsPageProps> = () => {
   };
 
   const loadTeamMembers = async () => {
-    if (!currentOrganization?.id) return;
+    // Organization context removed - team members loading disabled
+    return;
     try {
       const res = await fetch(`/api/organizations/${currentOrganization.id}/members`, {
         credentials: 'include',
@@ -559,7 +530,8 @@ const SettingsPage: React.FC<SettingsPageProps> = () => {
   };
 
   const handleOrganizationUpdate = async (values: any) => {
-    if (!currentOrganization?.id) {
+    // Organization context removed - organization update disabled
+    if (true) {
       message.error('No organization selected');
       return;
     }
@@ -1174,7 +1146,7 @@ const SettingsPage: React.FC<SettingsPageProps> = () => {
                 }
                 className="content-card"
               >
-                {!currentOrganization ? (
+                {true ? (
                   <Card>
                     <Alert
                       message="Organization Not Loaded"

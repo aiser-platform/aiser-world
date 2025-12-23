@@ -7,20 +7,17 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { useOrganization } from '@/context/OrganizationContext';
 import { Modal, Button } from 'antd';
 import { useRouter } from 'next/navigation';
 
 export const usePlanRestrictions = () => {
-  // CRITICAL: Call hooks unconditionally at the top level
-  // useOrganization itself is safe and called unconditionally
-  const { currentOrganization } = useOrganization();
   const router = useRouter();
   const [upgradeModalVisible, setUpgradeModalVisible] = useState(false);
   const [upgradeFeature, setUpgradeFeature] = useState<string>('');
   const [upgradeMessage, setUpgradeMessage] = useState<string>('');
 
-  const planType = currentOrganization?.plan_type || 'free';
+  // Default to free plan - organization context removed
+  const planType = 'free';
 
   /**
    * Check if a feature is available for the current plan

@@ -29,15 +29,14 @@ class EnhancedOnboardingService:
     async def create_quick_start_setup(
         self,
         user_id: str,
-        organization_id: int,
-        project_id: Optional[int],
+        organization_id: Optional[int],  # No longer used
+        project_id: Optional[int],  # No longer used
         plan_type: str = "free",
     ) -> Dict[str, Any]:
         """
         Create quick start setup for immediate value:
-        - Sample dashboard
-        - Sample data source (if needed)
         - Welcome message with next steps
+        - Organization/project creation removed
         """
         try:
             quick_start = {
@@ -46,16 +45,8 @@ class EnhancedOnboardingService:
                 "welcome_tour_completed": False,
             }
             
-            # For Free/Pro users, create a sample dashboard to show value
-            if plan_type in ["free", "pro"]:
-                # Create a sample "Getting Started" dashboard
-                dashboard_result = await self._create_sample_dashboard(
-                    organization_id=organization_id,
-                    project_id=project_id,
-                    user_id=user_id,
-                )
-                quick_start["sample_dashboard_created"] = dashboard_result.get("success", False)
-                quick_start["sample_dashboard_id"] = dashboard_result.get("dashboard_id")
+            # Skip dashboard creation - organization context removed
+            # Users can create dashboards after onboarding if needed
             
             # Create welcome message with personalized next steps
             welcome_message = await self._create_welcome_message(
@@ -72,56 +63,14 @@ class EnhancedOnboardingService:
     
     async def _create_sample_dashboard(
         self,
-        organization_id: int,
-        project_id: Optional[int],
+        organization_id: Optional[int],  # No longer used
+        project_id: Optional[int],  # No longer used
         user_id: str,
     ) -> Dict[str, Any]:
-        """Create a sample dashboard to demonstrate value"""
-        try:
-            # Create a simple "Getting Started" dashboard
-            result = await self.db.execute(
-                text("""
-                    INSERT INTO dashboards (
-                        name,
-                        description,
-                        project_id,
-                        organization_id,
-                        created_by,
-                        layout_config,
-                        is_public,
-                        is_active,
-                        created_at,
-                        updated_at
-                    ) VALUES (
-                        'Getting Started Dashboard',
-                        'Welcome! This is your first dashboard. Try asking questions in the AI Chat to create more charts.',
-                        :project_id,
-                        :org_id,
-                        :user_id,
-                        '{"layout": "grid", "widgets": []}'::jsonb,
-                        FALSE,
-                        TRUE,
-                        NOW(),
-                        NOW()
-                    )
-                    RETURNING id
-                """),
-                {
-                    "project_id": project_id,
-                    "org_id": organization_id,
-                    "user_id": user_id,
-                }
-            )
-            dashboard_id = result.scalar()
-            
-            return {
-                "success": True,
-                "dashboard_id": dashboard_id,
-            }
-            
-        except Exception as e:
-            logger.error(f"Failed to create sample dashboard: {str(e)}")
-            return {"success": False, "error": str(e)}
+        """Create a sample dashboard to demonstrate value - DISABLED (organization context removed)"""
+        # Dashboard creation removed - organization/project context removed
+        # Users can create dashboards after onboarding if needed
+        return {"success": False, "error": "Dashboard creation disabled - organization context removed"}
     
     async def _create_welcome_message(
         self,

@@ -290,31 +290,15 @@ class OnboardingService:
                 )
             )
             
-            # Provision default organization
-            # Use cleaned_data to ensure proper serialization (already validated JSON)
-            # Type assertion: cleaned_data is guaranteed to be Dict[str, Any] after clean_for_json
-            org_result = await self.provision_default_organization(
-                user_id=user_id,
-                onboarding_data=cleaned_data if isinstance(cleaned_data, dict) else {},  # Ensure dict type
-                plan_type=selected_plan,
-            )
+            # Organization/project creation removed - organization context removed
+            # Onboarding now just saves user preferences and marks onboarding as complete
             
-            # Provision default project (if needed)
-            project_id = None
-            if selected_plan in ["free", "pro"]:
-                project_result = await self.provision_default_project(
-                    organization_id=org_result["organization_id"],
-                    user_id=user_id,
-                    plan_type=selected_plan,
-                )
-                project_id = project_result.get("project_id")
-            
-            # Create quick start setup for immediate value
+            # Create quick start setup for immediate value (simplified, no org/project)
             enhanced_service = EnhancedOnboardingService(self.db)
             quick_start = await enhanced_service.create_quick_start_setup(
                 user_id=user_id,
-                organization_id=org_result["organization_id"],
-                project_id=project_id,
+                organization_id=None,  # No organization
+                project_id=None,  # No project
                 plan_type=selected_plan,
             )
             
@@ -324,8 +308,6 @@ class OnboardingService:
                 event="onboarding_completed",
                 metadata={
                     "plan_type": selected_plan,
-                    "organization_id": org_result["organization_id"],
-                    "project_id": project_id,
                 },
             )
             
@@ -333,8 +315,8 @@ class OnboardingService:
             
             return {
                 "success": True,
-                "organization_id": org_result["organization_id"],
-                "project_id": project_id,
+                "organization_id": None,  # No organization
+                "project_id": None,  # No project
                 "plan_type": selected_plan,
                 "quick_start": quick_start,
                 "welcome_message": quick_start.get("welcome_message", {}),
@@ -352,184 +334,42 @@ class OnboardingService:
         plan_type: str = "free",
     ) -> Dict[str, Any]:
         """
-        Create default organization for new user
+        Create default organization for new user - DISABLED (organization context removed)
         
         Returns:
-            {"organization_id": int, "organization_name": str}
+            {"organization_id": None, "organization_name": str}
         """
+        # Organization creation removed - organization context removed
         personal = onboarding_data.get("personal", {})
         workspace = onboarding_data.get("workspace", {})
         
-        # Priority: workspace.name > personal.company > firstName's Organization
+        # Return workspace name for reference, but no organization_id
         org_name = (
             workspace.get("name") or 
             personal.get("company") or 
-            f"{personal.get('firstName', 'User')}'s Organization"
+            f"{personal.get('firstName', 'User')}'s Workspace"
         )
-        slug = self._generate_slug(org_name, user_id)
-        
-        # Get plan config
-        plan_config = get_plan_config(plan_type)
-        
-        # Check if organization already exists for user
-        result = await self.db.execute(
-            text("""
-                SELECT o.id
-                FROM organizations o
-                JOIN user_organizations uo ON o.id = uo.organization_id
-                WHERE uo.user_id::text = :user_id
-                AND uo.role = 'owner'
-                LIMIT 1
-            """),
-            {"user_id": str(user_id)}
-        )
-        existing_org = result.fetchone()
-        
-        if existing_org:
-            return {
-                "organization_id": existing_org.id,
-                "organization_name": org_name,
-            }
-        
-        # Create organization
-        result = await self.db.execute(
-            text("""
-                INSERT INTO organizations (
-                    name,
-                    slug,
-                    description,
-                    plan_type,
-                    ai_credits_limit,
-                    max_projects,
-                    max_users,
-                    max_data_sources,
-                    storage_limit_gb,
-                    is_active,
-                    created_at,
-                    updated_at
-                ) VALUES (
-                    $1,
-                    $2,
-                    $3,
-                    $4,
-                    $5,
-                    $6,
-                    $7,
-                    $8,
-                    $9,
-                    TRUE,
-                    NOW(),
-                    NOW()
-                )
-                ON CONFLICT (slug) DO UPDATE SET
-                    name = EXCLUDED.name,
-                    updated_at = NOW()
-                RETURNING id
-            """),
-            (
-                org_name,
-                slug,
-                f"Default organization for {org_name}",
-                plan_type,
-                plan_config["ai_credits_limit"],
-                plan_config["max_projects"],
-                plan_config["max_users"],
-                plan_config["max_data_sources"],
-                plan_config["storage_limit_gb"],
-            )
-        )
-        org_id = result.scalar()
-        
-        # Add user as owner
-        try:
-            await self.db.execute(
-                text("""
-                    INSERT INTO user_organizations (
-                        organization_id,
-                        user_id,
-                        role,
-                        is_active,
-                        created_at
-                    ) VALUES (
-                        $1,
-                        $2,
-                        'owner',
-                        TRUE,
-                        NOW()
-                    )
-                    ON CONFLICT (organization_id, user_id) DO NOTHING
-                """),
-                (org_id, user_id)
-            )
-        except Exception as e:
-            logger.warning(f"Failed to add user to organization: {str(e)}")
-            # Non-fatal, continue
         
         return {
-            "organization_id": org_id,
+            "organization_id": None,  # No organization
             "organization_name": org_name,
         }
     
     async def provision_default_project(
         self,
-        organization_id: int,
+        organization_id: Optional[int],  # No longer used
         user_id: str,
         plan_type: str,
     ) -> Dict[str, Any]:
         """
-        Create default project for organization (Free/Pro users)
+        Create default project for organization - DISABLED (organization context removed)
         
         Returns:
-            {"project_id": int, "project_name": str}
+            {"project_id": None, "project_name": str}
         """
-        # Check if project already exists
-        result = await self.db.execute(
-            text("""
-                SELECT id
-                FROM projects
-                WHERE organization_id = $1
-                AND name = 'My First Project'
-                AND is_active = TRUE
-                LIMIT 1
-            """),
-            (organization_id,)
-        )
-        existing_project = result.fetchone()
-        
-        if existing_project:
-            return {
-                "project_id": existing_project.id,
-                "project_name": "My First Project",
-            }
-        
-        # Create project
-        result = await self.db.execute(
-            text("""
-                INSERT INTO projects (
-                    name,
-                    description,
-                    organization_id,
-                    created_by,
-                    is_active,
-                    created_at,
-                    updated_at
-                ) VALUES (
-                    'My First Project',
-                    'Your default project workspace',
-                    $1,
-                    $2,
-                    TRUE,
-                    NOW(),
-                    NOW()
-                )
-                RETURNING id
-            """),
-            (organization_id, user_id)
-        )
-        project_id = result.scalar()
-        
+        # Project creation removed - organization context removed
         return {
-            "project_id": project_id,
+            "project_id": None,  # No project
             "project_name": "My First Project",
         }
     

@@ -43,6 +43,7 @@ class DataSource(Base):
 
     # User and tenant
     user_id = Column(String, nullable=True)
+    # tenant_id column ignored - migration will drop it (organization context removed)
     tenant_id = Column(String, nullable=False, default="default")
 
     # Status
@@ -79,6 +80,7 @@ class DataQuery(Base):
 
     # User and tenant
     user_id = Column(String, nullable=True)
+    # tenant_id column ignored - migration will drop it (organization context removed)
     tenant_id = Column(String, nullable=False, default="default")
 
 

@@ -1,5 +1,5 @@
 -- Aiser Platform Database Initialization
--- Multi-tenant architecture with Cube.js semantic layer support
+-- Single-tenant architecture (organization/RBAC removed)
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS conversation (
     status VARCHAR(50) DEFAULT 'active',
     type VARCHAR(50) DEFAULT 'chat2chart',
     user_id UUID,
-    tenant_id VARCHAR(50) DEFAULT 'default',
+    -- tenant_id removed - organization context removed
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -31,17 +31,16 @@ CREATE TABLE IF NOT EXISTS charts (
     data_source VARCHAR(255),
     user_id UUID,
     conversation_id UUID REFERENCES conversation(id),
-    tenant_id VARCHAR(50) DEFAULT 'default',
+    -- tenant_id removed - organization context removed
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Create indexes for performance
-CREATE INDEX IF NOT EXISTS idx_conversation_tenant_id ON conversation(tenant_id);
+-- tenant_id indexes removed - organization context removed
 CREATE INDEX IF NOT EXISTS idx_conversation_user_id ON conversation(user_id);
 CREATE INDEX IF NOT EXISTS idx_conversation_created_at ON conversation(created_at);
 
-CREATE INDEX IF NOT EXISTS idx_charts_tenant_id ON charts(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_charts_user_id ON charts(user_id);
 CREATE INDEX IF NOT EXISTS idx_charts_conversation_id ON charts(conversation_id);
 CREATE INDEX IF NOT EXISTS idx_charts_created_at ON charts(created_at);
@@ -76,4 +75,4 @@ CREATE TRIGGER update_charts_updated_at BEFORE UPDATE ON charts
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Success message
-SELECT 'Aiser database initialized successfully with multi-tenant support!' as status;
+SELECT 'Aiser database initialized successfully!' as status;

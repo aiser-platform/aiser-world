@@ -539,7 +539,6 @@ class LangGraphMultiAgentOrchestrator:
         
         # Initialize services (same as old orchestrator)
         try:
-            from app.modules.ai.services.rbac_service import RBACService
             from app.modules.ai.services.performance_monitor import PerformanceMonitor
             from app.modules.ai.services.langchain_memory_service import LangChainMemoryService
             from app.modules.ai.services.context_enrichment_service import ContextEnrichmentService
@@ -547,18 +546,15 @@ class LangGraphMultiAgentOrchestrator:
             if self.async_session_factory:
                 self.memory_service = LangChainMemoryService(self.async_session_factory)
                 self.context_service = ContextEnrichmentService(self.async_session_factory)
-                self.rbac_service = RBACService(self.async_session_factory)
                 self.performance_monitor = PerformanceMonitor()
             else:
                 self.memory_service = None
                 self.context_service = None
-                self.rbac_service = None
                 self.performance_monitor = None
         except Exception as e:
             logger.warning(f"⚠️ Some services not available: {e}")
             self.memory_service = None
             self.context_service = None
-            self.rbac_service = None
             self.performance_monitor = None
         
         # Initialize agents (will be imported in nodes)

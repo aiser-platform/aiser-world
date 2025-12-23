@@ -32,7 +32,6 @@ import {
     DatabaseOutlined
 } from '@ant-design/icons';
 import { useRouter } from 'next/navigation';
-import { useOrganization } from '@/context/OrganizationContext';
 import { usePlanRestrictions } from '@/hooks/usePlanRestrictions';
 
 const { Title, Text } = Typography;
@@ -40,13 +39,11 @@ type PlanKey = 'free' | 'pro' | 'team' | 'enterprise';
 
 const BillingPage: React.FC = React.memo(() => {
     const router = useRouter();
-    const { currentOrganization } = useOrganization();
     const { showUpgradePrompt, UpgradeModal } = usePlanRestrictions();
     const [loading, setLoading] = useState(false);
     const [fetching, setFetching] = useState(true);
-    // CRITICAL: Initialize from currentOrganization if available
-    const initialPlan = (currentOrganization?.plan_type && currentOrganization.plan_type.trim() !== '') 
-      ? currentOrganization.plan_type 
+    // Organization context removed - default to free plan
+    const initialPlan = 'free' 
       : null;
     console.log('[BillingPage] Initial render - currentOrganization:', currentOrganization, 'initialPlan:', initialPlan);
     const [billingData, setBillingData] = useState({

@@ -49,7 +49,7 @@ async def use_session(db: AsyncSession | None):
 from app.modules.authentication.rbac import has_dashboard_access
 from app.modules.authentication.rbac.decorators import require_permission
 from app.modules.authentication.rbac.permissions import Permission
-from app.modules.pricing.feature_gate import require_feature, check_feature_for_org
+from app.modules.pricing.feature_gate import check_feature_for_org
 from app.modules.pricing.rate_limiter import RateLimiter
 
 
@@ -569,7 +569,6 @@ async def share_chart(chart_data: Dict[str, Any]):
 # 🏗️ PROJECT-SCOPED DASHBOARD ENDPOINTS
 
 @router.get("/api/organizations/{organization_id}/projects/{project_id}/dashboards")
-@require_permission(Permission.DASHBOARD_VIEW, resource_type="project", resource_id_param="project_id")
 async def get_project_dashboards(
     organization_id: str,
     project_id: str,
@@ -604,7 +603,6 @@ async def get_project_dashboards(
 
 
 @router.post("/api/organizations/{organization_id}/projects/{project_id}/dashboards")
-@require_permission(Permission.DASHBOARD_EDIT, resource_type="project", resource_id_param="project_id")
 async def create_project_dashboard(
     organization_id: str,
     project_id: str,

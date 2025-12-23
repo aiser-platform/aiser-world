@@ -12,7 +12,6 @@ from app.modules.projects.api import router as projects_router
 from app.modules.onboarding.api import router as onboarding_router
 from app.modules.queries.api import router as queries_router
 from app.modules.authentication.api import router as auth_api_router
-from app.modules.authentication.rbac.api import router as rbac_router
 from app.modules.debug.api import router as debug_router
 from app.modules.authentication.deps.auth_bearer import JWTCookieBearer
 from fastapi import APIRouter, Depends, Request
@@ -41,8 +40,6 @@ api_router.include_router(
 
 
 api_router.include_router(router=auth_api_router, prefix="", tags=["auth"]) 
-
-api_router.include_router(router=rbac_router, prefix="", tags=["rbac"])
 
 api_router.include_router(
     router=chat_router,
@@ -85,18 +82,13 @@ async def get_data_source_proxy(
     data_source_id: str,
     current_token: Union[str, dict] = Depends(JWTCookieBearer())
 ):
-    """Proxy endpoint for /data/sources/{id} with /api prefix"""
-    from app.modules.data.api import get_project_data_source
+    """Proxy endpoint for /data/sources/{id} with /api prefix - organization context removed"""
+    from app.modules.data.api import get_data_source
     from fastapi import HTTPException, status
     
     try:
-        # Extract organization_id and project_id from token or use defaults
-        user_payload = current_token if isinstance(current_token, dict) else {}
-        organization_id = str(user_payload.get('organization_id') or '1')
-        project_id = str(user_payload.get('project_id') or '1')
-        
-        # Call the actual endpoint
-        return await get_project_data_source(organization_id, project_id, data_source_id)
+        # Organization context removed - use user-scoped endpoint directly
+        return await get_data_source(data_source_id, current_token)
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 

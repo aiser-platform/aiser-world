@@ -86,30 +86,9 @@ class WorkingQueryService {
     }
 
     try {
-      // Get organization and project context from OrganizationContext or localStorage
-      let organizationId: any = 1;
-      try {
-        // @ts-ignore - dynamic import of context in client-side code
-        const { useOrganization } = await import('@/context/OrganizationContext');
-        // eslint-disable-next-line react-hooks/rules-of-hooks
-        const ctx = useOrganization();
-        organizationId = ctx?.currentOrganization?.id ?? localStorage.getItem('currentOrganizationId') ?? 1;
-      } catch (_err) {
-        organizationId = localStorage.getItem('currentOrganizationId') ?? 1;
-      }
-
-      // Prefer explicit numeric project id; fallback to first project or 1
-      let projectId = localStorage.getItem('currentProjectId') ?? (typeof window !== 'undefined' ? (window.localStorage.getItem('currentProjectId') || undefined) : undefined);
-      if (!projectId) {
-        try {
-          const { useOrganization } = await import('@/context/OrganizationContext');
-          // eslint-disable-next-line react-hooks/rules-of-hooks
-          const ctx = useOrganization();
-          if (ctx && Array.isArray(ctx.projects) && ctx.projects.length > 0) projectId = String(ctx.projects[0].id);
-        } catch (e) {
-          projectId = '1';
-        }
-      }
+      // Organization context removed - use localStorage fallback only
+      let organizationId: any = localStorage.getItem('currentOrganizationId') ?? 1;
+      let projectId = localStorage.getItem('currentProjectId') ?? (typeof window !== 'undefined' ? (window.localStorage.getItem('currentProjectId') || '1') : '1');
 
       let response;
       try {

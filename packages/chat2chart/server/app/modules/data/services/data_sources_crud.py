@@ -33,7 +33,7 @@ class DataSourceCreate:
     format: str  # postgresql, mysql, csv, s3, etc.
     description: Optional[str] = None
     connection_config: Dict[str, Any] = None
-    organization_id: Optional[str] = None
+    # organization_id removed - organization context removed
     project_id: Optional[str] = None
     is_active: bool = True
 
@@ -54,7 +54,7 @@ class DataSourceResponse:
     format: str
     description: Optional[str]
     connection_config: Dict[str, Any]
-    organization_id: Optional[str]
+    # organization_id removed - organization context removed
     project_id: Optional[str]
     is_active: bool
     created_at: datetime
@@ -101,7 +101,7 @@ class DataSourcesCRUD:
                 connection_config=conn_cfg,
                 metadata=json.dumps(metadata) if metadata else None,
                 user_id=user_id,
-                tenant_id=data_source_data.organization_id,
+                tenant_id=None,  # tenant_id set to None - organization context removed
                 is_active=data_source_data.is_active,
                 created_at=datetime.now(timezone.utc),
                 updated_at=datetime.now(timezone.utc)
@@ -138,7 +138,7 @@ class DataSourcesCRUD:
                 format=data_source.format,
                 description=data_source.description,
                 connection_config=data_source.connection_config,
-                organization_id=data_source.tenant_id,
+                # organization_id removed - organization context removed
                 project_id=data_source_data.project_id,
                 is_active=data_source.is_active,
                 created_at=data_source.created_at,
@@ -204,7 +204,7 @@ class DataSourcesCRUD:
                 format=data_source.format,
                 description=data_source.description,
                 connection_config=data_source.connection_config,
-                organization_id=data_source.tenant_id,
+                # organization_id removed - organization context removed
                 project_id=None,  # Would need to join with project_data_source table
                 is_active=data_source.is_active,
                 created_at=data_source.created_at,
@@ -224,19 +224,16 @@ class DataSourcesCRUD:
     async def list_data_sources(
         self,
         user_id: str,
-        organization_id: Optional[str] = None,
+        organization_id: Optional[str] = None,  # Ignored - organization context removed
         project_id: Optional[str] = None,
         data_source_type: Optional[str] = None,
         is_active: Optional[bool] = None,
         session: Optional[AsyncSession] = None
     ) -> List[DataSourceResponse]:
-        """List data sources with filters"""
+        """List data sources for a user. Organization/project filters are ignored in simplified mode."""
         try:
-            # Build query
+            # Build query - strictly user-scoped
             query = select(DataSource).where(DataSource.user_id == user_id)
-            
-            if organization_id:
-                query = query.where(DataSource.tenant_id == organization_id)
             
             if data_source_type:
                 query = query.where(DataSource.type == data_source_type)
@@ -276,7 +273,7 @@ class DataSourcesCRUD:
                     format=data_source.format,
                     description=data_source.description,
                     connection_config=data_source.connection_config,
-                    organization_id=data_source.tenant_id,
+                    # organization_id removed - organization context removed
                     project_id=project_id,
                     is_active=data_source.is_active,
                     created_at=data_source.created_at,
@@ -367,7 +364,7 @@ class DataSourcesCRUD:
                 format=data_source.format,
                 description=data_source.description,
                 connection_config=data_source.connection_config,
-                organization_id=data_source.tenant_id,
+                # organization_id removed - organization context removed
                 project_id=None,
                 is_active=data_source.is_active,
                 created_at=data_source.created_at,

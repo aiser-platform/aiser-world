@@ -19,7 +19,6 @@ import {
 import { usePermissions, Permission } from '@/hooks/usePermissions';
 import { PermissionGuard } from '@/components/PermissionGuard';
 import { RoleBadge, RoleType } from '@/components/RoleBadge';
-import { useOrganization } from '@/context/OrganizationContext';
 import type { ColumnsType } from 'antd/es/table';
 
 interface TeamMember {
@@ -40,8 +39,8 @@ interface TeamMembersTableProps {
 export const TeamMembersTable: React.FC<TeamMembersTableProps> = ({
   organizationId,
 }) => {
-  const { currentOrganization } = useOrganization();
-  const orgId = organizationId || currentOrganization?.id;
+  // Organization context removed - use provided organizationId or undefined
+  const orgId = organizationId;
   const { hasPermission, loading: permissionsLoading } = usePermissions({
     organizationId: orgId ? String(orgId) : undefined,
   });

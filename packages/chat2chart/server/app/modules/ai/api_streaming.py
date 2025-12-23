@@ -59,13 +59,8 @@ async def analyze_query_streaming(
         
         user_id = str(user_id)
         
-        # Get organization_id from request or token
-        organization_id = request.organization_id or current_token.get('organization_id')
-        if not organization_id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Organization ID required"
-            )
+        # Organization context removed - use default value
+        organization_id = request.organization_id or current_token.get('organization_id') or '1'
         
         logger.info(f"🌊 Starting streaming analysis for user {user_id}, query: {request.query[:100]}")
         

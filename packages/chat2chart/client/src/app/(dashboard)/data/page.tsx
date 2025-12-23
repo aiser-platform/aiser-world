@@ -38,7 +38,6 @@ import {
     ArrowUpOutlined,
 } from '@ant-design/icons';
 import UniversalDataSourceModal from '@/app/components/UniversalDataSourceModal/UniversalDataSourceModal';
-import { useOrganization } from '@/context/OrganizationContext';
 import { usePlanRestrictions } from '@/hooks/usePlanRestrictions';
 import { usePermissions, Permission } from '@/hooks/usePermissions';
 import { PermissionGuard } from '@/components/PermissionGuard';
@@ -61,11 +60,8 @@ interface DataSource {
 }
 
 const DataSourcesPage: React.FC = () => {
-    const { currentOrganization, usageStats, getOrganizationUsage } = useOrganization();
     const { showUpgradePrompt, UpgradeModal } = usePlanRestrictions();
-    const { hasPermission } = usePermissions({
-        organizationId: currentOrganization?.id,
-    });
+    const { hasPermission } = usePermissions();
     const { session } = useAuth();
     const [dataSources, setDataSources] = useState<DataSource[]>([]);
     const [loading, setLoading] = useState(false);
@@ -83,14 +79,11 @@ const DataSourcesPage: React.FC = () => {
         if (dataSourcesData) {
             const sources = dataSourcesData.data_sources || dataSourcesData.data || dataSourcesData || [];
             setDataSources(Array.isArray(sources) ? sources : []);
-            if (currentOrganization?.id) {
-                getOrganizationUsage(currentOrganization.id);
-            }
         }
         if (dataSourcesError) {
             message.error('Failed to load data sources');
         }
-    }, [dataSourcesData, dataSourcesError, currentOrganization?.id]);
+    }, [dataSourcesData, dataSourcesError]);
 
     useEffect(() => {
         setLoading(dataSourcesLoading);
@@ -115,9 +108,6 @@ const DataSourcesPage: React.FC = () => {
         setModalVisible(false);
         setSelectedDataSource(null);
         // React Query will automatically refetch data sources
-        if (currentOrganization?.id) {
-            getOrganizationUsage(currentOrganization.id);
-        }
     };
 
     const handleDeleteDataSource = async (dataSource: DataSource) => {
@@ -275,10 +265,11 @@ const DataSourcesPage: React.FC = () => {
         warehouses: dataSources.filter(ds => ds.type === 'warehouse' || ds.type === 'cube').length,
     };
 
-    const dataSourcesLimit = usageStats?.data_sources_limit ?? -1;
-    const dataSourcesUsedCount = usageStats?.data_sources_count ?? stats.total;
-    const dataSourcesPercent = dataSourcesLimit > 0 ? Math.min(100, (dataSourcesUsedCount / dataSourcesLimit) * 100) : 0;
-    const canAddDataSource = dataSourcesLimit < 0 || dataSourcesUsedCount < dataSourcesLimit;
+    // No organization limits - unlimited data sources
+    const dataSourcesLimit = -1;
+    const dataSourcesUsedCount = stats.total;
+    const dataSourcesPercent = 0;
+    const canAddDataSource = true;
 
     return (
         <div className="page-wrapper" style={{ paddingLeft: '24px', paddingRight: '24px', paddingTop: '24px', paddingBottom: '24px' }}>
@@ -383,7 +374,11 @@ const DataSourcesPage: React.FC = () => {
                                 </Button>
                             </Tooltip>
                         </PermissionGuard>
-                        <Button icon={<ReloadOutlined />} onClick={loadDataSources} loading={loading}>
+                        <Button 
+                            icon={<ReloadOutlined />} 
+                            onClick={() => window.location.reload()} 
+                            loading={loading}
+                        >
                             Refresh
                         </Button>
                     </Space>

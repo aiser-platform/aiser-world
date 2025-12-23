@@ -14,7 +14,6 @@ import AnimatedAIAvatar from './AnimatedAIAvatar';
 import SessionHistoryDropdown from './SessionHistoryDropdown';
 import AssetLibraryDropdown from './AssetLibraryDropdown';
 import AiserAIIcon from '@/app/components/AiserAIIcon/AiserAIIcon';
-import { usePlanRestrictions } from '@/hooks/usePlanRestrictions';
 import { makeMessageUserFriendly, makeProgressMessageUserFriendly, makeErrorMessageUserFriendly } from '@/utils/userFriendlyMessages';
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import shortid from 'shortid';
@@ -34,7 +33,6 @@ import Markdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import * as echarts from 'echarts';
 import { addWatermarkToChart } from '@/utils/watermark';
-import { useOrganization } from '@/context/OrganizationContext';
 import { getSecureAuthHeaders, isValidToken, sanitizeErrorMessage, isAuthError, handleAuthError } from '@/utils/secureAuth';
 import ChartMessage from './ChartMessage';
 import DeepAnalysisReport from './DeepAnalysisReport';
@@ -71,8 +69,6 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
     // CRITICAL: All hooks must be called unconditionally at the top level
     // This prevents "Rendered more hooks than during the previous render" errors
     const { isAuthenticated, authLoading, user, session } = useAuth();
-    const { hasFeature, canPerformAction, showUpgradePrompt, UpgradeModal } = usePlanRestrictions();
-    const { currentOrganization, getOrganizationUsage } = useOrganization();
     const [prompt, setPrompt] = useState('');
     const [messages, setMessages] = useState<IChatMessage[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -1244,7 +1240,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                                             executiveSummary={msg.executiveSummary || msg.analysis || msg.message || ''}
                                             isDark={document.documentElement.classList.contains('dark-mode') || 
                                                     document.documentElement.getAttribute('data-theme') === 'dark'}
-                                            planType={currentOrganization?.plan_type}
+                                            // planType removed – no org/plan gating
                                             conversationId={props.conversationId}
                                             selectedDataSourceId={props.selectedDataSource?.id}
                                             queryResults={msg.queryResult ? (Array.isArray(msg.queryResult) ? msg.queryResult : [msg.queryResult]) : undefined}
@@ -1262,7 +1258,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                                             config={msg.echartsConfig || msg.chartConfig}
                                             isDark={document.documentElement.classList.contains('dark-mode') || 
                                                     document.documentElement.getAttribute('data-theme') === 'dark'}
-                                            planType={currentOrganization?.plan_type}
+                                            // planType removed – no org/plan gating
                                             conversationId={props.conversationId}
                                             selectedDataSourceId={props.selectedDataSource?.id}
                                             sqlQuery={msg.sqlQuery}
@@ -2017,11 +2013,6 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
             }, 1500);
             return;
         }
-        // Check if user has API access for chart generation
-        if (!canPerformAction('generate_chart')) {
-            showUpgradePrompt('api_access', 'Chart generation requires Pro plan or higher. Upgrade to unlock AI-powered chart generation!');
-            return;
-        }
         // If file is selected, upload it first before sending message
         let uploadedDataSourceId: string | undefined = undefined;
         uploadedDataSourceIdRef.current = undefined; // Reset before upload
@@ -2258,7 +2249,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
             const response = await fetch('/api/ai/chat/analyze', {
                 method: 'POST',
                 credentials: 'include',
-                headers: getSecureAuthHeaders(false),
+                headers: getSecureAuthHeaders(session),
                 body: JSON.stringify({
                     query: textToSend,
                     data_source_id: uploadedDataSourceId || props.selectedDataSource?.id,
@@ -2267,7 +2258,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                     analysis_mode: effectiveMode, // Use effective mode (deep for files)
                     ai_model: currentModel === 'auto' ? 'azure_gpt5_mini' : currentModel,
                     stream: false,
-                    organization_id: currentOrganization?.id ? String(currentOrganization.id) : undefined
+                    // organization_id removed - simplified to user-scoped access only
                 })
             });
 
@@ -2397,9 +2388,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                     analysis_mode: analysisMode,
                     ai_model: aiModel === 'auto' ? 'azure_gpt5_mini' : aiModel, // Convert 'auto' to default model
                     stream: streamingEnabled,
-                    user_context: { stream: streamingEnabled },
-                    // CRITICAL: Include organization_id for streaming endpoint
-                    organization_id: currentOrganization?.id ? String(currentOrganization.id) : undefined
+                    user_context: { stream: streamingEnabled }
                 }),
                 signal: signal
             });
@@ -2718,16 +2707,6 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
             progressTimeoutRef.current = null;
         }
         
-        // Refresh organization usage stats after successful AI call (credits consumed)
-        if (currentOrganization?.id) {
-            try {
-                await getOrganizationUsage(currentOrganization.id);
-                console.log('✅ Refreshed organization usage stats after streaming AI call');
-            } catch (error) {
-                console.warn('⚠️ Failed to refresh usage stats:', error);
-            }
-        }
-        
         // Update progress one last time from final result if available - ensure 100%
         if (result.progress) {
             const friendlyMessage = makeProgressMessageUserFriendly(
@@ -2879,15 +2858,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
         if (result.success !== false) {
             await processAIResponse(result, query);
             
-            // Refresh organization usage stats after successful AI call (credits consumed)
-            if (currentOrganization?.id) {
-                try {
-                    await getOrganizationUsage(currentOrganization.id);
-                    console.log('✅ Refreshed organization usage stats after AI call');
-                } catch (error) {
-                    console.warn('⚠️ Failed to refresh usage stats:', error);
-                }
-            }
+            // Organization usage refresh removed – no org-level metering
         } else {
             // Handle error
             const errorMessage: IChatMessage = {
@@ -2909,15 +2880,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
 
     // Process AI response (extracted to avoid duplication)
     const processAIResponse = async (result: any, query: string) => {
-        // Refresh organization usage stats after successful AI response (credits consumed)
-        if (currentOrganization?.id) {
-            try {
-                await getOrganizationUsage(currentOrganization.id);
-                console.log('✅ Refreshed organization usage stats after AI response');
-            } catch (error) {
-                console.warn('⚠️ Failed to refresh usage stats:', error);
-            }
-        }
+        // Organization usage refresh removed – no org-level metering
         
         // CRITICAL: Extract all components - prioritize message/narration
         let aiAnalysis = makeMessageUserFriendly(result.message || result.narration || result.analysis || result.answer || '');
@@ -3772,7 +3735,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                     setShowDataSourceModal(false);
                 }}
             />
-            <UpgradeModal />
+            {/* UpgradeModal removed – no org/plan gating */}
         </div>
     );
 };
