@@ -55,3 +55,5 @@ def downgrade():
     op.drop_index('idx_saved_asset_conversation_id', table_name='saved_asset')
     op.drop_table('saved_asset')
 
+
+

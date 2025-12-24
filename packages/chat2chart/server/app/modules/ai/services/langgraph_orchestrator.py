@@ -1465,10 +1465,20 @@ class LangGraphMultiAgentOrchestrator:
             
             # Generate proper natural language response using LLM if we have results
             executive_summary = final_state.get("executive_summary")
-            narration = None
+            narration = final_state.get("narration") or final_state.get("message") or None
+            
+            # CRITICAL: Check if this is conversational mode (narration already set by routing_node/conversational_end)
+            # In conversational mode, we should preserve the existing narration
+            current_stage = final_state.get("current_stage", "")
+            is_conversational_complete = (
+                current_stage == "supervisor_conversational_complete" or 
+                current_stage == "conversational" or
+                "conversational" in current_stage.lower()
+            )
             
             # Try to generate a conversational response using LLM
-            if query_result_count > 0 and self.litellm_service:
+            # Only generate new narration if we have query results AND we're not in conversational mode
+            if query_result_count > 0 and self.litellm_service and not is_conversational_complete:
                 try:
                     # Prepare context for natural language response generation
                     query_intent = final_state.get("query_intent", {})
@@ -1524,7 +1534,9 @@ Return ONLY the response text, no markdown, no quotes."""
                     logger.warning(f"⚠️ Natural language generation error: {nl_err}, using fallback")
             
             # Fallback: Use executive summary or build from parts
-            if not narration or len(narration.strip()) < 20:
+            # CRITICAL: Only run fallback if we're NOT in conversational mode OR narration is truly missing
+            # This preserves narration set by routing_node/conversational_end for conversational routes
+            if not is_conversational_complete and (not narration or len(narration.strip()) < 20):
                 if executive_summary and isinstance(executive_summary, str) and len(executive_summary.strip()) > 20:
                     narration = executive_summary
                 else:

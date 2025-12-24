@@ -191,6 +191,8 @@ class AiserWorkflowState(TypedDict, total=False):
     critical_failure: bool
     progress_percentage: float  # Progress percentage (0.0-100.0)
     progress_message: str  # Human-readable progress message
+    message: str
+    narration: str
     
     # Context state
     agent_context: Dict[str, Any]
@@ -259,6 +261,9 @@ class AiserWorkflowStateValidator(BaseModel):
     organization_id: Optional[str] = Field(None, description="Organization ID")
     project_id: Optional[str] = Field(None, description="Project ID")
     conversation_id: Optional[str] = Field(None, description="Conversation ID")
+
+    message: str = Field(default="", description="Message")
+    narration: str = Field(default="", description="Narration")
     
     # Audit trail
     state_snapshots: List[Dict[str, Any]] = Field(default_factory=list, description="State snapshots for audit")
@@ -361,6 +366,8 @@ class AiserWorkflowStateValidator(BaseModel):
             "project_id": self.project_id,
             "conversation_id": self.conversation_id,
             "state_snapshots": self.state_snapshots,
+            "message": self.message,
+            "narration": self.narration,
         }
     
     @classmethod

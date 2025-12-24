@@ -81,6 +81,7 @@ services:
       - .env
     ports:
       - "8000:8000"
+      - "5678:5678"  # Debugpy port for remote debugging
     volumes:
       - ./packages/chat2chart/server:/app
       - chat2chart_poetry_cache:/root/.cache/poetry
@@ -137,8 +138,8 @@ services:
         
         echo "PostgreSQL is up - running migrations...";
         poetry run alembic -c alembic.ini upgrade head || echo "Migration failed or already applied";
-        echo "Starting chat2chart-server...";
-        poetry run uvicorn app.main:app --host 0.0.0.0 --port 8000;
+        echo "Starting chat2chart-server with debugpy (waiting for debugger to attach)...";
+        poetry run python -m debugpy --listen 0.0.0.0:5678 --wait-for-client -m uvicorn app.main:app --host 0.0.0.0 --port 8000;
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 10s

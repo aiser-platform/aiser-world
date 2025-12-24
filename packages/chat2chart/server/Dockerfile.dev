@@ -17,6 +17,7 @@ RUN poetry cache clear --all pypi -n && poetry lock && poetry install --no-root 
 RUN poetry run pip install alembic  # Ensure alembic is installed within the Poetry venv
 RUN poetry run pip install asyncpg sqlalchemy psycopg2-binary # Explicitly install asyncpg, sqlalchemy, and psycopg2-binary
 RUN poetry run pip install python-socketio python-engineio # Explicitly install socketio and engineio
+RUN poetry run pip install debugpy # Install debugpy for remote debugging
 RUN poetry run python -c "import duckdb; print('DuckDB imported successfully')" || (echo 'ERROR: DuckDB import failed' && exit 1)
 
 # Copy the pre-configured Alembic environment
@@ -35,6 +36,7 @@ RUN find . -type d -name "__pycache__" -exec rm -r {} +
 ENV PYTHONPATH=/app
 
 EXPOSE 8000
+EXPOSE 5678
 
 ENTRYPOINT ["/app/start-server.sh"]
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "debug"]

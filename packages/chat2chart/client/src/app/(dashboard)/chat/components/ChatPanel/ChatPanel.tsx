@@ -216,11 +216,6 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
             setCurrentModel(props.model);
         }
     }, [props.model]);
-
-    // REMOVED: Chart rendering logic moved to ChartMessage component
-    // This eliminates the need for document.getElementById, setTimeout, and complex useEffect hooks
-    // Charts now render directly in their own component with proper React lifecycle
-    // No cleanup needed - ChartMessage component handles its own lifecycle
     
     // CRITICAL FIX: Only restore charts from localStorage when conversationId changes, NOT on every message update
     // This prevents spamming localStorage during streaming and race conditions
@@ -2004,13 +1999,13 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
 
     // Handle send message
     const handleSendMessage = async (messageText?: string) => {
+        debugger;
+
         // CRITICAL: Check authentication before allowing any action
         if (!isAuthenticated || !user) {
             antMessage.error('Your session has expired. Please sign in again to continue.');
             // Redirect to login immediately
-            setTimeout(() => {
-                window.location.href = '/login';
-            }, 1500);
+            window.location.href = '/login'
             return;
         }
         // If file is selected, upload it first before sending message
@@ -2227,22 +2222,22 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
 
         try {
             // Respect user's streaming preference - DEFAULT TO STREAMING for better UX
-            const enableStreaming = streamingEnabled !== false; // Stream by default unless explicitly disabled
-            console.log(`🌊 Streaming ${enableStreaming ? 'ENABLED' : 'DISABLED'} for this request`);
+            // const enableStreaming = streamingEnabled !== false; // Stream by default unless explicitly disabled
+            // console.log(`🌊 Streaming ${enableStreaming ? 'ENABLED' : 'DISABLED'} for this request`);
             
-            if (enableStreaming) {
-                // Use streaming with SSE (Server-Sent Events)
-                console.log('🚀 Calling handleStreamingRequest...');
-                await handleStreamingRequest(
-                    textToSend,
-                    uploadedDataSourceId || props.selectedDataSource?.id,
-                    conversationId || props.conversationId,
-                    effectiveMode, // Use effective mode (deep for files)
-                    currentModel
-                );
-                // CRITICAL: Return here to prevent fall-through to non-streaming
-                return;
-            }
+            // if (enableStreaming) {
+            //     // Use streaming with SSE (Server-Sent Events)
+            //     console.log('🚀 Calling handleStreamingRequest...');
+            //     await handleStreamingRequest(
+            //         textToSend,
+            //         uploadedDataSourceId || props.selectedDataSource?.id,
+            //         conversationId || props.conversationId,
+            //         effectiveMode, // Use effective mode (deep for files)
+            //         currentModel
+            //     );
+            //     // CRITICAL: Return here to prevent fall-through to non-streaming
+            //     return;
+            // }
             
             // Non-streaming fallback (only if streaming explicitly disabled)
             console.log('📡 Using non-streaming request...');
@@ -2348,6 +2343,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
         analysisMode: string,
         aiModel: string
     ) => {
+        debugger;
         // Create abort controller for cancellation
         abortControllerRef.current = new AbortController();
         const signal = abortControllerRef.current.signal;
@@ -3585,6 +3581,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                                 type={isLoading ? "default" : "primary"}
                                 icon={isLoading ? <StopOutlined /> : <SendOutlined />}
                                 onClick={(e) => {
+                                    debugger;
                                     e.preventDefault();
                                     if (isLoading) {
                                         handleStopRequest();
