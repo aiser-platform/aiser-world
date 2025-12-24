@@ -1629,8 +1629,24 @@ Return ONLY the response text, no markdown, no quotes."""
             logger.info(f"✅ Final progress: {final_state.get('progress_percentage', 0.0)}% - {final_state.get('progress_message', 'N/A')}")
             logger.info(f"✅ Success: {result.get('success')}, Has SQL: {bool(result.get('sql_query'))}, Has Results: {bool(result.get('query_result'))}, Has Chart: {bool(result.get('echarts_config'))}, Has Insights: {bool(result.get('insights'))}")
             
-            # NOTE: Messages are already saved earlier in this method (around line 1507)
-            # No need to save again here to prevent duplicates
+            # CRITICAL: Save messages to database for non-streaming requests
+            # This ensures AI responses are persisted, updating user messages from "processing" to "completed"
+            if conversation_id:
+                try:
+                    narration = result.get("narration") or result.get("message") or result.get("analysis", "")
+                    result_dict = {
+                        "success": result.get("success", True),
+                        "echarts_config": result.get("echarts_config"),
+                        "insights": result.get("insights", []),
+                        "recommendations": result.get("recommendations", []),
+                        "sql_query": result.get("sql_query"),
+                        "query_result": result.get("query_result"),
+                        "execution_metadata": result.get("execution_metadata", {})
+                    }
+                    await self._save_conversation_messages(conversation_id, query, narration, result_dict)
+                    logger.info(f"✅ Saved messages for non-streaming request in conversation {conversation_id}")
+                except Exception as save_error:
+                    logger.error(f"⚠️ Failed to save messages for non-streaming request (non-critical): {save_error}")
             
             return result
             
