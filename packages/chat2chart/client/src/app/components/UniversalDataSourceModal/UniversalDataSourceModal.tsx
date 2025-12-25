@@ -945,7 +945,7 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
                 onClose();
                 message.success('API data source created successfully!');
                 return;
-                } else {
+            } else {
                 // Database/Warehouse/Cloud Storage connection
                 let endpoint = '/api/data/database/connect';
                 let requestBody: any;

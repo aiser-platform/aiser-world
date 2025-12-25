@@ -440,7 +440,6 @@ async def upload_file(
             'sheet_name': sheet_name,
             'delimiter': delimiter,
             'user_id': user_id,               # Pass user_id to service
-            'tenant_id': str(organization_id),  # Bind data source to organization/tenant
         }
         
         # Prevent duplicate display names (case-insensitive) for this user
@@ -505,100 +504,6 @@ async def upload_file(
         logger.error(f"Full traceback: {error_trace}")
         raise HTTPException(status_code=500, detail=f"File upload failed: {str(e)}")
 
-
-# Database connection endpoint (DEPRECATED - use /data/database/connect instead)
-# Maintained for backward compatibility but requires authentication
-@router.post("/connect-database")
-async def connect_database(
-    request: DatabaseConnectionRequest,
-    current_token: Union[str, dict] = Depends(JWTCookieBearer())
-):
-    """
-    Create database connection (DEPRECATED - use /data/database/connect instead)
-    
-    This endpoint is maintained for backward compatibility.
-    New code should use /data/database/connect which has better security and user ownership.
-    """
-    try:
-        # Extract user ID from JWT token
-        try:
-            user_payload = extract_user_payload(current_token)
-            user_id = str(user_payload.get('id') or user_payload.get('sub') or '')
-        except Exception:
-            user_id = ''
-        
-        if not user_id:
-            logger.warning('connect_database attempted without authenticated user')
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Authentication required')
-        
-        logger.info(f"🔌 Database connection request (deprecated endpoint): {request.type} for user {user_id}")
-        
-        # Handle URI-based connection
-        if request.uri:
-            logger.info("🔌 Database connection request via URI")
-            # Use the data service to parse URI and create connection with user ownership
-            result = await data_service.create_database_connection({'uri': request.uri, 'name': request.name}, tenant_id='default')
-            # Also store with user ownership
-            if result.get('success') and result.get('data_source_id'):
-                try:
-                    # NOTE: Pass plain credentials - store_database_connection will validate and encrypt them
-                    await data_service.store_database_connection({'uri': request.uri, 'name': request.name}, user_id=user_id)
-                except Exception as e:
-                    logger.warning(f"Failed to store connection with user ownership: {e}")
-            return result
-        
-        logger.info(f"🔌 Database connection request: {request.type}")
-        
-        config = {
-            'type': request.type,
-            'host': request.host,
-            'port': request.port,
-            'database': request.database,
-            'username': request.username,
-            'password': request.password,
-            'name': request.name or f"{request.type}_{request.database}"
-        }
-        
-        # Test database connection first
-        test_result = await data_service.test_database_connection(config)
-        if not test_result['success']:
-            raise HTTPException(status_code=400, detail=f"Connection failed: {test_result.get('error')}")
-        
-        # Store the connection via service with user ownership
-        # NOTE: Pass plain credentials - store_database_connection will validate and encrypt them
-        connection_result = await data_service.store_database_connection(config, user_id=user_id)
-        if not connection_result or not connection_result.get('success'):
-            err = (connection_result or {}).get('error') if isinstance(connection_result, dict) else 'Unknown error'
-            raise HTTPException(status_code=500, detail=f"Failed to store connection: {err}")
-        
-        return {
-            "success": True,
-            "data_source_id": connection_result.get('data_source_id'),
-            "message": "Database connection created successfully",
-            "data_source": {
-                "id": connection_result.get('data_source_id'),
-                "name": config.get('name'),
-                "type": "database",
-                "db_type": config.get('type'),
-                "status": "connected"
-            }
-        }
-            
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"❌ Database connection failed: {str(e)}")
-        import traceback
-        error_trace = traceback.format_exc()
-        logger.error(f"Full traceback: {error_trace}")
-        raise HTTPException(status_code=500, detail=f"Database connection failed: {str(e)}")
-
-
-# List data sources endpoint
-# DUPLICATE ENDPOINT - REMOVED (use line 372 version with auth instead)
-# @router.get("/sources")
-# async def list_data_sources():
-#     """List all data sources - DEPRECATED: Duplicate of line 372"""
 
 
 # Get data source endpoint
@@ -1100,6 +1005,8 @@ async def health_check():
         "litellm_integration": True,
         "intelligent_modeling": True
     }
+
+
 # Get uploaded data endpoint
 @router.get("/sources/{data_source_id}/data")
 async def get_data_source_data(
@@ -1568,21 +1475,6 @@ async def connect_warehouse(request: Dict[str, Any], current_token: Union[str, d
     logger.info(f"  - Request body: {json.dumps(request, default=str, indent=2)}")
     # Delegate to the implementation
     return await connect_enterprise_warehouse_legacy(request, current_token)
-
-
-# Note: Duplicate endpoint removed - use /warehouses/connect instead (line 2086)
-# The /cube-modeling/connect-warehouse is an alias that delegates to connect_enterprise_warehouse_legacy
-# The internal implementation has been consolidated to avoid duplication
-
-
-# DUPLICATE ENDPOINT - REMOVED (use line 1492 version instead)
-# @router.post("/cube-modeling/analyze") - DEPRECATED
-# The duplicate implementation starting at line 1879 has been commented out.
-# Use the version at line 1492 instead, which is the primary endpoint.
-
-# Orphaned code block from duplicate endpoint - safely removed
-# The duplicate /cube-modeling/analyze implementation has been completely removed.
-# Use the primary implementation at line 1492 instead.
 
 
 @router.get("/cube-modeling/types")
@@ -2891,11 +2783,11 @@ async def connect_delta_iceberg(
             insert_query = sa.text("""
                 INSERT INTO data_sources 
                 (id, name, type, format, db_type, size, row_count, schema, 
-                 connection_config, metadata, user_id, tenant_id, is_active, 
+                 connection_config, metadata, user_id, is_active, 
                  created_at, updated_at, last_accessed, file_path)
                 VALUES 
                 (:id, :name, :type, :format, :db_type, :size, :row_count, :schema,
-                 :connection_config, :metadata, :user_id, :tenant_id, :is_active,
+                 :connection_config, :metadata, :user_id, :is_active,
                  :created_at, :updated_at, :last_accessed, :file_path)
             """)
             
@@ -2917,7 +2809,6 @@ async def connect_delta_iceberg(
                     'created_at': datetime.now().isoformat()
                 }),
                 "user_id": user_id,
-                "tenant_id": str(organization_id),
                 "is_active": True,
                 "created_at": datetime.now(),
                 "updated_at": datetime.now(),

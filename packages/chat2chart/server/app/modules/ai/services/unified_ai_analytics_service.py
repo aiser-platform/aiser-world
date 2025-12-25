@@ -107,7 +107,6 @@ class UnifiedAIAnalyticsService:
         data_source_id: Optional[str] = None,
         business_context: Optional[str] = None,
         analysis_preferences: Optional[Dict[str, Any]] = None,
-        tenant_id: str = "default",
     ) -> Dict[str, Any]:
         """
         Intelligent query analysis with business context understanding
@@ -119,7 +118,7 @@ class UnifiedAIAnalyticsService:
 
             # Step 1: Analyze query intent and business context
             query_analysis = await self._analyze_query_intent(
-                natural_language_query, business_context, tenant_id
+                natural_language_query, business_context
             )
 
             # Step 2: Determine optimal analysis type
@@ -557,7 +556,7 @@ class UnifiedAIAnalyticsService:
 
     # Helper methods
     async def _analyze_query_intent(
-        self, query: str, business_context: Optional[str], tenant_id: str
+        self, query: str, business_context: Optional[str]
     ) -> Dict[str, Any]:
         """Analyze query intent and extract business context"""
         # Implementation would use LiteLLM for intent analysis
@@ -567,7 +566,6 @@ class UnifiedAIAnalyticsService:
             "complexity_level": "intermediate",
             "time_sensitivity": "medium",
             "data_requirements": ["historical", "real_time"],
-            "tenant_id": tenant_id,
         }
 
     def _determine_analysis_type(self, query_analysis: Dict[str, Any]) -> AnalysisType:

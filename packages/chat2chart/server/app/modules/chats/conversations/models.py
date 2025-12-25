@@ -10,11 +10,8 @@ class ChatConversation(BaseModel):
     # Override the ID field to use UUID
     id = Column(PostgreSQLUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     
-    # CRITICAL: user_id column for tenant isolation
+    # CRITICAL: user_id column for user ownership
     user_id = Column(PostgreSQLUUID(as_uuid=True), nullable=False, index=True)
-    
-    # tenant_id column ignored - migration will drop it (organization context removed)
-    tenant_id = Column(String(50), nullable=True, index=True)
 
     # Basic information
     title = Column(String, nullable=False)

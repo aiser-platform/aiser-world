@@ -25,10 +25,9 @@ class ChatVisualization(BaseModel):
     datasource = Column(JSONB, nullable=True)
     message_id = Column(UUID, nullable=True)
     
-    # User and organization fields
+    # User ownership
     user_id = Column(UUID(as_uuid=True), nullable=True)
     conversation_id = Column(UUID, ForeignKey("conversation.id"), nullable=True)
-    tenant_id = Column(String(50), default='default')
     
     # Timestamps
     created_at = Column(DateTime, server_default=func.now())

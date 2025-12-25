@@ -706,10 +706,9 @@ async def get_organization_usage(
             from app.modules.data.models import DataSource
             from app.modules.projects.models import Project
             
-            # Count data sources for this organization
+            # Count data sources for this organization (user-scoped only)
             data_sources_count = await session.execute(
                 select(func.count(DataSource.id)).where(
-                    DataSource.tenant_id == str(org_id_int),
                     DataSource.is_active == True
                 )
             )

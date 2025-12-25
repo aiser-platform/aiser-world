@@ -41,6 +41,7 @@ import './styles.css';
 import '../HistoryPanel/styles.css';
 import { getBackendUrlForApi } from '@/utils/backendUrl';
 import { useAuth } from '@/context/AuthContext';
+import { useAuthenticatedFetch } from '@/hooks/useAuthenticatedFetch';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -176,6 +177,7 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
     const [selectedSchemaName, setSelectedSchemaName] = useState<string>('public');
     const [selectedEntityKey, setSelectedEntityKey] = useState<string>('');
     const [newlyCreatedDataSourceId, setNewlyCreatedDataSourceId] = useState<string | null>(null);
+    const authenticatedFetch = useAuthenticatedFetch();
 
     const handleDeleteDataSource = useCallback(async (dataSourceId: string) => {
         try {
@@ -215,13 +217,9 @@ const EnhancedDataPanel: React.FC<EnhancedDataPanelProps> = ({
         setLoading(true);
         try {
             // Use API proxy for proper auth handling
-            const headers: Record<string, string> = {};
-            if (session?.access_token) {
-                headers['Authorization'] = `Bearer ${session.access_token}`;
-            }
-            const response = await fetch('/api/data/sources', {
-                credentials: 'include',
-                headers
+
+            const response = await authenticatedFetch('/api/data/sources', {
+                method: 'GET',
             });
             const result = await response.json();
             

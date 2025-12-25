@@ -109,15 +109,22 @@ class DataConnectivityService:
                 'error': str(e)
             }
 
-    async def store_database_connection(self, connection_request: Dict[str, Any], user_id: Optional[str] = None) -> Dict[str, Any]:
+    async def store_database_connection(self, connection_request: Dict[str, Any], user_id: str) -> Dict[str, Any]:
         """Store database connection configuration
         
         NOTE: This method validates the connection BEFORE encrypting credentials.
         This ensures the validation works with plain credentials, and also provides
         safety for users who skip the test step and directly click save.
+        
+        Args:
+            connection_request: Database connection configuration
+            user_id: User ID (required for data isolation and security)
         """
+        if not user_id:
+            raise ValueError("user_id is required for database connections")
+        
         try:
-            logger.info(f"💾 Storing database connection: {connection_request.get('type')}")
+            logger.info(f"💾 Storing database connection: {connection_request.get('type')} for user {user_id}")
 
             # ALWAYS validate the connection first with PLAIN credentials.
             # This prevents persisting phantom data sources when credentials or networking are invalid,
@@ -173,9 +180,6 @@ class DataConnectivityService:
                         logger.error(f"❌ Failed to encrypt credentials: {encrypt_error}")
                         safe_config = connection_request
                     
-                    # Extract tenant_id from connection_request or use organization_id
-                    tenant_id = connection_request.get('tenant_id') or connection_request.get('organization_id') or 'default'
-
                     new_source = DataSource(
                         id=connection_id,
                         name=connection_request.get('name') or f"{connection_request.get('type')}_connection",
@@ -200,8 +204,7 @@ class DataConnectivityService:
                             'status': 'connected',
                             'created_at': datetime.now().isoformat()
                         }),
-                        user_id=user_id if user_id else None,  # Set user_id if provided
-                        tenant_id=str(tenant_id),  # Set tenant_id from connection_request
+                        user_id=user_id,  # Required - validated at function entry
                         is_active=True,
                         created_at=datetime.now(),
                         updated_at=datetime.now(),
@@ -669,9 +672,11 @@ class DataConnectivityService:
                     logger.info(f"✅ Updated data source {data_source['id']} in database.")
                 else:
                     # Create new
-                    # Use user_id and tenant_id from data_source dict (passed from options)
+                    # Use user_id from data_source dict (passed from options)
                     user_id = data_source.get('user_id')
-                    tenant_id = data_source.get('tenant_id')
+                    
+                    if not user_id:
+                        raise ValueError(f"user_id is required when creating data source {data_source.get('id')}. Ensure user_id is passed in options.")
                     
                     new_data_source = DataSource(
                         id=data_source['id'],
@@ -683,11 +688,10 @@ class DataConnectivityService:
                         schema=data_source.get('schema'),
                         file_path=data_source.get('file_path'),
                         original_filename=data_source.get('original_filename'),
-                        user_id=user_id if user_id else self._get_current_user_id(),  # Use from options or fallback
-                        tenant_id=tenant_id if tenant_id else 'default'  # Use from options or fallback
+                        user_id=user_id  # Required - validated above
                     )
                     db.add(new_data_source)
-                    logger.info(f"✅ Saved new data source {data_source['id']} to database (user_id={user_id}, tenant_id={tenant_id}).")
+                    logger.info(f"✅ Saved new data source {data_source['id']} to database (user_id={user_id}).")
                 
                 await db.commit()
                 return True
@@ -745,7 +749,6 @@ class DataConnectivityService:
             
             # Generate data source metadata
             user_id = options.get('user_id') if options else None
-            tenant_id = options.get('tenant_id') if options else None
             name = options.get('name') if options else original_filename
             
             data_source = {
@@ -764,8 +767,7 @@ class DataConnectivityService:
                 'uuid_filename': f"file_{int(datetime.now().timestamp())}_{original_filename}",
                 'content_type': f"application/{file_extension}",
                 'storage_type': 'local',
-                'user_id': user_id,  # Pass user_id from options
-                'tenant_id': tenant_id  # Pass tenant_id from options
+                'user_id': user_id  # Pass user_id from options
             }
             
             # Store in registry (only store sample data for large files to save memory)
@@ -1301,7 +1303,7 @@ class DataConnectivityService:
         except Exception as e:
             raise ValueError(f"Invalid database URI format: {str(e)}")
 
-    async def create_database_connection(self, config: Dict[str, Any], tenant_id: str = 'default') -> Dict[str, Any]:
+    async def create_database_connection(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """Create database connection using Cube.js connectors"""
         try:
             # Handle URI-based connections
@@ -1337,7 +1339,6 @@ class DataConnectivityService:
                 'host': config.get('host'),
                 'database': config.get('database'),
                 'created_at': datetime.now().isoformat(),
-                'tenant_id': tenant_id,
                 'cube_integration': True,
                 'driver': cube_data_source['driver'],
                 'status': cube_data_source['status']
@@ -1572,8 +1573,6 @@ class DataConnectivityService:
                         'format': db_source.format,
                         'description': db_source.description,
                         'user_id': str(db_source.user_id) if db_source.user_id else None,
-                        'tenant_id': str(db_source.tenant_id) if hasattr(db_source, 'tenant_id') and db_source.tenant_id else None,
-                        'organization_id': str(db_source.tenant_id) if hasattr(db_source, 'tenant_id') and db_source.tenant_id else None,  # Alias for compatibility
                         'row_count': db_source.row_count,
                         'size': db_source.size,
                         'is_active': db_source.is_active,
@@ -2370,11 +2369,22 @@ class DataConnectivityService:
         self, 
         organization_id: str, 
         project_id: str, 
-        data_source_data: Dict[str, Any]
+        data_source_data: Dict[str, Any],
+        user_id: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Create a new data source for a specific project"""
+        """Create a new data source for a specific project
+        
+        NOTE: This method is legacy and may be deprecated. user_id should be provided.
+        """
+        # Extract user_id from data_source_data if not provided directly
+        if not user_id:
+            user_id = data_source_data.get('user_id')
+        
+        if not user_id:
+            raise ValueError("user_id is required for data source creation. Provide it in data_source_data or as a parameter.")
+        
         try:
-            logger.info(f"📊 Creating project data source for project {project_id} in organization {organization_id}")
+            logger.info(f"📊 Creating project data source for project {project_id} (user_id={user_id})")
             
             from app.modules.data.models import DataSource
             from app.modules.projects.models import ProjectDataSource
@@ -2434,9 +2444,8 @@ class DataConnectivityService:
                         'connection_config': connection_config,
                     # Allow callers to provide inline sample rows for file sources
                         'sample_data': data_source_data.get('data') or data_source_data.get('sample_data') or [],
-                        # Ensure ids are strings to avoid asyncpg type errors
-                        'user_id': str(organization_id) if organization_id is not None else None,
-                        'tenant_id': str(organization_id) if organization_id is not None else None,
+                        # Use actual user_id (required for data isolation)
+                        'user_id': str(user_id),
                         'is_active': True,
                         'created_at': datetime.now(),
                         'updated_at': datetime.now(),
@@ -2561,7 +2570,6 @@ class DataConnectivityService:
                             'connection_config': connection_config,
                             'sample_data': data_source_data.get('data') or data_source_data.get('sample_data') or [],
                             'user_id': str(organization_id),
-                            'tenant_id': str(organization_id),
                             'is_active': True,
                             'created_at': datetime.now(),
                             'updated_at': datetime.now()
@@ -2571,8 +2579,8 @@ class DataConnectivityService:
                         eng = get_sync_engine()
                         with eng.begin() as conn:
                             insert_ds = sa.text(
-                                "INSERT INTO data_sources (id, name, type, format, db_type, size, row_count, schema, description, connection_config, file_path, original_filename, created_at, updated_at, user_id, tenant_id, is_active, last_accessed) "
-                                "VALUES (:id, :name, :type, :format, :db_type, :size, :row_count, :schema, :description, :connection_config, :file_path, :original_filename, :created_at, :updated_at, :user_id, :tenant_id, :is_active, :last_accessed) "
+                                "INSERT INTO data_sources (id, name, type, format, db_type, size, row_count, schema, description, connection_config, file_path, original_filename, created_at, updated_at, user_id, is_active, last_accessed) "
+                                "VALUES (:id, :name, :type, :format, :db_type, :size, :row_count, :schema, :description, :connection_config, :file_path, :original_filename, :created_at, :updated_at, :user_id, :is_active, :last_accessed) "
                                 "ON CONFLICT (id) DO NOTHING"
                             )
                             params = {
@@ -2591,7 +2599,6 @@ class DataConnectivityService:
                                 'created_at': ds_vals.get('created_at'),
                                 'updated_at': ds_vals.get('updated_at'),
                                 'user_id': str(ds_vals.get('user_id')) if ds_vals.get('user_id') is not None else None,
-                                'tenant_id': str(ds_vals.get('tenant_id')) if ds_vals.get('tenant_id') is not None else None,
                                 'is_active': ds_vals.get('is_active'),
                                 'last_accessed': ds_vals.get('last_accessed')
                             }

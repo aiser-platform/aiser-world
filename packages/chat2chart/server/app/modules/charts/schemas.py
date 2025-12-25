@@ -39,13 +39,10 @@ class ChatVisualizationBaseSchema(BaseModel):
         description="Reference to the chat message that generated this visualization",
     )
 
-    # User and organization fields
+    # User ownership
     user_id: Optional[int] = Field(None, description="User ID who created the chart")
     conversation_id: Optional[Union[str, UUID]] = Field(
         None, description="Conversation ID"
-    )
-    tenant_id: str = Field(
-        "default", description="Tenant ID for multi-tenancy", max_length=50
     )
 
 

@@ -41,10 +41,8 @@ class DataSource(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
-    # User and tenant
-    user_id = Column(String, nullable=True)
-    # tenant_id column ignored - migration will drop it (organization context removed)
-    tenant_id = Column(String, nullable=False, default="default")
+    # User ownership (required for security and data isolation)
+    user_id = Column(String, nullable=False, index=True)
 
     # Status
     is_active = Column(Boolean, default=True)
@@ -78,10 +76,8 @@ class DataQuery(Base):
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    # User and tenant
-    user_id = Column(String, nullable=True)
-    # tenant_id column ignored - migration will drop it (organization context removed)
-    tenant_id = Column(String, nullable=False, default="default")
+    # User ownership (required for security and data isolation)
+    user_id = Column(String, nullable=False, index=True)
 
 
 # DataConnection model removed - use DataSource for both files and databases

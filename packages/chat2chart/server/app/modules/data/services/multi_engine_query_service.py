@@ -1121,16 +1121,7 @@ class DirectSQLEngine(BaseQueryEngine):
                 conn_uri = f"{scheme}://{auth}{hostpart}/{database}"
 
             # CRITICAL: Enforce read-only mode for database connections
-            # Add tenant_id/user_id filtering if available
-            tenant_id = data_source.get('tenant_id') or data_source.get('organization_id')
-            user_id = data_source.get('user_id')
-            
-            # Wrap query to enforce tenant isolation (if tenant_id available)
-            # Note: This is a simple approach - in production, use RLS at database level
-            if tenant_id and 'tenant_id' not in query.upper() and 'WHERE' in query.upper():
-                # Try to add tenant_id filter (simple approach - may need refinement)
-                logger.debug(f"🔒 Adding tenant isolation filter (tenant_id={tenant_id})")
-                # Note: This is a basic implementation - proper RLS should be at DB level
+            # User-scoped queries only (no tenant isolation needed)
             
             # Run blocking DB calls in a thread to avoid blocking the event loop
             def run_sync_query(uri: str, sql: str) -> Dict[str, Any]:

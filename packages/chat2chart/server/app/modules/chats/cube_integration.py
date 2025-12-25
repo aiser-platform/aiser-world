@@ -21,13 +21,12 @@ class CubeIntegrationService:
     async def query_ai_analytics(
         self,
         natural_language_query: str,
-        tenant_id: str = "default",
         user_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Send natural language query to Cube.js AI Analytics engine
         """
-        headers = {"Content-Type": "application/json", "X-Tenant-ID": tenant_id}
+        headers = {"Content-Type": "application/json"}
 
         if user_id:
             headers["X-User-ID"] = user_id
@@ -42,7 +41,7 @@ class CubeIntegrationService:
                     if response.status == 200:
                         result = await response.json()
                         logger.info(
-                            f"✅ AI Analytics query successful for tenant {tenant_id}"
+                            f"✅ AI Analytics query successful"
                         )
                         return result
                     else:
@@ -71,20 +70,18 @@ class CubeIntegrationService:
                 "naturalLanguageQuery": natural_language_query,
             }
 
-    async def get_cube_schema(self, tenant_id: str = "default") -> Dict[str, Any]:
+    async def get_cube_schema(self) -> Dict[str, Any]:
         """
-        Get Cube.js schema for the tenant
+        Get Cube.js schema
         """
-        headers = {"X-Tenant-ID": tenant_id}
-
         try:
             async with aiohttp.ClientSession(timeout=self.timeout) as session:
                 async with session.get(
-                    f"{self.ai_analytics_url}/schema/{tenant_id}", headers=headers
+                    f"{self.ai_analytics_url}/schema", headers={}
                 ) as response:
                     if response.status == 200:
                         result = await response.json()
-                        logger.info(f"✅ Schema loaded for tenant {tenant_id}")
+                        logger.info(f"✅ Schema loaded")
                         return result
                     else:
                         error_text = await response.text()
@@ -105,12 +102,11 @@ class CubeIntegrationService:
         data: list,
         query_type: str,
         natural_language_query: str,
-        tenant_id: str = "default",
     ) -> Dict[str, Any]:
         """
         Generate ECharts configuration from Cube.js data
         """
-        headers = {"Content-Type": "application/json", "X-Tenant-ID": tenant_id}
+        headers = {"Content-Type": "application/json"}
 
         payload = {
             "data": data,
@@ -127,7 +123,7 @@ class CubeIntegrationService:
                 ) as response:
                     if response.status == 200:
                         result = await response.json()
-                        logger.info(f"✅ Chart config generated for tenant {tenant_id}")
+                        logger.info(f"✅ Chart config generated")
                         return result
                     else:
                         error_text = await response.text()
@@ -146,19 +142,18 @@ class CubeIntegrationService:
     async def process_chat_query(
         self,
         natural_language_query: str,
-        tenant_id: str = "default",
         user_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Complete pipeline: NL query → AI analytics → Chart config
         """
         logger.info(
-            f"🚀 Processing chat query for tenant {tenant_id}: '{natural_language_query}'"
+            f"🚀 Processing chat query: '{natural_language_query}'"
         )
 
         # Step 1: Query AI Analytics
         ai_result = await self.query_ai_analytics(
-            natural_language_query, tenant_id, user_id
+            natural_language_query, user_id
         )
 
         if not ai_result.get("success", False):
@@ -173,7 +168,7 @@ class CubeIntegrationService:
         query_type = self.classify_query_type(natural_language_query)
 
         chart_result = await self.generate_chart_config(
-            data, query_type, natural_language_query, tenant_id
+            data, query_type, natural_language_query
         )
 
         # Step 3: Combine results
