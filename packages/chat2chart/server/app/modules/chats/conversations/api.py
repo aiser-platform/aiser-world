@@ -62,7 +62,7 @@ async def get_conversation(
     offset: int = 0,
     limit: int = 100,
     sort_by: str = "created_at",
-    sort_order: str = "desc",
+    sort_order: str = "asc",
     current_token: dict = Depends(JWTCookieBearer())
 ):
     """Get a specific conversation - only if user owns it"""

@@ -1,6 +1,7 @@
 'use client';
 
 import { AuthProvider } from '@/context/AuthContext';
+import { ConversationProvider } from '@/context/ConversationContext';
 import { OnboardingProvider } from '@/context/OnboardingContext';
 import { AntdRegistry } from '@ant-design/nextjs-registry';
 import { ReactNode } from 'react';
@@ -30,13 +31,15 @@ export function Providers({ children }: { children: ReactNode }) {
                 <ThemeProvider>
                     <BrandThemeProvider>
                         <AuthProvider>
-                            <OnboardingProvider>
-                                {children}
-                                <ClientDebugOverlay />
-                                {process.env.NODE_ENV === 'development' && (
-                                    <ReactQueryDevtools initialIsOpen={false} />
-                                )}
-                            </OnboardingProvider>
+                            <ConversationProvider>
+                                <OnboardingProvider>
+                                    {children}
+                                    <ClientDebugOverlay />
+                                    {process.env.NODE_ENV === 'development' && (
+                                        <ReactQueryDevtools initialIsOpen={false} />
+                                    )}
+                                </OnboardingProvider>
+                            </ConversationProvider>
                         </AuthProvider>
                     </BrandThemeProvider>
                 </ThemeProvider>

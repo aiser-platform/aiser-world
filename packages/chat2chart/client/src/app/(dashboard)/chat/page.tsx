@@ -14,7 +14,7 @@ import UniversalDataSourceModal from '@/app/components/UniversalDataSourceModal/
 import { ExtendedTable, IConversation, IDatabase } from './types';
 import { IFileUpload } from '@/app/components/FileUpload/types';
 import { useSearchParams } from 'next/navigation';
-import { conversationSessionManager } from '@/services/conversationSessionManager';
+import { useConversations } from '@/context/ConversationContext';
 import { useAuth } from '@/context/AuthContext';
 
 interface DataSource {
@@ -39,10 +39,21 @@ const { Text } = Typography;
 const ChatToChart = () => {
     const searchParams = useSearchParams();
     const { session } = useAuth();
-    // State management for conversations
-    const [conversations, setConversations] = useState<IConversation[]>([]);
-    const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
-    const [conversationState, setConversationState] = useState<IConversation | undefined>(undefined);
+    // Get conversation state from context
+    const { 
+        conversations, 
+        currentConversationId,
+        messages,
+        loadConversations: contextLoadConversations,
+        setCurrentConversation,
+        createNewConversation: contextCreateNewConversation,
+        updateConversationMetadata
+    } = useConversations();
+    
+    // Get conversationState from context
+    const conversationState = currentConversationId 
+        ? conversations.find(c => c.id === currentConversationId)
+        : undefined;
     const [activeTab, setActiveTab] = React.useState<string>('chat');
     const [selectedDataSource, setSelectedDataSource] = React.useState<DataSource | null>(null);
     const [generatedCharts, setGeneratedCharts] = React.useState<Record<string, any>[]>([]);
@@ -70,117 +81,40 @@ const ChatToChart = () => {
         undefined
     );
 
-    // Load conversations on component mount using session manager
+    // Restore data source from current conversation metadata when conversation loads
     useEffect(() => {
-        const initializeConversations = async () => {
+        if (currentConversationId && conversationState?.json_metadata) {
             try {
-                // CRITICAL: Always restore conversation from localStorage FIRST (before API call)
-                // This ensures instant restoration when navigating back
-                const savedConversationId = localStorage.getItem('current_conversation_id');
+                const metadata = typeof conversationState.json_metadata === 'string' 
+                    ? JSON.parse(conversationState.json_metadata) 
+                    : conversationState.json_metadata;
+                const dataSourceId = metadata.last_data_source_id || metadata.data_source_id || metadata.dataSourceId;
                 
-                // Load conversations using session manager
-                const loadedConversations = await conversationSessionManager.loadConversations(session?.access_token);
-                setConversations(loadedConversations);
-                
-                // Restore current conversation from localStorage if available
-                if (savedConversationId) {
-                    const savedConv = loadedConversations.find(c => c.id === savedConversationId);
-                    if (savedConv) {
-                        // CRITICAL: Set conversation state immediately for instant UI update
-                        setCurrentConversationId(savedConversationId);
-                        setConversationState(savedConv);
-                        
-                        // CRITICAL: Load messages for the saved conversation (don't skip)
-                        // This ensures messages are loaded when returning to the page
-                        await conversationSessionManager.setCurrentConversation(savedConversationId, false, session?.access_token);
-                        console.log('✅ Restored conversation and loaded messages:', savedConversationId);
-                        
-                        // CRITICAL: Restore data source from conversation metadata AND localStorage
-                        // Try conversation metadata first, then fallback to localStorage
-                        let dataSourceRestored = false;
-                        
-                        if (savedConv.json_metadata) {
-                            try {
-                                const metadata = typeof savedConv.json_metadata === 'string' 
-                                    ? JSON.parse(savedConv.json_metadata) 
-                                    : savedConv.json_metadata;
-                                const dataSourceId = metadata.last_data_source_id || metadata.data_source_id || metadata.dataSourceId;
-                                // CRITICAL: Skip invalid or demo data source IDs (like cube_real_001)
-                                if (dataSourceId && typeof dataSourceId === 'string' && !dataSourceId.includes('cube_real_') && !dataSourceId.includes('demo_')) {
-                                    try {
-                                        const dsResponse = await fetch(`/api/data/sources/${dataSourceId}`, {
-                                            credentials: 'include'
-                                            // Rely on cookies for auth (more secure)
-                                        });
-                                        if (dsResponse.ok) {
-                                            const dataSource = await dsResponse.json();
-                                            setSelectedDataSource(dataSource);
-                                            localStorage.setItem('selected_data_source', JSON.stringify(dataSource));
-                                            localStorage.setItem(`conv_has_data_source_${savedConversationId}`, 'true');
-                                            console.log('✅ Restored data source from conversation metadata:', dataSource.name);
-                                            dataSourceRestored = true;
-                                        } else if (dsResponse.status === 404) {
-                                            console.warn('⚠️ Data source not found, skipping:', dataSourceId);
-                                        }
-                                    } catch (e) {
-                                        console.warn('Failed to load data source from conversation metadata:', e);
-                                    }
-                                }
-                            } catch (e) {
-                                console.warn('Failed to parse conversation metadata:', e);
+                if (dataSourceId && typeof dataSourceId === 'string' && 
+                    !dataSourceId.includes('cube_real_') && !dataSourceId.includes('demo_')) {
+                    try {
+                        fetch(`/api/data/sources/${dataSourceId}`, {
+                            credentials: 'include'
+                        }).then(dsResponse => {
+                            if (dsResponse.ok) {
+                                dsResponse.json().then(dataSource => {
+                                    setSelectedDataSource(dataSource);
+                                    localStorage.setItem('selected_data_source', JSON.stringify(dataSource));
+                                    console.log('✅ Restored data source from conversation metadata:', dataSource.name);
+                                });
                             }
-                        }
-                        
-                        // Fallback: Try localStorage if conversation metadata didn't have data source
-                        if (!dataSourceRestored) {
-                            try {
-                                const savedDataSource = localStorage.getItem('selected_data_source');
-                                if (savedDataSource) {
-                                    const dataSource = JSON.parse(savedDataSource);
-                                    // Verify data source still exists
-                                    const dsResponse = await fetch(`/api/data/sources/${dataSource.id}`, {
-                                        credentials: 'include'
-                                    });
-                                    if (dsResponse.ok) {
-                                        const verifiedDataSource = await dsResponse.json();
-                                        setSelectedDataSource(verifiedDataSource);
-                                        console.log('✅ Restored data source from localStorage:', verifiedDataSource.name);
-                                    } else {
-                                        // Data source no longer exists, clear it
-                                        localStorage.removeItem('selected_data_source');
-                                    }
-                                }
-                            } catch (e) {
-                                console.warn('Failed to restore data source from localStorage:', e);
-                            }
-                        }
-                    } else {
-                        console.warn('⚠️ Saved conversation not found in loaded conversations:', savedConversationId);
+                        }).catch(e => {
+                            console.warn('Failed to load data source from conversation metadata:', e);
+                        });
+                    } catch (e) {
+                        console.warn('Failed to load data source from conversation metadata:', e);
                     }
                 }
-                
-                // Subscribe to session manager state changes
-                const unsubscribe = conversationSessionManager.subscribe((state) => {
-                    setConversations(state.conversations);
-                    if (state.currentConversationId !== currentConversationId) {
-                        setCurrentConversationId(state.currentConversationId);
-                        if (state.currentConversationId) {
-                            const conv = state.conversations.find(c => c.id === state.currentConversationId);
-                            if (conv) {
-                                setConversationState(conv);
-                            }
-                        }
-                    }
-                });
-                
-                return unsubscribe;
-            } catch (error) {
-                console.error('Failed to initialize conversations:', error);
+            } catch (e) {
+                console.warn('Failed to parse conversation metadata:', e);
             }
-        };
-        
-        initializeConversations();
-    }, []);
+        }
+    }, [currentConversationId, conversationState]);
     
     // Load persisted data source from localStorage (only on mount, not when selectedDataSource changes)
     // CRITICAL: Don't include selectedDataSource in dependencies to avoid infinite loop
@@ -315,132 +249,6 @@ const ChatToChart = () => {
         }
     }, [currentConversationId]); // Trigger only when conversation changes
 
-    // Load conversations from API (not localStorage)
-    const loadConversations = async () => {
-        try {
-            const headers: Record<string, string> = {};
-            if (session?.access_token) {
-                headers['Authorization'] = `Bearer ${session.access_token}`;
-            }
-            const response = await fetch('/api/conversations?limit=50', {
-                method: 'GET',
-                credentials: 'include',
-                headers
-            });
-            
-            if (response.ok) {
-                const data = await response.json();
-                const loadedConversations = data.items || [];
-                
-                // Sort conversations by updated_at (most recent first)
-                loadedConversations.sort((a: IConversation, b: IConversation) => {
-                    return getConversationTimestamp(b) - getConversationTimestamp(a);
-                });
-                
-                setConversations(loadedConversations);
-                
-                // Restore current conversation if exists, or use most recent as default
-                const currentId = localStorage.getItem('current_conversation_id');
-                let conversationToUse: IConversation | null = null;
-                
-                if (currentId && loadedConversations.length > 0) {
-                    const current = loadedConversations.find((c: IConversation) => c.id === currentId);
-                    if (current) {
-                        conversationToUse = current;
-                        console.log('✅ Restored saved conversation:', currentId);
-                    }
-                }
-                
-                // If no saved conversation found or no conversations exist, use most recent
-                if (!conversationToUse && loadedConversations.length > 0) {
-                    const fallbackConversation = loadedConversations[0];
-                    if (fallbackConversation) {
-                        conversationToUse = fallbackConversation;
-                        if (fallbackConversation.id) {
-                            console.log('✅ Using most recent conversation:', fallbackConversation.id);
-                        }
-                    }
-                }
-                
-                // If no conversations exist, create a default one
-                if (!conversationToUse && loadedConversations.length === 0) {
-                    try {
-                        const headers: Record<string, string> = {
-                            'Content-Type': 'application/json',
-                        };
-                        if (session?.access_token) {
-                            headers['Authorization'] = `Bearer ${session.access_token}`;
-                        }
-                        
-                        const createResponse = await fetch('/api/conversations', {
-                            method: 'POST',
-                            credentials: 'include',
-                            headers,
-                            body: JSON.stringify({
-                                title: 'New Conversation',
-                                json_metadata: '{}'
-                            })
-                        });
-                        
-                        if (createResponse.ok) {
-                            const newConv = await createResponse.json();
-                            setConversations([newConv]);
-                            setConversationState(newConv);
-                            saveCurrentConversationId(newConv.id ?? null);
-                            if (newConv?.id) {
-                                console.log('✅ Created new conversation:', newConv.id);
-                            }
-                            return;
-                        }
-                    } catch (createError) {
-                        console.error('Failed to create default conversation:', createError);
-                    }
-                }
-                
-                // Set the conversation to use
-                if (conversationToUse) {
-                    setConversationState(conversationToUse);
-                    setCurrentConversationId(conversationToUse.id ?? null);
-                    saveCurrentConversationId(conversationToUse.id ?? null);
-                    
-                    // CRITICAL: Restore data source from conversation metadata
-                    try {
-                        const metadataRaw = conversationToUse.json_metadata;
-                        let metadata: any = {};
-                        if (metadataRaw) {
-                            if (typeof metadataRaw === 'string') {
-                                metadata = JSON.parse(metadataRaw);
-                            } else if (typeof metadataRaw === 'object') {
-                                metadata = metadataRaw;
-                            }
-                        }
-                        const dataSourceId = metadata.last_data_source_id || metadata.data_source_id || null;
-                        // CRITICAL: Skip invalid or demo data source IDs
-                        if (dataSourceId && typeof dataSourceId === 'string' && !dataSourceId.includes('cube_real_') && !dataSourceId.includes('demo_')) {
-                            // Load and set the data source
-                            const dsResponse = await fetch(`/api/data/sources/${dataSourceId}`, {
-                                credentials: 'include'
-                            });
-                            if (dsResponse.ok) {
-                                const dsData = await dsResponse.json();
-                                setSelectedDataSource(dsData);
-                                console.log('✅ Restored data source from conversation:', dsData.name);
-                            } else if (dsResponse.status === 404) {
-                                console.warn('⚠️ Data source not found, skipping:', dataSourceId);
-                            }
-                        }
-                    } catch (e) {
-                        console.warn('Failed to restore data source from conversation:', e);
-                    }
-                }
-            } else {
-                console.error('Failed to load conversations from API');
-            }
-        } catch (error) {
-            console.error('Failed to load conversations:', error);
-        }
-    };
-
     // Listen for page visibility changes - only reload if needed (not on every tab switch)
     useEffect(() => {
         let lastReloadTime = Date.now();
@@ -452,7 +260,7 @@ const ChatToChart = () => {
                 // Only reload if enough time has passed (prevents excessive reloads)
                 if (timeSinceLastReload > RELOAD_INTERVAL) {
                     console.log('🔄 Page visible, reloading conversations (30s+ since last reload)');
-                    loadConversations();
+                    contextLoadConversations();
                     lastReloadTime = Date.now();
                 } else {
                     console.log('⏭️ Skipping reload (only', Math.round(timeSinceLastReload / 1000), 's since last reload)');
@@ -462,26 +270,17 @@ const ChatToChart = () => {
 
         document.addEventListener('visibilitychange', handleVisibilityChange);
         return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-    }, [loadConversations]);
+    }, [contextLoadConversations]);
 
-    // Save conversations to localStorage
-    const saveConversations = useCallback((newConversations: IConversation[]) => {
-        try {
-            localStorage.setItem('chat_conversations', JSON.stringify(newConversations));
-            setConversations(newConversations);
-        } catch (error) {
-            console.error('Failed to save conversations to localStorage:', error);
-        }
-    }, []);
+    // Conversations are now managed by session manager - no need for saveConversations
 
-    // Save current conversation ID
+    // Save current conversation ID to localStorage (for persistence across refreshes)
     const saveCurrentConversationId = useCallback((id: string | null) => {
         if (id) {
             localStorage.setItem('current_conversation_id', id);
         } else {
             localStorage.removeItem('current_conversation_id');
         }
-        setCurrentConversationId(id);
     }, []);
 
     // Handle conversation selection
@@ -496,125 +295,84 @@ const ChatToChart = () => {
         // Save current conversation's data source before switching
         if (currentConversationId && selectedDataSource) {
             try {
-                // Update conversation metadata with current data source
-                const headers: Record<string, string> = {
-                    'Content-Type': 'application/json',
-                };
-                if (session?.access_token) {
-                    headers['Authorization'] = `Bearer ${session.access_token}`;
-                }
-                await fetch(`/api/conversations/${currentConversationId}`, {
-                    method: 'PUT',
-                    credentials: 'include',
-                    headers,
-                    body: JSON.stringify({
-                        json_metadata: JSON.stringify({
-                            last_data_source_id: selectedDataSource.id,
-                            data_source_name: selectedDataSource.name
-                        })
+                await updateConversationMetadata(currentConversationId, {
+                    json_metadata: JSON.stringify({
+                        last_data_source_id: selectedDataSource.id,
+                        data_source_name: selectedDataSource.name,
+                        data_source_type: selectedDataSource.type
                     })
-                });
+                } as any);
             } catch (e) {
                 console.warn('Failed to save data source to conversation:', e);
             }
         }
         
-        // Use session manager to switch conversation (CRITICAL: don't skip message loading)
-        await conversationSessionManager.setCurrentConversation(conversationId, false, session?.access_token);
-        
-        // Set conversation state immediately
-        setConversationState(conversation);
+        // Use context to switch conversation (will load messages if needed)
+        await setCurrentConversation(conversationId);
         saveCurrentConversationId(conversationId);
         
-        // CRITICAL: Force ChatPanel to reload messages by updating conversationId
-        // This ensures messages are loaded when switching conversations
-        setCurrentConversationId(conversationId);
-        
-        // Load conversation details with messages from API
+        // Restore data source from conversation metadata
+        // Note: Session manager already loaded messages, but we need to check metadata for data source
         try {
-            const headers: Record<string, string> = {};
-            if (session?.access_token) {
-                headers['Authorization'] = `Bearer ${session.access_token}`;
-            }
-            const response = await fetch(`/api/conversations/${conversationId}?limit=100`, {
-                method: 'GET',
-                credentials: 'include',
-                headers
-            });
+            let dataSourceId: string | null = null;
             
-            if (response.ok) {
-                const data = await response.json();
-                console.log('✅ Loaded conversation data:', {
-                    conversationId,
-                    messageCount: data.messages?.length || 0,
-                    hasDataSource: !!data.conversation?.json_metadata
-                });
-                
-                // Extract data source ID from conversation metadata or most recent message
-                // Note: A conversation can have multiple data sources (user may switch during conversation)
-                // We restore the most recent/last used data source
-                let dataSourceId: string | null = null;
-                
-                // Try to get from conversation metadata (last_data_source_id or data_source_id)
-                if (data.conversation?.json_metadata) {
-                    try {
-                        const metadata = typeof data.conversation.json_metadata === 'string' 
-                            ? JSON.parse(data.conversation.json_metadata) 
-                            : data.conversation.json_metadata;
-                        // Prefer last_data_source_id (most recent), fallback to data_source_id
-                        dataSourceId = metadata.last_data_source_id || metadata.data_source_id || metadata.dataSourceId || null;
-                        if (dataSourceId) {
-                            console.log('✅ Found data source ID in conversation metadata:', dataSourceId);
-                        }
-                    } catch (e) {
-                        console.warn('Failed to parse conversation metadata:', e);
+            // Try to get from conversation metadata
+            if (conversation.json_metadata) {
+                try {
+                    const metadata = typeof conversation.json_metadata === 'string' 
+                        ? JSON.parse(conversation.json_metadata) 
+                        : conversation.json_metadata;
+                    dataSourceId = metadata.last_data_source_id || metadata.data_source_id || metadata.dataSourceId || null;
+                    if (dataSourceId) {
+                        console.log('✅ Found data source ID in conversation metadata:', dataSourceId);
+                    }
+                } catch (e) {
+                    console.warn('Failed to parse conversation metadata:', e);
+                }
+            }
+            
+            // If not in metadata, try to get from context's loaded messages
+            if (!dataSourceId) {
+                // Use context messages directly
+                const conversationMessages = messages.get(conversationId) || [];
+                // Search from most recent to oldest
+                for (let i = conversationMessages.length - 1; i >= 0; i--) {
+                    const msg = conversationMessages[i];
+                    const msgMetadata = msg.executionMetadata || {};
+                    if (msgMetadata.data_source_id || msg.dataSourceId) {
+                        dataSourceId = msgMetadata.data_source_id || msg.dataSourceId;
+                        console.log('✅ Found data source ID in most recent message:', dataSourceId);
+                        break;
                     }
                 }
-                
-                // If not in metadata, try to get from most recent message with data_source_id
-                if (!dataSourceId && data.messages && Array.isArray(data.messages)) {
-                    // Search from most recent to oldest
-                    for (let i = data.messages.length - 1; i >= 0; i--) {
-                        const msg = data.messages[i];
-                        const msgMetadata = msg.ai_metadata || {};
-                        if (msgMetadata.data_source_id) {
-                            dataSourceId = msgMetadata.data_source_id;
-                            console.log('✅ Found data source ID in most recent message:', dataSourceId);
-                            break;
-                        }
+            }
+            
+            // Restore data source if found (skip invalid IDs)
+            if (dataSourceId && typeof dataSourceId === 'string' && !dataSourceId.includes('cube_real_') && !dataSourceId.includes('demo_')) {
+                try {
+                    const headers: Record<string, string> = {};
+                    if (session?.access_token) {
+                        headers['Authorization'] = `Bearer ${session.access_token}`;
                     }
-                }
-                
-                // Restore data source if found (skip invalid IDs)
-                if (dataSourceId && typeof dataSourceId === 'string' && !dataSourceId.includes('cube_real_') && !dataSourceId.includes('demo_')) {
-                    try {
-                        const dsResponse = await fetch(`/api/data/sources/${dataSourceId}`, {
-                            credentials: 'include'
-                        });
-                        if (dsResponse.ok) {
-                            const dsData = await dsResponse.json();
-                            setSelectedDataSource(dsData);
-                            console.log('✅ Restored data source:', dsData.name);
-                        } else if (dsResponse.status === 404) {
-                            console.warn('⚠️ Data source not found, skipping:', dataSourceId);
-                            // CRITICAL: Don't clear existing data source if it's still valid
-                            // Only clear if current data source doesn't match any conversation
-                            // This prevents losing data source when switching between conversations
-                        }
-                    } catch (e) {
-                        console.error('Failed to load data source:', e);
-                        // CRITICAL: Don't clear on error - keep existing data source
+                    const dsResponse = await fetch(`/api/data/sources/${dataSourceId}`, {
+                        credentials: 'include',
+                        headers
+                    });
+                    if (dsResponse.ok) {
+                        const dsData = await dsResponse.json();
+                        setSelectedDataSource(dsData);
+                        console.log('✅ Restored data source:', dsData.name);
+                    } else if (dsResponse.status === 404) {
+                        console.warn('⚠️ Data source not found, skipping:', dataSourceId);
                     }
-                } else {
-                    // No data source for this conversation - but don't clear if we have a valid one
-                    // User might have selected a data source that's not yet saved to conversation metadata
-                    console.log('ℹ️ No data source found in conversation metadata, keeping current selection if valid');
+                } catch (e) {
+                    console.error('Failed to load data source:', e);
                 }
             } else {
-                console.error('Failed to load conversation details');
+                console.log('ℹ️ No data source found in conversation metadata, keeping current selection if valid');
             }
         } catch (error) {
-            console.error('Error loading conversation:', error);
+            console.error('Error restoring data source:', error);
         }
     }, [saveCurrentConversationId, currentConversationId, selectedDataSource]);
 
@@ -623,8 +381,8 @@ const ChatToChart = () => {
         try {
             console.log('🆕 Creating new conversation...');
             
-            // Use session manager to create new conversation
-            const newConversation = await conversationSessionManager.createNewConversation('New Conversation', session?.access_token);
+            // Use context to create new conversation
+            const newConversation = await contextCreateNewConversation('New Conversation');
             
             if (!newConversation || !newConversation.id) {
                 throw new Error('Failed to create conversation - no ID returned');
@@ -632,34 +390,12 @@ const ChatToChart = () => {
             
             console.log('✅ New conversation created:', newConversation.id);
             
-            // CRITICAL: Clear all previous conversation state to ensure complete independence
-            // BUT: Keep data source selection - user might want to use it in new conversation
-            // Only clear if user explicitly wants to start fresh (they can deselect manually)
-            // setSelectedDataSource(null); // REMOVED - keep data source for new conversation
-            // localStorage.removeItem('selected_data_source'); // REMOVED - keep persistence
-            
             // Clear generated charts and SQL results for the new conversation
             setGeneratedCharts([]);
             setSqlResults([]);
             
-            // Set conversation state immediately (don't wait - backend has committed)
-            setConversationState(newConversation);
-            setCurrentConversationId(newConversation.id);
+            // Context already handles setting it as current and adding to state
             saveCurrentConversationId(newConversation.id);
-            
-            // Add new conversation to local state immediately for real-time UI update
-            setConversations(prev => {
-                // Check if already exists to avoid duplicates
-                if (prev.find(c => c.id === newConversation.id)) {
-                    return prev;
-                }
-                // Add to beginning (most recent first)
-                return [newConversation, ...prev];
-            });
-            
-            // Reload conversations list to include the new one (but don't try to load messages yet)
-            // This ensures we have the latest from backend, but UI already shows the new one
-            loadConversations().catch(err => console.warn('Failed to reload conversations:', err));
             
             // Ensure we're on chat tab
             setActiveTab('chat');
@@ -671,7 +407,7 @@ const ChatToChart = () => {
             const errorMessage = error instanceof Error ? error.message : 'Failed to create new conversation. Please try again.';
             message.error(errorMessage);
         }
-    }, [saveCurrentConversationId, loadConversations]);
+    }, [saveCurrentConversationId, contextCreateNewConversation]);
 
     // Handle URL parameters for data source integration
     React.useEffect(() => {
