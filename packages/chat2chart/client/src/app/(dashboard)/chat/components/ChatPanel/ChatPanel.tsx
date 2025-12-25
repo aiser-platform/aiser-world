@@ -1,10 +1,7 @@
 import { IFileUpload } from '@/app/components/FileUpload/types';
-import { fetchApi } from '@/utils/api';
-import { apiService } from '@/services/apiService';
-import { conversationService, Conversation, Message } from '@/services/conversationService';
 import { useConversations } from '@/context/ConversationContext';
 import { isStreamingEnabled, setStreamingEnabled, toggleStreaming } from '@/utils/streamingConfig';
-import { SendOutlined, BulbOutlined, AudioOutlined, LinkOutlined, DatabaseOutlined, SettingOutlined, UserOutlined, PlusOutlined, FileTextOutlined, BarChartOutlined, MessageOutlined, ReloadOutlined, DownloadOutlined, CopyOutlined, ShareAltOutlined, InfoCircleOutlined, CodeOutlined, FileOutlined, EyeOutlined, EyeInvisibleOutlined, EditOutlined, DeleteOutlined, MoreOutlined, RiseOutlined, PieChartOutlined, SearchOutlined, LikeOutlined, DislikeOutlined, HeartOutlined, RocketOutlined, StopOutlined, DownOutlined, SaveOutlined, HistoryOutlined, CrownOutlined, TableOutlined, PaperClipOutlined, CloseOutlined } from '@ant-design/icons';
+import { SendOutlined, BulbOutlined, DatabaseOutlined, UserOutlined, MessageOutlined, CopyOutlined, ShareAltOutlined, CodeOutlined, HeartOutlined, StopOutlined, SaveOutlined, PaperClipOutlined, CloseOutlined } from '@ant-design/icons';
 import { Button, Input, Card, Tag, Space, Tooltip, Alert, Typography, Avatar, Divider, Empty, Spin, Select, Tabs, Dropdown, Menu, message as antMessage, Checkbox, Modal, Progress, Switch, Table } from 'antd';
 import UniversalDataSourceModal from '@/app/components/UniversalDataSourceModal/UniversalDataSourceModal';
 import InlineModeSelector from './InlineModeSelector';
@@ -29,10 +26,7 @@ import {
 // Removed: MessageBox and EnhancedChatMessage components deleted
 import './styles.css';
 import { useAuth } from '@/context/AuthContext';
-import Markdown from 'react-markdown';
-import rehypeRaw from 'rehype-raw';
 import * as echarts from 'echarts';
-import { addWatermarkToChart } from '@/utils/watermark';
 import { getSecureAuthHeaders, isValidToken, sanitizeErrorMessage, isAuthError, handleAuthError } from '@/utils/secureAuth';
 import ChartMessage from './ChartMessage';
 import DeepAnalysisReport from './DeepAnalysisReport';
@@ -44,11 +38,6 @@ const AISER_AI_NAME = 'Aicser AI';
 const AISER_AI_HANDLE = '@AicserAI';
 const CHAT_LOADING_MESSAGE = `${AISER_AI_NAME} is analyzing your request...`;
 const LIMIT = 10;
-
-const sanitizeMessages = (msgs: IChatMessage[] = []) =>
-    msgs.filter(
-        (msg) => msg && msg.id !== 'processing' && msg.messageType !== 'processing'
-    );
 
 interface ChatPanelProps {
     conversationId?: string;
@@ -66,8 +55,6 @@ interface ChatPanelProps {
 }
 
 const ChatPanel: React.FC<ChatPanelProps> = (props) => {
-    // CRITICAL: All hooks must be called unconditionally at the top level
-    // This prevents "Rendered more hooks than during the previous render" errors
     const { isAuthenticated, authLoading, user, session } = useAuth();
     const { messages: contextMessages, createNewConversation, addMessage, updateConversationMetadata } = useConversations();
     const [prompt, setPrompt] = useState('');
@@ -79,10 +66,9 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
     const [temporaryMessages, setTemporaryMessages] = useState<IChatMessage[]>([]);
     // Merge context messages with temporary messages for display
     const messages = [...contextMessagesForConversation, ...temporaryMessages];
-    // debugger;
     const [isLoading, setIsLoading] = useState(false);
     const [isStreaming, setIsStreaming] = useState(false);
-    const [streamingMessage, setStreamingMessage] = useState<string>('');
+    // const [streamingMessage, setStreamingMessage] = useState<string>('');
     const [streamingEnabled, setStreamingEnabledState] = useState(isStreamingEnabled());
     const [progressState, setProgressState] = useState<{
         percentage: number;
@@ -93,18 +79,18 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
     const [currentMode, setCurrentMode] = useState(props.mode || 'standard');
     const [currentModel, setCurrentModel] = useState(props.model || 'auto'); // Default to 'auto'
     const [availableModels, setAvailableModels] = useState<any[]>([]);
-    const [reactions, setReactions] = useState<Record<string, string[]>>({});
+    // const [reactions, setReactions] = useState<Record<string, string[]>>({});
     const [favorites, setFavorites] = useState<Set<string>>(new Set());
-    const [comments, setComments] = useState<Record<string, string[]>>({});
+    // const [comments, setComments] = useState<Record<string, string[]>>({});
     const [isTyping, setIsTyping] = useState(false);
     const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(null);
-    const [messageCache, setMessageCache] = useState<{
-        [key: string]: {
-            messages: IChatMessage[];
-            conversation: IConversation;
-            pagination: Pagination;
-        };
-    }>({});
+    // const [messageCache, setMessageCache] = useState<{
+    //     [key: string]: {
+    //         messages: IChatMessage[];
+    //         conversation: IConversation;
+    //         pagination: Pagination;
+    //     };
+    // }>({});
     const [uploadingFile, setUploadingFile] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
@@ -114,15 +100,15 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
 
     const authGuardActive = !authLoading && !isAuthenticated;
     const isSendBusy = isLoading || isStreaming;
-    const sendButtonDisabled = authGuardActive || (!prompt.trim() && !isSendBusy);
-    const sendButtonTooltip = authGuardActive
-        ? 'Sign in to chat with Aicser AI'
-        : isSendBusy
-            ? 'Click to stop'
-            : '💡 Tip: Use Ctrl+Enter to send, Esc to clear';
-    const sendButtonType = authGuardActive || isSendBusy ? 'default' : 'primary';
-    const sendButtonIcon = isSendBusy ? <StopOutlined /> : <SendOutlined />;
-    const sendButtonText = isSendBusy ? 'Stop' : 'Send';
+    // const sendButtonDisabled = authGuardActive || (!prompt.trim() && !isSendBusy);
+    // const sendButtonTooltip = authGuardActive
+    //     ? 'Sign in to chat with Aicser AI'
+    //     : isSendBusy
+    //         ? 'Click to stop'
+    //         : '💡 Tip: Use Ctrl+Enter to send, Esc to clear';
+    // const sendButtonType = authGuardActive || isSendBusy ? 'default' : 'primary';
+    // const sendButtonIcon = isSendBusy ? <StopOutlined /> : <SendOutlined />;
+    // const sendButtonText = isSendBusy ? 'Stop' : 'Send';
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -133,44 +119,44 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
     const uploadedDataSourceIdRef = useRef<string | undefined>(undefined); // Store uploaded data source ID across async operations
     
     // Render real-time progress based on actual state (simplified, no duplication)
-    const renderProgressSteps = (progress: { percentage: number; message: string; stage: string } | null) => {
-        if (!progress) {
-            return <span>Starting workflow...</span>;
-        }
+    // const renderProgressSteps = (progress: { percentage: number; message: string; stage: string } | null) => {
+    //     if (!progress) {
+    //         return <span>Starting workflow...</span>;
+    //     }
         
-        const currentStage = progress.stage || 'start';
-        const currentMessage = progress.message || 'Processing...';
+    //     const currentStage = progress.stage || 'start';
+    //     const currentMessage = progress.message || 'Processing...';
         
-        // Use user-friendly message utility
-        const friendlyMessage = makeProgressMessageUserFriendly(currentStage, currentMessage);
+    //     // Use user-friendly message utility
+    //     const friendlyMessage = makeProgressMessageUserFriendly(currentStage, currentMessage);
         
-        // Map stages to icons
-        const stageIcons: Record<string, string> = {
-            'start': '🚀',
-            'route_query': '🔍',
-            'nl2sql': '💾',
-            'nl2sql_complete': '✓',
-            'validate_sql': '✓',
-            'sql_validated': '✓',
-            'execute_query': '⚡',
-            'query_executed': '✓',
-            'validate_results': '✓',
-            'results_validated': '✓',
-            'generate_chart': '📊',
-            'generate_insights': '💡',
-            'unified_chart_insights': '📊',
-            'complete': '✅'
-        };
+    //     // Map stages to icons
+    //     const stageIcons: Record<string, string> = {
+    //         'start': '🚀',
+    //         'route_query': '🔍',
+    //         'nl2sql': '💾',
+    //         'nl2sql_complete': '✓',
+    //         'validate_sql': '✓',
+    //         'sql_validated': '✓',
+    //         'execute_query': '⚡',
+    //         'query_executed': '✓',
+    //         'validate_results': '✓',
+    //         'results_validated': '✓',
+    //         'generate_chart': '📊',
+    //         'generate_insights': '💡',
+    //         'unified_chart_insights': '📊',
+    //         'complete': '✅'
+    //     };
         
-        const icon = stageIcons[currentStage] || '⏳';
+    //     const icon = stageIcons[currentStage] || '⏳';
         
-        return (
-            <>
-                <span style={{ fontSize: '14px' }}>{icon}</span>
-                <span>{friendlyMessage}</span>
-            </>
-        );
-    };
+    //     return (
+    //         <>
+    //             <span style={{ fontSize: '14px' }}>{icon}</span>
+    //             <span>{friendlyMessage}</span>
+    //         </>
+    //     );
+    // };
 
     // Fetch available models on component mount
     useEffect(() => {
@@ -226,36 +212,6 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
         }
     }, [props.model]);
     
-    // CRITICAL: Restore progress state from localStorage when conversation loads
-    useEffect(() => {
-        if (!props.conversationId) {
-            setProgressState(null);
-            return;
-        }
-        
-        try {
-            const cacheKey = `conv_progress_${props.conversationId}`;
-            const savedProgress = localStorage.getItem(cacheKey);
-            if (savedProgress) {
-                const progress = JSON.parse(savedProgress);
-                // Only restore if it's recent (within last 5 minutes)
-                const progressAge = Date.now() - (progress.timestamp || 0);
-                if (progressAge < 5 * 60 * 1000) {
-                    setProgressState({
-                        percentage: progress.percentage || 0,
-                        message: progress.message || '',
-                        stage: progress.stage || 'start'
-                    });
-                    console.log('✅ Restored progress state from localStorage:', progress.stage);
-                } else {
-                    // Progress is stale, clear it
-                    localStorage.removeItem(cacheKey);
-                }
-            }
-        } catch (e) {
-            console.warn('Failed to restore progress state:', e);
-        }
-    }, [props.conversationId]);
     
     // CRITICAL FIX: Modern chat interface rendering - NO HOOKS INSIDE THIS FUNCTION
     // This prevents "Rendered more hooks than during the previous render" error
@@ -836,12 +792,6 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
         });
     };
 
-    // Get user name from email
-    const getUserName = () => {
-        // TODO: Get actual username from user context/API
-        return 'Admin'; // Placeholder - should get from user context
-    };
-
     // Format timestamp
     const formatTime = (timestamp: string | Date) => {
         if (!timestamp) return 'Now';
@@ -869,53 +819,53 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
         }
     };
 
-    // Handle message reactions
-    const handleReaction = (messageId: string, emoji: string) => {
-        setReactions(prev => {
-            const currentReactions = prev[messageId] || [];
-            const newReactions = currentReactions.includes(emoji)
-                ? currentReactions.filter(e => e !== emoji)
-                : [...currentReactions, emoji];
-            return {
-                ...prev,
-                [messageId]: newReactions
-            };
-        });
-    };
+    // // Handle message reactions
+    // const handleReaction = (messageId: string, emoji: string) => {
+    //     setReactions(prev => {
+    //         const currentReactions = prev[messageId] || [];
+    //         const newReactions = currentReactions.includes(emoji)
+    //             ? currentReactions.filter(e => e !== emoji)
+    //             : [...currentReactions, emoji];
+    //         return {
+    //             ...prev,
+    //             [messageId]: newReactions
+    //         };
+    //     });
+    // };
     
-    // Handle user feedback for AI responses
-    const handleFeedback = async (messageId: string, feedback: 'positive' | 'negative') => {
-        try {
-            const message = messages.find(m => m.id === messageId);
-            if (!message) return;
+    // // Handle user feedback for AI responses
+    // const handleFeedback = async (messageId: string, feedback: 'positive' | 'negative') => {
+    //     try {
+    //         const message = messages.find(m => m.id === messageId);
+    //         if (!message) return;
             
-            const response = await fetch('/chats/chat/feedback', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                credentials: 'include',
-                body: JSON.stringify({
-                    conversation_id: props.conversationId,
-                    message_id: messageId,
-                    query: message.query || message.content || '',
-                    satisfactory: feedback === 'positive',
-                    feedback_text: feedback === 'positive' ? 'Helpful response' : 'Response needs improvement',
-                    agent_id: 'orchestrator'
-                })
-            });
+    //         const response = await fetch('/chats/chat/feedback', {
+    //             method: 'POST',
+    //             headers: {
+    //                 'Content-Type': 'application/json',
+    //             },
+    //             credentials: 'include',
+    //             body: JSON.stringify({
+    //                 conversation_id: props.conversationId,
+    //                 message_id: messageId,
+    //                 query: message.query || message.content || '',
+    //                 satisfactory: feedback === 'positive',
+    //                 feedback_text: feedback === 'positive' ? 'Helpful response' : 'Response needs improvement',
+    //                 agent_id: 'orchestrator'
+    //             })
+    //         });
             
-            const result = await response.json();
-            if (result.success) {
-                antMessage.success('Thank you for your feedback! It helps us improve.');
-            } else {
-                antMessage.warning('Failed to submit feedback. Please try again.');
-            }
-        } catch (error) {
-            console.error('Error submitting feedback:', error);
-            antMessage.error('Failed to submit feedback. Please try again.');
-        }
-    };
+    //         const result = await response.json();
+    //         if (result.success) {
+    //             antMessage.success('Thank you for your feedback! It helps us improve.');
+    //         } else {
+    //             antMessage.warning('Failed to submit feedback. Please try again.');
+    //         }
+    //     } catch (error) {
+    //         console.error('Error submitting feedback:', error);
+    //         antMessage.error('Failed to submit feedback. Please try again.');
+    //     }
+    // };
 
     // Handle favorites
     const handleFavorite = (messageId: string) => {
@@ -930,13 +880,13 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
         });
     };
 
-    // Handle comments
-    const handleComment = (messageId: string, comment: string) => {
-        setComments(prev => ({
-            ...prev,
-            [messageId]: [...(prev[messageId] || []), comment]
-        }));
-    };
+    // // Handle comments
+    // const handleComment = (messageId: string, comment: string) => {
+    //     setComments(prev => ({
+    //         ...prev,
+    //         [messageId]: [...(prev[messageId] || []), comment]
+    //     }));
+    // };
 
     // Handle sharing
     const handleShare = (messageId: string) => {
@@ -1449,22 +1399,6 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
             });
             if (!exists) {
                 addMessage(userMessage, conversationId);
-                // Why still use localstorage
-                // CRITICAL: Immediately save to localStorage with proper serialization
-                try {
-                    const cacheKey = `conv_messages_${conversationId}`;
-                    const allMessages = [...existingMessages, userMessage];
-                    // Serialize with proper date handling
-                    const serializable = allMessages.map(msg => ({
-                        ...msg,
-                        created_at: msg.created_at instanceof Date ? msg.created_at.toISOString() : msg.created_at,
-                        updated_at: msg.updated_at instanceof Date ? msg.updated_at.toISOString() : msg.updated_at
-                    }));
-                    localStorage.setItem(cacheKey, JSON.stringify(serializable));
-                    console.log('💾 Immediately saved', allMessages.length, 'messages to localStorage (including user message)');
-                } catch (e) {
-                    console.error('❌ Failed to save to localStorage:', e);
-                }
             } else {
                 console.warn('⚠️ Duplicate message detected, skipping:', userMessage.id);
             }
@@ -1483,18 +1417,6 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
             updateConversationMetadata(conversationId, {
                 json_metadata: JSON.stringify(metadataObj) as any
             }).catch(e => console.warn('Failed to update conversation metadata:', e));
-            
-            // Also save to localStorage for immediate persistence
-            try {
-                const metadataKey = `conv_metadata_${conversationId}`;
-                localStorage.setItem(metadataKey, JSON.stringify({
-                    last_data_source_id: props.selectedDataSource.id,
-                    data_source_name: props.selectedDataSource.name,
-                    data_source_type: props.selectedDataSource.type
-                }));
-            } catch (e) {
-                console.warn('Failed to save data source to localStorage:', e);
-            }
         }
         
 
@@ -2462,47 +2384,6 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
             updateConversationMetadata(props.conversationId, {
                 json_metadata: JSON.stringify(metadata) as any
             }).catch(e => console.warn('Failed to update conversation metadata:', e));
-        }
-        
-        // CRITICAL: Immediately save to localStorage to prevent loss on navigation
-        // Also save chart configs separately for persistence
-        if (props.conversationId) {
-            try {
-                const cacheKey = `conv_messages_${props.conversationId}`;
-                const allMessages = contextMessages.get(props.conversationId) || [];
-                // Serialize with proper date handling and ensure chart configs are preserved
-                const serializable = allMessages.map(msg => ({
-                    ...msg,
-                    created_at: msg.created_at instanceof Date ? msg.created_at.toISOString() : msg.created_at,
-                    updated_at: msg.updated_at instanceof Date ? msg.updated_at.toISOString() : msg.updated_at,
-                    // CRITICAL: Ensure echartsConfig is preserved
-                    echartsConfig: msg.echartsConfig || msg.chartConfig,
-                    chartConfig: msg.chartConfig || msg.echartsConfig
-                }));
-                localStorage.setItem(cacheKey, JSON.stringify(serializable));
-                
-                // CRITICAL: Also save chart configs separately for quick restoration
-                // This ensures charts persist across navigation and screen switches
-                const chartsWithConfigs = allMessages.filter(msg => msg.echartsConfig || msg.chartConfig);
-                if (chartsWithConfigs.length > 0) {
-                    const chartsKey = `conv_charts_${props.conversationId}`;
-                    const chartsData = chartsWithConfigs.map(msg => ({
-                        id: msg.id,
-                        echartsConfig: msg.echartsConfig || msg.chartConfig,
-                        chartConfig: msg.chartConfig || msg.echartsConfig,
-                        // Also save query result and insights for complete restoration
-                        queryResult: msg.queryResult,
-                        insights: msg.insights,
-                        recommendations: msg.recommendations
-                    }));
-                    localStorage.setItem(chartsKey, JSON.stringify(chartsData));
-                    console.log('💾 Saved', chartsData.length, 'chart configs to localStorage');
-                }
-                
-                console.log('💾 Immediately saved', allMessages.length, 'messages to localStorage (including new AI message)');
-            } catch (e) {
-                console.error('❌ Failed to save AI message to localStorage:', e);
-            }
         }
         
         // Auto-name conversation based on first user message if title is still "New Conversation"
