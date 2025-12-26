@@ -190,9 +190,10 @@ class DataSourcesCRUD:
             if not data_source:
                 return None
             
-            # Test connection status
+            # Test connection status and fetch schema (only when retrieving a specific data source)
             connection_status = "unknown"
             metadata = {}
+            fetched_schema = None
             if data_source.connection_config:
                 try:
                     test_result = await self.real_data_manager.test_connection(data_source)
@@ -200,8 +201,8 @@ class DataSourcesCRUD:
                     
                     # Get schema if connected
                     if connection_status == "connected" and data_source.type == "database":
-                        schema = await self.real_data_manager.get_schema(data_source)
-                        metadata = {"schema": schema}
+                        fetched_schema = await self.real_data_manager.get_schema(data_source)
+                        metadata = {"schema": fetched_schema}
                 except Exception as e:
                     logger.warning(f"Connection test failed: {e}")
                     connection_status = "failed"
@@ -209,6 +210,9 @@ class DataSourcesCRUD:
                 DS_CREATE_COUNTER.inc()
             except Exception:
                 pass
+
+            # Use fetched schema if available, otherwise fall back to model's schema
+            schema_to_return = fetched_schema if fetched_schema is not None else data_source.schema
 
             return DataSourceResponse(
                 id=data_source.id,
@@ -225,7 +229,7 @@ class DataSourcesCRUD:
                 last_accessed=data_source.last_accessed,
                 connection_status=connection_status,
                 metadata=metadata,
-                schema=data_source.schema,
+                schema=schema_to_return,  # Use fetched schema if available
                 row_count=data_source.row_count,
                 size=data_source.size,
                 file_path=data_source.file_path,
@@ -267,24 +271,10 @@ class DataSourcesCRUD:
             data_sources = result.scalars().all()
             
             # Convert to response objects
+            # NOTE: Connection testing is NOT performed during listing for performance.
+            # Connection testing and schema fetching only happen when a specific data source is retrieved.
             responses = []
             for data_source in data_sources:
-                # Test connection status
-                connection_status = "unknown"
-                metadata = {}
-                if data_source.connection_config:
-                    try:
-                        test_result = await self.real_data_manager.test_connection(data_source)
-                        connection_status = "connected" if test_result.success else "failed"
-                        
-                        # Get schema if connected
-                        if connection_status == "connected" and data_source.type == "database":
-                            schema = await self.real_data_manager.get_schema(data_source)
-                            metadata = {"schema": schema}
-                    except Exception as e:
-                        logger.warning(f"Connection test failed: {e}")
-                        connection_status = "failed"
-                
                 responses.append(DataSourceResponse(
                     id=data_source.id,
                     name=data_source.name,
@@ -298,9 +288,9 @@ class DataSourcesCRUD:
                     created_at=data_source.created_at,
                     updated_at=data_source.updated_at,
                     last_accessed=data_source.last_accessed,
-                    connection_status=connection_status,
-                    metadata=metadata,
-                    schema=data_source.schema,
+                    connection_status=None,  # Not tested during listing
+                    metadata={},  # Empty metadata during listing
+                    schema=None,  # Not fetched during listing
                     row_count=data_source.row_count,
                     size=data_source.size,
                     file_path=data_source.file_path,

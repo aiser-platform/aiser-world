@@ -31,6 +31,7 @@ import { getSecureAuthHeaders, isValidToken, sanitizeErrorMessage, isAuthError, 
 import ChartMessage from './ChartMessage';
 import DeepAnalysisReport from './DeepAnalysisReport';
 import ThoughtProcessDisplay from './ThoughtProcessDisplay';
+import { useDataSources } from '@/context/DataSourceContext';
 
 const { TextArea } = Input;
 const { Title, Text, Paragraph } = Typography;
@@ -43,7 +44,6 @@ interface ChatPanelProps {
     conversationId?: string;
     callback: (data: { conversation: IConversation }) => void;
     selectedDataSource?: any;
-    selectedDataSources?: any[];
     mode?: string;
     onModeChange?: (mode: string) => void;
     model?: string;
@@ -55,6 +55,7 @@ interface ChatPanelProps {
 }
 
 const ChatPanel: React.FC<ChatPanelProps> = (props) => {
+    const { refreshDataSources } = useDataSources();
     const { isAuthenticated, authLoading, user, session } = useAuth();
     const { messages: contextMessages, createNewConversation, addMessage, updateConversationMetadata } = useConversations();
     const [prompt, setPrompt] = useState('');
@@ -1605,7 +1606,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
         analysisMode: string,
         aiModel: string
     ) => {
-        debugger;
+        
         // Create abort controller for cancellation
         abortControllerRef.current = new AbortController();
         const signal = abortControllerRef.current.signal;
@@ -2931,9 +2932,21 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
             <UniversalDataSourceModal
                 isOpen={showDataSourceModal}
                 onClose={() => setShowDataSourceModal(false)}
-                onDataSourceCreated={(dataSource: any) => {
+                onDataSourceCreated={async (dataSource: any) => {
                     console.log('Created data source:', dataSource);
                     setShowDataSourceModal(false);
+                    
+                    // Refresh the data sources context
+                    try {
+                        await refreshDataSources();
+                    } catch (e) {
+                        console.error('Failed to refresh data sources:', e);
+                    }
+                    
+                    // Notify parent if callback exists
+                    if (dataSource?.id && props.onDataSourceSelect) {
+                        props.onDataSourceSelect(dataSource);
+                    }
                 }}
             />
             {/* UpgradeModal removed – no org/plan gating */}

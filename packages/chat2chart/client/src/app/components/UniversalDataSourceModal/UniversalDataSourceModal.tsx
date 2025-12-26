@@ -829,7 +829,7 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
     const saveDataSource = async () => {
         setLoading(true);
         try {
-            let response;
+            let response: Response | undefined;
             
             if (dataSourceConfig.type === 'file') {
                 if (!uploadedFile) {
@@ -894,7 +894,7 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
                     
                     if (!response.ok) {
                         const errorData = await response.json().catch(() => ({ 
-                            error: `Server error (${response.status}): ${response.statusText}` 
+                            error: `Server error (${response!.status}): ${response!.statusText}` 
                         }));
                         const errorMessage = errorData.detail || errorData.error || errorData.message || `Upload failed: ${response.status}`;
                         setTestResult({ success: false, error: errorMessage });
@@ -915,15 +915,21 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
                         onDataSourceCreated(dataSource);
                         onClose();
                         message.success('File uploaded and saved successfully!');
+                        setLoading(false);
+                        return;
                     } else {
                         const errorMessage = result.error || result.detail || 'Failed to upload file';
                         setTestResult({ success: false, error: errorMessage });
                         message.error(`Upload failed: ${errorMessage}`);
+                        setLoading(false);
+                        return;
                     }
                 } catch (error: any) {
                     const errorMessage = error.message || 'Network error. Please check your connection and try again.';
                     setTestResult({ success: false, error: errorMessage });
                     message.error(`Upload failed: ${errorMessage}`);
+                    setLoading(false);
+                    return;
                 }
             } else if (dataSourceConfig.type === 'api') {
                 // For API data sources, create a mock data source
@@ -1070,10 +1076,10 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(requestBody)
-                });
+                }) as Response;
             }
             
-            if (!response.ok) {
+            if (!response || !response.ok) {
                 const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
                 console.error('Save failed:', response.status, errorData);
                 setTestResult({ 

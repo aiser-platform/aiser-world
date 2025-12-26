@@ -336,7 +336,8 @@ async def get_data_sources(
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Authentication required')
 
         # Get user's data sources directly via CRUD service (user-scoped only)
-        async with get_async_session() as db:
+        from app.db.session import async_session
+        async with async_session() as db:
             accessible_sources = await data_crud_service.list_data_sources(
                 user_id=user_id,
                 session=db
@@ -516,11 +517,9 @@ async def get_data_source(
     """Get data source information - REQUIRES AUTHENTICATION and ownership verification"""
     try:
         # Extract user ID from JWT token - CRITICAL for security
-        try:
-            user_payload = extract_user_payload(current_token)
-            user_id = str(user_payload.get('id') or user_payload.get('user_id') or user_payload.get('sub') or '')
-        except Exception:
-            user_id = ''
+        user_id = None
+        if isinstance(current_token, dict):
+            user_id = str(current_token.get('id') or current_token.get('user_id') or current_token.get('sub') or '')
 
         if not user_id:
             logger.warning('get_data_source attempted without authenticated user')

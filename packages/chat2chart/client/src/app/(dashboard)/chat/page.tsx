@@ -13,9 +13,8 @@ import EnhancedDataPanel from './components/DataPanel/EnhancedDataPanel';
 import UniversalDataSourceModal from '@/app/components/UniversalDataSourceModal/UniversalDataSourceModal';
 import { ExtendedTable, IConversation, IDatabase } from './types';
 import { IFileUpload } from '@/app/components/FileUpload/types';
-import { useSearchParams } from 'next/navigation';
 import { useConversations } from '@/context/ConversationContext';
-import { useAuth } from '@/context/AuthContext';
+import { useDataSources } from '@/context/DataSourceContext';
 
 interface DataSource {
     id: string;
@@ -37,8 +36,6 @@ interface DataSource {
 const { Text } = Typography;
 
 const ChatToChart = () => {
-    const searchParams = useSearchParams();
-    const { session } = useAuth();
     // Get conversation state from context
     const { 
         conversations, 
@@ -54,15 +51,44 @@ const ChatToChart = () => {
     const conversationState = currentConversationId 
         ? conversations.find(c => c.id === currentConversationId)
         : undefined;
-    const [activeTab, setActiveTab] = React.useState<string>('chat');
-    const [selectedDataSource, setSelectedDataSource] = React.useState<DataSource | null>(null);
+    
+    // Get data source state from context
+    const { 
+        selectedDataSourceId, 
+        getSelectedDataSource, 
+        selectDataSource: contextSelectDataSource,
+        dataSources: contextDataSources,
+        refreshDataSources
+    } = useDataSources();
+    
+    // Derive selectedDataSource from context and map to local format
+    const contextDataSource = selectedDataSourceId ? getSelectedDataSource() : null;
+    const selectedDataSource: DataSource | null = contextDataSource ? {
+        id: contextDataSource.id,
+        name: contextDataSource.name,
+        type: contextDataSource.type,
+        status: contextDataSource.connection_status === 'connected' ? 'connected' : 
+                contextDataSource.connection_status === 'failed' ? 'error' : 'disconnected',
+        config: contextDataSource.connection_config || {},
+        schema: contextDataSource.schema || undefined,
+        metadata: contextDataSource.metadata || {},
+        row_count: contextDataSource.row_count,
+        description: contextDataSource.description,
+        lastUsed: contextDataSource.last_accessed,
+        rowCount: contextDataSource.row_count,
+        columns: [],
+        size: contextDataSource.size?.toString()
+    } : null;
+    
+
     const [generatedCharts, setGeneratedCharts] = React.useState<Record<string, any>[]>([]);
     const [dataPanelCollapsed, setDataPanelCollapsed] = React.useState<boolean>(false);
     const [sqlResults, setSqlResults] = React.useState<Record<string, any>[]>([]);
     const [showDataSourceModal, setShowDataSourceModal] = React.useState<boolean>(false);
     // Drag handlers removed - history panel removed
-    const [selectedDataSources, setSelectedDataSources] = React.useState<DataSource[]>([]); // Data sources selected from DataPanel
     const autoCollapseRef = React.useRef<{ applied: boolean; mode: 'none' | 'both' | 'history' } | null>(null);
+    // Track the last conversation we restored data source for, to prevent reverting user selections
+    const lastRestoredConversationId = React.useRef<string | null>(null);
 
     const screens = Grid.useBreakpoint();
     const isLargeScreen = screens.lg ?? false;
@@ -71,183 +97,100 @@ const ChatToChart = () => {
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [dbList, setDbList] = React.useState<IDatabase[]>([]);
-    const [db, setDb] = React.useState<IDatabase | undefined>(undefined);
     const [schema, setSchema] = React.useState<string | undefined>(undefined);
     const [tables, setTables] = React.useState<ExtendedTable[] | undefined>(
         undefined
     );
-    const [file, setFile] = React.useState<IFileUpload | undefined>(undefined);
     const [openAIModel, setOpenAIModel] = React.useState<string | undefined>(
         undefined
     );
 
-    // Restore data source from current conversation metadata when conversation loads
-    useEffect(() => {
-        if (currentConversationId && conversationState?.json_metadata) {
-            try {
-                const metadata = typeof conversationState.json_metadata === 'string' 
-                    ? JSON.parse(conversationState.json_metadata) 
-                    : conversationState.json_metadata;
-                const dataSourceId = metadata.last_data_source_id || metadata.data_source_id || metadata.dataSourceId;
+    // // Restore data source from current conversation metadata when conversation loads
+    // useEffect(() => {
+    //     if (currentConversationId && conversationState?.json_metadata) {
+    //         try {
+    //             const metadata = typeof conversationState.json_metadata === 'string' 
+    //                 ? JSON.parse(conversationState.json_metadata) 
+    //                 : conversationState.json_metadata;
+    //                             const dataSourceId = metadata.last_data_source_id || metadata.data_source_id || metadata.dataSourceId;
                 
-                if (dataSourceId && typeof dataSourceId === 'string' && 
-                    !dataSourceId.includes('cube_real_') && !dataSourceId.includes('demo_')) {
-                    try {
-                        fetch(`/api/data/sources/${dataSourceId}`, {
-                            credentials: 'include'
-                        }).then(dsResponse => {
-                            if (dsResponse.ok) {
-                                dsResponse.json().then(dataSource => {
-                                    setSelectedDataSource(dataSource);
-                                    localStorage.setItem('selected_data_source', JSON.stringify(dataSource));
-                                    console.log('✅ Restored data source from conversation metadata:', dataSource.name);
-                                });
-                            }
-                        }).catch(e => {
-                            console.warn('Failed to load data source from conversation metadata:', e);
-                        });
-                    } catch (e) {
-                        console.warn('Failed to load data source from conversation metadata:', e);
-                    }
-                }
-            } catch (e) {
-                console.warn('Failed to parse conversation metadata:', e);
-            }
-        }
-    }, [currentConversationId, conversationState]);
-    
-    // Load persisted data source from localStorage (only on mount, not when selectedDataSource changes)
-    // CRITICAL: Don't include selectedDataSource in dependencies to avoid infinite loop
-    useEffect(() => {
-        try {
-            const savedDataSource = localStorage.getItem('selected_data_source');
-            if (savedDataSource) {
-                const dataSource = JSON.parse(savedDataSource);
-                // Always restore if it exists and is different from current
-                if (!selectedDataSource || selectedDataSource.id !== dataSource.id) {
-                    setSelectedDataSource(dataSource);
-                    console.log('✅ Loaded persisted data source from localStorage:', dataSource.name);
-                }
-            }
-        } catch (e) {
-            console.warn('Failed to load persisted data source:', e);
-        }
-    }, []); // Run only once on mount
+    //             if (dataSourceId && typeof dataSourceId === 'string' && 
+    //                 !dataSourceId.includes('cube_real_') && !dataSourceId.includes('demo_') &&
+    //                 selectedDataSourceId !== dataSourceId) {
+    //                 // Use context to select data source
+    //                 contextSelectDataSource(dataSourceId).catch(e => {
+    //                     console.warn('Failed to load data source from conversation metadata:', e);
+    //                 });
+    //                             }
+    //                         } catch (e) {
+    //                             console.warn('Failed to parse conversation metadata:', e);
+    //                         }
+    //                     }
+    // }, [currentConversationId, conversationState, selectedDataSourceId, contextSelectDataSource]);
+                        
+    // Load persisted data source from localStorage (only on mount, not when selectedDataSourceId changes)
+    // useEffect(() => {
+    //                         try {
+    //                             const savedDataSource = localStorage.getItem('selected_data_source');
+    //                             if (savedDataSource) {
+    //                                 const dataSource = JSON.parse(savedDataSource);
+    //             // Always restore if it exists and is different from current
+    //             if (dataSource.id && selectedDataSourceId !== dataSource.id) {
+    //                 contextSelectDataSource(dataSource.id).catch(e => {
+    //                             console.warn('Failed to restore data source from localStorage:', e);
+    //                 });
+    //             }
+    //         }
+    //     } catch (e) {
+    //         console.warn('Failed to load persisted data source:', e);
+    //     }
+    //     // eslint-disable-next-line react-hooks/exhaustive-deps
+    // }, []); // Run only once on mount
 
     // Persist selected data source to localStorage AND conversation metadata
     // CRITICAL: This ensures data source persists across screen switches and navigation
-    useEffect(() => {
-        if (selectedDataSource) {
-            try {
-                // Save to localStorage (global preference) - persists across all navigation
-                localStorage.setItem('selected_data_source', JSON.stringify(selectedDataSource));
-                console.log('💾 Persisted data source to localStorage:', selectedDataSource.name);
+    // useEffect(() => {
+    //     if (selectedDataSource) {
+    //         try {
+    //             // Save to localStorage (global preference) - persists across all navigation
+    //             localStorage.setItem('selected_data_source', JSON.stringify(selectedDataSource));
+    //             console.log('💾 Persisted data source to localStorage:', selectedDataSource.name);
                 
-                // Also save to current conversation metadata (per-conversation)
-                if (currentConversationId) {
-                    const headers: Record<string, string> = {
-                        'Content-Type': 'application/json'
-                    };
-                    if (session?.access_token) {
-                        headers['Authorization'] = `Bearer ${session.access_token}`;
-                    }
-                    fetch(`/api/conversations/${currentConversationId}`, {
-                        method: 'PUT',
-                        credentials: 'include',
-                        headers,
-                        body: JSON.stringify({
-                            json_metadata: JSON.stringify({
-                                last_data_source_id: selectedDataSource.id,
-                                data_source_name: selectedDataSource.name,
-                                data_source_type: selectedDataSource.type
-                            })
-                        })
-                    }).catch(e => console.warn('Failed to save data source to conversation:', e));
-                }
-            } catch (e) {
-                console.warn('Failed to persist data source:', e);
-            }
-        } else {
-            // CRITICAL: Only clear localStorage if explicitly cleared (not on navigation)
-            // Don't clear on every null - might be temporary during load
-            // Only clear if we're sure user wants to deselect
-            const shouldClear = !currentConversationId || 
-                               (currentConversationId && !localStorage.getItem(`conv_has_data_source_${currentConversationId}`));
-            if (shouldClear) {
-                localStorage.removeItem('selected_data_source');
-            }
-        }
-    }, [selectedDataSource, currentConversationId]);
-    
-    // CRITICAL: Restore data source from localStorage on mount AND when returning to page
-    // This ensures data source persists across screen switches
-    useEffect(() => {
-        // Only restore if we don't already have a selected data source
-        if (!selectedDataSource) {
-            try {
-                const savedDataSource = localStorage.getItem('selected_data_source');
-                if (savedDataSource) {
-                    const dataSource = JSON.parse(savedDataSource);
-                    // Verify data source still exists before restoring
-                    fetch(`/api/data/sources/${dataSource.id}`, {
-                        credentials: 'include'
-                    }).then(response => {
-                        if (response.ok) {
-                            response.json().then(dsData => {
-                                setSelectedDataSource(dsData);
-                                console.log('✅ Restored data source from localStorage after screen switch:', dsData.name);
-                            });
-                        } else {
-                            // Data source no longer exists, clear it
-                            localStorage.removeItem('selected_data_source');
-                        }
-                    }).catch(() => {
-                        // On error, try to restore anyway (might be network issue)
-                        setSelectedDataSource(dataSource);
-                    });
-                }
-            } catch (e) {
-                console.warn('Failed to restore data source from localStorage:', e);
-            }
-        }
-    }, []); // Only run on mount
-
-    // CRITICAL FIX: When conversation switches, restore data source from conversation metadata
-    // This prevents data source from "randomly" being deselected on conversation switch
-    useEffect(() => {
-        if (currentConversationId && conversationState && conversationState.json_metadata) {
-            try {
-                const metadata = typeof conversationState.json_metadata === 'string'
-                    ? JSON.parse(conversationState.json_metadata)
-                    : conversationState.json_metadata;
-                
-                const dataSourceId = metadata.last_data_source_id || metadata.data_source_id;
-                
-                // Only restore if it's different from current selection
-                if (dataSourceId && (!selectedDataSource || selectedDataSource.id !== dataSourceId)) {
-                    // Verify the data source still exists
-                    fetch(`/api/data/sources/${dataSourceId}`, {
-                        credentials: 'include'
-                    }).then(response => {
-                        if (response.ok) {
-                            response.json().then(dsData => {
-                                // Double-check we haven't changed conversations in the meantime
-                                if (currentConversationId === dsData.conversation_id || 
-                                    currentConversationId === conversationState.id) {
-                                    setSelectedDataSource(dsData);
-                                    console.log('✅ Restored data source on conversation switch:', dsData.name);
-                                }
-                            });
-                        }
-                    }).catch(err => {
-                        console.warn('Failed to restore data source for conversation:', err);
-                    });
-                }
-            } catch (e) {
-                console.warn('Failed to parse conversation metadata:', e);
-            }
-        }
-    }, [currentConversationId]); // Trigger only when conversation changes
+    //             // Also save to current conversation metadata (per-conversation)
+    //             if (currentConversationId) {
+    //                 const headers: Record<string, string> = {
+    //                     'Content-Type': 'application/json'
+    //                 };
+    //                 if (session?.access_token) {
+    //                     headers['Authorization'] = `Bearer ${session.access_token}`;
+    //                 }
+    //                 fetch(`/api/conversations/${currentConversationId}`, {
+    //                     method: 'PUT',
+    //                     credentials: 'include',
+    //                     headers,
+    //                     body: JSON.stringify({
+    //                         json_metadata: JSON.stringify({
+    //                             last_data_source_id: selectedDataSource.id,
+    //                             data_source_name: selectedDataSource.name,
+    //                             data_source_type: selectedDataSource.type
+    //                         })
+    //                     })
+    //                 }).catch(e => console.warn('Failed to save data source to conversation:', e));
+    //             }
+    //         } catch (e) {
+    //             console.warn('Failed to persist data source:', e);
+    //         }
+    //     } else {
+    //         // CRITICAL: Only clear localStorage if explicitly cleared (not on navigation)
+    //         // Don't clear on every null - might be temporary during load
+    //         // Only clear if we're sure user wants to deselect
+    //         const shouldClear = !currentConversationId || 
+    //                            (currentConversationId && !localStorage.getItem(`conv_has_data_source_${currentConversationId}`));
+    //         if (shouldClear) {
+    //             localStorage.removeItem('selected_data_source');
+    //         }
+    //     }
+    // }, [selectedDataSource, currentConversationId, session]);
 
     // Listen for page visibility changes - only reload if needed (not on every tab switch)
     useEffect(() => {
@@ -296,11 +239,11 @@ const ChatToChart = () => {
         if (currentConversationId && selectedDataSource) {
             try {
                 await updateConversationMetadata(currentConversationId, {
-                    json_metadata: JSON.stringify({
-                        last_data_source_id: selectedDataSource.id,
+                        json_metadata: JSON.stringify({
+                            last_data_source_id: selectedDataSource.id,
                         data_source_name: selectedDataSource.name,
                         data_source_type: selectedDataSource.type
-                    })
+                        })
                 } as any);
             } catch (e) {
                 console.warn('Failed to save data source to conversation:', e);
@@ -314,67 +257,66 @@ const ChatToChart = () => {
         // Restore data source from conversation metadata
         // Note: Session manager already loaded messages, but we need to check metadata for data source
         try {
-            let dataSourceId: string | null = null;
-            
+                let dataSourceId: string | null = null;
+                
             // Try to get from conversation metadata
             if (conversation.json_metadata) {
                 try {
                     const metadata = typeof conversation.json_metadata === 'string' 
                         ? JSON.parse(conversation.json_metadata) 
                         : conversation.json_metadata;
-                    dataSourceId = metadata.last_data_source_id || metadata.data_source_id || metadata.dataSourceId || null;
-                    if (dataSourceId) {
-                        console.log('✅ Found data source ID in conversation metadata:', dataSourceId);
+                        dataSourceId = metadata.last_data_source_id || metadata.data_source_id || metadata.dataSourceId || null;
+                        if (dataSourceId) {
+                            console.log('✅ Found data source ID in conversation metadata:', dataSourceId);
+                        }
+                    } catch (e) {
+                        console.warn('Failed to parse conversation metadata:', e);
                     }
-                } catch (e) {
-                    console.warn('Failed to parse conversation metadata:', e);
                 }
-            }
-            
+                
             // If not in metadata, try to get from context's loaded messages
             if (!dataSourceId) {
                 // Use context messages directly
                 const conversationMessages = messages.get(conversationId) || [];
-                // Search from most recent to oldest
+                    // Search from most recent to oldest
                 for (let i = conversationMessages.length - 1; i >= 0; i--) {
                     const msg = conversationMessages[i];
                     const msgMetadata = msg.executionMetadata || {};
                     if (msgMetadata.data_source_id || msg.dataSourceId) {
                         dataSourceId = msgMetadata.data_source_id || msg.dataSourceId;
-                        console.log('✅ Found data source ID in most recent message:', dataSourceId);
-                        break;
+                            console.log('✅ Found data source ID in most recent message:', dataSourceId);
+                            break;
+                        }
                     }
                 }
-            }
-            
-            // Restore data source if found (skip invalid IDs)
-            if (dataSourceId && typeof dataSourceId === 'string' && !dataSourceId.includes('cube_real_') && !dataSourceId.includes('demo_')) {
-                try {
-                    const headers: Record<string, string> = {};
-                    if (session?.access_token) {
-                        headers['Authorization'] = `Bearer ${session.access_token}`;
+                
+                // Restore data source if found (skip invalid IDs)
+                // Only restore if this is a different conversation than we've already restored
+                if (dataSourceId && 
+                    typeof dataSourceId === 'string' && 
+                    !dataSourceId.includes('cube_real_') && 
+                    !dataSourceId.includes('demo_') &&
+                    conversationId !== lastRestoredConversationId.current) {
+                    if (selectedDataSourceId !== dataSourceId) {
+                        lastRestoredConversationId.current = conversationId;
+                        contextSelectDataSource(dataSourceId).catch(e => {
+                            console.error('Failed to load data source:', e);
+                        });
+                    } else {
+                        // Mark as restored even if already selected
+                        lastRestoredConversationId.current = conversationId;
                     }
-                    const dsResponse = await fetch(`/api/data/sources/${dataSourceId}`, {
-                        credentials: 'include',
-                        headers
-                    });
-                    if (dsResponse.ok) {
-                        const dsData = await dsResponse.json();
-                        setSelectedDataSource(dsData);
-                        console.log('✅ Restored data source:', dsData.name);
-                    } else if (dsResponse.status === 404) {
-                        console.warn('⚠️ Data source not found, skipping:', dataSourceId);
+                } else {
+                    console.log('ℹ️ No data source found in conversation metadata, keeping current selection if valid');
+                    // Mark as restored even if no data source found
+                    if (conversationId) {
+                        lastRestoredConversationId.current = conversationId;
                     }
-                } catch (e) {
-                    console.error('Failed to load data source:', e);
-                }
-            } else {
-                console.log('ℹ️ No data source found in conversation metadata, keeping current selection if valid');
             }
         } catch (error) {
             console.error('Error restoring data source:', error);
         }
-    }, [saveCurrentConversationId, currentConversationId, selectedDataSource]);
+    }, [saveCurrentConversationId, currentConversationId, contextSelectDataSource, messages, selectedDataSource]);
 
     // Handle new conversation
     const handleNewConversation = useCallback(async () => {
@@ -397,9 +339,6 @@ const ChatToChart = () => {
             // Context already handles setting it as current and adding to state
             saveCurrentConversationId(newConversation.id);
             
-            // Ensure we're on chat tab
-            setActiveTab('chat');
-            
             console.log('✅ New conversation setup complete - messages will load when user sends first message');
             message.success('New conversation created');
         } catch (error) {
@@ -409,56 +348,30 @@ const ChatToChart = () => {
         }
     }, [saveCurrentConversationId, contextCreateNewConversation]);
 
-    // Handle URL parameters for data source integration
-    React.useEffect(() => {
-        const dataSourceId = searchParams?.get ? searchParams.get('dataSource') : null;
-        const modelingComplete = searchParams?.get ? searchParams.get('modeling') : null;
-        
-        if (dataSourceId) {
-            // For now, we'll set a placeholder and let the EnhancedDataPanel handle the actual data source
-            // The EnhancedDataPanel will load and set the real data source when it mounts
-            console.log('Data source ID from URL:', dataSourceId);
-            
-            // If modeling is complete, show success message
-            if (modelingComplete === 'complete') {
-                // You can add a success notification here
-                console.log('Data modeling completed for:', dataSourceId);
-            }
-        }
-    }, [searchParams]);
 
     // Handle data source creation
-    const handleDataSourceCreated = (dataSource: any) => {
-        setSelectedDataSource(dataSource);
+    const handleDataSourceCreated = async (dataSource: any) => {
         setShowDataSourceModal(false);
         
         // Show success message
         console.log('New data source created:', dataSource);
         
-        // Update chat state with the new data source
-        if (dataSource.type === 'file') {
-            setFile({
-                filename: dataSource.config.connectionDetails.filename,
-                content_type: dataSource.config.connectionDetails.content_type,
-                storage_type: dataSource.config.connectionDetails.storage_type,
-                file_size: dataSource.config.connectionDetails.file_size,
-                uuid_filename: dataSource.config.connectionDetails.uuid_filename
-            });
-        } else if (dataSource.type === 'database' || dataSource.type === 'warehouse') {
-            setDb({
-                name: dataSource.name,
-                type: dataSource.type,
-                host: dataSource.config.connectionDetails.host || '',
-                port: dataSource.config.connectionDetails.port || 5432,
-                database: dataSource.config.connectionDetails.database || '',
-                username: dataSource.config.connectionDetails.username || '',
-                password: dataSource.config.connectionDetails.password || ''
-            });
+        // Refresh the data sources list first to ensure it's in the context
+        try {
+            await refreshDataSources();
+        } catch (e) {
+            console.error('Failed to refresh data sources:', e);
         }
         
-        // Switch to chat tab to start analyzing
-        setActiveTab('chat');
-        
+        // Select the new data source using context
+        if (dataSource.id) {
+            try {
+                await contextSelectDataSource(dataSource.id);
+            } catch (e) {
+                console.error('Failed to select newly created data source:', e);
+            }
+        }
+
         // Show success notification
         message.success(`Data source "${dataSource.name}" connected successfully! You can now start chatting with your data.`);
     };
@@ -496,43 +409,6 @@ const ChatToChart = () => {
         return () => window.removeEventListener('resize', applyResponsiveLayout);
     }, []);
 
-    const renderWelcomeCards = () => (
-        <Row gutter={[16, 16]} style={{ padding: '24px' }}>
-            <Col span={8}>
-                <Card 
-                    hoverable
-                    onClick={() => setShowDataSourceModal(true)}
-                    style={{ textAlign: 'center', height: 200 }}
-                >
-                    <DatabaseOutlined style={{ fontSize: 48, color: 'var(--color-brand-primary)', marginBottom: 16 }} />
-                    <h3>Connect Data Sources</h3>
-                    <p>Upload files or connect to databases to get started with your analysis</p>
-                </Card>
-            </Col>
-            <Col span={8}>
-                <Card 
-                    hoverable
-                    onClick={() => setActiveTab('chat')}
-                    style={{ textAlign: 'center', height: 200 }}
-                >
-                    <MessageOutlined style={{ fontSize: 48, color: 'var(--color-functional-success)', marginBottom: 16 }} />
-                    <h3>Chat to Chart</h3>
-                    <p>Ask questions in natural language and get instant visualizations</p>
-                </Card>
-            </Col>
-            <Col span={8}>
-                <Card 
-                    hoverable
-                    onClick={() => setActiveTab('charts')}
-                    style={{ textAlign: 'center', height: 200 }}
-                >
-                    <BarChartOutlined style={{ fontSize: 48, color: 'var(--color-functional-warning)', marginBottom: 16 }} />
-                    <h3>Generated Charts</h3>
-                    <p>View and manage all your generated charts and visualizations</p>
-                </Card>
-            </Col>
-        </Row>
-    );
 
     const getConversationTimestamp = (conversation: IConversation) => {
         const metadata = conversation as Record<string, any>;
@@ -540,48 +416,6 @@ const ChatToChart = () => {
         return new Date(timestamp).getTime();
     };
 
-    const renderChartsGallery = () => (
-        <div style={{ padding: '24px' }}>
-            <Row gutter={[16, 16]}>
-                {generatedCharts.length === 0 ? (
-                    <Col span={24}>
-                        <Card style={{ textAlign: 'center', padding: '48px' }}>
-                            <BarChartOutlined style={{ fontSize: 64, color: 'var(--color-border-primary)', marginBottom: 16 }} />
-                            <h3>No Charts Generated Yet</h3>
-                            <p>Start by connecting a data source and asking questions in the chat</p>
-                            <Space>
-                                <Button type="primary" onClick={() => setActiveTab('datasources')}>
-                                    Connect Data Source
-                                </Button>
-                                <Button onClick={() => setActiveTab('chat')}>
-                                    Start Chatting
-                                </Button>
-                            </Space>
-                        </Card>
-                    </Col>
-                ) : (
-                    generatedCharts.map((chart, index) => (
-                        <Col key={index} span={8}>
-                            <Card
-                                hoverable
-                                cover={<div style={{ height: 200, backgroundColor: 'var(--ant-color-fill-secondary, var(--color-surface-raised))' }}>Chart Preview</div>}
-                                actions={[
-                                    <Button key="view" type="text">View</Button>,
-                                    <Button key="download" type="text">Download</Button>,
-                                    <Button key="share" type="text">Share</Button>
-                                ]}
-                            >
-                                <Card.Meta
-                                    title={`Chart ${index + 1}`}
-                                    description="Generated from your data analysis"
-                                />
-                            </Card>
-                        </Col>
-                    ))
-                )}
-            </Row>
-        </div>
-    );
 
     return (
         <div className="chat-page-container" style={{ 
@@ -620,24 +454,20 @@ const ChatToChart = () => {
                         callback={(props: {
                             conversation: IConversation;
                         }) => {
-                            setConversationState(props.conversation);
+                            // setConversationState(props.conversation);
                         }}
                         selectedDataSource={selectedDataSource}
-                        selectedDataSources={selectedDataSources}
                         model={openAIModel}
                         onModelChange={(id: string) => setOpenAIModel(id)}
                         onSelectConversation={(conversation) => {
                             handleSelectConversation(conversation);
-                            setDb(undefined);
                             setSchema(undefined);
                             setTables(undefined);
                         }}
                         onNewConversation={() => {
                             handleNewConversation();
-                            setDb(undefined);
                             setSchema(undefined);
                             setTables(undefined);
-                            setFile(undefined);
                         }}
                         onConversationDeleted={() => {
                             // If current conversation was deleted, switch to first available or create new
@@ -695,47 +525,7 @@ const ChatToChart = () => {
                     </div>
                 ) : (
                     <EnhancedDataPanel
-                        onDataSourceSelect={(dataSource) => {
-                            console.log('🔄 Chat page onDataSourceSelect called with:', dataSource);
-                            // CRITICAL: Force state update to ensure UI reflects selection
-                            setSelectedDataSource(dataSource);
-                            
-                            if (dataSource) {
-                                setSelectedDataSources([dataSource]);
-                                // Force a re-render to ensure DataPanel shows selection
-                                console.log('✅ Data source selected:', dataSource.id, dataSource.name);
-                            } else {
-                                setSelectedDataSources([]);
-                            }
-                            
-                            if (dataSource && dataSource.type === 'file') {
-                                setFile({
-                                    filename: dataSource.name,
-                                    content_type: 'application/octet-stream',
-                                    storage_type: 'local',
-                                    file_size: 0,
-                                    uuid_filename: dataSource.id
-                                });
-                            } else if (dataSource && dataSource.type === 'database') {
-                                setDb({
-                                    id: Number(dataSource.id) || undefined,
-                                    name: dataSource.name,
-                                    type: dataSource.config?.db_type || 'postgresql',
-                                    host: dataSource.config?.host || '',
-                                    port: Number(dataSource.config?.port) || 5432,
-                                    database: dataSource.config?.database || '',
-                                    username: dataSource.config?.username || ''
-                                });
-                            }
-                        }}
-                        selectedDataSource={selectedDataSource}
                         onCollapse={() => setDataPanelCollapsed(true)}
-                        onRefresh={() => {
-                            console.log('Refreshing data sources...');
-                        }}
-                        onDataSourcesChange={(sources) => {
-                            setSelectedDataSources(sources);
-                        }}
                     />
                 )}
             </div>
