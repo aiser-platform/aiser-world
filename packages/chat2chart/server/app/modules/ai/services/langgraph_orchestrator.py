@@ -132,10 +132,14 @@ class LangGraphMultiAgentOrchestrator:
         self,
         conversation_id: str,
         user_query: str
-    ) -> None:
-        """Save user message immediately when query starts (before workflow)"""
+    ) -> Optional[str]:
+        """Save user message immediately when query starts (before workflow)
+        
+        Returns:
+            Optional[str]: Message ID if successfully saved, None otherwise
+        """
         if not conversation_id or not self.async_session_factory:
-            return
+            return None
         
         try:
             import uuid as uuid_lib
@@ -148,7 +152,7 @@ class LangGraphMultiAgentOrchestrator:
                 conversation_uuid = uuid_lib.UUID(conversation_id)
             except ValueError:
                 logger.warning(f"Invalid conversation_id format for saving user message: {conversation_id}")
-                return
+                return None
             
             async_gen = self.async_session_factory()
             session = await async_gen.__anext__()
@@ -179,9 +183,12 @@ class LangGraphMultiAgentOrchestrator:
                     status="processing"  # Mark as processing
                 )
                 session.add(user_message)
+                await session.flush()  # Flush to get the ID
+                message_id = str(user_message.id)  # Capture the ID
                 await session.commit()
                 
-                logger.info(f"💾 Saved user message immediately for conversation {conversation_id}")
+                logger.info(f"💾 Saved user message immediately (ID: {message_id}) for conversation {conversation_id}")
+                return message_id
             except Exception as e:
                 await session.rollback()
                 raise
@@ -193,13 +200,15 @@ class LangGraphMultiAgentOrchestrator:
         except Exception as e:
             logger.error(f"⚠️ Failed to save user message immediately (non-critical): {e}")
             # Don't fail the workflow if message saving fails
+            return None
     
     async def _save_conversation_messages(
         self,
         conversation_id: str,
         user_query: str,
         ai_response: str,
-        result: Dict[str, Any]
+        result: Dict[str, Any],
+        user_message_id: Optional[str] = None
     ) -> None:
         """
         Save user query and AI response to conversation messages atomically.
@@ -211,6 +220,7 @@ class LangGraphMultiAgentOrchestrator:
             user_query: User's query
             ai_response: AI's response
             result: Full result dictionary
+            user_message_id: Optional message ID from _save_user_message_immediately
         """
         if not conversation_id or not self.async_session_factory:
             return
@@ -250,34 +260,52 @@ class LangGraphMultiAgentOrchestrator:
                     await session.flush()
                     logger.info(f"📝 Created new conversation: {conversation_id}")
                 
-                # CRITICAL: Check if user message already exists (from _save_user_message_immediately)
-                # to avoid duplicates - check by query text AND recent timestamp
-                from datetime import datetime, timedelta
-                recent_threshold = datetime.utcnow() - timedelta(seconds=30)
+                # CRITICAL: Find existing user message - prefer message ID lookup (most reliable)
+                existing_user = None
+                if user_message_id:
+                    try:
+                        message_uuid = uuid_lib.UUID(user_message_id)
+                        msg_result = await session.execute(
+                            select(ChatMessage).filter(
+                                ChatMessage.id == message_uuid,
+                                ChatMessage.conversation_id == conversation_uuid,
+                                ChatMessage.is_active == True
+                            )
+                        )
+                        existing_user = msg_result.scalar_one_or_none()
+                        if existing_user:
+                            logger.debug(f"💾 Found user message by ID: {user_message_id}")
+                    except (ValueError, Exception) as e:
+                        logger.warning(f"⚠️ Invalid or missing message ID {user_message_id}: {e}, falling back to query matching")
                 
-                existing_user_msg = await session.execute(
-                    select(ChatMessage).filter(
-                        ChatMessage.conversation_id == conversation_uuid,
-                        ChatMessage.query == user_query,
-                        ChatMessage.answer == None,
-                        ChatMessage.is_active == True,
-                        ChatMessage.created_at >= recent_threshold
-                    ).order_by(ChatMessage.created_at.desc()).limit(1)
-                )
-                existing_user = existing_user_msg.scalar_one_or_none()
-                
+                # Fallback: Check if user message already exists by query text (if ID lookup failed)
                 if not existing_user:
-                    # Also check for any user message with same query in last 5 seconds (more aggressive dedupe)
-                    very_recent_threshold = datetime.utcnow() - timedelta(seconds=5)
-                    very_recent_msg = await session.execute(
+                    from datetime import datetime, timedelta
+                    recent_threshold = datetime.utcnow() - timedelta(seconds=30)
+                    
+                    existing_user_msg = await session.execute(
                         select(ChatMessage).filter(
                             ChatMessage.conversation_id == conversation_uuid,
                             ChatMessage.query == user_query,
+                            ChatMessage.answer == None,
                             ChatMessage.is_active == True,
-                            ChatMessage.created_at >= very_recent_threshold
+                            ChatMessage.created_at >= recent_threshold
                         ).order_by(ChatMessage.created_at.desc()).limit(1)
                     )
-                    existing_user = very_recent_msg.scalar_one_or_none()
+                    existing_user = existing_user_msg.scalar_one_or_none()
+                    
+                    if not existing_user:
+                        # Also check for any user message with same query in last 5 seconds (more aggressive dedupe)
+                        very_recent_threshold = datetime.utcnow() - timedelta(seconds=5)
+                        very_recent_msg = await session.execute(
+                            select(ChatMessage).filter(
+                                ChatMessage.conversation_id == conversation_uuid,
+                                ChatMessage.query == user_query,
+                                ChatMessage.is_active == True,
+                                ChatMessage.created_at >= very_recent_threshold
+                            ).order_by(ChatMessage.created_at.desc()).limit(1)
+                        )
+                        existing_user = very_recent_msg.scalar_one_or_none()
                 
                 # ===== ATOMIC TRANSACTION: Save both messages together =====
                 if not existing_user:
@@ -296,7 +324,7 @@ class LangGraphMultiAgentOrchestrator:
                     if existing_user.status == "processing":
                         existing_user.status = "completed"
                         await session.flush()
-                        logger.debug(f"💾 Updated existing user message status to completed (prevented duplicate)")
+                        logger.debug(f"💾 Updated existing user message status to completed (ID: {existing_user.id}, prevented duplicate)")
                 
                 # Save AI response message
                 # Include full response with SQL, chart config, insights if available
@@ -1282,9 +1310,10 @@ class LangGraphMultiAgentOrchestrator:
         start_time = time.time()
         
         # CRITICAL: Save user message immediately when query starts (before workflow)
+        user_message_id = None
         if conversation_id:
             try:
-                await self._save_user_message_immediately(conversation_id, query)
+                user_message_id = await self._save_user_message_immediately(conversation_id, query)
             except Exception as e:
                 logger.warning(f"⚠️ Failed to save user message immediately (non-critical): {e}")
         
@@ -1303,6 +1332,12 @@ class LangGraphMultiAgentOrchestrator:
                 analysis_mode=analysis_mode,
                 model=model
             )
+            
+            # Store user_message_id in execution_metadata so it flows through the workflow
+            if user_message_id:
+                if "execution_metadata" not in initial_state:
+                    initial_state["execution_metadata"] = {}
+                initial_state["execution_metadata"]["user_message_id"] = user_message_id
             
             # Override with conversation history and agent context if provided
             initial_state["conversation_history"] = conversation_history
@@ -1621,7 +1656,9 @@ Return ONLY the response text, no markdown, no quotes."""
                         "query_result": result.get("query_result"),
                         "execution_metadata": result.get("execution_metadata", {})
                     }
-                    await self._save_conversation_messages(conversation_id, query, narration, result_dict)
+                    # Extract user_message_id from execution_metadata
+                    user_message_id = result.get("execution_metadata", {}).get("user_message_id")
+                    await self._save_conversation_messages(conversation_id, query, narration, result_dict, user_message_id=user_message_id)
                     logger.info(f"✅ Saved messages for non-streaming request in conversation {conversation_id}")
                 except Exception as save_error:
                     logger.error(f"⚠️ Failed to save messages for non-streaming request (non-critical): {save_error}")
@@ -2045,7 +2082,9 @@ Return ONLY the response text, no markdown, no quotes."""
                                 "query_result": final_state.get("query_result"),
                                 "execution_metadata": final_state.get("execution_metadata", {})
                             }
-                            await self._save_conversation_messages(conversation_id, query, narration, result_dict)
+                            # Extract user_message_id from execution_metadata
+                            user_message_id = final_state.get("execution_metadata", {}).get("user_message_id")
+                            await self._save_conversation_messages(conversation_id, query, narration, result_dict, user_message_id=user_message_id)
                             logger.info(f"✅ Saved messages in real-time for conversation {conversation_id}")
                         except Exception as save_error:
                             logger.error(f"⚠️ Failed to save messages in real-time (non-critical): {save_error}")
@@ -2133,7 +2172,9 @@ Return ONLY the response text, no markdown, no quotes."""
                                 "query_result": final_state.get("query_result"),
                                 "execution_metadata": final_state.get("execution_metadata", {})
                             }
-                            await self._save_conversation_messages(conversation_id, query, narration, result_dict)
+                            # Extract user_message_id from execution_metadata
+                            user_message_id = final_state.get("execution_metadata", {}).get("user_message_id")
+                            await self._save_conversation_messages(conversation_id, query, narration, result_dict, user_message_id=user_message_id)
                             logger.info(f"✅ Saved messages after stream end for conversation {conversation_id}")
                         except Exception as save_error:
                             logger.error(f"⚠️ Failed to save messages after stream end (non-critical): {save_error}")
@@ -2159,7 +2200,9 @@ Return ONLY the response text, no markdown, no quotes."""
                                 "query_result": last_state.get("query_result"),
                                 "execution_metadata": last_state.get("execution_metadata", {})
                             }
-                            await self._save_conversation_messages(conversation_id, query, narration, result_dict)
+                            # Extract user_message_id from execution_metadata
+                            user_message_id = last_state.get("execution_metadata", {}).get("user_message_id")
+                            await self._save_conversation_messages(conversation_id, query, narration, result_dict, user_message_id=user_message_id)
                             logger.info(f"✅ Saved messages for incomplete workflow in conversation {conversation_id}")
                         except Exception as save_error:
                             logger.error(f"⚠️ Failed to save messages for incomplete workflow (non-critical): {save_error}")
