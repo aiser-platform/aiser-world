@@ -363,6 +363,7 @@ async def upload_file(
     sheet_name: Optional[str] = Form(default=None),
     delimiter: Optional[str] = Form(default=','),
     preview_only: bool = Form(default=False),  # Preview-only mode (doesn't save to database)
+    upload_with_prompt: bool = Form(default=False),  # Whether file is uploaded with a prompt (enables in-memory storage)
     current_token: Union[str, dict] = Depends(JWTCookieBearer())
 ):
     """Upload and process data file using the data service (requires authentication)
@@ -376,28 +377,14 @@ async def upload_file(
     """
     try:
         # Extract user ID from JWT token
-        # JWTCookieBearer returns dict payload when possible, or token string
-        try:
-            if isinstance(current_token, dict):
-                user_payload = current_token
-            else:
-                # If it's a string token, decode it
-                user_payload = extract_user_payload(current_token)
-            
-            # Extract user_id from various possible fields
-            user_id = str(user_payload.get('id') or user_payload.get('user_id') or user_payload.get('sub') or '')
-            
-            logger.info(f"🔍 Extracted user_id: {user_id} from payload keys: {list(user_payload.keys()) if isinstance(user_payload, dict) else 'not dict'}")
-        except Exception as e:
-            logger.error(f"❌ Failed to extract user_id from token: {str(e)}")
-            import traceback
-            logger.error(f"Full traceback: {traceback.format_exc()}")
-            user_id = ''
-        
+        user_id = None
+        if isinstance(current_token, dict):
+            user_id = str(current_token.get('id') or current_token.get('user_id') or current_token.get('sub') or '')
+
         if not user_id:
-            logger.warning('upload_file attempted without authenticated user')
+            logger.warning('get_data_source attempted without authenticated user')
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Authentication required')
-        
+
         await enforce_data_source_limit(user_id)
 
         # DEBUG: Log file object details
@@ -434,13 +421,14 @@ async def upload_file(
             raise HTTPException(status_code=400, detail="File is empty")
         
         # Prepare options for the service
-        # Also resolve organization ownership for proper tenant binding and plan-based retention
-        organization_id = await enforce_data_source_limit(user_id)
         options = {
             'include_data': include_preview,
             'sheet_name': sheet_name,
             'delimiter': delimiter,
             'user_id': user_id,               # Pass user_id to service
+            'upload_with_prompt': upload_with_prompt,  # Pass upload_with_prompt flag
+            'name': name,                     # Pass name to service
+            'preview_only': preview_only,    # Explicitly set preview_only flag
         }
         
         # Prevent duplicate display names (case-insensitive) for this user
@@ -1081,72 +1069,76 @@ async def get_data_source_data(
                         "format": data_source.get('format')
                     }
                 }
-            if 'file_path' in data_source and data_source.get('file_path'):
-                file_path = data_source['file_path']
-
-                if not os.path.exists(file_path):
-                    logger.warning(f"File not found at path: {file_path}")
-                    raise HTTPException(status_code=404, detail="Data file not found")
-            else:
-                # Try to load persisted file_path from database in case the in-memory
-                # registry doesn't have it (create may have persisted separately).
-                try:
-                    from app.db.session import get_sync_engine
-                    eng = get_sync_engine()
-                    with eng.connect() as conn:
-                        q = sa.text("SELECT file_path, format FROM data_sources WHERE id = :id LIMIT 1")
-                        r = conn.execute(q, {"id": data_source_id})
-                        row = r.fetchone()
-                        if row and row[0]:
-                            file_path = row[0]
-                            # populate format if missing
-                            if not data_source.get('format') and row[1]:
-                                data_source['format'] = row[1]
-                except Exception:
-                    file_path = None
-
-                if not file_path:
-                    # No file available to read
-                    raise HTTPException(status_code=400, detail="No data available for this data source")
             
-            # Load data based on file type (only if a file path was provided)
-            if 'file_path' in data_source:
+            # Try to load from PostgreSQL storage
+            object_key = data_source.get('file_path')  # Now it's object_key
+            if object_key:
                 try:
-                    # file_path already validated above
-                    if data_source['format'] == 'csv':
-                        import pandas as pd
-                        df = pd.read_csv(file_path)
-                        data = df.to_dict('records')
-                    elif data_source['format'] in ['xlsx', 'xls']:
-                        import pandas as pd
-                        df = pd.read_excel(file_path)
-                        data = df.to_dict('records')
-                    elif data_source['format'] == 'json':
-                        import json
-                        with open(file_path, 'r') as f:
-                            data = json.load(f)
-                    else:
-                        raise HTTPException(status_code=400, detail=f"Unsupported file format: {data_source['format']}")
-
-                    return {
-                        "success": True,
-                        "data_source_id": data_source_id,
-                        "data": data,
-                        "metadata": {
-                            "filename": data_source['name'],
-                            "columns": data_source.get('schema', {}).get('columns', []),
-                            "row_count": len(data),
-                            "file_path": file_path,
-                            "format": data_source['format']
+                    from app.modules.data.services.postgres_storage_service import PostgresStorageService
+                    storage_service = PostgresStorageService()
+                    
+                    # Load file from PostgreSQL
+                    file_content = await storage_service.get_file(object_key, user_id)
+                    
+                    # Process based on format
+                    import tempfile
+                    file_format = data_source.get('format', 'csv')
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_format}") as tmp:
+                        tmp.write(file_content)
+                        tmp_path = tmp.name
+                    
+                    try:
+                        if file_format == 'csv':
+                            import pandas as pd
+                            df = pd.read_csv(tmp_path)
+                            data = df.to_dict('records')
+                        elif file_format in ['xlsx', 'xls']:
+                            import pandas as pd
+                            df = pd.read_excel(tmp_path)
+                            data = df.to_dict('records')
+                        elif file_format == 'json':
+                            import json
+                            with open(tmp_path, 'r') as f:
+                                data = json.load(f)
+                        else:
+                            raise HTTPException(status_code=400, detail=f"Unsupported format: {file_format}")
+                        
+                        return {
+                            "success": True,
+                            "data_source_id": data_source_id,
+                            "data": data,
+                            "metadata": {
+                                "filename": data_source['name'],
+                                "columns": data_source.get('schema', {}).get('columns', []),
+                                "row_count": len(data),
+                                "file_path": object_key,
+                                "format": file_format
+                            }
                         }
+                    finally:
+                        if os.path.exists(tmp_path):
+                            os.unlink(tmp_path)
+                except Exception as e:
+                    logger.error(f"Failed to load from PostgreSQL storage: {e}")
+                    # Fall through to sample_data fallback
+            
+            # Fallback to sample_data
+            sample_data = data_source.get('sample_data', [])
+            if sample_data:
+                return {
+                    "success": True,
+                    "data_source_id": data_source_id,
+                    "data": sample_data,
+                    "metadata": {
+                        "filename": data_source['name'],
+                        "columns": data_source.get('schema', {}).get('columns', []),
+                        "row_count": len(sample_data),
+                        "file_path": object_key,
+                        "format": data_source.get('format')
                     }
-
-                except Exception as parse_error:
-                    logger.error(f"❌ Failed to parse file {file_path}: {str(parse_error)}")
-                    raise HTTPException(status_code=500, detail=f"Failed to parse file: {str(parse_error)}")
-            else:
-                # No in-memory data and no file to read
-                raise HTTPException(status_code=400, detail="No data available for this data source")
+                }
+            
+            raise HTTPException(status_code=400, detail="No data available for this data source")
         
         # For database sources, return connection info
         elif data_source['type'] == 'database':

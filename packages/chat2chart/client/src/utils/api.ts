@@ -36,7 +36,9 @@ export const fetchApi = async (
     endpoint: string,
     options: RequestInit = {}
 ): Promise<Response> => {
-    const defaultHeaders: Record<string, string> = {
+    // Don't set Content-Type for FormData - browser will set it automatically with boundary
+    const isFormData = options.body instanceof FormData;
+    const defaultHeaders: Record<string, string> = isFormData ? {} : {
         'Content-Type': 'application/json',
     };
 

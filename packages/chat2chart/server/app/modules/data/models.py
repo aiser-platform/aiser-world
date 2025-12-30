@@ -4,6 +4,7 @@ Database models for data sources and connections
 """
 
 from sqlalchemy import Column, String, Integer, DateTime, Text, JSON, Boolean
+from sqlalchemy.dialects.postgresql import BYTEA
 from sqlalchemy.sql import func
 from app.common.model import Base
 
@@ -81,3 +82,30 @@ class DataQuery(Base):
 
 
 # DataConnection model removed - use DataSource for both files and databases
+
+
+class FileStorage(Base):
+    """Table for storing file binary data in PostgreSQL"""
+    
+    __tablename__ = "file_storage"
+    
+    # Object key (used as file_path in data_sources)
+    object_key = Column(String, primary_key=True, index=True)
+    
+    # Binary data
+    file_data = Column(BYTEA, nullable=False)  # PostgreSQL BYTEA type
+    
+    # Metadata
+    file_size = Column(Integer, nullable=False)
+    content_type = Column(String, nullable=True)
+    original_filename = Column(String, nullable=True)
+    
+    # Ownership
+    user_id = Column(String, nullable=False, index=True)
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Soft delete
+    is_active = Column(Boolean, default=True)

@@ -32,6 +32,7 @@ import ChartMessage from './ChartMessage';
 import DeepAnalysisReport from './DeepAnalysisReport';
 import ThoughtProcessDisplay from './ThoughtProcessDisplay';
 import { useDataSources } from '@/context/DataSourceContext';
+import { useRouter } from 'next/navigation';
 
 const { TextArea } = Input;
 const { Title, Text, Paragraph } = Typography;
@@ -55,7 +56,12 @@ interface ChatPanelProps {
 }
 
 const ChatPanel: React.FC<ChatPanelProps> = (props) => {
-    const { refreshDataSources } = useDataSources();
+    const router = useRouter();
+    const { 
+        refreshDataSources, 
+        selectDataSource: contextSelectDataSource,
+        dataSources: contextDataSources 
+    } = useDataSources();
     const { isAuthenticated, authLoading, user, session } = useAuth();
     const { messages: contextMessages, createNewConversation, addMessage, updateConversationMetadata } = useConversations();
     const [prompt, setPrompt] = useState('');
@@ -82,16 +88,6 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
     const [availableModels, setAvailableModels] = useState<any[]>([]);
     // const [reactions, setReactions] = useState<Record<string, string[]>>({});
     const [favorites, setFavorites] = useState<Set<string>>(new Set());
-    // const [comments, setComments] = useState<Record<string, string[]>>({});
-    const [isTyping, setIsTyping] = useState(false);
-    const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(null);
-    // const [messageCache, setMessageCache] = useState<{
-    //     [key: string]: {
-    //         messages: IChatMessage[];
-    //         conversation: IConversation;
-    //         pagination: Pagination;
-    //     };
-    // }>({});
     const [uploadingFile, setUploadingFile] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
@@ -956,8 +952,19 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
         return { valid: true };
     };
 
-    // Handle file upload
+    // Handle file upload (direct upload, not before sending message)
     const handleFileUpload = async (file: File) => {
+        // ✅ Pre-upload authentication validation using AuthContext
+        if (!isAuthenticated || !user || !session) {
+            antMessage.error('Your session has expired. Please sign in again.');
+            router.push('/login');
+            return;
+        }
+        if (!session.access_token) {
+            antMessage.error('Authentication token missing. Please sign in again.');
+            return;
+        }
+        
         // Validate file
         const validation = validateFile(file);
         if (!validation.valid) {
@@ -1016,6 +1023,12 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                 // Start upload - use correct endpoint path
                 xhr.open('POST', '/api/data/upload');
                 xhr.withCredentials = true; // Include cookies for auth
+                
+                // ✅ Add Authorization header from AuthContext for consistent auth handling
+                if (session.access_token) {
+                    xhr.setRequestHeader('Authorization', `Bearer ${session.access_token}`);
+                }
+                
                 xhr.send(formData);
             });
 
@@ -1023,20 +1036,29 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
 
             if (result.success && result.data_source) {
                 const dataSource = result.data_source;
+                const dataSourceId = dataSource.id || dataSource.data_source_id;
                 
-                // Auto-select the uploaded file as data source
-                const newDataSource = {
-                    id: dataSource.id || dataSource.data_source_id,
-                    name: dataSource.name || file.name,
-                    type: 'file' as const,
-                    status: 'connected' as const,
-                    config: dataSource.config || {},
-                    columns: dataSource.columns || dataSource.schema || [],
-                    rowCount: dataSource.row_count || dataSource.rowCount || 0
-                };
-
-                // Notify parent component to select this data source
-                props.onDataSourceSelect?.(newDataSource);
+                // ✅ Refresh data sources list to include the newly uploaded file
+                await refreshDataSources();
+                
+                // ✅ Use DataSourceContext to select the data source (loads schema automatically)
+                try {
+                    await contextSelectDataSource(dataSourceId);
+                    console.log('✅ Data source selected via context:', dataSourceId);
+                } catch (selectError) {
+                    console.warn('Failed to select data source via context, using fallback:', selectError);
+                    // Fallback: Create minimal data source object for legacy callback
+                    const newDataSource = {
+                        id: dataSourceId,
+                        name: dataSource.name || file.name,
+                        type: 'file' as const,
+                        status: 'connected' as const,
+                        config: dataSource.config || {},
+                        columns: dataSource.columns || dataSource.schema || [],
+                        rowCount: dataSource.row_count || dataSource.rowCount || 0
+                    };
+                    props.onDataSourceSelect?.(newDataSource);
+                }
 
                 antMessage.success(`File "${file.name}" uploaded successfully! ${dataSource.row_count || 0} rows processed.`);
                 
@@ -1050,8 +1072,9 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                 if (currentPrompt && currentPrompt.includes('comprehensive analysis')) {
                     // Auto-send the analysis query with deep mode
                     setTimeout(async () => {
-                        // Ensure data source is selected
-                        if (!props.selectedDataSource || props.selectedDataSource.id !== newDataSource.id) {
+                        // Ensure data source is selected via context
+                        const selectedDS = contextDataSources.find(ds => ds.id === dataSourceId);
+                        if (!selectedDS) {
                             await new Promise(resolve => setTimeout(resolve, 500));
                         }
                         
@@ -1176,6 +1199,16 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
     const handleFileUploadBeforeSend = async (file: File): Promise<string | boolean> => {
         if (!file) return true; // No file to upload, proceed with message
         
+        if (!isAuthenticated || !user || !session) {
+            antMessage.error('Your session has expired. Please sign in again.');
+            router.push('/login');
+            return false;
+        }
+        if (!session.access_token) {
+            antMessage.error('Authentication token missing. Please sign in again.');
+            return false;
+        }
+        
         const validation = validateFile(file);
         if (!validation.valid) {
             antMessage.error(validation.error || 'Invalid file');
@@ -1189,6 +1222,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
             const formData = new FormData();
             formData.append('file', file);
             formData.append('include_preview', 'true');
+            formData.append('upload_with_prompt', 'true');  // File is uploaded with a prompt, enable in-memory storage
 
             const xhr = new XMLHttpRequest();
             
@@ -1227,7 +1261,9 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                 });
 
                 xhr.open('POST', '/api/data/upload');
-                xhr.withCredentials = true;
+                if (session.access_token) {
+                    xhr.setRequestHeader('Authorization', `Bearer ${session.access_token}`);
+                }
                 xhr.send(formData);
             });
 
@@ -1236,30 +1272,25 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
             if (result.success && result.data_source) {
                 const dataSource = result.data_source;
                 const dataSourceId = dataSource.id || dataSource.data_source_id;
-                const newDataSource = {
-                    id: dataSourceId,
-                    name: dataSource.name || file.name,
-                    type: 'file' as const,
-                    status: 'connected' as const,
-                    config: dataSource.config || {},
-                    columns: dataSource.columns || dataSource.schema || [],
-                    rowCount: dataSource.row_count || dataSource.rowCount || 0
-                };
-
-                // CRITICAL: Select the data source immediately so it's available for the message
-                props.onDataSourceSelect?.(newDataSource);
                 
-                // CRITICAL: Dispatch event to notify data panel to refresh
+                await refreshDataSources();
+                
                 try {
-                    window.dispatchEvent(new CustomEvent('datasource-created', {
-                        detail: {
-                            data_source: newDataSource,
-                            data_source_id: dataSourceId
-                        }
-                    }));
-                    console.log('📡 Dispatched datasource-created event');
-                } catch (e) {
-                    console.warn('Failed to dispatch datasource-created event:', e);
+                    await contextSelectDataSource(dataSourceId);
+                    console.log('✅ Data source selected via context:', dataSourceId);
+                } catch (selectError) {
+                    console.warn('Failed to select data source via context, using fallback:', selectError);
+                    // Fallback: Create minimal data source object for legacy callback
+                    const newDataSource = {
+                        id: dataSourceId,
+                        name: dataSource.name || file.name,
+                        type: 'file' as const,
+                        status: 'connected' as const,
+                        config: dataSource.config || {},
+                        columns: dataSource.columns || dataSource.schema || [],
+                        rowCount: dataSource.row_count || dataSource.rowCount || 0
+                    };
+                    props.onDataSourceSelect?.(newDataSource);
                 }
                 
                 // Store the data source ID for use in the message
@@ -1495,7 +1526,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
             //     // CRITICAL: Return here to prevent fall-through to non-streaming
             //     return;
             // }
-            
+            debugger;
             // Non-streaming fallback (only if streaming explicitly disabled)
             console.log('📡 Using non-streaming request...');
             const response = await fetch('/api/ai/chat/analyze', {
@@ -1606,7 +1637,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
         analysisMode: string,
         aiModel: string
     ) => {
-        
+
         // Create abort controller for cancellation
         abortControllerRef.current = new AbortController();
         const signal = abortControllerRef.current.signal;
@@ -2416,18 +2447,9 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
     };
 
     // Handle typing
+    // MIGHT have to make it uncontrolled for performance
     const handleTyping = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         setPrompt(e.target.value);
-        
-        if (typingTimeout) {
-            clearTimeout(typingTimeout);
-        }
-        
-        setIsTyping(true);
-        const timeout = setTimeout(() => {
-            setIsTyping(false);
-        }, 1000);
-        setTypingTimeout(timeout);
     };
 
     // Auto-scroll: Only scroll when a NEW message is sent (not on every message change)

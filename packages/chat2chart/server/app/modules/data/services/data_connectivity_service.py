@@ -10,7 +10,7 @@ import json
 import re
 import sqlalchemy as sa
 from typing import Dict, List, Optional, Any, Union
-from datetime import datetime
+from datetime import datetime, date
 import tempfile
 from pathlib import Path
 from .database_connector_service import DatabaseConnectorService
@@ -25,7 +25,6 @@ class DataConnectivityService:
     """Service for handling data connectivity and file uploads"""
     
     def __init__(self):
-        self.upload_dir = "./uploads"
         self.max_file_size = 50 * 1024 * 1024  # 50MB
         self.supported_formats = ['csv', 'xlsx', 'xls', 'json', 'tsv', 'parquet', 'parq', 'snappy']
         
@@ -61,9 +60,6 @@ class DataConnectivityService:
             }
         }
         
-        # Ensure upload directory exists
-        self._ensure_upload_dir()
-        
         # Data source registry (in production, this would be in database)
         self.data_sources = {}
         
@@ -73,6 +69,19 @@ class DataConnectivityService:
         # Initialize database connector service
         self.database_connector = DatabaseConnectorService()
         self.ai_schema_service = AISchemaService()  # Add AI schema service
+    
+    def _make_json_serializable(self, obj: Any) -> Any:
+        """Recursively convert date/datetime objects to ISO format strings for JSON serialization"""
+        if isinstance(obj, (date, datetime)):
+            return obj.isoformat()
+        elif isinstance(obj, dict):
+            return {key: self._make_json_serializable(value) for key, value in obj.items()}
+        elif isinstance(obj, list):
+            return [self._make_json_serializable(item) for item in obj]
+        elif pd.isna(obj):
+            return None
+        else:
+            return obj
 
     async def test_database_connection(self, connection_request: Dict[str, Any]) -> Dict[str, Any]:
         """Test database connection without storing credentials"""
@@ -666,9 +675,11 @@ class DataConnectivityService:
                     existing.size = data_source.get('size')
                     existing.row_count = data_source.get('row_count')
                     existing.schema = data_source.get('schema')
-                    existing.file_path = data_source.get('file_path')
+                    existing.file_path = data_source.get('file_path')  # Now stores object_key
                     existing.original_filename = data_source.get('original_filename')
-                    existing.updated_at = datetime.now()
+                    existing.sample_data = data_source.get('sample_data')  # Save sample_data as JSON
+                    from datetime import timezone
+                    existing.updated_at = datetime.now(timezone.utc)
                     logger.info(f"✅ Updated data source {data_source['id']} in database.")
                 else:
                     # Create new
@@ -686,8 +697,9 @@ class DataConnectivityService:
                         size=data_source.get('size'),
                         row_count=data_source.get('row_count'),
                         schema=data_source.get('schema'),
-                        file_path=data_source.get('file_path'),
+                        file_path=data_source.get('file_path'),  # Now stores object_key
                         original_filename=data_source.get('original_filename'),
+                        sample_data=data_source.get('sample_data'),  # Save sample_data as JSON
                         user_id=user_id  # Required - validated above
                     )
                     db.add(new_data_source)
@@ -697,14 +709,17 @@ class DataConnectivityService:
                 return True
                 
         except Exception as e:
-            logger.error(f"❌ Failed to save data source to database: {str(e)}")
+            logger.error(f"❌ Failed to save data source to database: {str(e)}", exc_info=True)
+            import traceback
+            logger.error(f"❌ Traceback: {traceback.format_exc()}")
             return False
 
     async def process_uploaded_file(
         self, 
-        file_path: str, 
+        file_path: str,  # Temp file path for processing
         original_filename: str, 
-        options: Optional[Dict[str, Any]] = None
+        options: Optional[Dict[str, Any]] = None,
+        object_key: Optional[str] = None  # NEW: Object key from PostgreSQL storage
     ) -> Dict[str, Any]:
         """Process uploaded file and extract data"""
         try:
@@ -751,47 +766,55 @@ class DataConnectivityService:
             user_id = options.get('user_id') if options else None
             name = options.get('name') if options else original_filename
             
+            # Get file size from temp file
+            file_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
+            
             data_source = {
                 'id': f"file_{int(datetime.now().timestamp())}",
                 'name': name or original_filename,
                 'type': 'file',
                 'format': file_extension,
-                'size': os.path.getsize(file_path),
+                'size': file_size,
                 'uploaded_at': datetime.now().isoformat(),
                 'schema': enhanced_schema,
                 'row_count': len(data),
-                'file_path': file_path,
+                'file_path': object_key,  # NEW: Store object_key, not file path
                 'original_filename': original_filename,
                 'preview': data[:10] if len(data) > 10 else data,  # First 10 rows for preview
                 # Add fields expected by frontend
                 'uuid_filename': f"file_{int(datetime.now().timestamp())}_{original_filename}",
                 'content_type': f"application/{file_extension}",
-                'storage_type': 'local',
+                'storage_type': 'postgresql',  # Updated: now using PostgreSQL storage
                 'user_id': user_id  # Pass user_id from options
             }
             
-            # Store in registry (only store sample data for large files to save memory)
-            max_memory_rows = 1000  # Only keep first 1000 rows in memory
-            if len(data) > max_memory_rows:
-                logger.info(f"📊 Large file detected ({len(data)} rows), storing only sample data in memory")
-                data_source['sample_data'] = data[:max_memory_rows]
-                data_source['data'] = data[:max_memory_rows]  # Keep sample for quick access
-            else:
-                data_source['data'] = data
-                data_source['sample_data'] = data
+            # Conditional in-memory storage based on upload_with_prompt flag
+            upload_with_prompt = options.get('upload_with_prompt', False)
+            max_sample_rows = 10000  # Increased from 1000
             
-            self.data_sources[data_source['id']] = {
-                **data_source
-            }
-            
-            # Save to database (only save sample_data, not full data for large files)
-            if preview_only:
-                logger.info("⏩ Skipping database save for preview-only mode")
+            if upload_with_prompt:
+                # Store in memory for immediate query processing
+                if len(data) > max_sample_rows:
+                    data_source['sample_data'] = data[:max_sample_rows]
+                    data_source['data'] = data[:max_sample_rows]
+                else:
+                    data_source['data'] = data
+                    data_source['sample_data'] = data
+                
+                # Store in memory cache
+                self.data_sources[data_source['id']] = data_source
+                logger.info(f"💾 Stored in memory for immediate processing")
             else:
-                # For large files, only save sample_data to database
-                if len(data) > max_memory_rows:
-                    data_source['sample_data'] = data[:max_memory_rows]
-                await self._save_data_source_to_db(data_source)
+                # Don't store in memory - only save to DB
+                data_source['sample_data'] = data[:max_sample_rows] if len(data) > max_sample_rows else data
+                logger.info(f"⏩ Skipping in-memory storage (file uploaded without prompt)")
+            
+            # Always save to database
+            if not preview_only:
+                save_success = await self._save_data_source_to_db(data_source)
+                if not save_success:
+                    logger.error(f"❌ Failed to save data source {data_source.get('id')} to database")
+                    raise Exception(f"Failed to save data source to database. Check logs for details.")
             
             logger.info(f"✅ File processed successfully: {len(data)} rows, {len(enhanced_schema['columns'])} columns")
             
@@ -803,10 +826,6 @@ class DataConnectivityService:
             
         except Exception as error:
             logger.error(f"❌ File processing failed: {str(error)}")
-            
-            # Clean up file on error
-            if os.path.exists(file_path):
-                os.unlink(file_path)
             
             return {
                 'success': False,
@@ -820,6 +839,7 @@ class DataConnectivityService:
         options: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """Upload and process a file from content"""
+        tmp_file_path = None
         try:
             logger.info(f"📁 File upload request: {filename}")
             
@@ -835,30 +855,39 @@ class DataConnectivityService:
             if file_extension not in self.supported_formats:
                 raise ValueError(f"Unsupported file format: {file_extension}")
             
-            # Create unique filename and save to upload directory
-            timestamp = int(datetime.now().timestamp())
-            unique_filename = f"file_{timestamp}_{filename}"
-            file_path = os.path.join(self.upload_dir, unique_filename)
+            # Get user_id from options
+            user_id = options.get('user_id')
+            if not user_id:
+                raise ValueError("user_id is required for file upload")
             
-            # Ensure upload directory exists
-            self._ensure_upload_dir()
+            # Store file in PostgreSQL
+            from app.modules.data.services.postgres_storage_service import PostgresStorageService
+            storage_service = PostgresStorageService()
             
-            # Save file content
-            with open(file_path, 'wb') as f:
-                f.write(file_content)
+            content_type = f"application/{file_extension}"
             
-            logger.info(f"💾 File saved to: {file_path}")
+            # Store file in PostgreSQL and get object_key
+            object_key = await storage_service.store_file(
+                file_content=file_content,
+                user_id=user_id,
+                original_filename=filename,
+                content_type=content_type
+            )
             
-            # Process the uploaded file
-            result = await self.process_uploaded_file(file_path, filename, options)
+            logger.info(f"💾 File stored in PostgreSQL: {object_key}")
+            
+            # Create temp file for processing (will be deleted after processing)
+            with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_extension}") as tmp_file:
+                tmp_file.write(file_content)
+                tmp_file_path = tmp_file.name
+            
+            # Process the uploaded file (pass object_key)
+            result = await self.process_uploaded_file(tmp_file_path, filename, options, object_key)
             
             if result['success']:
                 logger.info(f"✅ File upload completed successfully: {filename}")
                 return result
             else:
-                # Clean up file if processing failed
-                if os.path.exists(file_path):
-                    os.unlink(file_path)
                 return result
                 
         except Exception as error:
@@ -867,6 +896,13 @@ class DataConnectivityService:
                 'success': False,
                 'error': str(error)
             }
+        finally:
+            # Clean up temp file
+            if tmp_file_path and os.path.exists(tmp_file_path):
+                try:
+                    os.unlink(tmp_file_path)
+                except Exception as e:
+                    logger.warning(f"⚠️ Failed to clean up temp file: {str(e)}")
 
     async def _process_csv_file(self, file_path: str, delimiter: str = ',', encoding: str = 'utf-8') -> tuple:
         """Process CSV/TSV files using DuckDB for fast, direct processing"""
@@ -911,6 +947,9 @@ class DataConnectivityService:
                 # Convert to list of dictionaries
                 data = [dict(zip(columns, row)) for row in sample_result]
                 
+                # Convert date/datetime objects to JSON-serializable strings
+                data = self._make_json_serializable(data)
+                
                 # Get full row count
                 total_rows = conn.execute("SELECT COUNT(*) FROM data").fetchone()[0]
                 schema['row_count'] = total_rows
@@ -931,6 +970,10 @@ class DataConnectivityService:
                     for key, value in row.items():
                         if pd.isna(value):
                             row[key] = None
+                
+                # Convert date/datetime objects to JSON-serializable strings
+                data = self._make_json_serializable(data)
+                
                 schema = self._infer_schema_from_dataframe(df)
                 return data, schema
             
@@ -962,6 +1005,9 @@ class DataConnectivityService:
                 
                 # Convert to list of dictionaries
                 data = [dict(zip(columns, row)) for row in sample_result]
+                
+                # Convert date/datetime objects to JSON-serializable strings
+                data = self._make_json_serializable(data)
                 
                 # Get full row count
                 total_rows = conn.execute("SELECT COUNT(*) FROM data").fetchone()[0]
@@ -1081,6 +1127,8 @@ class DataConnectivityService:
                         # Use first sheet as primary data (for backward compatibility)
                         if idx == 0 or (sheet_name and sheet == sheet_name):
                             primary_data = df.to_dict('records')
+                            # Convert date/datetime objects to JSON-serializable strings
+                            primary_data = self._make_json_serializable(primary_data)
                             primary_schema = self._infer_schema_from_dataframe(df)
                             primary_schema['row_count'] = sheet_schema['row_count']
                             primary_schema['table_name'] = table_name
@@ -1151,6 +1199,9 @@ class DataConnectivityService:
                 
                 # Convert to list of dictionaries
                 data = [dict(zip(columns, row)) for row in sample_result]
+                
+                # Convert date/datetime objects to JSON-serializable strings
+                data = self._make_json_serializable(data)
                 
                 # Get full row count
                 total_rows = conn.execute("SELECT COUNT(*) FROM data").fetchone()[0]
@@ -1434,20 +1485,41 @@ class DataConnectivityService:
         # CRITICAL: Check if data is in memory first
         data = data_source.get('data', [])
         
-        # If no in-memory data, try to load from file_path if available
+        # If no in-memory data, try to load from PostgreSQL storage
         if not data or len(data) == 0:
-            file_path = data_source.get('file_path') or data_source.get('config', {}).get('file_path')
-            if file_path and os.path.exists(file_path):
-                logger.info(f"📊 Loading file data from path: {file_path}")
-                file_format = data_source.get('format', 'csv')
+            object_key = data_source.get('file_path')  # Now it's object_key
+            if object_key:
                 try:
-                    data = await self._read_file_data(file_path, file_format, limit=query.get('limit', 10000))
-                    logger.info(f"✅ Loaded {len(data)} rows from file path")
+                    from app.modules.data.services.postgres_storage_service import PostgresStorageService
+                    storage_service = PostgresStorageService()
+                    user_id = data_source.get('user_id')
+                    
+                    if not user_id:
+                        logger.warning("⚠️ user_id not found in data_source, cannot load from PostgreSQL storage")
+                    else:
+                        # Load file from PostgreSQL
+                        logger.info(f"📊 Loading file data from PostgreSQL storage: {object_key}")
+                        file_content = await storage_service.get_file(object_key, user_id)
+                        
+                        # Write to temp file for processing
+                        file_format = data_source.get('format', 'csv')
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_format}") as tmp:
+                            tmp.write(file_content)
+                            tmp_path = tmp.name
+                        
+                        try:
+                            # Process file
+                            data = await self._read_file_data(tmp_path, file_format, limit=query.get('limit', 10000))
+                            logger.info(f"✅ Loaded {len(data)} rows from PostgreSQL storage")
+                        finally:
+                            # Clean up temp file
+                            if os.path.exists(tmp_path):
+                                os.unlink(tmp_path)
                 except Exception as e:
-                    logger.error(f"❌ Failed to load file from path: {str(e)}")
+                    logger.error(f"❌ Failed to load from PostgreSQL storage: {str(e)}")
                     data = []
         
-        # If still no data, check for sample_data or preview_data
+        # Fallback to sample_data
         if not data or len(data) == 0:
             data = data_source.get('sample_data', []) or data_source.get('preview_data', [])
             if data:
@@ -1580,18 +1652,16 @@ class DataConnectivityService:
                         'updated_at': db_source.updated_at.isoformat() if db_source.updated_at else None,
                     }
                     
-                    # Add file_path if available directly from model
+                    # Add file_path if available directly from model (now stores object_key)
                     if hasattr(db_source, 'file_path') and db_source.file_path:
-                        data_source_dict['file_path'] = db_source.file_path
+                        data_source_dict['file_path'] = db_source.file_path  # This is now object_key
                     
                     # Parse config and schema if available
                     try:
                         if db_source.connection_config:
                             config = json.loads(db_source.connection_config) if isinstance(db_source.connection_config, str) else db_source.connection_config
                             data_source_dict['config'] = config
-                            # Extract file_path from config if available
-                            if isinstance(config, dict):
-                                data_source_dict['file_path'] = config.get('file_path') or config.get('file_location')
+                            data_source_dict['connection_config'] = config
                     except Exception as e:
                         logger.warning(f"⚠️ Failed to parse connection_config: {e}")
                     
@@ -1602,19 +1672,19 @@ class DataConnectivityService:
                     except Exception as e:
                         logger.warning(f"⚠️ Failed to parse schema: {e}")
                     
-                    # For file sources, try to load data if file_path is available
-                    if db_source.type == 'file' and data_source_dict.get('file_path'):
-                        file_path = data_source_dict['file_path']
-                        if os.path.exists(file_path):
-                            try:
-                                file_format = db_source.format or 'csv'
-                                # Load a sample to verify file is accessible
-                                sample_data = await self._read_file_data(file_path, file_format, limit=10)
-                                if sample_data:
-                                    data_source_dict['data'] = sample_data  # Store sample in memory
-                                    logger.info(f"✅ Loaded sample data from file path: {file_path}")
-                            except Exception as e:
-                                logger.warning(f"⚠️ Could not load sample data from {file_path}: {e}")
+                    # Load sample_data from database
+                    if db_source.sample_data:
+                        try:
+                            sample = json.loads(db_source.sample_data) if isinstance(db_source.sample_data, str) else db_source.sample_data
+                            data_source_dict['sample_data'] = sample
+                            data_source_dict['data'] = sample  # For compatibility
+                            logger.info(f"✅ Loaded sample_data from database")
+                        except Exception as e:
+                            logger.warning(f"⚠️ Failed to parse sample_data: {e}")
+                    
+                    # Add original_filename if available
+                    if hasattr(db_source, 'original_filename') and db_source.original_filename:
+                        data_source_dict['original_filename'] = db_source.original_filename
                     
                     # Cache in memory for future access
                     self.data_sources[data_source_id] = data_source_dict
@@ -1930,11 +2000,6 @@ class DataConnectivityService:
             }
 
     # Utility methods
-    def _ensure_upload_dir(self):
-        """Ensure upload directory exists"""
-        if not os.path.exists(self.upload_dir):
-            os.makedirs(self.upload_dir, exist_ok=True)
-
     def _get_file_extension(self, filename: str) -> str:
         """Get file extension"""
         return Path(filename).suffix.lower().lstrip('.')

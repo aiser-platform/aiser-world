@@ -884,11 +884,8 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
                 });
                 
                 try {
-                    response = await fetch('/api/data/upload', {
+                    response = await authenticatedFetch('/api/data/upload', {
                         method: 'POST',
-                        credentials: 'include',
-                        // DO NOT set Content-Type header - browser will set it automatically with boundary for FormData
-                        // This is critical - if we set Content-Type manually, the boundary won't be included
                         body: formData
                     });
                     

@@ -53,9 +53,7 @@ async function handleDataRequest(
     const queryString = searchParams.toString();
     const fullUrl = queryString ? `${backendUrl}?${queryString}` : backendUrl;
     
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
+    const headers: Record<string, string> = {};
     
     // Forward Authorization header if present
     const authHeader = request.headers.get('Authorization');
