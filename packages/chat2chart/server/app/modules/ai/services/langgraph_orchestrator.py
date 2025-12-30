@@ -307,26 +307,7 @@ class LangGraphMultiAgentOrchestrator:
                         )
                         existing_user = very_recent_msg.scalar_one_or_none()
                 
-                # ===== ATOMIC TRANSACTION: Save both messages together =====
-                if not existing_user:
-                    # Save user message only if it doesn't exist
-                    user_message = ChatMessage(
-                        conversation_id=conversation_uuid,
-                        query=user_query,
-                        answer=None,
-                        status="completed"
-                    )
-                    session.add(user_message)
-                    await session.flush()
-                    logger.debug(f"💾 Saved user message in _save_conversation_messages")
-                else:
-                    # Update existing user message status if it was "processing"
-                    if existing_user.status == "processing":
-                        existing_user.status = "completed"
-                        await session.flush()
-                        logger.debug(f"💾 Updated existing user message status to completed (ID: {existing_user.id}, prevented duplicate)")
-                
-                # Save AI response message
+                # Build AI response and metadata FIRST (before updating user message)
                 # Include full response with SQL, chart config, insights if available
                 ai_response_full = ai_response
                 if result.get("sql_query"):
@@ -353,6 +334,31 @@ class LangGraphMultiAgentOrchestrator:
                     ai_metadata["query_result_count"] = len(result.get("query_result", []))
                 if result.get("execution_metadata"):
                     ai_metadata["execution_metadata"] = result.get("execution_metadata")
+                
+                # ===== ATOMIC TRANSACTION: Save both messages together =====
+                if not existing_user:
+                    # Save user message only if it doesn't exist
+                    user_message = ChatMessage(
+                        conversation_id=conversation_uuid,
+                        query=user_query,
+                        answer=None,
+                        status="completed"
+                    )
+                    session.add(user_message)
+                    await session.flush()
+                    logger.debug(f"💾 Saved user message in _save_conversation_messages")
+                else:
+                    # Update existing user message with AI response
+                    if existing_user.status == "processing":
+                        existing_user.status = "completed"
+                        # CRITICAL: Set the answer and ai_metadata on the same message
+                        existing_user.answer = ai_response_full
+                        existing_user.ai_metadata = ai_metadata if ai_metadata else existing_user.ai_metadata
+                        await session.commit()
+                        logger.debug(f"💾 Updated existing user message with AI response (ID: {existing_user.id}, prevented duplicate)")
+                        return  # Exit early - we've saved everything to the same message
+                
+                # Save AI response message (only if we didn't update existing_user above)
                 
                 # CRITICAL: Enhanced duplicate detection and success validation
                 # Check for recent AI messages with same content (within last 30 seconds for streaming)
