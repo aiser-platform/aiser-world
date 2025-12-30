@@ -54,7 +54,9 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
       
       if (data.messages && Array.isArray(data.messages)) {
         // ai_metadata is now guaranteed to be in the response (or null)
-        const loadedMessages: IChatMessage[] = data.messages.map((msg: any) => {
+        const loadedMessages: IChatMessage[] = [];
+        
+        data.messages.forEach((msg: any) => {
           const aiMetadata = msg.ai_metadata || {};
           
           // Extract echarts config (handle primary_chart wrapper if present)
@@ -63,32 +65,75 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
             echartsConfig = echartsConfig.primary_chart;
           }
 
-          // Determine role from message structure
-          const role = msg.query ? 'user' : 'assistant';
+          // CRITICAL: If message has both query and answer, split into two messages
+          if (msg.query && msg.answer) {
+            // Create user message
+            loadedMessages.push({
+              id: `${msg.id}-user`,
+              query: msg.query,
+              answer: '',
+              content: msg.query,
+              message: msg.query,
+              created_at: new Date(msg.created_at || Date.now()),
+              updated_at: new Date(msg.created_at || Date.now()),
+              role: 'user',
+              timestamp: msg.created_at || new Date().toISOString(),
+              messageType: 'text',
+              saved: true
+            });
 
-          return {
-            id: msg.id || crypto.randomUUID(),
-            query: msg.query || '',
-            answer: msg.answer || '',
-            content: msg.answer || msg.query || '',
-            message: msg.answer || msg.query || '',
-            created_at: new Date(msg.created_at || Date.now()),
-            updated_at: new Date(msg.updated_at || Date.now()),
-            role: role,
-            timestamp: msg.created_at || new Date().toISOString(),
-            messageType: msg.query ? 'text' : 'ai_response',
-            saved: true,
-            executionMetadata: aiMetadata.execution_metadata || aiMetadata,
-            echartsConfig: echartsConfig,
-            chartConfig: echartsConfig,
-            insights: aiMetadata.insights || [],
-            recommendations: aiMetadata.recommendations || [],
-            sqlSuggestions: aiMetadata.sql_suggestions || [],
-            sqlQuery: aiMetadata.sql_query,
-            queryResult: aiMetadata.query_result,
-            analysis: msg.answer || '',
-            dataSourceId: aiMetadata.data_source_id
-          };
+            // Create assistant message
+            loadedMessages.push({
+              id: `${msg.id}-assistant`,
+              query: '',
+              answer: msg.answer,
+              content: msg.answer,
+              message: msg.answer,
+              created_at: new Date(msg.updated_at || msg.created_at || Date.now()),
+              updated_at: new Date(msg.updated_at || Date.now()),
+              role: 'assistant',
+              timestamp: msg.updated_at || msg.created_at || new Date().toISOString(),
+              messageType: 'ai_response',
+              saved: true,
+              executionMetadata: aiMetadata.execution_metadata || aiMetadata,
+              echartsConfig: echartsConfig,
+              chartConfig: echartsConfig,
+              insights: aiMetadata.insights || [],
+              recommendations: aiMetadata.recommendations || [],
+              sqlSuggestions: aiMetadata.sql_suggestions || [],
+              sqlQuery: aiMetadata.sql_query,
+              queryResult: aiMetadata.query_result,
+              analysis: msg.answer,
+              dataSourceId: aiMetadata.data_source_id
+            });
+          } else {
+            // Original logic for messages with only query or only answer
+            const role = msg.query ? 'user' : 'assistant';
+
+            loadedMessages.push({
+              id: msg.id || crypto.randomUUID(),
+              query: msg.query || '',
+              answer: msg.answer || '',
+              content: msg.answer || msg.query || '',
+              message: msg.answer || msg.query || '',
+              created_at: new Date(msg.created_at || Date.now()),
+              updated_at: new Date(msg.updated_at || Date.now()),
+              role: role,
+              timestamp: msg.created_at || new Date().toISOString(),
+              messageType: msg.query ? 'text' : 'ai_response',
+              saved: true,
+              executionMetadata: aiMetadata.execution_metadata || aiMetadata,
+              echartsConfig: echartsConfig,
+              chartConfig: echartsConfig,
+              insights: aiMetadata.insights || [],
+              recommendations: aiMetadata.recommendations || [],
+              sqlSuggestions: aiMetadata.sql_suggestions || [],
+              sqlQuery: aiMetadata.sql_query,
+              queryResult: aiMetadata.query_result,
+              analysis: msg.answer || '',
+              dataSourceId: aiMetadata.data_source_id
+            });
+          }
         });
 
         setMessages(prev => {
