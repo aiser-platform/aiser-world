@@ -549,6 +549,7 @@ class DataConnectivityService:
                         'size': source.size,
                         'row_count': source.row_count,
                         'schema': source.schema,
+                        'user_id': getattr(source, 'user_id', None),
                         'created_at': source.created_at.isoformat() if source.created_at else None,
                         'updated_at': source.updated_at.isoformat() if source.updated_at else None,
                         'is_active': source.is_active,

@@ -238,30 +238,77 @@ This query was optimized for the data source and executed successfully."""
                 # Extract JSON from response
                 import json as json_lib
                 unified_result = None
+                
+                def extract_json_from_text(text: str) -> Optional[Dict]:
+                    """Extract and parse JSON from text with proper brace balancing."""
+                    # First, try to find JSON in markdown code blocks
+                    json_block_pattern = r'```(?:json)?\s*(\{[\s\S]*?\})\s*```'
+                    match = re.search(json_block_pattern, text, re.DOTALL)
+                    if match:
+                        json_str = match.group(1)
+                    else:
+                        # Find the first opening brace
+                        first_brace = text.find('{')
+                        if first_brace == -1:
+                            return None
+                        
+                        # Balance braces to find the complete JSON object
+                        brace_count = 0
+                        start_pos = first_brace
+                        end_pos = first_brace
+                        
+                        for i, char in enumerate(text[first_brace:], start=first_brace):
+                            if char == '{':
+                                brace_count += 1
+                            elif char == '}':
+                                brace_count -= 1
+                                if brace_count == 0:
+                                    end_pos = i + 1
+                                    break
+                        
+                        if brace_count != 0:
+                            # Unbalanced braces - try to fix by finding the last closing brace
+                            last_brace = text.rfind('}')
+                            if last_brace > first_brace:
+                                json_str = text[first_brace:last_brace + 1]
+                            else:
+                                return None
+                        else:
+                            json_str = text[start_pos:end_pos]
+                    
+                    # Clean up common JSON issues
+                    # Remove trailing commas before closing braces/brackets
+                    json_str = re.sub(r',(\s*[}\]])', r'\1', json_str)
+                    # Remove comments (not standard JSON but sometimes LLMs add them)
+                    json_str = re.sub(r'//.*?$', '', json_str, flags=re.MULTILINE)
+                    json_str = re.sub(r'/\*.*?\*/', '', json_str, flags=re.DOTALL)
+                    
+                    try:
+                        return json_lib.loads(json_str)
+                    except json_lib.JSONDecodeError as e:
+                        logger.debug(f"JSON parse error after cleaning: {e}, JSON snippet: {json_str[:200]}")
+                        # Try one more time with more aggressive cleaning
+                        try:
+                            # Remove any non-printable characters except newlines and tabs
+                            json_str_clean = ''.join(char for char in json_str if char.isprintable() or char in '\n\t')
+                            return json_lib.loads(json_str_clean)
+                        except json_lib.JSONDecodeError:
+                            return None
+                
                 try:
-                    # Try parsing as direct JSON
+                    # Try parsing as direct JSON first
                     unified_result = json_lib.loads(content)
                 except json_lib.JSONDecodeError as e:
                     logger.warning(f"⚠️ Direct JSON parse failed: {e}, trying extraction methods")
-                    # Try extracting JSON from markdown code blocks
-                    json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', content, re.DOTALL)
-                    if json_match:
-                        try:
-                            unified_result = json_lib.loads(json_match.group(1))
-                        except json_lib.JSONDecodeError:
-                            pass
-                    
-                    if not unified_result:
-                        # Try finding JSON object in text
-                        json_match = re.search(r'\{[\s\S]*\}', content, re.DOTALL)
-                        if json_match:
-                            try:
-                                unified_result = json_lib.loads(json_match.group(0))
-                            except json_lib.JSONDecodeError:
-                                pass
+                    # Use robust extraction
+                    unified_result = extract_json_from_text(content)
                     
                     if not unified_result:
                         logger.error(f"❌ No valid JSON found in LLM response. Content length: {len(content)}, first 200 chars: {content[:200]}")
+                        # Log more context for debugging
+                        if len(content) > 500:
+                            error_pos = 214  # Common error position from logs
+                            logger.error(f"Content around error position (char {error_pos}): {content[max(0, error_pos-50):min(len(content), error_pos+50)]}")
                         raise ValueError("No valid JSON found in LLM response")
                 
                 # CRITICAL: Validate and fix structure IMMEDIATELY after parsing (fix at source)

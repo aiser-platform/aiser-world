@@ -223,8 +223,17 @@ async def deep_file_analysis_node(state: AiserWorkflowState) -> AiserWorkflowSta
         state["query_result"] = combined_data
         
         from app.modules.ai.nodes.unified_node import unified_chart_insights_node
-        # unified_node gets litellm_service from LangGraph execution context
-        state = await unified_chart_insights_node(state)
+        from app.modules.ai.services.litellm_service import LiteLLMService
+        
+        # Instantiate litellm_service (required argument for unified_chart_insights_node)
+        litellm_service = LiteLLMService()
+        
+        # Pass required arguments
+        state = await unified_chart_insights_node(
+            state,
+            litellm_service=litellm_service,
+            session_factory=None  # Optional, can be None
+        )
         
         logger.info(f"✅ Unified node complete:")
         logger.info(f"   - Insights: {len(state.get('insights', []))}")
@@ -279,24 +288,71 @@ async def _run_data_profiling(data_source: Dict[str, Any]) -> Dict[str, Any]:
                 if not file_path:
                     raise Exception("No file_path available for data profiling")
                 
-                if file_format == "csv":
-                    safe_path = file_path.replace("'", "''") if file_path else ""
-                    conn.execute(f"CREATE TABLE IF NOT EXISTS data AS SELECT * FROM read_csv_auto('{safe_path}')")
-                elif file_format == "parquet":
-                    safe_path = file_path.replace("'", "''") if file_path else ""
-                    conn.execute(f"CREATE TABLE IF NOT EXISTS data AS SELECT * FROM read_parquet('{safe_path}')")
-                elif file_format in ("xlsx", "xls"):
-                    # Use pandas to read Excel and register with DuckDB
+                # Check if file_path is an object_key (starts with "user_files/")
+                # If so, load from PostgreSQL storage
+                tmp_path = None
+                if file_path.startswith("user_files/"):
+                    # Load from PostgreSQL storage
+                    from app.modules.data.services.postgres_storage_service import PostgresStorageService
+                    storage_service = PostgresStorageService()
+                    user_id = data_source.get('user_id')
+                    
+                    if not user_id:
+                        raise Exception("user_id required to load file from PostgreSQL storage")
+                    
+                    # Load file from PostgreSQL storage
+                    file_content = await storage_service.get_file(file_path, user_id)
+                    
+                    # Write to temp file for DuckDB
+                    import tempfile
+                    import os
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_format}") as tmp:
+                        tmp.write(file_content)
+                        tmp_path = tmp.name
+                    
                     try:
-                        df = pd.read_excel(file_path, engine='openpyxl', sheet_name=0)  # Read first sheet
-                        conn.register("_excel_df", df)
-                        conn.execute("CREATE TABLE IF NOT EXISTS data AS SELECT * FROM _excel_df")
-                        logger.info(f"✅ Loaded Excel file into DuckDB: {len(df)} rows, {len(df.columns)} columns")
-                    except Exception as excel_error:
-                        logger.error(f"❌ Failed to load Excel file: {excel_error}")
-                        raise Exception(f"Excel file processing failed: {str(excel_error)}")
+                        if file_format == "csv":
+                            safe_path = tmp_path.replace("'", "''")
+                            conn.execute(f"CREATE TABLE IF NOT EXISTS data AS SELECT * FROM read_csv_auto('{safe_path}')")
+                        elif file_format == "parquet":
+                            safe_path = tmp_path.replace("'", "''")
+                            conn.execute(f"CREATE TABLE IF NOT EXISTS data AS SELECT * FROM read_parquet('{safe_path}')")
+                        elif file_format in ("xlsx", "xls"):
+                            # Use pandas to read Excel and register with DuckDB
+                            df = pd.read_excel(tmp_path, engine='openpyxl', sheet_name=0)  # Read first sheet
+                            conn.register("_excel_df", df)
+                            conn.execute("CREATE TABLE IF NOT EXISTS data AS SELECT * FROM _excel_df")
+                            logger.info(f"✅ Loaded Excel file into DuckDB: {len(df)} rows, {len(df.columns)} columns")
+                        else:
+                            raise Exception(f"Unsupported file format: {file_format}")
+                    finally:
+                        # Clean up temp file
+                        if tmp_path and os.path.exists(tmp_path):
+                            try:
+                                os.unlink(tmp_path)
+                            except Exception as e:
+                                logger.warning(f"Failed to clean up temp file: {e}")
                 else:
-                    raise Exception(f"Unsupported file format: {file_format}")
+                    # Legacy: file_path is an actual file path (shouldn't happen in production)
+                    if file_format == "csv":
+                        safe_path = file_path.replace("'", "''") if file_path else ""
+                        conn.execute(f"CREATE TABLE IF NOT EXISTS data AS SELECT * FROM read_csv_auto('{safe_path}')")
+                    elif file_format == "parquet":
+                        safe_path = file_path.replace("'", "''") if file_path else ""
+                        conn.execute(f"CREATE TABLE IF NOT EXISTS data AS SELECT * FROM read_parquet('{safe_path}')")
+                    elif file_format in ("xlsx", "xls"):
+                        # Use pandas to read Excel and register with DuckDB
+                        try:
+                            df = pd.read_excel(file_path, engine='openpyxl', sheet_name=0)  # Read first sheet
+                            conn.register("_excel_df", df)
+                            conn.execute("CREATE TABLE IF NOT EXISTS data AS SELECT * FROM _excel_df")
+                            logger.info(f"✅ Loaded Excel file into DuckDB: {len(df)} rows, {len(df.columns)} columns")
+                        except Exception as excel_error:
+                            logger.error(f"❌ Failed to load Excel file: {excel_error}")
+                            raise Exception(f"Excel file processing failed: {str(excel_error)}")
+                    else:
+                        raise Exception(f"Unsupported file format: {file_format}")
+                
                 table_name = "data"
             else:
                 # Use first sheet table

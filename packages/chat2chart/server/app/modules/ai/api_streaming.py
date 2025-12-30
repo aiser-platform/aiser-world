@@ -31,6 +31,7 @@ class ChatRequestSchema(BaseModel):
     data_source_id: Optional[str] = None
     organization_id: Optional[str] = None
     model: Optional[str] = None  # AI model to use (from frontend selection)
+    analysis_mode: Optional[str] = "standard"  # Analysis mode: "standard" (default) or "deep"
 
 logger = logging.getLogger(__name__)
 
@@ -85,26 +86,23 @@ async def analyze_query_streaming(
                     async_session_factory=async_session_factory
                 )
                 
-                # Determine analysis mode - check if file source
-                analysis_mode = "standard"
+                # Respect analysis_mode from request, default to "standard"
+                analysis_mode = request.analysis_mode or "standard"
+                
+                # Log data source type for debugging (but don't force routing based on it)
                 if request.data_source_id and data_service:
                     try:
-                        # Check if it's a file source
                         if hasattr(data_service, 'data_sources') and request.data_source_id in data_service.data_sources:
                             source_info = data_service.data_sources[request.data_source_id]
                             source_type = source_info.get('type', '').lower() if isinstance(source_info, dict) else str(getattr(source_info, 'type', '')).lower()
-                            if source_type == 'file':
-                                analysis_mode = "deep"  # Always use deep analysis for file sources
-                                logger.info(f"📊 File data source detected for streaming - using deep file analysis mode")
+                            logger.info(f"📊 Data source type: {source_type}, analysis_mode: {analysis_mode}")
                         else:
                             source_info = await data_service.get_data_source_by_id(request.data_source_id)
                             if source_info:
                                 source_type = source_info.get('type', '').lower() if isinstance(source_info, dict) else str(getattr(source_info, 'type', '')).lower()
-                                if source_type == 'file':
-                                    analysis_mode = "deep"
-                                    logger.info(f"📊 File data source detected for streaming - using deep analysis mode")
+                                logger.info(f"📊 Data source type: {source_type}, analysis_mode: {analysis_mode}")
                     except Exception as e:
-                        logger.warning(f"Could not check data source type for streaming: {e}")
+                        logger.debug(f"Could not check data source type for streaming: {e}")
                 
                 # Stream state updates
                 async for state_update in orchestrator.execute_streaming(

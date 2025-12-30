@@ -758,50 +758,28 @@ class LangGraphMultiAgentOrchestrator:
         if state.get("error"):
             return "error"
         
-        # CRITICAL: Check if data source is a file - route to file analysis
         data_source_id = state.get("data_source_id")
+        
+        # Check analysis_mode - only route to deep_file_analysis if explicitly "deep"
+        execution_metadata = state.get("execution_metadata", {})
+        analysis_mode = execution_metadata.get("analysis_mode") or state.get("analysis_mode", "standard")
+        
+        if analysis_mode == "deep":
+            # Only route to deep analysis if explicitly requested
+            logger.info(f"📊 Deep analysis mode detected - routing to deep file analysis")
+            state["current_stage"] = "routed_to_deep_file_analysis"
+            return "deep_file_analysis"
+        
+        # For file sources with standard mode, continue to normal SQL path
+        # Log data source type for debugging but don't use it for routing
         if data_source_id:
-            # Check if it's a file data source
-            is_file_source = False
             try:
-                # Check in-memory registry first
                 if self.data_service and hasattr(self.data_service, 'data_sources') and data_source_id in self.data_service.data_sources:
                     source_info = self.data_service.data_sources[data_source_id]
                     source_type = source_info.get('type', '').lower() if isinstance(source_info, dict) else str(getattr(source_info, 'type', '')).lower()
-                    if source_type == 'file':
-                        is_file_source = True
-                        logger.info(f"📊 File data source detected in registry - routing to file analysis")
-                else:
-                    # Try to check via data service method (async, but we're in sync context)
-                    # We'll check this in the route_query_node instead
-                    pass
+                    logger.debug(f"📊 Data source type: {source_type}, analysis_mode: {analysis_mode}")
             except Exception as e:
-                logger.warning(f"Could not check data source type: {e}")
-            
-            # Also check analysis_mode from execution_metadata
-            execution_metadata = state.get("execution_metadata", {})
-            analysis_mode = execution_metadata.get("analysis_mode") or state.get("analysis_mode", "standard")
-            if analysis_mode == "deep":
-                is_file_source = True
-                logger.info(f"📊 Deep analysis mode detected - routing to deep file analysis")
-                state["current_stage"] = "routed_to_deep_file_analysis"
-                return "deep_file_analysis"
-            
-            # Also check data source ID pattern
-            if not is_file_source and 'file_' in str(data_source_id).lower():
-                is_file_source = True
-                logger.info(f"📊 File pattern detected in data source ID - routing to deep file analysis")
-            
-            # CRITICAL: Route ALL file sources to deep_file_analysis (not deprecated file_analysis)
-            if is_file_source:
-                # Default to deep analysis for all file sources
-                if analysis_mode != "deep":
-                    analysis_mode = "deep"
-                    execution_metadata["analysis_mode"] = "deep"
-                    state["execution_metadata"] = execution_metadata
-                    logger.info(f"📊 File source detected - defaulting to deep analysis mode")
-                state["current_stage"] = "routed_to_deep_file_analysis"
-                return "deep_file_analysis"
+                logger.debug(f"Could not check data source type: {e}")
         
         # CRITICAL: If no data_source_id, use conversational mode (no SQL generation)
         if not data_source_id:

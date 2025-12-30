@@ -645,6 +645,7 @@ class DuckDBEngine(BaseQueryEngine):
         if inline_data and isinstance(inline_data, (list, tuple)) and len(inline_data) > 0:
             try:
                 # Convert inline rows to a pandas DataFrame and create DuckDB table
+                import pandas as pd
                 df = pd.DataFrame(inline_data)
                 conn.register("_aiser_inline_df", df)
                 conn.execute("CREATE TABLE data AS SELECT * FROM _aiser_inline_df")
@@ -684,7 +685,6 @@ class DuckDBEngine(BaseQueryEngine):
                                 conn.execute(f"CREATE TABLE data AS SELECT * FROM read_json_auto('{safe_path}')")
                             elif file_format in ("xlsx", "xls"):
                                 # For Excel files, use pandas to read and then register in DuckDB
-                                import pandas as pd
                                 df = pd.read_excel(tmp_path, engine='openpyxl', sheet_name=0)
                                 df = df.replace({pd.NA: None, pd.NaT: None})
                                 conn.register("_excel_df", df)

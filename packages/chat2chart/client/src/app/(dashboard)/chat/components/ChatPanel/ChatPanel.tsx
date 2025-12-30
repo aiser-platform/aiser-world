@@ -1085,11 +1085,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                             return;
                         }
                         
-                        // Set mode to deep for file analysis
-                        setCurrentMode('deep');
-                        props.onModeChange?.('deep');
-                        
-                        // Send the analysis query
+                        // Send the analysis query (using current mode, default to 'standard')
                         setTimeout(() => {
                             handleSendMessage(currentPrompt);
                         }, 500);
@@ -1351,26 +1347,9 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
             return;
         }
 
-        // CRITICAL: Set mode to deep if file was just uploaded (file sources always use deep analysis)
-        // Also set to deep if prompt contains analysis keywords
-        const isAnalysisQuery = textToSend.toLowerCase().includes('comprehensive analysis') || 
-                                textToSend.toLowerCase().includes('deep analysis') ||
-                                textToSend.toLowerCase().includes('data quality assessment') ||
-                                textToSend.toLowerCase().includes('key statistics');
-        
-        // CRITICAL: File data sources ALWAYS use deep analysis workflow
-        const shouldUseDeepMode = uploadedDataSourceId || 
-                                  (props.selectedDataSource?.type === 'file') ||
-                                  selectedFile || 
-                                  isAnalysisQuery;
-        
-        const effectiveMode = shouldUseDeepMode ? 'deep' : currentMode;
-        
-        if (shouldUseDeepMode && currentMode !== 'deep') {
-            setCurrentMode('deep');
-            props.onModeChange?.('deep');
-            console.log('📊 File data source detected - using deep analysis mode');
-        }
+        // Use current mode or default to 'standard' - no forced deep mode for files
+        // Users can explicitly choose deep mode if they want comprehensive analysis
+        const effectiveMode = currentMode || 'standard';
 
         setIsLoading(true);
         setPrompt('');
@@ -1520,7 +1499,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
             //         textToSend,
             //         uploadedDataSourceId || props.selectedDataSource?.id,
             //         conversationId || props.conversationId,
-            //         effectiveMode, // Use effective mode (deep for files)
+            //         effectiveMode || 'standard', // Use current mode, default to 'standard'
             //         currentModel
             //     );
             //     // CRITICAL: Return here to prevent fall-through to non-streaming
@@ -1538,7 +1517,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                     data_source_id: uploadedDataSourceId || props.selectedDataSource?.id,
                     business_context: 'data_analysis',
                     conversation_id: conversationId || props.conversationId,
-                    analysis_mode: effectiveMode, // Use effective mode (deep for files)
+                    analysis_mode: effectiveMode || 'standard', // Use current mode, default to 'standard'
                     ai_model: currentModel === 'auto' ? 'azure_gpt5_mini' : currentModel,
                     stream: false,
                     // organization_id removed - simplified to user-scoped access only
