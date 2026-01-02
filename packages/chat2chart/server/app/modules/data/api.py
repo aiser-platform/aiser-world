@@ -1313,9 +1313,12 @@ async def connect_enterprise_warehouse_legacy(request: Dict[str, Any], current_t
         logger.info("🔍 EXTRACTED connection_config:")
         logger.info(f"  - connection_config type: {type(connection_config)}")
         logger.info(f"  - connection_config == request: {connection_config == request}")
-        logger.info(f"  - connection_config keys: {list(connection_config.keys()) if isinstance(connection_config, dict) else 'not dict'}")
-        logger.info(f"  - connection_config.get('host'): {connection_config.get('host') if isinstance(connection_config, dict) else 'N/A'}")
-        logger.info(f"  - Full connection_config dump: {json.dumps(connection_config, default=str, indent=2)}")
+        if isinstance(connection_config, dict):
+            safe_keys = list(connection_config.keys())
+            logger.info(f"  - connection_config keys: {safe_keys}")
+            logger.info(f"  - connection_config.get('host'): {connection_config.get('host')}")
+        else:
+            logger.info("  - connection_config is not a dict; skipping detailed logging")
         
         # Handle URI parsing if connection_config is the same as request
         if connection_config == request:

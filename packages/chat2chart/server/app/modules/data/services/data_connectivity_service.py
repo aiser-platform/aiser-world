@@ -133,7 +133,8 @@ class DataConnectivityService:
             raise ValueError("user_id is required for database connections")
         
         try:
-            logger.info(f"💾 Storing database connection: {connection_request.get('type')} for user {user_id}")
+            db_type = str(connection_request.get('type', '')).lower()
+            logger.info(f"💾 Storing database connection of type '{db_type}' for user {user_id}")
 
             # ALWAYS validate the connection first with PLAIN credentials.
             # This prevents persisting phantom data sources when credentials or networking are invalid,
