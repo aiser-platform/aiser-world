@@ -304,11 +304,11 @@ This query was optimized for the data source and executed successfully."""
                     unified_result = extract_json_from_text(content)
                     
                     if not unified_result:
-                        logger.error(f"❌ No valid JSON found in LLM response. Content length: {len(content)}, first 200 chars: {content[:200]}")
-                        # Log more context for debugging
+                        logger.error(f"❌ No valid JSON found in LLM response. Content length: {len(content)} (content omitted for security)")
+                        # Log limited numeric context for debugging without including raw model output
                         if len(content) > 500:
                             error_pos = 214  # Common error position from logs
-                            logger.error(f"Content around error position (char {error_pos}): {content[max(0, error_pos-50):min(len(content), error_pos+50)]}")
+                            logger.error(f"JSON parsing failed near position {error_pos} out of {len(content)} characters (content omitted for security)")
                         raise ValueError("No valid JSON found in LLM response")
                 
                 # CRITICAL: Validate and fix structure IMMEDIATELY after parsing (fix at source)
