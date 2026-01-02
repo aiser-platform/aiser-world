@@ -286,7 +286,7 @@ This query was optimized for the data source and executed successfully."""
                     try:
                         return json_lib.loads(json_str)
                     except json_lib.JSONDecodeError as e:
-                        logger.debug(f"JSON parse error after cleaning: {e}, JSON snippet: {json_str[:200]}")
+                        logger.debug("JSON parse error after cleaning")
                         # Try one more time with more aggressive cleaning
                         try:
                             # Remove any non-printable characters except newlines and tabs
