@@ -14,125 +14,32 @@ from fastapi import APIRouter, UploadFile, File, HTTPException, Form, Depends, s
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.authentication.deps.auth_bearer import JWTCookieBearer
-from app.modules.authentication.auth import Auth
+# Auth class removed - using extract_user_payload helper instead
+# from app.modules.authentication.auth import Auth
 from app.db.session import get_async_session
-from app.modules.authentication.rbac.decorators import require_permission
-from app.modules.authentication.rbac.permissions import Permission
-from .services.rbac_service import rbac_service, DataSourceRBACService
+# DataSourceRBACService removed - organization/RBAC context removed
+# from .services.rbac_service import DataSourceRBACService
 from .services.data_connectivity_service import DataConnectivityService
 from .services.intelligent_data_modeling_service import IntelligentDataModelingService
-from .services.cube_integration_service import CubeIntegrationService
-from .services.cube_data_modeling_service import CubeDataModelingService
-from .services.cube_connector_service import CubeConnectorService
-from .services.real_cube_integration_service import RealCubeIntegrationService
+from .services.database_connector_service import DatabaseConnectorService
 from .services.data_retention_service import DataRetentionService
 from app.modules.data.services.multi_engine_query_service import MultiEngineQueryService, QueryEngine
 from app.modules.data.services.enterprise_connectors_service import EnterpriseConnectorsService, ConnectionConfig, ConnectorType
-from app.modules.data.services.yaml_schema_service import YAMLSchemaService
 from app.modules.data.services.delta_iceberg_connector import DeltaIcebergConnector
 import sqlalchemy as sa
 from app.modules.authentication.deps.auth_bearer import current_user_payload
 from app.modules.data.schemas import DataSourceUpdate
 from app.modules.data.services.data_sources_crud import DataSourcesCRUD
 from app.modules.projects.services import ProjectService
-from app.modules.organization.services import OrganizationService
-from app.modules.pricing.feature_gate import require_feature, check_feature_for_org
+# OrganizationService removed - organization context removed
+from app.modules.pricing.feature_gate import check_feature_for_org
 from app.modules.pricing.rate_limiter import RateLimiter
 
 # logger should be available for functions defined below
 logger = logging.getLogger(__name__)
 
 
-async def verify_project_access(request: Request, organization_id: str, project_id: str) -> bool:
-    """Dependency: verify caller has access to organization/project (owner/admin/member).
-
-    Reads Authorization header (Bearer token) and checks RBAC helpers.
-    """
-    # Accept token from Authorization header or cookie (c2c_access_token) for browser flows
-    auth_header = request.headers.get("authorization") or request.headers.get("Authorization")
-    token = None
-    if auth_header:
-        token = auth_header.split(" ", 1)[1] if auth_header.lower().startswith("bearer ") else auth_header
-    else:
-        # Fall back to cookie-based token used by frontend (HttpOnly cookie)
-        try:
-            token = request.cookies.get('c2c_access_token') or request.cookies.get('access_token')
-        except Exception:
-            token = None
-    if not token:
-        raise HTTPException(status_code=401, detail="Missing authorization token")
-
-    # Perform RBAC checks using synchronous DB calls to avoid asyncpg concurrent-operation
-    try:
-        # Decode unverified claims to extract a user identifier (id/email)
-        uid = None
-        email = None
-        try:
-            from jose import jwt as _jose_jwt
-            if isinstance(token, str) and "." in token:
-                claims = _jose_jwt.get_unverified_claims(token) or {}
-                uid = claims.get('id') or claims.get('user_id') or claims.get('sub')
-                email = claims.get('email')
-        except Exception:
-            pass
-
-        # Resolve uid via sync DB if we only have email or legacy id
-        try:
-            from app.db.session import get_sync_engine
-            eng = get_sync_engine()
-            with eng.connect() as conn:
-                # If uid looks numeric, try legacy_id lookup
-                resolved_uid = None
-                if uid and str(uid).isdigit():
-                    q = sa.text("SELECT id::text AS id_text FROM users WHERE legacy_id = :legacy LIMIT 1")
-                    r = conn.execute(q, {"legacy": int(uid)})
-                    row = r.fetchone()
-                    if row:
-                        resolved_uid = row[0]
-
-                if not resolved_uid and email:
-                    q = sa.text("SELECT id::text AS id_text FROM users WHERE email = :email LIMIT 1")
-                    r = conn.execute(q, {"email": email})
-                    row = r.fetchone()
-                    if row:
-                        resolved_uid = row[0]
-
-                if not resolved_uid and uid:
-                    # assume uid is already a UUID text
-                    resolved_uid = str(uid)
-
-                if not resolved_uid:
-                    raise HTTPException(status_code=401, detail="Unauthorized: user not found")
-
-                # Check project ownership
-                qproj = sa.text("SELECT created_by::text AS created_by FROM projects WHERE id = :pid LIMIT 1")
-                rp = conn.execute(qproj, {"pid": int(project_id)})
-                prow = rp.fetchone()
-                if prow and prow[0] and str(prow[0]) == resolved_uid:
-                    return True
-
-                # Check org role
-                qrole = sa.text("SELECT role FROM user_organizations WHERE organization_id = :oid AND user_id::text = :uid LIMIT 1")
-                rr = conn.execute(qrole, {"oid": int(organization_id), "uid": resolved_uid})
-                rrow = rr.fetchone()
-                if rrow:
-                    role = rrow[0]
-                    if role in ("owner", "admin", "member"):
-                        return True
-
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.exception(f"RBAC check failed (sync fallback): {e}")
-            raise HTTPException(status_code=500, detail="RBAC verification failed")
-
-        raise HTTPException(status_code=403, detail="Forbidden: insufficient permissions")
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger = logging.getLogger(__name__)
-        logger.exception(f"RBAC top-level failure: {e}")
-        raise HTTPException(status_code=500, detail="RBAC verification failed")
+# verify_project_access function removed - organization/RBAC context removed
 
 logger = logging.getLogger(__name__)
 
@@ -141,58 +48,24 @@ router = APIRouter()
 # Service Instantiations
 data_service = DataConnectivityService()
 data_crud_service = DataSourcesCRUD()
-rbac_service = DataSourceRBACService()
 project_service = ProjectService()
-organization_service = OrganizationService()
-cube_modeling_service = CubeDataModelingService()
+# organization_service removed - organization context removed
+database_connector = DatabaseConnectorService()
 intelligent_data_modeling_service = IntelligentDataModelingService()
-cube_integration_service = CubeIntegrationService()
-cube_connector_service = CubeConnectorService()
-real_cube_integration_service = RealCubeIntegrationService()
 multi_engine_service = MultiEngineQueryService()
 enterprise_connectors_service = EnterpriseConnectorsService()
-yaml_schema_service = YAMLSchemaService()
 delta_iceberg_connector = DeltaIcebergConnector()
 
 
 async def enforce_data_source_limit(user_id: str) -> int:
-    """Ensure the authenticated user's organization has capacity for another data source."""
+    """No-op in simplified mode: data source creation is only user-scoped, no org limits."""
     if not user_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Authentication required",
         )
-
-    from app.db.session import async_session
-    async with async_session() as db:
-        result = await db.execute(
-            sa.text(
-                """
-                SELECT organization_id
-                FROM user_organizations
-                WHERE user_id::text = :user_id
-                ORDER BY created_at ASC
-                LIMIT 1
-                """
-            ),
-            {"user_id": str(user_id)},
-        )
-        row = result.fetchone()
-        if not row or row.organization_id is None:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You need to join an organization before adding data sources.",
-            )
-
-        organization_id = row.organization_id
-        rate_limiter = RateLimiter(db)
-        allowed, message, _ = await rate_limiter.check_data_source_limit(organization_id)
-        if not allowed:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=message,
-            )
-        return organization_id
+    # Return dummy organization id for backward compatibility where required
+    return 0
 
 
 @router.post("/retention/cleanup")
@@ -367,7 +240,7 @@ async def connect_database(request: DatabaseConnectionRequest, current_token: Un
                 user_payload = current_token
             else:
                 # If it's a string token, decode it
-                user_payload = Auth().decodeJWT(current_token) or {}
+                user_payload = extract_user_payload(current_token)
             
             # Extract user_id from various possible fields
             user_id = str(user_payload.get('id') or user_payload.get('user_id') or user_payload.get('sub') or '')
@@ -383,8 +256,8 @@ async def connect_database(request: DatabaseConnectionRequest, current_token: Un
             logger.warning('connect_database attempted without authenticated user')
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Authentication required')
         
-        # Enforce data source limit and resolve organization ownership
-        organization_id = await enforce_data_source_limit(user_id)
+        # Enforce data source limit (no-op in simplified mode)
+        await enforce_data_source_limit(user_id)
 
         logger.info(f"🔌 Connecting to database: {request.type} for user {user_id}")
         
@@ -408,20 +281,11 @@ async def connect_database(request: DatabaseConnectionRequest, current_token: Un
         if not test_result['success']:
             raise HTTPException(status_code=400, detail=f"Connection failed: {test_result.get('error')}")
         
-        # Store the connection (ensure credentials are encrypted before persist)
-        try:
-            from app.modules.data.utils.credentials import encrypt_credentials
-            connection_config_safe = encrypt_credentials(connection_config)
-        except Exception:
-            connection_config_safe = connection_config
-
-        # Attach organization/tenant information so it is persisted with the data source
-        # NOTE: DataConnectivityService.store_database_connection expects to find organization_id/tenant_id
-        #       in the connection config and will map it to data_sources.tenant_id.
-        connection_config_safe["organization_id"] = str(organization_id)
+        # In simplified mode, do not attach organization/tenant information – user_id is sufficient ownership
 
         # Store the connection via service with user ownership
-        connection_result = await data_service.store_database_connection(connection_config_safe, user_id=user_id)
+        # NOTE: Pass plain credentials - store_database_connection will validate and encrypt them
+        connection_result = await data_service.store_database_connection(connection_config, user_id=user_id)
         if not connection_result or not connection_result.get('success'):
             err = (connection_result or {}).get('error') if isinstance(connection_result, dict) else 'Unknown error'
             raise HTTPException(status_code=500, detail=f"Failed to store connection: {err}")
@@ -463,19 +327,21 @@ async def get_data_sources(
 ):
     """Get user's data sources with authentication"""
     try:
-        # Extract user ID from JWT token
-        try:
-            user_payload = current_token if isinstance(current_token, dict) else Auth().decodeJWT(current_token) or {}
-            user_id = str(user_payload.get('id') or user_payload.get('sub') or '')
-        except Exception:
-            user_id = ''
-
+        # Extract user ID from JWT token (JWTCookieBearer returns dict payload)
+        user_id = None
+        if isinstance(current_token, dict):
+            user_id = str(current_token.get('id') or current_token.get('user_id') or current_token.get('sub') or '')
         if not user_id:
             logger.warning('get_data_sources attempted without authenticated user')
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Authentication required')
 
-        # Get user's data sources using RBAC service
-        accessible_sources = await rbac_service.get_accessible_data_sources(user_id)
+        # Get user's data sources directly via CRUD service (user-scoped only)
+        from app.db.session import async_session
+        async with async_session() as db:
+            accessible_sources = await data_crud_service.list_data_sources(
+                user_id=user_id,
+                session=db
+            )
 
         return {
             "success": True,
@@ -488,394 +354,6 @@ async def get_data_sources(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# 🏗️ PROJECT-SCOPED DATA SOURCE ENDPOINTS
-
-@router.get("/api/organizations/{organization_id}/projects/{project_id}/data-sources")
-async def get_project_data_sources(
-    organization_id: str,
-    project_id: str,
-    offset: int = 0,
-    limit: int = 100,
-    current_token: Union[str, dict] = Depends(JWTCookieBearer())
-):
-    """Get data sources for a specific project (project-scoped) - REQUIRES AUTHENTICATION"""
-    try:
-        # Extract user ID from JWT token - CRITICAL for security
-        try:
-            user_payload = current_token if isinstance(current_token, dict) else Auth().decodeJWT(current_token) or {}
-            user_id = str(user_payload.get('id') or user_payload.get('user_id') or user_payload.get('sub') or '')
-        except Exception:
-            user_id = ''
-
-        if not user_id:
-            logger.warning('get_project_data_sources attempted without authenticated user')
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Authentication required')
-
-        # CRITICAL: Verify user has access to this project/organization
-        # Use RBAC service to get accessible data sources (filters by user_id)
-        accessible_sources = await rbac_service.get_accessible_data_sources(
-            user_id=user_id,
-            organization_id=int(organization_id) if organization_id.isdigit() else None,
-            project_id=int(project_id) if project_id.isdigit() else None
-        )
-        
-        # Filter to only sources in this specific project
-        project_sources = []
-        for source in accessible_sources:
-            # Check if source belongs to this project (via project_data_sources table or metadata)
-            source_project_id = source.get('project_id') or source.get('metadata', {}).get('project_id')
-            if source_project_id and str(source_project_id) == str(project_id):
-                project_sources.append(source)
-            # Also include sources that are directly owned by user and in this project context
-            elif source.get('user_id') == user_id:
-                # Additional check: verify via project_data_sources table
-                # For now, include if user owns it (will be filtered by RBAC service)
-                project_sources.append(source)
-        
-        logger.info(f"📊 Returning {len(project_sources)} data sources for project {project_id} (user: {user_id})")
-        
-        return {
-            "success": True,
-            "data_sources": project_sources,
-            "organization_id": organization_id,
-            "project_id": project_id,
-            "count": len(project_sources)
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"❌ Failed to get project data sources: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/api/organizations/{organization_id}/projects/{project_id}/data-sources")
-async def create_project_data_source(
-    organization_id: str,
-    project_id: str,
-    request: DataSourceCreateRequest,
-    request_obj: Request
-):
-    """Create a new data source for a specific project"""
-    try:
-        logger.info(f"📊 Creating data source for project {project_id} in organization {organization_id}")
-        
-        # RBAC: ensure caller has access to create data source for this project
-        # (owner/admin/member allowed). Use the incoming Request for auth header.
-        try:
-            await verify_project_access(request_obj, organization_id, project_id)
-        except HTTPException as he:
-            # In CI/dev/test environments we allow unauthenticated project-scoped
-            # data source creation to simplify E2E tests. Control via env var.
-            allow_unsafe = os.environ.get('ALLOW_UNAUTH_PROJECT_CREATE', 'true').lower() in ('1', 'true', 'yes')
-            if allow_unsafe and he.status_code in (401, 403):
-                logger.warning(f"RBAC bypass for project data source create due to testing mode: {he.detail}")
-            else:
-                raise
-
-        result = await data_service.create_project_data_source(
-            organization_id=organization_id,
-            project_id=project_id,
-            data_source_data=request.model_dump()
-        )
-
-        # Normalize response for clients/tests: include top-level data_source_id and id
-        if isinstance(result, dict) and result.get('success'):
-            ds = result.get('data_source') or {}
-            ds_id = ds.get('id') or ds.get('data_source_id')
-            # If the service didn't return an id, attempt best-effort lookup in the in-memory registry
-            if not ds_id:
-                try:
-                    # data_service is the module-level service instance
-                    for k, v in data_service.data_sources.items():
-                        if v.get('name') == request.name and str(v.get('project_id')) == str(project_id):
-                            ds_id = v.get('id') or k
-                            break
-                except Exception:
-                    ds_id = None
-
-            # Final fallback: query DB for a matching data_source linked to this project
-            if not ds_id:
-                try:
-                    from app.db.session import get_sync_engine
-                    import sqlalchemy as sa
-                    eng = get_sync_engine()
-                    with eng.connect() as conn:
-                        q = sa.text(
-                            "SELECT ds.id FROM data_sources ds JOIN project_data_source pds ON pds.data_source_id = ds.id "
-                            "WHERE ds.name = :name AND pds.project_id = :pid LIMIT 1"
-                        )
-                        r = conn.execute(q, {"name": request.name, "pid": int(project_id)})
-                        row = r.fetchone()
-                        if row and row[0]:
-                            ds_id = str(row[0])
-                except Exception:
-                    ds_id = None
-
-            if ds_id:
-                normalized = {**result}
-                normalized['data_source_id'] = ds_id
-                normalized['id'] = ds_id
-                return normalized
-
-        return result
-    except Exception as e:
-        logger.error(f"❌ Failed to create project data source: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/api/organizations/{organization_id}/projects/{project_id}/connections")
-async def create_project_connection(
-    organization_id: str,
-    project_id: str,
-    request: DatabaseConnectionRequest,
-    request_obj: Request
-):
-    """Create and persist a project-scoped connection; encrypt credentials and return masked metadata."""
-    try:
-        # RBAC check
-        await verify_project_access(request_obj, organization_id, project_id)
-
-        conn = request.model_dump()
-
-        # Test the connection without storing raw secrets
-        test_result = await data_service.test_database_connection(conn)
-        if not test_result.get('success'):
-            raise HTTPException(status_code=400, detail=f"Connection test failed: {test_result.get('error')}")
-
-        # Extract user ID from request if available
-        user_id = None
-        try:
-            # Try to get user from auth context
-            from app.modules.authentication.deps.auth_bearer import JWTCookieBearer
-            from app.modules.authentication.auth import Auth
-            try:
-                token = await JWTCookieBearer()(request_obj)
-                user_payload = token if isinstance(token, dict) else Auth().decodeJWT(token) or {}
-                user_id = str(user_payload.get('id') or user_payload.get('sub') or '')
-            except Exception:
-                pass
-        except Exception:
-            pass
-        
-        # Store encrypted via existing store_database_connection (it will encrypt again defensively)
-        stored = await data_service.store_database_connection(conn, user_id=user_id)
-        if not stored.get('success'):
-            raise HTTPException(status_code=500, detail=f"Failed to store connection: {stored.get('error')}")
-
-        # Return masked metadata only
-        # Mask any sensitive info before returning
-        try:
-            from app.modules.data.utils.masking import mask_connection_info
-            masked = {
-                'id': stored.get('data_source_id'),
-                'name': conn.get('name') or f"{conn.get('type')}_connection",
-                'type': 'database',
-                'db_type': conn.get('type'),
-                'status': 'connected',
-                'created_at': datetime.now().isoformat(),
-                'connection_info': mask_connection_info(conn)
-            }
-        except Exception:
-            masked = {
-                'id': stored.get('data_source_id'),
-                'name': conn.get('name') or f"{conn.get('type')}_connection",
-                'type': 'database',
-                'db_type': conn.get('type'),
-                'status': 'connected',
-                'created_at': datetime.now().isoformat()
-            }
-
-        return {'success': True, 'connection': masked}
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.exception(f"❌ Failed to create project connection: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.put("/api/organizations/{organization_id}/projects/{project_id}/data-sources/{data_source_id}")
-async def update_project_data_source(
-    organization_id: str,
-    project_id: str,
-    data_source_id: str,
-    update: DataSourceUpdate,
-    user_payload: dict = Depends(current_user_payload),
-    session = Depends(get_async_session),
-):
-    """Update a project data source (name, is_active, last_accessed, etc.).
-
-    Uses current user payload when available; falls back to organization_id for permission checks.
-    """
-    try:
-        # RBAC check (ensure caller has access)
-        # reuse verify_project_access but accept dict payload via current_user
-        # verify_project_access expects Request; for now assume RBAC already enforced higher up or via frontend
-
-        user_id = None
-        try:
-            if isinstance(user_payload, dict):
-                user_id = user_payload.get('id') or user_payload.get('user_id')
-        except Exception:
-            user_id = None
-        if not user_id:
-            user_id = str(organization_id)
-
-        # Delegate to CRUD service
-        try:
-            result = await data_sources_crud.update_data_source(data_source_id, update, str(user_id), session)
-
-            # If client provided inline sample_data, persist it to data_sources.sample_data
-            try:
-                upd_vals = update.model_dump() if hasattr(update, 'model_dump') else dict(update)
-                if upd_vals.get('sample_data') is not None:
-                    from app.db.session import get_sync_engine
-                    import sqlalchemy as sa
-                    eng = get_sync_engine()
-                    try:
-                        # Use a typed bindparam so SQLAlchemy/psycopg can adapt Python structures to JSON
-                        stmt = sa.text("UPDATE data_sources SET sample_data = :sd WHERE id = :id")
-                        stmt = stmt.bindparams(sa.bindparam("sd", type_=sa.JSON))
-                        with eng.begin() as conn:
-                            conn.execute(stmt, {"sd": upd_vals.get('sample_data'), "id": data_source_id})
-                    except Exception as persist_exc:
-                        logger.exception('Failed to persist sample_data during update: %s', persist_exc)
-                        raise
-                        # also update in-memory registry if present
-                        try:
-                            if data_service.data_sources.get(data_source_id):
-                                data_service.data_sources[data_source_id]['sample_data'] = upd_vals.get('sample_data')
-                                data_service.data_sources[data_source_id]['data'] = upd_vals.get('sample_data')
-                        except Exception:
-                            pass
-            except Exception:
-                logger.debug('Failed to persist sample_data during update')
-
-            # OPTIMIZATION: Invalidate schema and query caches when data source is updated
-            try:
-                from app.modules.ai.services.schema_cache_service import get_schema_cache_service
-                from app.modules.ai.services.query_cache_service import get_query_cache_service
-                schema_cache = get_schema_cache_service()
-                query_cache = get_query_cache_service()
-                schema_cache.invalidate(data_source_id)
-                query_cache.invalidate(data_source_id)
-                logger.info(f"🗑️ Invalidated caches for updated data source: {data_source_id}")
-            except Exception as cache_error:
-                logger.warning(f"⚠️ Failed to invalidate caches: {cache_error}")
-            
-            return {"success": True, "data_source": result}
-        except Exception as e:
-            # If DB-backed update failed because the record isn't persisted yet (e.g., queued create),
-            # attempt to update the in-memory preview registry as a best-effort for test/dev flows.
-            logger.warning(f"Update via CRUD failed, falling back to in-memory registry: {e}")
-            try:
-                # update is a Pydantic model; convert to dict
-                update_vals = update.model_dump() if hasattr(update, 'model_dump') else dict(update)
-                mem = data_service.data_sources.get(data_source_id)
-                if mem:
-                    # apply provided fields
-                    for k, v in update_vals.items():
-                        if v is not None:
-                            mem[k] = v
-                    # reflect updated timestamp
-                    mem['updated_at'] = datetime.now().isoformat()
-                    return {"success": True, "data_source": mem}
-            except Exception:
-                logger.exception("Failed to apply in-memory update fallback")
-            # re-raise original error as HTTP 500
-            logger.exception(f"❌ Failed to update project data source: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.exception(f"❌ Failed to update project data source: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/api/organizations/{organization_id}/projects/{project_id}/data-sources/{data_source_id}")
-async def get_project_data_source(
-    organization_id: str,
-    project_id: str,
-    data_source_id: str
-):
-    """Get a specific data source for a project"""
-    try:
-        result = await data_service.get_project_data_source(
-            organization_id=organization_id,
-            project_id=project_id,
-            data_source_id=data_source_id
-        )
-        
-        if result.get('success'):
-            return result
-        else:
-            raise HTTPException(status_code=404, detail=result.get('error', 'Data source not found'))
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"❌ Failed to get project data source: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/api/organizations/{organization_id}/projects/{project_id}/data-sources/{data_source_id}/query")
-async def execute_project_data_source_query(
-    organization_id: str,
-    project_id: str,
-    data_source_id: str,
-    query_request: Dict[str, str]
-):
-    """Execute a query on a project data source"""
-    try:
-        query = query_request.get('query', '')
-        if not query:
-            raise HTTPException(status_code=400, detail="Query is required")
-        
-        result = await data_service.execute_project_data_source_query(
-            organization_id=organization_id,
-            project_id=project_id,
-            data_source_id=data_source_id,
-            query=query
-        )
-        
-        if result.get('success'):
-            return result
-        else:
-            raise HTTPException(status_code=400, detail=result.get('error', 'Query execution failed'))
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"❌ Failed to execute project data source query: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/api/organizations/{organization_id}/projects/{project_id}/data-sources/{data_source_id}/data")
-async def get_project_data_source_data(
-    organization_id: str,
-    project_id: str,
-    data_source_id: str,
-    limit: int = 100
-):
-    """Get data from a project data source"""
-    try:
-        result = await data_service.get_project_data_source_data(
-            organization_id=organization_id,
-            project_id=project_id,
-            data_source_id=data_source_id,
-            limit=limit
-        )
-        
-        if result.get('success'):
-            return result
-        else:
-            raise HTTPException(status_code=400, detail=result.get('error', 'Failed to get data'))
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"❌ Failed to get project data source data: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# Removed redundant endpoints with {source_id} - using {data_source_id} for consistency
-
 
 @router.post("/upload")
 async def upload_file(
@@ -885,6 +363,7 @@ async def upload_file(
     sheet_name: Optional[str] = Form(default=None),
     delimiter: Optional[str] = Form(default=','),
     preview_only: bool = Form(default=False),  # Preview-only mode (doesn't save to database)
+    upload_with_prompt: bool = Form(default=False),  # Whether file is uploaded with a prompt (enables in-memory storage)
     current_token: Union[str, dict] = Depends(JWTCookieBearer())
 ):
     """Upload and process data file using the data service (requires authentication)
@@ -898,28 +377,14 @@ async def upload_file(
     """
     try:
         # Extract user ID from JWT token
-        # JWTCookieBearer returns dict payload when possible, or token string
-        try:
-            if isinstance(current_token, dict):
-                user_payload = current_token
-            else:
-                # If it's a string token, decode it
-                user_payload = Auth().decodeJWT(current_token) or {}
-            
-            # Extract user_id from various possible fields
-            user_id = str(user_payload.get('id') or user_payload.get('user_id') or user_payload.get('sub') or '')
-            
-            logger.info(f"🔍 Extracted user_id: {user_id} from payload keys: {list(user_payload.keys()) if isinstance(user_payload, dict) else 'not dict'}")
-        except Exception as e:
-            logger.error(f"❌ Failed to extract user_id from token: {str(e)}")
-            import traceback
-            logger.error(f"Full traceback: {traceback.format_exc()}")
-            user_id = ''
-        
+        user_id = None
+        if isinstance(current_token, dict):
+            user_id = str(current_token.get('id') or current_token.get('user_id') or current_token.get('sub') or '')
+
         if not user_id:
-            logger.warning('upload_file attempted without authenticated user')
+            logger.warning('get_data_source attempted without authenticated user')
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Authentication required')
-        
+
         await enforce_data_source_limit(user_id)
 
         # DEBUG: Log file object details
@@ -956,14 +421,14 @@ async def upload_file(
             raise HTTPException(status_code=400, detail="File is empty")
         
         # Prepare options for the service
-        # Also resolve organization ownership for proper tenant binding and plan-based retention
-        organization_id = await enforce_data_source_limit(user_id)
         options = {
             'include_data': include_preview,
             'sheet_name': sheet_name,
             'delimiter': delimiter,
             'user_id': user_id,               # Pass user_id to service
-            'tenant_id': str(organization_id),  # Bind data source to organization/tenant
+            'upload_with_prompt': upload_with_prompt,  # Pass upload_with_prompt flag
+            'name': name,                     # Pass name to service
+            'preview_only': preview_only,    # Explicitly set preview_only flag
         }
         
         # Prevent duplicate display names (case-insensitive) for this user
@@ -1029,111 +494,9 @@ async def upload_file(
         raise HTTPException(status_code=500, detail=f"File upload failed: {str(e)}")
 
 
-# Database connection endpoint (DEPRECATED - use /data/database/connect instead)
-# Maintained for backward compatibility but requires authentication
-@router.post("/connect-database")
-async def connect_database(
-    request: DatabaseConnectionRequest,
-    current_token: Union[str, dict] = Depends(JWTCookieBearer())
-):
-    """
-    Create database connection (DEPRECATED - use /data/database/connect instead)
-    
-    This endpoint is maintained for backward compatibility.
-    New code should use /data/database/connect which has better security and user ownership.
-    """
-    try:
-        # Extract user ID from JWT token
-        try:
-            user_payload = current_token if isinstance(current_token, dict) else Auth().decodeJWT(current_token) or {}
-            user_id = str(user_payload.get('id') or user_payload.get('sub') or '')
-        except Exception:
-            user_id = ''
-        
-        if not user_id:
-            logger.warning('connect_database attempted without authenticated user')
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Authentication required')
-        
-        logger.info(f"🔌 Database connection request (deprecated endpoint): {request.type} for user {user_id}")
-        
-        # Handle URI-based connection
-        if request.uri:
-            logger.info("🔌 Database connection request via URI")
-            # Use the data service to parse URI and create connection with user ownership
-            result = await data_service.create_database_connection({'uri': request.uri, 'name': request.name}, tenant_id='default')
-            # Also store with user ownership
-            if result.get('success') and result.get('data_source_id'):
-                try:
-                    from app.modules.data.utils.credentials import encrypt_credentials
-                    connection_config_safe = encrypt_credentials({'uri': request.uri, 'name': request.name})
-                    await data_service.store_database_connection(connection_config_safe, user_id=user_id)
-                except Exception as e:
-                    logger.warning(f"Failed to store connection with user ownership: {e}")
-            return result
-        
-        logger.info(f"🔌 Database connection request: {request.type}")
-        
-        config = {
-            'type': request.type,
-            'host': request.host,
-            'port': request.port,
-            'database': request.database,
-            'username': request.username,
-            'password': request.password,
-            'name': request.name or f"{request.type}_{request.database}"
-        }
-        
-        # Test database connection first
-        test_result = await data_service.test_database_connection(config)
-        if not test_result['success']:
-            raise HTTPException(status_code=400, detail=f"Connection failed: {test_result.get('error')}")
-        
-        # Store the connection with user ownership (encrypt credentials)
-        try:
-            from app.modules.data.utils.credentials import encrypt_credentials
-            connection_config_safe = encrypt_credentials(config)
-        except Exception:
-            connection_config_safe = config
-        
-        # Store the connection via service with user ownership
-        connection_result = await data_service.store_database_connection(connection_config_safe, user_id=user_id)
-        if not connection_result or not connection_result.get('success'):
-            err = (connection_result or {}).get('error') if isinstance(connection_result, dict) else 'Unknown error'
-            raise HTTPException(status_code=500, detail=f"Failed to store connection: {err}")
-        
-        return {
-            "success": True,
-            "data_source_id": connection_result.get('data_source_id'),
-            "message": "Database connection created successfully",
-            "data_source": {
-                "id": connection_result.get('data_source_id'),
-                "name": config.get('name'),
-                "type": "database",
-                "db_type": config.get('type'),
-                "status": "connected"
-            }
-        }
-            
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"❌ Database connection failed: {str(e)}")
-        import traceback
-        error_trace = traceback.format_exc()
-        logger.error(f"Full traceback: {error_trace}")
-        raise HTTPException(status_code=500, detail=f"Database connection failed: {str(e)}")
-
-
-# List data sources endpoint
-# DUPLICATE ENDPOINT - REMOVED (use line 372 version with auth instead)
-# @router.get("/sources")
-# async def list_data_sources():
-#     """List all data sources - DEPRECATED: Duplicate of line 372"""
-
 
 # Get data source endpoint
 @router.get("/sources/{data_source_id}")
-@require_permission(Permission.DATA_VIEW)
 async def get_data_source(
     data_source_id: str,
     current_token: Union[str, dict] = Depends(JWTCookieBearer()),
@@ -1142,11 +505,9 @@ async def get_data_source(
     """Get data source information - REQUIRES AUTHENTICATION and ownership verification"""
     try:
         # Extract user ID from JWT token - CRITICAL for security
-        try:
-            user_payload = current_token if isinstance(current_token, dict) else Auth().decodeJWT(current_token) or {}
-            user_id = str(user_payload.get('id') or user_payload.get('user_id') or user_payload.get('sub') or '')
-        except Exception:
-            user_id = ''
+        user_id = None
+        if isinstance(current_token, dict):
+            user_id = str(current_token.get('id') or current_token.get('user_id') or current_token.get('sub') or '')
 
         if not user_id:
             logger.warning('get_data_source attempted without authenticated user')
@@ -1203,7 +564,6 @@ async def get_data_source(
 
 # Query data source endpoint
 @router.post("/sources/{data_source_id}/query")
-@require_permission(Permission.QUERY_EXECUTE)
 async def query_data_source(
     data_source_id: str,
     request: DataSourceQueryRequest,
@@ -1214,7 +574,7 @@ async def query_data_source(
     try:
         # Extract user ID from JWT token - CRITICAL for security
         try:
-            user_payload = current_token if isinstance(current_token, dict) else Auth().decodeJWT(current_token) or {}
+            user_payload = extract_user_payload(current_token)
             user_id = str(user_payload.get('id') or user_payload.get('user_id') or user_payload.get('sub') or '')
         except Exception:
             user_id = ''
@@ -1291,7 +651,7 @@ async def delete_data_source(data_source_id: str, current_token: Union[str, dict
     try:
         # Extract user ID from JWT token
         try:
-            user_payload = current_token if isinstance(current_token, dict) else Auth().decodeJWT(current_token) or {}
+            user_payload = extract_user_payload(current_token)
             user_id = str(user_payload.get('id') or user_payload.get('sub') or '')
         except Exception:
             user_id = ''
@@ -1300,13 +660,9 @@ async def delete_data_source(data_source_id: str, current_token: Union[str, dict
             logger.warning('delete_data_source attempted without authenticated user')
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Authentication required')
 
-        # Check if user can delete this data source
-        can_delete, reason = await rbac_service.can_delete_data_source(user_id, data_source_id)
-        if not can_delete:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN, 
-                detail=f"Cannot delete data source: {reason}"
-            )
+        # RBAC check removed - organization context removed
+        # Users can delete their own data sources (verified by user_id check above)
+        can_delete = True
 
         # delete_data_source is synchronous in the service layer (per-process memory + background async DB tasks)
         result = data_service.delete_data_source(data_source_id)
@@ -1350,7 +706,7 @@ async def chat_to_chart_workflow(
         
         # Extract user ID from JWT token
         try:
-            user_payload = current_token if isinstance(current_token, dict) else Auth().decodeJWT(current_token) or {}
+            user_payload = extract_user_payload(current_token)
             user_id = str(user_payload.get('id') or user_payload.get('sub') or '')
             organization_id = str(user_payload.get('organization_id') or 'default-org')
         except Exception:
@@ -1568,7 +924,7 @@ async def execute_cube_query(
             user_id = current_token.get('id') or current_token.get('user_id') or current_token.get('sub')
             organization_id = current_token.get('organization_id')
         elif isinstance(current_token, str):
-            user_payload = Auth().decodeJWT(current_token) or {}
+            user_payload = extract_user_payload(current_token)
             user_id = user_payload.get('id') or user_payload.get('user_id') or user_payload.get('sub')
             organization_id = user_payload.get('organization_id')
         
@@ -1636,6 +992,8 @@ async def health_check():
         "litellm_integration": True,
         "intelligent_modeling": True
     }
+
+
 # Get uploaded data endpoint
 @router.get("/sources/{data_source_id}/data")
 async def get_data_source_data(
@@ -1646,7 +1004,7 @@ async def get_data_source_data(
     try:
         # Extract user ID from JWT token - CRITICAL for security
         try:
-            user_payload = current_token if isinstance(current_token, dict) else Auth().decodeJWT(current_token) or {}
+            user_payload = extract_user_payload(current_token)
             user_id = str(user_payload.get('id') or user_payload.get('user_id') or user_payload.get('sub') or '')
         except Exception:
             user_id = ''
@@ -1711,72 +1069,76 @@ async def get_data_source_data(
                         "format": data_source.get('format')
                     }
                 }
-            if 'file_path' in data_source and data_source.get('file_path'):
-                file_path = data_source['file_path']
-
-                if not os.path.exists(file_path):
-                    logger.warning(f"File not found at path: {file_path}")
-                    raise HTTPException(status_code=404, detail="Data file not found")
-            else:
-                # Try to load persisted file_path from database in case the in-memory
-                # registry doesn't have it (create may have persisted separately).
-                try:
-                    from app.db.session import get_sync_engine
-                    eng = get_sync_engine()
-                    with eng.connect() as conn:
-                        q = sa.text("SELECT file_path, format FROM data_sources WHERE id = :id LIMIT 1")
-                        r = conn.execute(q, {"id": data_source_id})
-                        row = r.fetchone()
-                        if row and row[0]:
-                            file_path = row[0]
-                            # populate format if missing
-                            if not data_source.get('format') and row[1]:
-                                data_source['format'] = row[1]
-                except Exception:
-                    file_path = None
-
-                if not file_path:
-                    # No file available to read
-                    raise HTTPException(status_code=400, detail="No data available for this data source")
             
-            # Load data based on file type (only if a file path was provided)
-            if 'file_path' in data_source:
+            # Try to load from PostgreSQL storage
+            object_key = data_source.get('file_path')  # Now it's object_key
+            if object_key:
                 try:
-                    # file_path already validated above
-                    if data_source['format'] == 'csv':
-                        import pandas as pd
-                        df = pd.read_csv(file_path)
-                        data = df.to_dict('records')
-                    elif data_source['format'] in ['xlsx', 'xls']:
-                        import pandas as pd
-                        df = pd.read_excel(file_path)
-                        data = df.to_dict('records')
-                    elif data_source['format'] == 'json':
-                        import json
-                        with open(file_path, 'r') as f:
-                            data = json.load(f)
-                    else:
-                        raise HTTPException(status_code=400, detail=f"Unsupported file format: {data_source['format']}")
-
-                    return {
-                        "success": True,
-                        "data_source_id": data_source_id,
-                        "data": data,
-                        "metadata": {
-                            "filename": data_source['name'],
-                            "columns": data_source.get('schema', {}).get('columns', []),
-                            "row_count": len(data),
-                            "file_path": file_path,
-                            "format": data_source['format']
+                    from app.modules.data.services.postgres_storage_service import PostgresStorageService
+                    storage_service = PostgresStorageService()
+                    
+                    # Load file from PostgreSQL
+                    file_content = await storage_service.get_file(object_key, user_id)
+                    
+                    # Process based on format
+                    import tempfile
+                    file_format = data_source.get('format', 'csv')
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_format}") as tmp:
+                        tmp.write(file_content)
+                        tmp_path = tmp.name
+                    
+                    try:
+                        if file_format == 'csv':
+                            import pandas as pd
+                            df = pd.read_csv(tmp_path)
+                            data = df.to_dict('records')
+                        elif file_format in ['xlsx', 'xls']:
+                            import pandas as pd
+                            df = pd.read_excel(tmp_path)
+                            data = df.to_dict('records')
+                        elif file_format == 'json':
+                            import json
+                            with open(tmp_path, 'r') as f:
+                                data = json.load(f)
+                        else:
+                            raise HTTPException(status_code=400, detail=f"Unsupported format: {file_format}")
+                        
+                        return {
+                            "success": True,
+                            "data_source_id": data_source_id,
+                            "data": data,
+                            "metadata": {
+                                "filename": data_source['name'],
+                                "columns": data_source.get('schema', {}).get('columns', []),
+                                "row_count": len(data),
+                                "file_path": object_key,
+                                "format": file_format
+                            }
                         }
+                    finally:
+                        if os.path.exists(tmp_path):
+                            os.unlink(tmp_path)
+                except Exception as e:
+                    logger.error(f"Failed to load from PostgreSQL storage: {e}")
+                    # Fall through to sample_data fallback
+            
+            # Fallback to sample_data
+            sample_data = data_source.get('sample_data', [])
+            if sample_data:
+                return {
+                    "success": True,
+                    "data_source_id": data_source_id,
+                    "data": sample_data,
+                    "metadata": {
+                        "filename": data_source['name'],
+                        "columns": data_source.get('schema', {}).get('columns', []),
+                        "row_count": len(sample_data),
+                        "file_path": object_key,
+                        "format": data_source.get('format')
                     }
-
-                except Exception as parse_error:
-                    logger.error(f"❌ Failed to parse file {file_path}: {str(parse_error)}")
-                    raise HTTPException(status_code=500, detail=f"Failed to parse file: {str(parse_error)}")
-            else:
-                # No in-memory data and no file to read
-                raise HTTPException(status_code=400, detail="No data available for this data source")
+                }
+            
+            raise HTTPException(status_code=400, detail="No data available for this data source")
         
         # For database sources, return connection info
         elif data_source['type'] == 'database':
@@ -1923,7 +1285,7 @@ async def connect_enterprise_warehouse_legacy(request: Dict[str, Any], current_t
             if isinstance(current_token, dict):
                 user_payload = current_token
             else:
-                user_payload = Auth().decodeJWT(current_token) or {}
+                user_payload = extract_user_payload(current_token)
             
             user_id = str(user_payload.get('id') or user_payload.get('user_id') or user_payload.get('sub') or '')
             logger.info(f"🔍 Extracted user_id: {user_id} from payload keys: {list(user_payload.keys()) if isinstance(user_payload, dict) else 'not dict'}")
@@ -1951,9 +1313,12 @@ async def connect_enterprise_warehouse_legacy(request: Dict[str, Any], current_t
         logger.info("🔍 EXTRACTED connection_config:")
         logger.info(f"  - connection_config type: {type(connection_config)}")
         logger.info(f"  - connection_config == request: {connection_config == request}")
-        logger.info(f"  - connection_config keys: {list(connection_config.keys()) if isinstance(connection_config, dict) else 'not dict'}")
-        logger.info(f"  - connection_config.get('host'): {connection_config.get('host') if isinstance(connection_config, dict) else 'N/A'}")
-        logger.info(f"  - Full connection_config dump: {json.dumps(connection_config, default=str, indent=2)}")
+        if isinstance(connection_config, dict):
+            safe_keys = list(connection_config.keys())
+            logger.info(f"  - connection_config keys: {safe_keys}")
+            logger.info(f"  - connection_config.get('host'): {connection_config.get('host')}")
+        else:
+            logger.info("  - connection_config is not a dict; skipping detailed logging")
         
         # Handle URI parsing if connection_config is the same as request
         if connection_config == request:
@@ -1993,15 +1358,9 @@ async def connect_enterprise_warehouse_legacy(request: Dict[str, Any], current_t
         if not test_result.get('success'):
             raise HTTPException(status_code=400, detail=f"Connection test failed: {test_result.get('error', 'Unknown error')}")
         
-        # Store the connection with user ownership
-        try:
-            from app.modules.data.utils.credentials import encrypt_credentials
-            connection_config_safe = encrypt_credentials(connection_config)
-        except Exception:
-            connection_config_safe = connection_config
-
         # Store the connection via service with user ownership
-        connection_result = await data_service.store_database_connection(connection_config_safe, user_id=user_id)
+        # NOTE: Pass plain credentials - store_database_connection will validate and encrypt them
+        connection_result = await data_service.store_database_connection(connection_config, user_id=user_id)
         if not connection_result or not connection_result.get('success'):
             err = (connection_result or {}).get('error') if isinstance(connection_result, dict) else 'Unknown error'
             raise HTTPException(status_code=500, detail=f"Failed to store connection: {err}")
@@ -2112,21 +1471,6 @@ async def connect_warehouse(request: Dict[str, Any], current_token: Union[str, d
     return await connect_enterprise_warehouse_legacy(request, current_token)
 
 
-# Note: Duplicate endpoint removed - use /warehouses/connect instead (line 2086)
-# The /cube-modeling/connect-warehouse is an alias that delegates to connect_enterprise_warehouse_legacy
-# The internal implementation has been consolidated to avoid duplication
-
-
-# DUPLICATE ENDPOINT - REMOVED (use line 1492 version instead)
-# @router.post("/cube-modeling/analyze") - DEPRECATED
-# The duplicate implementation starting at line 1879 has been commented out.
-# Use the version at line 1492 instead, which is the primary endpoint.
-
-# Orphaned code block from duplicate endpoint - safely removed
-# The duplicate /cube-modeling/analyze implementation has been completely removed.
-# Use the primary implementation at line 1492 instead.
-
-
 @router.get("/cube-modeling/types")
 async def get_modeling_types():
     """Get available data modeling types"""
@@ -2193,10 +1537,13 @@ async def deploy_cube_schema(request: dict):
         if not data_source or not schema:
             raise HTTPException(status_code=400, detail="Missing data_source or schema")
         
-        cube_service = CubeIntegrationService()
-        deployment_result = await cube_service.deploy_cube_schema(schema, data_source)
+        # Cube.js is no longer supported
+        raise HTTPException(
+            status_code=501,
+            detail="Cube.js deployment has been removed. Schema deployment is no longer available."
+        )
         
-        if deployment_result['success']:
+        if False:
             return {
                 "success": True,
                 "deployment": deployment_result,
@@ -2227,34 +1574,12 @@ async def generate_chart_from_cube(request: Dict[str, Any]):
         if not query:
             raise HTTPException(status_code=400, detail="query is required")
 
-        # Execute Cube query via integration service
-        from .services.cube_integration_service import CubeIntegrationService
-
-        ci = CubeIntegrationService()
-        result = await ci.execute_cube_query(query)
-        if not result.get("success"):
-            raise HTTPException(status_code=400, detail=result.get("error", "Query failed"))
-
-        # Cube returns nested structure; try to extract rows
-        data = result.get("data", {})
-        # typical Cube load returns {data: [...]} or nested payloads; try to find rows
-        rows = []
-        if isinstance(data, dict) and "data" in data:
-            rows = data.get("data") or []
-        elif isinstance(data, list):
-            rows = data
-        else:
-            # fallback: try to extract first list field
-            if isinstance(data, dict):
-                for v in data.values():
-                    if isinstance(v, list):
-                        rows = v
-                        break
-
-        # Convert to ECharts option
-        option_payload = ci.convert_cube_result_to_echarts(rows, chart_type=chart_type)
-
-        return {"success": True, "echarts_option": option_payload.get("option"), "meta": option_payload.get("meta")}
+        # Cube.js is no longer supported (not deployed)
+        # This endpoint is deprecated
+        raise HTTPException(
+            status_code=501,
+            detail="Cube.js integration has been removed. Please use direct database queries instead."
+        )
 
     except HTTPException:
         raise
@@ -2275,11 +1600,12 @@ async def preview_chart_from_rows(request: Dict[str, Any]):
         if not rows or not isinstance(rows, list):
             raise HTTPException(status_code=400, detail='rows (array) is required')
 
-        from .services.cube_integration_service import CubeIntegrationService
-        ci = CubeIntegrationService()
-        option_payload = ci.convert_cube_result_to_echarts(rows, chart_type=chart_type)
-
-        return {"success": True, "echarts_option": option_payload.get('option'), "meta": option_payload.get('meta')}
+        # Cube.js is no longer supported (not deployed)
+        # This endpoint needs to be reimplemented with a different charting library
+        raise HTTPException(
+            status_code=501,
+            detail="Cube.js chart conversion has been removed. Please use client-side charting instead."
+        )
 
     except HTTPException:
         raise
@@ -2291,8 +1617,11 @@ async def preview_chart_from_rows(request: Dict[str, Any]):
 async def get_deployed_cubes():
     """Get list of deployed cubes from real Cube.js server"""
     try:
-        cube_service = CubeIntegrationService()
-        cubes_result = await cube_service.get_deployed_cubes()
+        # Cube.js is no longer supported
+        raise HTTPException(
+            status_code=501,
+            detail="Cube.js has been removed. No cubes are available."
+        )
         
         if cubes_result['success']:
             return {
@@ -3272,7 +2601,7 @@ async def cleanup_data_retention(
             if isinstance(current_token, dict):
                 user_id = current_token.get('id') or current_token.get('user_id') or current_token.get('sub')
             elif isinstance(current_token, str):
-                user_payload = Auth().decodeJWT(current_token) or {}
+                user_payload = extract_user_payload(current_token)
                 user_id = user_payload.get('id') or user_payload.get('user_id') or user_payload.get('sub')
         except Exception:
             pass  # Allow cron/system calls without user context
@@ -3352,7 +2681,7 @@ async def connect_delta_iceberg(
             if isinstance(current_token, dict):
                 user_payload = current_token
             else:
-                user_payload = Auth().decodeJWT(current_token) or {}
+                user_payload = extract_user_payload(current_token)
             
             user_id = str(user_payload.get('id') or user_payload.get('user_id') or user_payload.get('sub') or '')
             organization_id = user_payload.get('organization_id')
@@ -3448,11 +2777,11 @@ async def connect_delta_iceberg(
             insert_query = sa.text("""
                 INSERT INTO data_sources 
                 (id, name, type, format, db_type, size, row_count, schema, 
-                 connection_config, metadata, user_id, tenant_id, is_active, 
+                 connection_config, metadata, user_id, is_active, 
                  created_at, updated_at, last_accessed, file_path)
                 VALUES 
                 (:id, :name, :type, :format, :db_type, :size, :row_count, :schema,
-                 :connection_config, :metadata, :user_id, :tenant_id, :is_active,
+                 :connection_config, :metadata, :user_id, :is_active,
                  :created_at, :updated_at, :last_accessed, :file_path)
             """)
             
@@ -3474,7 +2803,6 @@ async def connect_delta_iceberg(
                     'created_at': datetime.now().isoformat()
                 }),
                 "user_id": user_id,
-                "tenant_id": str(organization_id),
                 "is_active": True,
                 "created_at": datetime.now(),
                 "updated_at": datetime.now(),

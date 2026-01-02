@@ -231,7 +231,6 @@ class DataSourceRBACService:
                         "schema": ds.schema,
                         "description": ds.description,
                         "user_id": ds.user_id,
-                        "tenant_id": ds.tenant_id,
                         "created_at": ds.created_at.isoformat() if ds.created_at else None,
                         "updated_at": ds.updated_at.isoformat() if ds.updated_at else None,
                         "is_active": ds.is_active,

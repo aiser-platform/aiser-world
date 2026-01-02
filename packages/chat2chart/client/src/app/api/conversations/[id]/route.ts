@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { extractAccessToken } from '@/utils/cookieParser';
 
 // Use server-safe backend resolution: map localhost->internal service when SSR
 const BACKEND_URL = ((): string => {
@@ -27,11 +26,6 @@ export async function GET(request: NextRequest, context: { params?: any }) {
             headers['Authorization'] = authHeader;
         }
         
-        // Forward all cookies
-        const cookieHeader = request.headers.get('Cookie');
-        if (cookieHeader) {
-            headers['Cookie'] = cookieHeader;
-        }
         
         const response = await fetch(`${BACKEND_URL}/conversations/${id}?${searchParams.toString()}`, {
             method: 'GET',
@@ -85,11 +79,6 @@ export async function PUT(request: NextRequest, context: { params?: any }) {
             headers['Authorization'] = authHeader;
         }
         
-        // Forward all cookies
-        const cookieHeader = request.headers.get('Cookie');
-        if (cookieHeader) {
-            headers['Cookie'] = cookieHeader;
-        }
         
         const response = await fetch(`${BACKEND_URL}/conversations/${id}`, {
             method: 'PUT',
@@ -180,22 +169,6 @@ export async function POST(request: NextRequest, context: { params?: any }) {
         const authHeader = request.headers.get('Authorization');
         if (authHeader) {
             headers['Authorization'] = authHeader;
-        }
-        
-        // Forward all cookies (CRITICAL for JWT authentication)
-        const cookieHeader = request.headers.get('Cookie');
-        if (cookieHeader) {
-            headers['Cookie'] = cookieHeader;
-        }
-        
-        // Extract access token using reliable cookie parser
-        const accessToken = extractAccessToken({
-            cookies: request.cookies,
-            headers: request.headers
-        });
-        
-        if (accessToken && !authHeader) {
-            headers['Authorization'] = `Bearer ${accessToken}`;
         }
         
         const response = await fetch(`${BACKEND_URL}/conversations/${id}/messages`, {

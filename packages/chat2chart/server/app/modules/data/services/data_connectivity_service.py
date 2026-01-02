@@ -10,12 +10,13 @@ import json
 import re
 import sqlalchemy as sa
 from typing import Dict, List, Optional, Any, Union
-from datetime import datetime
+from datetime import datetime, date
 import tempfile
 from pathlib import Path
-from .cube_connector_service import CubeConnectorService
+from .database_connector_service import DatabaseConnectorService
 from app.modules.data.services.ai_schema_service import AISchemaService
 from app.db.session import async_operation_lock
+from app.modules.data.utils.credentials import encrypt_credentials, decrypt_credentials
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,6 @@ class DataConnectivityService:
     """Service for handling data connectivity and file uploads"""
     
     def __init__(self):
-        self.upload_dir = "./uploads"
         self.max_file_size = 50 * 1024 * 1024  # 50MB
         self.supported_formats = ['csv', 'xlsx', 'xls', 'json', 'tsv', 'parquet', 'parq', 'snappy']
         
@@ -60,29 +60,28 @@ class DataConnectivityService:
             }
         }
         
-        # Ensure upload directory exists
-        self._ensure_upload_dir()
-        
         # Data source registry (in production, this would be in database)
         self.data_sources = {}
         
         # Initialize demo data for testing
         self._initialize_demo_data()
         
-        # Initialize Cube.js connector service
-        self.cube_connector = CubeConnectorService()
+        # Initialize database connector service
+        self.database_connector = DatabaseConnectorService()
         self.ai_schema_service = AISchemaService()  # Add AI schema service
-        
-        # Database connector configurations (now using Cube.js)
-        self.db_connectors = {
-            'postgresql': self._create_cube_connector,
-            'mysql': self._create_cube_connector,
-            'sqlserver': self._create_cube_connector,
-            'snowflake': self._create_cube_connector,
-            'bigquery': self._create_cube_connector,
-            'redshift': self._create_cube_connector,
-            'clickhouse': self._create_cube_connector
-        }
+    
+    def _make_json_serializable(self, obj: Any) -> Any:
+        """Recursively convert date/datetime objects to ISO format strings for JSON serialization"""
+        if isinstance(obj, (date, datetime)):
+            return obj.isoformat()
+        elif isinstance(obj, dict):
+            return {key: self._make_json_serializable(value) for key, value in obj.items()}
+        elif isinstance(obj, list):
+            return [self._make_json_serializable(item) for item in obj]
+        elif pd.isna(obj):
+            return None
+        else:
+            return obj
 
     async def test_database_connection(self, connection_request: Dict[str, Any]) -> Dict[str, Any]:
         """Test database connection without storing credentials"""
@@ -91,15 +90,18 @@ class DataConnectivityService:
             
             db_type = connection_request.get('type', '').lower()
             
-            if db_type not in self.db_connectors:
+            # Get supported databases from DatabaseConnectorService
+            supported_dbs = self.database_connector.get_supported_databases()
+            
+            if db_type not in supported_dbs:
                 return {
                     'success': False,
-                    'error': f'Unsupported database type: {db_type}'
+                    'error': f'Unsupported database type: {db_type}. Supported: {supported_dbs}'
                 }
             
-            # Test connection using Cube.js connector directly
+            # Test connection using DatabaseConnectorService
             try:
-                test_result = await self.cube_connector.test_connection(connection_request)
+                test_result = await self.database_connector.test_connection(connection_request)
                 return test_result
                     
             except Exception as e:
@@ -116,11 +118,43 @@ class DataConnectivityService:
                 'error': str(e)
             }
 
-    async def store_database_connection(self, connection_request: Dict[str, Any], user_id: Optional[str] = None) -> Dict[str, Any]:
-        """Store database connection configuration"""
+    async def store_database_connection(self, connection_request: Dict[str, Any], user_id: str) -> Dict[str, Any]:
+        """Store database connection configuration
+        
+        NOTE: This method validates the connection BEFORE encrypting credentials.
+        This ensures the validation works with plain credentials, and also provides
+        safety for users who skip the test step and directly click save.
+        
+        Args:
+            connection_request: Database connection configuration
+            user_id: User ID (required for data isolation and security)
+        """
+        if not user_id:
+            raise ValueError("user_id is required for database connections")
+        
         try:
-            logger.info(f"💾 Storing database connection: {connection_request.get('type')}")
-            
+            db_type = str(connection_request.get('type', '')).lower()
+            logger.info(f"💾 Storing database connection of type '{db_type}' for user {user_id}")
+
+            # ALWAYS validate the connection first with PLAIN credentials.
+            # This prevents persisting phantom data sources when credentials or networking are invalid,
+            # and provides safety for users who skip the test step.
+            try:
+                test_result = await self.database_connector.test_connection(connection_request)
+                if not test_result.get('success'):
+                    error_msg = test_result.get('error') or 'Database connection test failed'
+                    logger.warning(f"❌ Connection validation failed; not storing data source: {error_msg}")
+                    return {
+                        'success': False,
+                        'error': error_msg
+                    }
+            except Exception as validation_error:
+                logger.error(f"❌ Unexpected error while validating connection before store: {validation_error}")
+                return {
+                    'success': False,
+                    'error': f'Connection validation failed: {validation_error}'
+                }
+
             # Generate unique ID for the connection
             connection_id = f"db_{connection_request.get('type')}_{int(datetime.now().timestamp())}"
             
@@ -156,9 +190,6 @@ class DataConnectivityService:
                         logger.error(f"❌ Failed to encrypt credentials: {encrypt_error}")
                         safe_config = connection_request
                     
-                    # Extract tenant_id from connection_request or use organization_id
-                    tenant_id = connection_request.get('tenant_id') or connection_request.get('organization_id') or 'default'
-
                     new_source = DataSource(
                         id=connection_id,
                         name=connection_request.get('name') or f"{connection_request.get('type')}_connection",
@@ -183,8 +214,7 @@ class DataConnectivityService:
                             'status': 'connected',
                             'created_at': datetime.now().isoformat()
                         }),
-                        user_id=user_id if user_id else None,  # Set user_id if provided
-                        tenant_id=str(tenant_id),  # Set tenant_id from connection_request
+                        user_id=user_id,  # Required - validated at function entry
                         is_active=True,
                         created_at=datetime.now(),
                         updated_at=datetime.now(),
@@ -206,13 +236,13 @@ class DataConnectivityService:
                 # Fallback to memory storage (connection_data already prepared)
             self.data_sources[connection_id] = connection_data
             
-            # Also register with Cube.js if available
+            # Create connection in DatabaseConnectorService for future queries
             try:
-                cube_result = await self.cube_connector.create_cube_data_source(connection_request)
-                if cube_result['success']:
-                    logger.info(f"✅ Database connection registered with Cube.js: {connection_id}")
-            except Exception as cube_error:
-                logger.warning(f"⚠️ Cube.js integration failed for {connection_id}: {str(cube_error)}")
+                conn_result = await self.database_connector.create_connection(connection_request)
+                if conn_result.get('success'):
+                    logger.info(f"✅ Database connection engine created: {connection_id}")
+            except Exception as conn_error:
+                logger.warning(f"⚠️ Connection engine creation failed (queries may not work): {str(conn_error)}")
             
             logger.info(f"✅ Database connection stored: {connection_id}")
             
@@ -520,6 +550,7 @@ class DataConnectivityService:
                         'size': source.size,
                         'row_count': source.row_count,
                         'schema': source.schema,
+                        'user_id': getattr(source, 'user_id', None),
                         'created_at': source.created_at.isoformat() if source.created_at else None,
                         'updated_at': source.updated_at.isoformat() if source.updated_at else None,
                         'is_active': source.is_active,
@@ -646,15 +677,19 @@ class DataConnectivityService:
                     existing.size = data_source.get('size')
                     existing.row_count = data_source.get('row_count')
                     existing.schema = data_source.get('schema')
-                    existing.file_path = data_source.get('file_path')
+                    existing.file_path = data_source.get('file_path')  # Now stores object_key
                     existing.original_filename = data_source.get('original_filename')
-                    existing.updated_at = datetime.now()
+                    existing.sample_data = data_source.get('sample_data')  # Save sample_data as JSON
+                    from datetime import timezone
+                    existing.updated_at = datetime.now(timezone.utc)
                     logger.info(f"✅ Updated data source {data_source['id']} in database.")
                 else:
                     # Create new
-                    # Use user_id and tenant_id from data_source dict (passed from options)
+                    # Use user_id from data_source dict (passed from options)
                     user_id = data_source.get('user_id')
-                    tenant_id = data_source.get('tenant_id')
+                    
+                    if not user_id:
+                        raise ValueError(f"user_id is required when creating data source {data_source.get('id')}. Ensure user_id is passed in options.")
                     
                     new_data_source = DataSource(
                         id=data_source['id'],
@@ -664,26 +699,29 @@ class DataConnectivityService:
                         size=data_source.get('size'),
                         row_count=data_source.get('row_count'),
                         schema=data_source.get('schema'),
-                        file_path=data_source.get('file_path'),
+                        file_path=data_source.get('file_path'),  # Now stores object_key
                         original_filename=data_source.get('original_filename'),
-                        user_id=user_id if user_id else self._get_current_user_id(),  # Use from options or fallback
-                        tenant_id=tenant_id if tenant_id else 'default'  # Use from options or fallback
+                        sample_data=data_source.get('sample_data'),  # Save sample_data as JSON
+                        user_id=user_id  # Required - validated above
                     )
                     db.add(new_data_source)
-                    logger.info(f"✅ Saved new data source {data_source['id']} to database (user_id={user_id}, tenant_id={tenant_id}).")
+                    logger.info(f"✅ Saved new data source {data_source['id']} to database (user_id={user_id}).")
                 
                 await db.commit()
                 return True
                 
         except Exception as e:
-            logger.error(f"❌ Failed to save data source to database: {str(e)}")
+            logger.error(f"❌ Failed to save data source to database: {str(e)}", exc_info=True)
+            import traceback
+            logger.error(f"❌ Traceback: {traceback.format_exc()}")
             return False
 
     async def process_uploaded_file(
         self, 
-        file_path: str, 
+        file_path: str,  # Temp file path for processing
         original_filename: str, 
-        options: Optional[Dict[str, Any]] = None
+        options: Optional[Dict[str, Any]] = None,
+        object_key: Optional[str] = None  # NEW: Object key from PostgreSQL storage
     ) -> Dict[str, Any]:
         """Process uploaded file and extract data"""
         try:
@@ -728,51 +766,57 @@ class DataConnectivityService:
             
             # Generate data source metadata
             user_id = options.get('user_id') if options else None
-            tenant_id = options.get('tenant_id') if options else None
             name = options.get('name') if options else original_filename
+            
+            # Get file size from temp file
+            file_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
             
             data_source = {
                 'id': f"file_{int(datetime.now().timestamp())}",
                 'name': name or original_filename,
                 'type': 'file',
                 'format': file_extension,
-                'size': os.path.getsize(file_path),
+                'size': file_size,
                 'uploaded_at': datetime.now().isoformat(),
                 'schema': enhanced_schema,
                 'row_count': len(data),
-                'file_path': file_path,
+                'file_path': object_key,  # NEW: Store object_key, not file path
                 'original_filename': original_filename,
                 'preview': data[:10] if len(data) > 10 else data,  # First 10 rows for preview
                 # Add fields expected by frontend
                 'uuid_filename': f"file_{int(datetime.now().timestamp())}_{original_filename}",
                 'content_type': f"application/{file_extension}",
-                'storage_type': 'local',
-                'user_id': user_id,  # Pass user_id from options
-                'tenant_id': tenant_id  # Pass tenant_id from options
+                'storage_type': 'postgresql',  # Updated: now using PostgreSQL storage
+                'user_id': user_id  # Pass user_id from options
             }
             
-            # Store in registry (only store sample data for large files to save memory)
-            max_memory_rows = 1000  # Only keep first 1000 rows in memory
-            if len(data) > max_memory_rows:
-                logger.info(f"📊 Large file detected ({len(data)} rows), storing only sample data in memory")
-                data_source['sample_data'] = data[:max_memory_rows]
-                data_source['data'] = data[:max_memory_rows]  # Keep sample for quick access
-            else:
-                data_source['data'] = data
-                data_source['sample_data'] = data
+            # Conditional in-memory storage based on upload_with_prompt flag
+            upload_with_prompt = options.get('upload_with_prompt', False)
+            max_sample_rows = 10000  # Increased from 1000
             
-            self.data_sources[data_source['id']] = {
-                **data_source
-            }
-            
-            # Save to database (only save sample_data, not full data for large files)
-            if preview_only:
-                logger.info("⏩ Skipping database save for preview-only mode")
+            if upload_with_prompt:
+                # Store in memory for immediate query processing
+                if len(data) > max_sample_rows:
+                    data_source['sample_data'] = data[:max_sample_rows]
+                    data_source['data'] = data[:max_sample_rows]
+                else:
+                    data_source['data'] = data
+                    data_source['sample_data'] = data
+                
+                # Store in memory cache
+                self.data_sources[data_source['id']] = data_source
+                logger.info(f"💾 Stored in memory for immediate processing")
             else:
-                # For large files, only save sample_data to database
-                if len(data) > max_memory_rows:
-                    data_source['sample_data'] = data[:max_memory_rows]
-                await self._save_data_source_to_db(data_source)
+                # Don't store in memory - only save to DB
+                data_source['sample_data'] = data[:max_sample_rows] if len(data) > max_sample_rows else data
+                logger.info(f"⏩ Skipping in-memory storage (file uploaded without prompt)")
+            
+            # Always save to database
+            if not preview_only:
+                save_success = await self._save_data_source_to_db(data_source)
+                if not save_success:
+                    logger.error(f"❌ Failed to save data source {data_source.get('id')} to database")
+                    raise Exception(f"Failed to save data source to database. Check logs for details.")
             
             logger.info(f"✅ File processed successfully: {len(data)} rows, {len(enhanced_schema['columns'])} columns")
             
@@ -784,10 +828,6 @@ class DataConnectivityService:
             
         except Exception as error:
             logger.error(f"❌ File processing failed: {str(error)}")
-            
-            # Clean up file on error
-            if os.path.exists(file_path):
-                os.unlink(file_path)
             
             return {
                 'success': False,
@@ -801,6 +841,7 @@ class DataConnectivityService:
         options: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """Upload and process a file from content"""
+        tmp_file_path = None
         try:
             logger.info(f"📁 File upload request: {filename}")
             
@@ -816,30 +857,39 @@ class DataConnectivityService:
             if file_extension not in self.supported_formats:
                 raise ValueError(f"Unsupported file format: {file_extension}")
             
-            # Create unique filename and save to upload directory
-            timestamp = int(datetime.now().timestamp())
-            unique_filename = f"file_{timestamp}_{filename}"
-            file_path = os.path.join(self.upload_dir, unique_filename)
+            # Get user_id from options
+            user_id = options.get('user_id')
+            if not user_id:
+                raise ValueError("user_id is required for file upload")
             
-            # Ensure upload directory exists
-            self._ensure_upload_dir()
+            # Store file in PostgreSQL
+            from app.modules.data.services.postgres_storage_service import PostgresStorageService
+            storage_service = PostgresStorageService()
             
-            # Save file content
-            with open(file_path, 'wb') as f:
-                f.write(file_content)
+            content_type = f"application/{file_extension}"
             
-            logger.info(f"💾 File saved to: {file_path}")
+            # Store file in PostgreSQL and get object_key
+            object_key = await storage_service.store_file(
+                file_content=file_content,
+                user_id=user_id,
+                original_filename=filename,
+                content_type=content_type
+            )
             
-            # Process the uploaded file
-            result = await self.process_uploaded_file(file_path, filename, options)
+            logger.info(f"💾 File stored in PostgreSQL: {object_key}")
+            
+            # Create temp file for processing (will be deleted after processing)
+            with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_extension}") as tmp_file:
+                tmp_file.write(file_content)
+                tmp_file_path = tmp_file.name
+            
+            # Process the uploaded file (pass object_key)
+            result = await self.process_uploaded_file(tmp_file_path, filename, options, object_key)
             
             if result['success']:
                 logger.info(f"✅ File upload completed successfully: {filename}")
                 return result
             else:
-                # Clean up file if processing failed
-                if os.path.exists(file_path):
-                    os.unlink(file_path)
                 return result
                 
         except Exception as error:
@@ -848,6 +898,13 @@ class DataConnectivityService:
                 'success': False,
                 'error': str(error)
             }
+        finally:
+            # Clean up temp file
+            if tmp_file_path and os.path.exists(tmp_file_path):
+                try:
+                    os.unlink(tmp_file_path)
+                except Exception as e:
+                    logger.warning(f"⚠️ Failed to clean up temp file: {str(e)}")
 
     async def _process_csv_file(self, file_path: str, delimiter: str = ',', encoding: str = 'utf-8') -> tuple:
         """Process CSV/TSV files using DuckDB for fast, direct processing"""
@@ -892,6 +949,9 @@ class DataConnectivityService:
                 # Convert to list of dictionaries
                 data = [dict(zip(columns, row)) for row in sample_result]
                 
+                # Convert date/datetime objects to JSON-serializable strings
+                data = self._make_json_serializable(data)
+                
                 # Get full row count
                 total_rows = conn.execute("SELECT COUNT(*) FROM data").fetchone()[0]
                 schema['row_count'] = total_rows
@@ -912,6 +972,10 @@ class DataConnectivityService:
                     for key, value in row.items():
                         if pd.isna(value):
                             row[key] = None
+                
+                # Convert date/datetime objects to JSON-serializable strings
+                data = self._make_json_serializable(data)
+                
                 schema = self._infer_schema_from_dataframe(df)
                 return data, schema
             
@@ -943,6 +1007,9 @@ class DataConnectivityService:
                 
                 # Convert to list of dictionaries
                 data = [dict(zip(columns, row)) for row in sample_result]
+                
+                # Convert date/datetime objects to JSON-serializable strings
+                data = self._make_json_serializable(data)
                 
                 # Get full row count
                 total_rows = conn.execute("SELECT COUNT(*) FROM data").fetchone()[0]
@@ -1062,6 +1129,8 @@ class DataConnectivityService:
                         # Use first sheet as primary data (for backward compatibility)
                         if idx == 0 or (sheet_name and sheet == sheet_name):
                             primary_data = df.to_dict('records')
+                            # Convert date/datetime objects to JSON-serializable strings
+                            primary_data = self._make_json_serializable(primary_data)
                             primary_schema = self._infer_schema_from_dataframe(df)
                             primary_schema['row_count'] = sheet_schema['row_count']
                             primary_schema['table_name'] = table_name
@@ -1132,6 +1201,9 @@ class DataConnectivityService:
                 
                 # Convert to list of dictionaries
                 data = [dict(zip(columns, row)) for row in sample_result]
+                
+                # Convert date/datetime objects to JSON-serializable strings
+                data = self._make_json_serializable(data)
                 
                 # Get full row count
                 total_rows = conn.execute("SELECT COUNT(*) FROM data").fetchone()[0]
@@ -1284,7 +1356,7 @@ class DataConnectivityService:
         except Exception as e:
             raise ValueError(f"Invalid database URI format: {str(e)}")
 
-    async def create_database_connection(self, config: Dict[str, Any], tenant_id: str = 'default') -> Dict[str, Any]:
+    async def create_database_connection(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """Create database connection using Cube.js connectors"""
         try:
             # Handle URI-based connections
@@ -1295,17 +1367,16 @@ class DataConnectivityService:
                 config = {**parsed_config, **{k: v for k, v in config.items() if k != 'uri'}}
                 logger.info(f"🔌 Parsed URI to: {config.get('type')} at {config.get('host')}:{config.get('port')}")
             
-            logger.info(f"🔌 Creating database connection via Cube.js: {config.get('type')}")
+            logger.info(f"🔌 Creating database connection: {config.get('type')}")
             
             db_type = config.get('type')
-            if db_type not in self.db_connectors:
-                # Get supported databases from Cube.js
-                supported = self.cube_connector.get_supported_databases()
-                supported_types = [db['type'] for db in supported['supported_databases']]
-                raise ValueError(f"Unsupported database type: {db_type}. Supported: {supported_types}")
+            supported_dbs = self.database_connector.get_supported_databases()
             
-            # Create connection using Cube.js connector
-            cube_result = await self.cube_connector.create_cube_data_source(config, tenant_id)
+            if db_type not in supported_dbs:
+                raise ValueError(f"Unsupported database type: {db_type}. Supported: {supported_dbs}")
+            
+            # Create connection using DatabaseConnectorService
+            cube_result = await self.database_connector.create_connection(config)
             
             if not cube_result['success']:
                 raise Exception(cube_result['error'])
@@ -1321,7 +1392,6 @@ class DataConnectivityService:
                 'host': config.get('host'),
                 'database': config.get('database'),
                 'created_at': datetime.now().isoformat(),
-                'tenant_id': tenant_id,
                 'cube_integration': True,
                 'driver': cube_data_source['driver'],
                 'status': cube_data_source['status']
@@ -1417,20 +1487,41 @@ class DataConnectivityService:
         # CRITICAL: Check if data is in memory first
         data = data_source.get('data', [])
         
-        # If no in-memory data, try to load from file_path if available
+        # If no in-memory data, try to load from PostgreSQL storage
         if not data or len(data) == 0:
-            file_path = data_source.get('file_path') or data_source.get('config', {}).get('file_path')
-            if file_path and os.path.exists(file_path):
-                logger.info(f"📊 Loading file data from path: {file_path}")
-                file_format = data_source.get('format', 'csv')
+            object_key = data_source.get('file_path')  # Now it's object_key
+            if object_key:
                 try:
-                    data = await self._read_file_data(file_path, file_format, limit=query.get('limit', 10000))
-                    logger.info(f"✅ Loaded {len(data)} rows from file path")
+                    from app.modules.data.services.postgres_storage_service import PostgresStorageService
+                    storage_service = PostgresStorageService()
+                    user_id = data_source.get('user_id')
+                    
+                    if not user_id:
+                        logger.warning("⚠️ user_id not found in data_source, cannot load from PostgreSQL storage")
+                    else:
+                        # Load file from PostgreSQL
+                        logger.info(f"📊 Loading file data from PostgreSQL storage: {object_key}")
+                        file_content = await storage_service.get_file(object_key, user_id)
+                        
+                        # Write to temp file for processing
+                        file_format = data_source.get('format', 'csv')
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_format}") as tmp:
+                            tmp.write(file_content)
+                            tmp_path = tmp.name
+                        
+                        try:
+                            # Process file
+                            data = await self._read_file_data(tmp_path, file_format, limit=query.get('limit', 10000))
+                            logger.info(f"✅ Loaded {len(data)} rows from PostgreSQL storage")
+                        finally:
+                            # Clean up temp file
+                            if os.path.exists(tmp_path):
+                                os.unlink(tmp_path)
                 except Exception as e:
-                    logger.error(f"❌ Failed to load file from path: {str(e)}")
+                    logger.error(f"❌ Failed to load from PostgreSQL storage: {str(e)}")
                     data = []
         
-        # If still no data, check for sample_data or preview_data
+        # Fallback to sample_data
         if not data or len(data) == 0:
             data = data_source.get('sample_data', []) or data_source.get('preview_data', [])
             if data:
@@ -1500,20 +1591,19 @@ class DataConnectivityService:
                     'error': 'Cube.js data source not found'
                 }
             
-            # Convert our query format to Cube.js query format
-            cube_query = self._convert_to_cube_query(query, cube_data_source)
+            # Execute query through DatabaseConnectorService
+            # Note: query should be a SQL string, not a structured query
+            sql_query = query.get('sql') or query.get('query') if isinstance(query, dict) else str(query)
             
-            # Execute query through Cube.js
-            result = await self.cube_connector.query_cube_data_source(
+            result = await self.database_connector.execute_query(
                 data_source['id'],
-                cube_query,
-                data_source.get('tenant_id', 'default')
+                sql_query
             )
             
             return result
             
         except Exception as error:
-            logger.error(f"❌ Database query through Cube.js failed: {str(error)}")
+            logger.error(f"❌ Database query failed: {str(error)}")
             return {
                 'success': False,
                 'error': str(error)
@@ -1557,8 +1647,6 @@ class DataConnectivityService:
                         'format': db_source.format,
                         'description': db_source.description,
                         'user_id': str(db_source.user_id) if db_source.user_id else None,
-                        'tenant_id': str(db_source.tenant_id) if hasattr(db_source, 'tenant_id') and db_source.tenant_id else None,
-                        'organization_id': str(db_source.tenant_id) if hasattr(db_source, 'tenant_id') and db_source.tenant_id else None,  # Alias for compatibility
                         'row_count': db_source.row_count,
                         'size': db_source.size,
                         'is_active': db_source.is_active,
@@ -1566,18 +1654,16 @@ class DataConnectivityService:
                         'updated_at': db_source.updated_at.isoformat() if db_source.updated_at else None,
                     }
                     
-                    # Add file_path if available directly from model
+                    # Add file_path if available directly from model (now stores object_key)
                     if hasattr(db_source, 'file_path') and db_source.file_path:
-                        data_source_dict['file_path'] = db_source.file_path
+                        data_source_dict['file_path'] = db_source.file_path  # This is now object_key
                     
                     # Parse config and schema if available
                     try:
                         if db_source.connection_config:
                             config = json.loads(db_source.connection_config) if isinstance(db_source.connection_config, str) else db_source.connection_config
                             data_source_dict['config'] = config
-                            # Extract file_path from config if available
-                            if isinstance(config, dict):
-                                data_source_dict['file_path'] = config.get('file_path') or config.get('file_location')
+                            data_source_dict['connection_config'] = config
                     except Exception as e:
                         logger.warning(f"⚠️ Failed to parse connection_config: {e}")
                     
@@ -1588,19 +1674,19 @@ class DataConnectivityService:
                     except Exception as e:
                         logger.warning(f"⚠️ Failed to parse schema: {e}")
                     
-                    # For file sources, try to load data if file_path is available
-                    if db_source.type == 'file' and data_source_dict.get('file_path'):
-                        file_path = data_source_dict['file_path']
-                        if os.path.exists(file_path):
-                            try:
-                                file_format = db_source.format or 'csv'
-                                # Load a sample to verify file is accessible
-                                sample_data = await self._read_file_data(file_path, file_format, limit=10)
-                                if sample_data:
-                                    data_source_dict['data'] = sample_data  # Store sample in memory
-                                    logger.info(f"✅ Loaded sample data from file path: {file_path}")
-                            except Exception as e:
-                                logger.warning(f"⚠️ Could not load sample data from {file_path}: {e}")
+                    # Load sample_data from database
+                    if db_source.sample_data:
+                        try:
+                            sample = json.loads(db_source.sample_data) if isinstance(db_source.sample_data, str) else db_source.sample_data
+                            data_source_dict['sample_data'] = sample
+                            data_source_dict['data'] = sample  # For compatibility
+                            logger.info(f"✅ Loaded sample_data from database")
+                        except Exception as e:
+                            logger.warning(f"⚠️ Failed to parse sample_data: {e}")
+                    
+                    # Add original_filename if available
+                    if hasattr(db_source, 'original_filename') and db_source.original_filename:
+                        data_source_dict['original_filename'] = db_source.original_filename
                     
                     # Cache in memory for future access
                     self.data_sources[data_source_id] = data_source_dict
@@ -1853,15 +1939,18 @@ class DataConnectivityService:
             
             db_type = config.get('type', '').lower()
             
-            if db_type not in self.db_connectors:
+            # Get supported databases from DatabaseConnectorService
+            supported_dbs = self.database_connector.get_supported_databases()
+            
+            if db_type not in supported_dbs:
                 return {
                     'success': False,
-                    'error': f'Unsupported database type: {db_type}'
+                    'error': f'Unsupported database type: {db_type}. Supported: {supported_dbs}'
                 }
             
-            # Use Cube.js connector to get schema
+            # Use DatabaseConnectorService to get schema
             try:
-                schema_result = await self.cube_connector.get_database_schema(config)
+                schema_result = await self.database_connector.get_schema(config)
                 if schema_result['success']:
                     return {
                         'success': True,
@@ -1870,12 +1959,12 @@ class DataConnectivityService:
                         'total_rows': schema_result.get('total_rows', 0)
                     }
                 else:
-                    logger.warning(f"⚠️ Cube.js schema fetch failed: {schema_result.get('error')}")
+                    logger.warning(f"⚠️ Schema fetch failed: {schema_result.get('error')}")
                     # Enhanced fallback with more realistic schema structure
                     return await self._get_enhanced_fallback_schema(config)
                     
-            except Exception as cube_error:
-                logger.warning(f"⚠️ Cube.js schema fetch failed: {str(cube_error)}")
+            except Exception as schema_error:
+                logger.warning(f"⚠️ Schema fetch failed: {str(schema_error)}")
                 # Enhanced fallback with more realistic schema structure
                 return await self._get_enhanced_fallback_schema(config)
                 
@@ -1913,20 +2002,15 @@ class DataConnectivityService:
             }
 
     # Utility methods
-    def _ensure_upload_dir(self):
-        """Ensure upload directory exists"""
-        if not os.path.exists(self.upload_dir):
-            os.makedirs(self.upload_dir, exist_ok=True)
-
     def _get_file_extension(self, filename: str) -> str:
         """Get file extension"""
         return Path(filename).suffix.lower().lstrip('.')
 
-    # Cube.js connector methods
-    async def _create_cube_connector(self, config: Dict[str, Any]):
-        """Create database connector through Cube.js"""
-        # This is handled by the cube_connector service
-        return await self.cube_connector.create_cube_data_source(config)
+    # Database connector methods
+    async def _create_database_connector(self, config: Dict[str, Any]):
+        """Create database connector"""
+        # This is handled by the database_connector service
+        return await self.database_connector.create_connection(config)
 
     def _convert_to_cube_query(self, query: Dict[str, Any], cube_data_source: Dict[str, Any]) -> Dict[str, Any]:
         """Convert our query format to Cube.js query format"""
@@ -1985,8 +2069,19 @@ class DataConnectivityService:
         return operator_mapping.get(operator, 'equals')
 
     async def get_supported_databases(self) -> Dict[str, Any]:
-        """Get supported database types from Cube.js"""
-        return self.cube_connector.get_supported_databases()
+        """Get supported database types"""
+        supported_dbs = self.database_connector.get_supported_databases()
+        return {
+            'success': True,
+            'supported_databases': [
+                {
+                    'type': db_type,
+                    'name': db_type.title(),
+                    'driver': 'sqlalchemy',
+                }
+                for db_type in supported_dbs
+            ]
+        }
 
     def _auto_detect_delimiter(self, file_path: str) -> str:
         """Auto-detect CSV delimiter"""
@@ -2341,11 +2436,22 @@ class DataConnectivityService:
         self, 
         organization_id: str, 
         project_id: str, 
-        data_source_data: Dict[str, Any]
+        data_source_data: Dict[str, Any],
+        user_id: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Create a new data source for a specific project"""
+        """Create a new data source for a specific project
+        
+        NOTE: This method is legacy and may be deprecated. user_id should be provided.
+        """
+        # Extract user_id from data_source_data if not provided directly
+        if not user_id:
+            user_id = data_source_data.get('user_id')
+        
+        if not user_id:
+            raise ValueError("user_id is required for data source creation. Provide it in data_source_data or as a parameter.")
+        
         try:
-            logger.info(f"📊 Creating project data source for project {project_id} in organization {organization_id}")
+            logger.info(f"📊 Creating project data source for project {project_id} (user_id={user_id})")
             
             from app.modules.data.models import DataSource
             from app.modules.projects.models import ProjectDataSource
@@ -2405,9 +2511,8 @@ class DataConnectivityService:
                         'connection_config': connection_config,
                     # Allow callers to provide inline sample rows for file sources
                         'sample_data': data_source_data.get('data') or data_source_data.get('sample_data') or [],
-                        # Ensure ids are strings to avoid asyncpg type errors
-                        'user_id': str(organization_id) if organization_id is not None else None,
-                        'tenant_id': str(organization_id) if organization_id is not None else None,
+                        # Use actual user_id (required for data isolation)
+                        'user_id': str(user_id),
                         'is_active': True,
                         'created_at': datetime.now(),
                         'updated_at': datetime.now(),
@@ -2532,7 +2637,6 @@ class DataConnectivityService:
                             'connection_config': connection_config,
                             'sample_data': data_source_data.get('data') or data_source_data.get('sample_data') or [],
                             'user_id': str(organization_id),
-                            'tenant_id': str(organization_id),
                             'is_active': True,
                             'created_at': datetime.now(),
                             'updated_at': datetime.now()
@@ -2542,8 +2646,8 @@ class DataConnectivityService:
                         eng = get_sync_engine()
                         with eng.begin() as conn:
                             insert_ds = sa.text(
-                                "INSERT INTO data_sources (id, name, type, format, db_type, size, row_count, schema, description, connection_config, file_path, original_filename, created_at, updated_at, user_id, tenant_id, is_active, last_accessed) "
-                                "VALUES (:id, :name, :type, :format, :db_type, :size, :row_count, :schema, :description, :connection_config, :file_path, :original_filename, :created_at, :updated_at, :user_id, :tenant_id, :is_active, :last_accessed) "
+                                "INSERT INTO data_sources (id, name, type, format, db_type, size, row_count, schema, description, connection_config, file_path, original_filename, created_at, updated_at, user_id, is_active, last_accessed) "
+                                "VALUES (:id, :name, :type, :format, :db_type, :size, :row_count, :schema, :description, :connection_config, :file_path, :original_filename, :created_at, :updated_at, :user_id, :is_active, :last_accessed) "
                                 "ON CONFLICT (id) DO NOTHING"
                             )
                             params = {
@@ -2562,7 +2666,6 @@ class DataConnectivityService:
                                 'created_at': ds_vals.get('created_at'),
                                 'updated_at': ds_vals.get('updated_at'),
                                 'user_id': str(ds_vals.get('user_id')) if ds_vals.get('user_id') is not None else None,
-                                'tenant_id': str(ds_vals.get('tenant_id')) if ds_vals.get('tenant_id') is not None else None,
                                 'is_active': ds_vals.get('is_active'),
                                 'last_accessed': ds_vals.get('last_accessed')
                             }

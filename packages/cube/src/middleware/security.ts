@@ -26,7 +26,8 @@ const winston = {
     }
   }
 };
-import { TenantRequest } from './tenant';
+// TenantRequest removed - organization context removed
+// import { TenantRequest } from './tenant';
 
 const logger = winston.createLogger({
   level: process.env.LOG_LEVEL || 'info',
@@ -102,13 +103,14 @@ async function verifyApiKey(apiKey: string): Promise<JWTPayload | null> {
 /**
  * Create security context from request
  */
-export async function createSecurityContext(req: TenantRequest): Promise<SecurityContext> {
+export async function createSecurityContext(req: any): Promise<SecurityContext> {
   const authHeader = req.headers.authorization;
   const apiKeyHeader = req.headers['x-api-key'] as string;
   
   // Default security context for unauthenticated requests
+  // tenantId always set to 'default' - organization context removed
   let securityContext: SecurityContext = {
-    tenantId: req.tenant?.tenantId || 'default',
+    tenantId: 'default',
     roles: ['anonymous'],
     permissions: ['read:public'],
     isAuthenticated: false
@@ -123,7 +125,7 @@ export async function createSecurityContext(req: TenantRequest): Promise<Securit
       if (payload) {
         securityContext = {
           userId: payload.sub,
-          tenantId: payload.tenantId || req.tenant?.tenantId || 'default',
+          tenantId: 'default',  // Always 'default' - organization context removed
           roles: payload.roles || ['user'],
           permissions: payload.permissions || ['read:own', 'write:own'],
           isAuthenticated: true,
@@ -143,7 +145,7 @@ export async function createSecurityContext(req: TenantRequest): Promise<Securit
       if (payload) {
         securityContext = {
           userId: payload.sub,
-          tenantId: payload.tenantId || req.tenant?.tenantId || 'default',
+          tenantId: 'default',  // Always 'default' - organization context removed
           roles: payload.roles || ['service'],
           permissions: payload.permissions || ['read:all', 'write:all'],
           isAuthenticated: true,
@@ -158,7 +160,7 @@ export async function createSecurityContext(req: TenantRequest): Promise<Securit
     else if (process.env.NODE_ENV === 'development') {
       securityContext = {
         userId: 'dev-user',
-        tenantId: req.tenant?.tenantId || 'default',
+        tenantId: 'default',  // Always 'default' - organization context removed
         roles: ['admin', 'user'],
         permissions: ['read:all', 'write:all', 'admin:all'],
         isAuthenticated: true,
@@ -168,12 +170,7 @@ export async function createSecurityContext(req: TenantRequest): Promise<Securit
       logger.info('Development mode: allowing unauthenticated access');
     }
 
-    // Ensure tenant consistency
-    if (req.tenant && securityContext.tenantId !== req.tenant.tenantId) {
-      logger.warn(`Tenant mismatch: token=${securityContext.tenantId}, context=${req.tenant.tenantId}`);
-      // Use tenant from context (header/subdomain) as it's more explicit
-      securityContext.tenantId = req.tenant.tenantId;
-    }
+    // Tenant validation removed - organization context removed
 
     return securityContext;
     
@@ -215,8 +212,8 @@ export function hasRole(
  */
 export function getCubePermissions(securityContext: SecurityContext): any {
   const permissions: any = {
-    // Basic tenant isolation
-    tenant_id: securityContext.tenantId
+    // Tenant isolation removed - always 'default'
+    tenant_id: 'default'
   };
   
   // Add user-specific filters if authenticated
@@ -299,11 +296,12 @@ export function createAuditLog(
  */
 export function getRateLimitKey(securityContext: SecurityContext): string {
   // Use different rate limit keys based on authentication
+  // tenantId removed - use userId only
   if (securityContext.isAuthenticated && securityContext.userId) {
-    return `user:${securityContext.userId}:${securityContext.tenantId}`;
+    return `user:${securityContext.userId}`;
   }
   
-  return `tenant:${securityContext.tenantId}`;
+  return `anonymous:default`;
 }
 
 /**

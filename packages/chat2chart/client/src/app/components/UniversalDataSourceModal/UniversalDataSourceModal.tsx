@@ -39,6 +39,7 @@ import {
     InfoCircleOutlined,
     EditOutlined
 } from '@ant-design/icons';
+import { useAuthenticatedFetch } from '@/hooks/useAuthenticatedFetch';
 
 const { Step } = Steps;
 const { Option } = Select;
@@ -114,6 +115,7 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
     const [testResult, setTestResult] = useState<any>(null);
     const [connectionUrlEditable, setConnectionUrlEditable] = useState(true); // Editable by default
     const [customConnectionUrl, setCustomConnectionUrl] = useState('');
+    const authenticatedFetch = useAuthenticatedFetch();
     
     // Data source configuration
     const [dataSourceConfig, setDataSourceConfig] = useState<DataSourceConfig>({
@@ -336,19 +338,22 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
     };
 
     // Database types
+    // NOTE: The core relational/warehouse options mirror `CubeConnectorService.supported_databases`.
+    // Additional data lake / cloud storage options are backed by dedicated connectors.
     const databaseTypes = [
-        { value: 'postgresql', label: 'PostgreSQL', port: 5432, isDataLake: false, isCloudStorage: false },
-        { value: 'mysql', label: 'MySQL', port: 3306, isDataLake: false, isCloudStorage: false },
-        { value: 'sqlserver', label: 'SQL Server', port: 1433, isDataLake: false, isCloudStorage: false },
-        { value: 'clickhouse', label: 'ClickHouse', port: 8123, isDataLake: false, isCloudStorage: false },
-        { value: 'snowflake', label: 'Snowflake', port: 443, isDataLake: false, isCloudStorage: false },
-        { value: 'bigquery', label: 'BigQuery', port: null, isDataLake: false, isCloudStorage: false },
-        { value: 'redshift', label: 'Redshift', port: 5439, isDataLake: false, isCloudStorage: false },
-        { value: 'delta_lake', label: 'Delta Lake', port: null, isDataLake: true, isCloudStorage: false },
-        { value: 'iceberg', label: 'Apache Iceberg', port: null, isDataLake: true, isCloudStorage: false },
-        { value: 's3_parquet', label: 'S3 Cloud Storage', port: null, isDataLake: false, isCloudStorage: true },
-        { value: 'azure_blob', label: 'Azure Blob Storage', port: null, isDataLake: false, isCloudStorage: true },
-        { value: 'gcp_cloud_storage', label: 'GCP Cloud Storage', port: null, isDataLake: false, isCloudStorage: true }
+        { value: 'postgresql', label: 'PostgreSQL', port: 5432, isDataLake: false, isCloudStorage: false, disabled: false },
+        { value: 'mysql', label: 'MySQL', port: 3306, isDataLake: false, isCloudStorage: false, disabled: false },
+        // SQL Server support depends on OS-level ODBC libraries; mark as "coming soon" to avoid surprises.
+        { value: 'sqlserver', label: 'SQL Server (coming soon)', port: 1433, isDataLake: false, isCloudStorage: false, disabled: true },
+        { value: 'clickhouse', label: 'ClickHouse', port: 8123, isDataLake: false, isCloudStorage: false, disabled: false },
+        { value: 'snowflake', label: 'Snowflake', port: 443, isDataLake: false, isCloudStorage: false, disabled: false },
+        { value: 'bigquery', label: 'BigQuery', port: null, isDataLake: false, isCloudStorage: false, disabled: false },
+        { value: 'redshift', label: 'Redshift', port: 5439, isDataLake: false, isCloudStorage: false, disabled: false },
+        { value: 'delta_lake', label: 'Delta Lake', port: null, isDataLake: true, isCloudStorage: false, disabled: false },
+        { value: 'iceberg', label: 'Apache Iceberg', port: null, isDataLake: true, isCloudStorage: false, disabled: false },
+        { value: 's3_parquet', label: 'S3 Cloud Storage', port: null, isDataLake: false, isCloudStorage: true, disabled: false },
+        { value: 'azure_blob', label: 'Azure Blob Storage', port: null, isDataLake: false, isCloudStorage: true, disabled: false },
+        { value: 'gcp_cloud_storage', label: 'GCP Cloud Storage', port: null, isDataLake: false, isCloudStorage: true, disabled: false }
     ];
     
     const [selectedDatabaseType, setSelectedDatabaseType] = useState('postgresql');
@@ -732,9 +737,8 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
                         ...(connectionConfig.snapshotId && { snapshot_id: connectionConfig.snapshotId })
                     };
                     
-                    const response = await fetch('/api/data/delta-iceberg/test', {
+                    const response = await authenticatedFetch('/api/data/delta-iceberg/test', {
                         method: 'POST',
-                        credentials: 'include',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(testRequest)
                     });
@@ -803,9 +807,8 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
             // All databases use the same test endpoint - no need for special handling
             // The backend /data/database/test handles all database types including warehouses
             
-            const response = await fetch(endpoint, {
+            const response = await authenticatedFetch(endpoint, {
                 method: 'POST',
-                credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(requestBody)
             });
@@ -826,7 +829,7 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
     const saveDataSource = async () => {
         setLoading(true);
         try {
-            let response;
+            let response: Response | undefined;
             
             if (dataSourceConfig.type === 'file') {
                 if (!uploadedFile) {
@@ -881,17 +884,14 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
                 });
                 
                 try {
-                    response = await fetch('/api/data/upload', {
+                    response = await authenticatedFetch('/api/data/upload', {
                         method: 'POST',
-                        credentials: 'include',
-                        // DO NOT set Content-Type header - browser will set it automatically with boundary for FormData
-                        // This is critical - if we set Content-Type manually, the boundary won't be included
                         body: formData
                     });
                     
                     if (!response.ok) {
                         const errorData = await response.json().catch(() => ({ 
-                            error: `Server error (${response.status}): ${response.statusText}` 
+                            error: `Server error (${response!.status}): ${response!.statusText}` 
                         }));
                         const errorMessage = errorData.detail || errorData.error || errorData.message || `Upload failed: ${response.status}`;
                         setTestResult({ success: false, error: errorMessage });
@@ -912,15 +912,21 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
                         onDataSourceCreated(dataSource);
                         onClose();
                         message.success('File uploaded and saved successfully!');
+                        setLoading(false);
+                        return;
                     } else {
                         const errorMessage = result.error || result.detail || 'Failed to upload file';
                         setTestResult({ success: false, error: errorMessage });
                         message.error(`Upload failed: ${errorMessage}`);
+                        setLoading(false);
+                        return;
                     }
                 } catch (error: any) {
                     const errorMessage = error.message || 'Network error. Please check your connection and try again.';
                     setTestResult({ success: false, error: errorMessage });
                     message.error(`Upload failed: ${errorMessage}`);
+                    setLoading(false);
+                    return;
                 }
             } else if (dataSourceConfig.type === 'api') {
                 // For API data sources, create a mock data source
@@ -942,7 +948,7 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
                 onClose();
                 message.success('API data source created successfully!');
                 return;
-                } else {
+            } else {
                 // Database/Warehouse/Cloud Storage connection
                 let endpoint = '/api/data/database/connect';
                 let requestBody: any;
@@ -1063,15 +1069,14 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
                     }
                 }
                 
-                response = await fetch(endpoint, {
+                response = await authenticatedFetch(endpoint, {
                     method: 'POST',
-                    credentials: 'include',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(requestBody)
-                });
+                }) as Response;
             }
             
-            if (!response.ok) {
+            if (!response || !response.ok) {
                 const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
                 console.error('Save failed:', response.status, errorData);
                 setTestResult({ 
@@ -1644,14 +1649,18 @@ const UniversalDataSourceModal: React.FC<UniversalDataSourceModalProps> = ({
                                     style={{ width: '100%' }}
                                     size="large"
                                 >
-                                {databaseTypes.map(db => (
-                                    <Option key={db.value} value={db.value}>
-                                        <Space>
-                                            <DatabaseLogo dbType={db.value} size={18} />
-                                            <span>{db.label}</span>
-                                        </Space>
-                                    </Option>
-                                ))}
+                                    {databaseTypes.map(db => (
+                                        <Option
+                                            key={db.value}
+                                            value={db.value}
+                                            disabled={db.disabled}
+                                        >
+                                            <Space>
+                                                <DatabaseLogo dbType={db.value} size={18} />
+                                                <span>{db.label}</span>
+                                            </Space>
+                                        </Option>
+                                    ))}
                                 </Select>
                             </Form.Item>
                         </Col>

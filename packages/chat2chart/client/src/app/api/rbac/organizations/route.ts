@@ -7,14 +7,20 @@ export async function GET(request: NextRequest) {
     // Forward request to backend
     const backendUrl = `${BACKEND_URL}/api/rbac/organizations`;
     
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    
+    // Forward Authorization header if present
+    const authHeader = request.headers.get('Authorization');
+    if (authHeader) {
+      headers['Authorization'] = authHeader;
+    }
+    
     const response = await fetch(backendUrl, {
       method: 'GET',
       credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        // Forward cookies
-        Cookie: request.headers.get('cookie') || '',
-      },
+      headers,
     });
 
     if (!response.ok) {

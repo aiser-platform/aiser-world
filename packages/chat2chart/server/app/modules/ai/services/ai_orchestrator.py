@@ -1839,29 +1839,50 @@ Your comprehensive analysis:"""
                     logger.info(f"✅ Loaded {len(data)} rows from data service")
                     return data, {"total_rows": len(data), "loaded_rows": len(data), "sampling_method": "database", "is_complete": True, "coverage_percentage": 100}
                 
-                # Try file_path if available
-                file_path = full_source.get("file_path") or full_source.get("config", {}).get("file_path")
-                if file_path:
-                    import os
-                    if os.path.exists(file_path):
-                        logger.info(f"📁 Loading file from path: {file_path}")
-                        file_format = full_source.get("format", "csv")
-                        import pandas as pd
+                # Try to load from PostgreSQL storage using object_key
+                object_key = full_source.get("file_path")  # Now it's object_key
+                if object_key:
+                    try:
+                        from app.modules.data.services.postgres_storage_service import PostgresStorageService
+                        storage_service = PostgresStorageService()
+                        user_id = full_source.get("user_id")
                         
-                        if file_format == "csv":
-                            df = pd.read_csv(file_path)
-                        elif file_format in ["xlsx", "xls"]:
-                            df = pd.read_excel(file_path)
-                        elif file_format == "json":
-                            df = pd.read_json(file_path)
-                        elif file_format == "parquet":
-                            df = pd.read_parquet(file_path)
+                        if not user_id:
+                            logger.warning("⚠️ user_id not found in data_source, cannot load from PostgreSQL storage")
                         else:
-                            raise Exception(f"Unsupported file format: {file_format}")
-                        
-                        data = df.to_dict('records')
-                        logger.info(f"✅ Loaded {len(data)} rows from file path")
-                        return data, {"total_rows": len(data), "loaded_rows": len(data), "sampling_method": "file_path", "is_complete": True, "coverage_percentage": 100}
+                            logger.info(f"📁 Loading file from PostgreSQL storage: {object_key}")
+                            file_content = await storage_service.get_file(object_key, user_id)
+                            
+                            # Write to temp file for processing
+                            import tempfile
+                            file_format = full_source.get("format", "csv")
+                            with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_format}") as tmp:
+                                tmp.write(file_content)
+                                tmp_path = tmp.name
+                            
+                            try:
+                                import pandas as pd
+                                
+                                if file_format == "csv":
+                                    df = pd.read_csv(tmp_path)
+                                elif file_format in ["xlsx", "xls"]:
+                                    df = pd.read_excel(tmp_path)
+                                elif file_format == "json":
+                                    df = pd.read_json(tmp_path)
+                                elif file_format == "parquet":
+                                    df = pd.read_parquet(tmp_path)
+                                else:
+                                    raise Exception(f"Unsupported file format: {file_format}")
+                                
+                                data = df.to_dict('records')
+                                logger.info(f"✅ Loaded {len(data)} rows from PostgreSQL storage")
+                                return data, {"total_rows": len(data), "loaded_rows": len(data), "sampling_method": "postgresql_storage", "is_complete": True, "coverage_percentage": 100}
+                            finally:
+                                import os
+                                if os.path.exists(tmp_path):
+                                    os.unlink(tmp_path)
+                    except Exception as e:
+                        logger.warning(f"⚠️ Failed to load from PostgreSQL storage: {e}")
             
             # Last resort: query via data service
             query_result = await data_service.query_data_source(

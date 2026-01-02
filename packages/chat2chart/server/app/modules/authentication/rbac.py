@@ -1,6 +1,6 @@
 from typing import Optional, Iterable
 from sqlalchemy import select, text
-from app.modules.user.models import User
+# User model removed - user management will be handled by Supabase
 from app.modules.projects.models import Project
 from app.db.session import async_session
 import uuid
@@ -46,22 +46,9 @@ async def _resolve_user_str(user_payload) -> Optional[str]:
     except Exception:
         pass
 
-    # Lookup by email or username to resolve canonical UUID
-    async with async_session() as sdb:
-        try:
-            if email:
-                res = await sdb.execute(select(User.id).where(User.email == email))
-                row = res.first()
-                if row:
-                    return str(row[0])
-            if username:
-                res = await sdb.execute(select(User.id).where(User.username == username))
-                row = res.first()
-                if row:
-                    return str(row[0])
-        except Exception as e:
-            logger.exception(f"_resolve_user_str DB error: {e}")
-            return None
+    # Users table removed - user lookup will be done via Supabase
+    # For now, just return the UUID if it's valid, otherwise None
+    # User resolution will be handled by Supabase integration
 
     return None
 

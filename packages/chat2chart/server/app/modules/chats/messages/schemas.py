@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Dict, Any
 from uuid import UUID
 
 from app.common.schemas import BaseSchema
@@ -42,4 +42,12 @@ class MessageUpdateSchema(BaseModel):
 
 # Schema for reading a message (includes id and timestamps)
 class MessageResponseSchema(MessageBase, BaseSchema):
-    pass
+    """Schema for message response with all fields including metadata"""
+    ai_metadata: Optional[Dict[str, Any]] = Field(
+        None,
+        description="AI response metadata (chart config, insights, recommendations, SQL queries, execution metadata)"
+    )
+    metadata: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Additional message metadata"
+    )

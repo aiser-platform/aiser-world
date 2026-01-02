@@ -18,7 +18,7 @@ from .services.ai_orchestrator import AIOrchestrator
 from .services.litellm_service import LiteLLMService
 from app.core.deps import get_current_user
 from app.core.cache import cache
-from app.modules.user.models import User
+# User model removed - user management will be handled by Supabase
 from app.modules.authentication.deps.auth_bearer import JWTCookieBearer
 from typing import Union
 
@@ -37,6 +37,7 @@ class ChatAnalysisRequest(BaseModel):
     user_context: Optional[Dict[str, Any]] = None  # User preferences and history
     selected_data_sources: Optional[List[Dict[str, Any]]] = None  # Multi-source context
     model: Optional[str] = None  # AI model to use (from frontend selection)
+    analysis_mode: Optional[str] = "standard"  # Analysis mode: "standard" (default) or "deep"
 
 
 class EChartsGenerationRequest(BaseModel):
@@ -100,105 +101,32 @@ async def analyze_chat_query(
         # Let AI service handle all queries, including greetings
         # This ensures we get real AI responses instead of hardcoded ones
 
-        # CRITICAL: Check if this is a file data source - route to LangGraph orchestrator
-        analysis_mode = "standard"
-        is_file_source = False
+        # Respect analysis_mode from request, default to "standard"
+        analysis_mode = request.analysis_mode or "standard"
         
+        # Log data source type for debugging (but don't force routing based on it)
         if request.data_source_id:
             try:
                 from app.modules.data.services.data_connectivity_service import DataConnectivityService
                 data_service = DataConnectivityService()
-                # Use get_data_source instead of get_data_source_by_id for better database support
                 source_result = await data_service.get_data_source(request.data_source_id)
                 if source_result.get("success"):
                     source_info = source_result.get("data_source", {})
                     source_type = source_info.get('type', '').lower() if isinstance(source_info, dict) else 'unknown'
-                    if source_type == 'file':
-                        is_file_source = True
-                        analysis_mode = "deep"  # Always use deep analysis for file sources
-                        logger.info(f"📊 File data source detected for non-streaming - using deep file analysis: {request.data_source_id}")
-                    else:
-                        logger.info(f"📊 Non-file data source detected: {source_type}")
-                else:
-                    logger.warning(f"⚠️ Could not get data source {request.data_source_id}: {source_result.get('error', 'Unknown error')}")
+                    logger.info(f"📊 Data source type: {source_type}, analysis_mode: {analysis_mode}")
             except Exception as e:
-                logger.error(f"❌ Error checking data source type for non-streaming: {str(e)}", exc_info=True)
+                logger.debug(f"Could not check data source type: {str(e)}")
         
-        # If file source detected, use LangGraph orchestrator
-        if is_file_source:
-            try:
-                from .services.langgraph_orchestrator import LangGraphMultiAgentOrchestrator
-                
-                # Extract user info from token (already decoded by JWTCookieBearer)
-                user_payload = current_token if isinstance(current_token, dict) else {}
-                user_id = str(user_payload.get('id') or user_payload.get('user_id') or user_payload.get('sub') or '')
-                organization_id = str(user_payload.get('organization_id') or user_payload.get('org_id') or '')
-                
-                # Initialize services
-                from app.modules.data.services.multi_engine_query_service import MultiEngineQueryService
-                from app.modules.data.services.data_connectivity_service import DataConnectivityService
-                from app.db.session import get_async_session
-                
-                multi_query_service = MultiEngineQueryService()
-                data_service = DataConnectivityService()
-                async_session_factory = get_async_session
-                
-                # Initialize orchestrator with required services
-                orchestrator = LangGraphMultiAgentOrchestrator(
-                    multi_query_service=multi_query_service,
-                    data_service=data_service,
-                    async_session_factory=async_session_factory
-                )
-                
-                logger.info(f"🚀 Starting LangGraph file analysis for data source: {request.data_source_id}")
-                result = await orchestrator.execute(
-                    query=request.query,
-                    conversation_id=request.conversation_id or "",
-                    user_id=user_id,
-                    organization_id=organization_id or None,
-                    data_source_id=request.data_source_id,
-                    analysis_mode=analysis_mode,
-                    model=request.model  # Pass model from request
-                )
-                
-                logger.info(f"✅ LangGraph file analysis completed. Result keys: {list(result.keys()) if isinstance(result, dict) else 'not a dict'}")
-                
-                return {
-                    "success": True,
-                    "query": request.query,
-                    "analysis": result.get("narration") or result.get("analysis") or result.get("message", ""),
-                    "query_result": result.get("query_result"),
-                    "echarts_config": result.get("echarts_config"),
-                    "insights": result.get("insights", []),
-                    "recommendations": result.get("recommendations", []),
-                    "execution_metadata": result.get("execution_metadata", {}),
-                    "ai_engine": result.get("execution_metadata", {}).get("ai_engine", "LangGraph"),
-                }
-            except Exception as e:
-                logger.error(f"❌ LangGraph orchestrator failed for file analysis: {str(e)}", exc_info=True)
-                # For file analysis, don't fall through to generic LiteLLM - return error
-                return {
-                    "success": False,
-                    "query": request.query,
-                    "analysis": f"File analysis failed: {str(e)}. Please try again or contact support.",
-                    "error": str(e),
-                    "execution_metadata": {
-                        "status": "error",
-                        "timestamp": str(datetime.datetime.now()),
-                    },
-                    "ai_engine": "Error",
-                }
-        
-        # CRITICAL: For non-file data sources (database, warehouse, API), route to LangGraph orchestrator
-        # This ensures proper NL2SQL → Query → Chart → Insights workflow
-        if request.data_source_id and not is_file_source:
+        # CRITICAL: Route all data sources (file, database, warehouse, API) to LangGraph orchestrator
+        # The orchestrator's routing logic will handle whether to use deep_file_analysis or standard SQL path
+        # based on analysis_mode
+        if request.data_source_id:
             try:
                 from .services.langgraph_orchestrator import LangGraphMultiAgentOrchestrator
                 
                 # Extract user info from token
                 user_payload = current_token if isinstance(current_token, dict) else {}
                 user_id = str(user_payload.get('id') or user_payload.get('user_id') or user_payload.get('sub') or '')
-                organization_id = str(user_payload.get('organization_id') or user_payload.get('org_id') or '')
                 
                 # Initialize services
                 from app.modules.data.services.multi_engine_query_service import MultiEngineQueryService
@@ -216,12 +144,14 @@ async def analyze_chat_query(
                     async_session_factory=async_session_factory
                 )
                 
-                logger.info(f"🚀 Starting LangGraph data analysis for data source: {request.data_source_id}")
+                logger.info(f"🚀 Starting LangGraph analysis for data source: {request.data_source_id} (mode: {analysis_mode})")
+                # Organization context removed - use default value
+                organization_id = '1'
                 result = await orchestrator.execute(
                     query=request.query,
                     conversation_id=request.conversation_id or "",
                     user_id=user_id,
-                    organization_id=organization_id or None,
+                    organization_id=organization_id,  # Default value since organization context removed
                     data_source_id=request.data_source_id,
                     analysis_mode=analysis_mode,
                     model=request.model  # Pass model from request
@@ -264,7 +194,6 @@ async def analyze_chat_query(
                 # Extract user info from token
                 user_payload = current_token if isinstance(current_token, dict) else {}
                 user_id = str(user_payload.get('id') or user_payload.get('user_id') or user_payload.get('sub') or '')
-                organization_id = str(user_payload.get('organization_id') or user_payload.get('org_id') or '')
                 
                 # Initialize services
                 from app.modules.data.services.multi_engine_query_service import MultiEngineQueryService
@@ -283,11 +212,13 @@ async def analyze_chat_query(
                 )
                 
                 logger.info(f"💬 No data_source_id - routing to LangGraph conversational mode")
+                # Organization context removed - use default value
+                organization_id = '1'
                 result = await orchestrator.execute(
                     query=request.query,
                     conversation_id=request.conversation_id or "",
                     user_id=user_id,
-                    organization_id=organization_id or None,
+                    organization_id=organization_id,  # Default value since organization context removed
                     model=request.model,  # Pass model from request
                     data_source_id=None,  # Explicitly None for conversational mode
                     analysis_mode="standard"
@@ -572,7 +503,7 @@ async def analyze_chat_query(
 
 @router.post("/chat", response_model=Dict)
 async def chat_completion(
-    request: ChatRequest, current_user: User = Depends(get_current_user)
+    request: ChatRequest, current_user = Depends(get_current_user)  # User model removed
 ):
     """Standard chat completion endpoint"""
     try:
@@ -601,7 +532,7 @@ async def chat_completion(
 
 @router.post("/analyze", response_model=AnalysisResponse)
 async def enhanced_data_analysis(
-    request: EnhancedAnalysisRequest, current_user: User = Depends(get_current_user)
+    request: EnhancedAnalysisRequest, current_user = Depends(get_current_user)  # User model removed
 ):
     """Enhanced data analysis with full context awareness"""
     try:
@@ -731,7 +662,7 @@ async def stream_chat_analysis(request: ChatAnalysisRequest):
 @router.post("/echarts/generate")
 async def generate_echarts(
     request: EChartsGenerationRequest,
-    current_user: User = Depends(get_current_user),
+    current_user = Depends(get_current_user),  # User model removed
 ) -> Dict[str, Any]:
     """
     Generate ECharts configuration based on query and data
@@ -1166,7 +1097,7 @@ async def test_ai_configuration() -> Dict[str, Any]:
 
 
 @router.get("/models")
-async def get_available_models(current_user: User = Depends(get_current_user)):
+async def get_available_models(current_user = Depends(get_current_user)):  # User model removed
     """Get available AI models"""
     try:
         litellm_service = LiteLLMService()

@@ -12,7 +12,7 @@ from sqlalchemy.orm import selectinload
 
 from app.db.session import get_async_session
 from app.modules.projects.models import UserOrganization, Project, Organization
-from app.modules.user.models import User
+# User model removed - user management will be handled by Supabase
 from .permissions import Permission, ROLES, get_role_permissions
 
 logger = logging.getLogger(__name__)
@@ -306,25 +306,23 @@ async def get_organization_members(
     try:
         org_id = int(organization_id) if isinstance(organization_id, str) else organization_id
         
-        query = select(UserOrganization, User).join(
-            User, UserOrganization.user_id == User.id
-        ).where(
+        # Users table removed - user info will come from Supabase
+        query = select(UserOrganization).where(
             and_(
                 UserOrganization.organization_id == org_id,
-                UserOrganization.is_active == True,
-                User.is_active == True,
-                User.is_deleted == False
+                UserOrganization.is_active == True
             )
         )
         result = await db.execute(query)
         rows = result.all()
         
         members = []
-        for user_org, user in rows:
+        for user_org in rows:
+            # User details will be fetched from Supabase when integrated
             members.append({
-                'user_id': str(user.id),
-                'email': user.email,
-                'username': user.username,
+                'user_id': str(user_org.user_id),
+                'email': None,  # Will be fetched from Supabase
+                'username': None,  # Will be fetched from Supabase
                 'role': user_org.role,
                 'is_active': user_org.is_active,
                 'joined_at': user_org.created_at.isoformat() if user_org.created_at else None,

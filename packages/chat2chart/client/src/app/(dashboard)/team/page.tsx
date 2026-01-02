@@ -39,7 +39,6 @@ import {
     SearchOutlined,
     MailOutlined
 } from '@ant-design/icons';
-import { useOrganization } from '@/context/OrganizationContext';
 import { usePermissions, Permission } from '@/hooks/usePermissions';
 import { PermissionGuard } from '@/components/PermissionGuard';
 import { RoleBadge } from '@/components/RoleBadge';
@@ -58,10 +57,7 @@ interface TeamMember {
 }
 
 export default function TeamManagementPage() {
-    const { currentOrganization } = useOrganization();
-    const { hasPermission, loading: permissionsLoading } = usePermissions({
-        organizationId: currentOrganization?.id,
-    });
+    const { hasPermission, loading: permissionsLoading } = usePermissions();
     const [isInviteModalVisible, setIsInviteModalVisible] = useState(false);
     const [loading, setLoading] = useState(false);
     const [fetching, setFetching] = useState(true);

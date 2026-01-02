@@ -17,7 +17,7 @@ from sqlalchemy.orm import selectinload
 from fastapi import HTTPException, status
 
 from app.db.session import get_async_session
-from app.modules.data.models import DataSource, DataQuery, DataConnection
+from app.modules.data.models import DataSource, DataQuery
 from app.modules.projects.models import Organization, Project
 from app.core.real_data_sources import real_data_source_manager
 from app.modules.data.utils.credentials import encrypt_credentials
@@ -33,7 +33,6 @@ class DataSourceCreate:
     format: str  # postgresql, mysql, csv, s3, etc.
     description: Optional[str] = None
     connection_config: Dict[str, Any] = None
-    organization_id: Optional[str] = None
     project_id: Optional[str] = None
     is_active: bool = True
 
@@ -47,21 +46,30 @@ class DataSourceUpdate:
 
 @dataclass
 class DataSourceResponse:
-    """Data source response"""
+    """Data source response - includes all fields from DataSource model"""
     id: str
     name: str
     type: str
-    format: str
-    description: Optional[str]
-    connection_config: Dict[str, Any]
-    organization_id: Optional[str]
-    project_id: Optional[str]
-    is_active: bool
-    created_at: datetime
-    updated_at: datetime
-    last_accessed: Optional[datetime]
+    format: Optional[str] = None
+    db_type: Optional[str] = None
+    description: Optional[str] = None
+    connection_config: Optional[Dict[str, Any]] = None
+    project_id: Optional[str] = None
+    is_active: bool = True
+    created_at: datetime = None  # type: ignore
+    updated_at: Optional[datetime] = None
+    last_accessed: Optional[datetime] = None
     connection_status: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
+    
+    # Additional fields from model that were missing
+    schema: Optional[Dict[str, Any]] = None
+    row_count: Optional[int] = None
+    size: Optional[int] = None
+    file_path: Optional[str] = None
+    original_filename: Optional[str] = None
+    sample_data: Optional[List[Dict[str, Any]]] = None
+    user_id: Optional[str] = None
 
 class DataSourcesCRUD:
     """Complete CRUD operations for data sources"""
@@ -81,10 +89,8 @@ class DataSourcesCRUD:
             data_source_id = str(uuid.uuid4())
             
             # Create data source
-            # Map description into metadata to match DataSource model fields
+            # Metadata can be used for other non-standard fields if needed
             metadata = {}
-            if getattr(data_source_data, 'description', None):
-                metadata['description'] = data_source_data.description
 
             # Encrypt sensitive fields in connection_config before storing
             conn_cfg = data_source_data.connection_config or {}
@@ -98,10 +104,10 @@ class DataSourcesCRUD:
                 name=data_source_data.name,
                 type=data_source_data.type,
                 format=data_source_data.format,
+                description=data_source_data.description,
                 connection_config=conn_cfg,
                 metadata=json.dumps(metadata) if metadata else None,
                 user_id=user_id,
-                tenant_id=data_source_data.organization_id,
                 is_active=data_source_data.is_active,
                 created_at=datetime.now(timezone.utc),
                 updated_at=datetime.now(timezone.utc)
@@ -136,16 +142,23 @@ class DataSourcesCRUD:
                 name=data_source.name,
                 type=data_source.type,
                 format=data_source.format,
+                db_type=data_source.db_type,
                 description=data_source.description,
                 connection_config=data_source.connection_config,
-                organization_id=data_source.tenant_id,
                 project_id=data_source_data.project_id,
                 is_active=data_source.is_active,
                 created_at=data_source.created_at,
                 updated_at=data_source.updated_at,
                 last_accessed=data_source.last_accessed,
                 connection_status=connection_status,
-                metadata=metadata
+                metadata=metadata,
+                schema=data_source.schema,
+                row_count=data_source.row_count,
+                size=data_source.size,
+                file_path=data_source.file_path,
+                original_filename=data_source.original_filename,
+                sample_data=data_source.sample_data,
+                user_id=data_source.user_id
             )
             
         except Exception as e:
@@ -177,9 +190,10 @@ class DataSourcesCRUD:
             if not data_source:
                 return None
             
-            # Test connection status
+            # Test connection status and fetch schema (only when retrieving a specific data source)
             connection_status = "unknown"
             metadata = {}
+            fetched_schema = None
             if data_source.connection_config:
                 try:
                     test_result = await self.real_data_manager.test_connection(data_source)
@@ -187,8 +201,8 @@ class DataSourcesCRUD:
                     
                     # Get schema if connected
                     if connection_status == "connected" and data_source.type == "database":
-                        schema = await self.real_data_manager.get_schema(data_source)
-                        metadata = {"schema": schema}
+                        fetched_schema = await self.real_data_manager.get_schema(data_source)
+                        metadata = {"schema": fetched_schema}
                 except Exception as e:
                     logger.warning(f"Connection test failed: {e}")
                     connection_status = "failed"
@@ -197,21 +211,31 @@ class DataSourcesCRUD:
             except Exception:
                 pass
 
+            # Use fetched schema if available, otherwise fall back to model's schema
+            schema_to_return = fetched_schema if fetched_schema is not None else data_source.schema
+
             return DataSourceResponse(
                 id=data_source.id,
                 name=data_source.name,
                 type=data_source.type,
                 format=data_source.format,
+                db_type=data_source.db_type,
                 description=data_source.description,
                 connection_config=data_source.connection_config,
-                organization_id=data_source.tenant_id,
                 project_id=None,  # Would need to join with project_data_source table
                 is_active=data_source.is_active,
                 created_at=data_source.created_at,
                 updated_at=data_source.updated_at,
                 last_accessed=data_source.last_accessed,
                 connection_status=connection_status,
-                metadata=metadata
+                metadata=metadata,
+                schema=schema_to_return,  # Use fetched schema if available
+                row_count=data_source.row_count,
+                size=data_source.size,
+                file_path=data_source.file_path,
+                original_filename=data_source.original_filename,
+                sample_data=data_source.sample_data,
+                user_id=data_source.user_id
             )
             
         except Exception as e:
@@ -224,19 +248,15 @@ class DataSourcesCRUD:
     async def list_data_sources(
         self,
         user_id: str,
-        organization_id: Optional[str] = None,
         project_id: Optional[str] = None,
         data_source_type: Optional[str] = None,
         is_active: Optional[bool] = None,
         session: Optional[AsyncSession] = None
     ) -> List[DataSourceResponse]:
-        """List data sources with filters"""
+        """List data sources for a user. Organization/project filters are ignored in simplified mode."""
         try:
-            # Build query
+            # Build query - strictly user-scoped
             query = select(DataSource).where(DataSource.user_id == user_id)
-            
-            if organization_id:
-                query = query.where(DataSource.tenant_id == organization_id)
             
             if data_source_type:
                 query = query.where(DataSource.type == data_source_type)
@@ -251,39 +271,32 @@ class DataSourcesCRUD:
             data_sources = result.scalars().all()
             
             # Convert to response objects
+            # NOTE: Connection testing is NOT performed during listing for performance.
+            # Connection testing and schema fetching only happen when a specific data source is retrieved.
             responses = []
             for data_source in data_sources:
-                # Test connection status
-                connection_status = "unknown"
-                metadata = {}
-                if data_source.connection_config:
-                    try:
-                        test_result = await self.real_data_manager.test_connection(data_source)
-                        connection_status = "connected" if test_result.success else "failed"
-                        
-                        # Get schema if connected
-                        if connection_status == "connected" and data_source.type == "database":
-                            schema = await self.real_data_manager.get_schema(data_source)
-                            metadata = {"schema": schema}
-                    except Exception as e:
-                        logger.warning(f"Connection test failed: {e}")
-                        connection_status = "failed"
-                
                 responses.append(DataSourceResponse(
                     id=data_source.id,
                     name=data_source.name,
                     type=data_source.type,
                     format=data_source.format,
+                    db_type=data_source.db_type,
                     description=data_source.description,
                     connection_config=data_source.connection_config,
-                    organization_id=data_source.tenant_id,
                     project_id=project_id,
                     is_active=data_source.is_active,
                     created_at=data_source.created_at,
                     updated_at=data_source.updated_at,
                     last_accessed=data_source.last_accessed,
-                    connection_status=connection_status,
-                    metadata=metadata
+                    connection_status=None,  # Not tested during listing
+                    metadata={},  # Empty metadata during listing
+                    schema=None,  # Not fetched during listing
+                    row_count=data_source.row_count,
+                    size=data_source.size,
+                    file_path=data_source.file_path,
+                    original_filename=data_source.original_filename,
+                    sample_data=data_source.sample_data,
+                    user_id=data_source.user_id
                 ))
             
             return responses
@@ -365,16 +378,23 @@ class DataSourcesCRUD:
                 name=data_source.name,
                 type=data_source.type,
                 format=data_source.format,
+                db_type=data_source.db_type,
                 description=data_source.description,
                 connection_config=data_source.connection_config,
-                organization_id=data_source.tenant_id,
                 project_id=None,
                 is_active=data_source.is_active,
                 created_at=data_source.created_at,
                 updated_at=data_source.updated_at,
                 last_accessed=data_source.last_accessed,
                 connection_status=connection_status,
-                metadata=metadata
+                metadata=metadata,
+                schema=data_source.schema,
+                row_count=data_source.row_count,
+                size=data_source.size,
+                file_path=data_source.file_path,
+                original_filename=data_source.original_filename,
+                sample_data=data_source.sample_data,
+                user_id=data_source.user_id
             )
             
         except HTTPException:

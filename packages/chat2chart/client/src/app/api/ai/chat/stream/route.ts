@@ -6,11 +6,19 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const backendBase = getBackendUrlForApi();
 
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    
+    // Forward Authorization header if present
+    const authHeader = request.headers.get('Authorization');
+    if (authHeader) {
+      headers['Authorization'] = authHeader;
+    }
+
     const upstream = await fetch(`${backendBase}/ai/chat/stream`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify(body),
     });
 

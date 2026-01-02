@@ -1,9 +1,0 @@
-FROM cubejs/cube:latest
-
-# Copy canonical cube schemas into the image for enterprise deployments
-COPY ../cube_schemas /cube/conf/schema
-
-# Preserve default entrypoint and expose same ports
-EXPOSE 4000 3031
-
-

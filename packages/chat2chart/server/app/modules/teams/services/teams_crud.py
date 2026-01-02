@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from fastapi import HTTPException, status
 
-from app.modules.user.models import User
+# User model removed - user management will be handled by Supabase
 from app.modules.projects.models import Organization, UserOrganization, Project, ProjectUser
 
 logger = logging.getLogger(__name__)
@@ -111,16 +111,12 @@ class TeamsCRUD:
     ) -> TeamMemberResponse:
         """Add a team member to organization/project"""
         try:
-            # Check if user exists
-            user_result = await session.execute(
-                select(User).where(User.id == member_data.user_id)
-            )
-            user = user_result.scalar_one_or_none()
-            
-            if not user:
+            # Users table removed - user validation will be done via Supabase
+            # For now, just validate that user_id is provided
+            if not member_data.user_id:
                 raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="User not found"
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="user_id is required"
                 )
             
             # Check if organization exists
@@ -185,17 +181,18 @@ class TeamsCRUD:
             
             await session.commit()
             
+            # User details will be fetched from Supabase when integrated
             return TeamMemberResponse(
-                user_id=user.id,
-                username=user.username,
-                email=user.email,
-                full_name=user.full_name,
+                user_id=member_data.user_id,
+                username=None,  # Will be fetched from Supabase
+                email=None,  # Will be fetched from Supabase
+                full_name=None,  # Will be fetched from Supabase
                 role=member_data.role,
                 organization_id=member_data.organization_id,
                 project_id=member_data.project_id,
                 is_active=True,
                 joined_at=datetime.now(timezone.utc),
-                last_accessed=user.last_login,
+                last_accessed=None,  # Will be fetched from Supabase
                 permissions=self.role_permissions.get(member_data.role, [])
             )
             
@@ -217,11 +214,10 @@ class TeamsCRUD:
     ) -> List[TeamMemberResponse]:
         """Get team members for organization/project"""
         try:
+            # Users table removed - user info will come from Supabase
             if project_id:
                 # Get project team members
-                query = select(ProjectUser, User).join(
-                    User, ProjectUser.user_id == User.id
-                ).where(
+                query = select(ProjectUser).where(
                     and_(
                         ProjectUser.project_id == project_id,
                         ProjectUser.is_active
@@ -229,9 +225,7 @@ class TeamsCRUD:
                 )
             else:
                 # Get organization team members
-                query = select(UserOrganization, User).join(
-                    User, UserOrganization.user_id == User.id
-                ).where(
+                query = select(UserOrganization).where(
                     and_(
                         UserOrganization.organization_id == organization_id,
                         UserOrganization.is_active
@@ -244,25 +238,26 @@ class TeamsCRUD:
             team_members = []
             for member_data in members:
                 if project_id:
-                    member, user = member_data
+                    member = member_data
                     role = member.role
                     joined_at = member.joined_at
                 else:
-                    member, user = member_data
+                    member = member_data
                     role = member.role
-                    joined_at = member.joined_at
+                    joined_at = member.created_at if hasattr(member, 'created_at') else None
                 
+                # User details will be fetched from Supabase when integrated
                 team_members.append(TeamMemberResponse(
-                    user_id=user.id,
-                    username=user.username,
-                    email=user.email,
-                    full_name=user.full_name,
+                    user_id=member.user_id,
+                    username=None,  # Will be fetched from Supabase
+                    email=None,  # Will be fetched from Supabase
+                    full_name=None,  # Will be fetched from Supabase
                     role=role,
                     organization_id=organization_id,
                     project_id=project_id,
-                    is_active=member.is_active,
+                    is_active=member.is_active if hasattr(member, 'is_active') else True,
                     joined_at=joined_at,
-                    last_accessed=user.last_login,
+                    last_accessed=None,  # Will be fetched from Supabase
                     permissions=self.role_permissions.get(role, [])
                 ))
             
@@ -325,25 +320,21 @@ class TeamsCRUD:
             
             await session.flush()
             
-            # Get user details
-            user_result = await session.execute(
-                select(User).where(User.id == user_id)
-            )
-            user = user_result.scalar_one()
-            
+            # Users table removed - user details will be fetched from Supabase
             await session.commit()
             
+            # User details will be fetched from Supabase when integrated
             return TeamMemberResponse(
-                user_id=user.id,
-                username=user.username,
-                email=user.email,
-                full_name=user.full_name,
+                user_id=user_id,
+                username=None,  # Will be fetched from Supabase
+                email=None,  # Will be fetched from Supabase
+                full_name=None,  # Will be fetched from Supabase
                 role=org_member.role,
                 organization_id=organization_id,
                 project_id=None,
                 is_active=org_member.is_active,
-                joined_at=org_member.joined_at,
-                last_accessed=user.last_login,
+                joined_at=org_member.created_at.isoformat() if org_member.created_at else None,
+                last_accessed=None,  # Will be fetched from Supabase
                 permissions=self.role_permissions.get(org_member.role, [])
             )
             
@@ -421,16 +412,9 @@ class TeamsCRUD:
     ) -> TeamInviteResponse:
         """Invite a team member via email"""
         try:
-            # Check if user already exists with this email
-            existing_user = await session.execute(
-                select(User).where(User.email == invite_data.email)
-            )
-            
-            if existing_user.scalar_one_or_none():
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="User with this email already exists"
-                )
+            # Users table removed - user lookup will be done via Supabase
+            # For now, we'll need user_id to be provided or looked up from Supabase
+            # This invite functionality will be fully implemented with Supabase integration
             
             # Check if organization exists
             org_result = await session.execute(

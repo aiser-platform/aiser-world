@@ -518,15 +518,11 @@ class OrganizationService(
                             except Exception:
                                 final_user_val = maybe
                         else:
-                            # Try email/username lookup
-                            email = user_id.get('email')
-                            username = user_id.get('username')
-                            if email or username:
-                                q = select(User).where((User.email == email) if email else (User.username == username))
-                                pres = await db.execute(q)
-                                u = pres.scalar_one_or_none()
-                                if u:
-                                    final_user_val = u.id
+                            # Users table removed - use user_id directly from token payload
+                            # User lookup will be handled by Supabase integration
+                            final_user_val = user_id.get('id') or user_id.get('user_id') or user_id.get('sub')
+                            if final_user_val:
+                                final_user_val = str(final_user_val)
                     else:
                         # Try to convert to UUID if it's a UUID string
                         try:

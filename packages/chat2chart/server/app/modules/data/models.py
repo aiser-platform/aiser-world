@@ -4,6 +4,7 @@ Database models for data sources and connections
 """
 
 from sqlalchemy import Column, String, Integer, DateTime, Text, JSON, Boolean
+from sqlalchemy.dialects.postgresql import BYTEA
 from sqlalchemy.sql import func
 from app.common.model import Base
 
@@ -41,9 +42,8 @@ class DataSource(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
-    # User and tenant
-    user_id = Column(String, nullable=True)
-    tenant_id = Column(String, nullable=False, default="default")
+    # User ownership (required for security and data isolation)
+    user_id = Column(String, nullable=False, index=True)
 
     # Status
     is_active = Column(Boolean, default=True)
@@ -77,39 +77,35 @@ class DataQuery(Base):
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    # User and tenant
-    user_id = Column(String, nullable=True)
-    tenant_id = Column(String, nullable=False, default="default")
+    # User ownership (required for security and data isolation)
+    user_id = Column(String, nullable=False, index=True)
 
 
-class DataConnection(Base):
-    """Data connection model for database connections"""
+# DataConnection model removed - use DataSource for both files and databases
 
-    __tablename__ = "data_connections"
 
-    id = Column(String, primary_key=True, index=True)
-    name = Column(String, nullable=False)
-    type = Column(String, nullable=False)  # 'postgresql', 'mysql', etc.
-
-    # Connection details (encrypted in production)
-    host = Column(String, nullable=False)
-    port = Column(Integer, nullable=False)
-    database = Column(String, nullable=False)
-    username = Column(String, nullable=False)
-    password = Column(String, nullable=False)  # Should be encrypted
-
-    # Connection options
-    connection_options = Column(JSON, nullable=True)
-
-    # Status
-    is_active = Column(Boolean, default=True)
-    last_tested = Column(DateTime(timezone=True), nullable=True)
-    test_status = Column(String, nullable=True)  # 'success', 'failed'
-
+class FileStorage(Base):
+    """Table for storing file binary data in PostgreSQL"""
+    
+    __tablename__ = "file_storage"
+    
+    # Object key (used as file_path in data_sources)
+    object_key = Column(String, primary_key=True, index=True)
+    
+    # Binary data
+    file_data = Column(BYTEA, nullable=False)  # PostgreSQL BYTEA type
+    
+    # Metadata
+    file_size = Column(Integer, nullable=False)
+    content_type = Column(String, nullable=True)
+    original_filename = Column(String, nullable=True)
+    
+    # Ownership
+    user_id = Column(String, nullable=False, index=True)
+    
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-
-    # User and tenant
-    user_id = Column(String, nullable=True)
-    tenant_id = Column(String, nullable=False, default="default")
+    
+    # Soft delete
+    is_active = Column(Boolean, default=True)

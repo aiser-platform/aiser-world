@@ -148,7 +148,7 @@ class EnhancedChatService:
             )
 
     async def _process_analytics_query(
-        self, data: ChatSchema, tenant_id: str, user_id: Optional[str]
+        self, data: ChatSchema, user_id: Optional[str]
     ) -> ChatResponseSchema:
         """
         Process analytics queries through Cube.js AI engine
@@ -158,7 +158,7 @@ class EnhancedChatService:
 
             # Query Cube.js AI Analytics
             cube_result = await self.cube_service.process_chat_query(
-                data.prompt, tenant_id, user_id
+                data.prompt, user_id
             )
 
             if not cube_result.get("success", False):

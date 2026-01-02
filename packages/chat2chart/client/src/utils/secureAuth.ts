@@ -21,34 +21,18 @@ export function isValidToken(token: string | null | undefined): boolean {
 }
 
 /**
- * Gets secure authentication headers
- * Only includes Authorization header if token is valid
- * Prefers cookies for authentication (more secure)
- * @param includeAuthHeader - Whether to include Authorization header (default: false, prefers cookies)
- * @returns Headers object with secure authentication
+ * Gets secure authentication headers using Supabase session token
+ * @param session - Supabase session object with access_token
+ * @returns Headers object with Bearer token authentication
  */
-export function getSecureAuthHeaders(includeAuthHeader: boolean = false): Record<string, string> {
+export function getSecureAuthHeaders(session: { access_token?: string } | null | undefined): Record<string, string> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
 
-  // Only add Authorization header if explicitly requested and token is valid
-  if (includeAuthHeader) {
-    try {
-      // Try multiple token storage locations (in order of preference)
-      const token = 
-        localStorage.getItem('aiser_access_token') ||
-        localStorage.getItem('access_token') ||
-        localStorage.getItem('token');
-      
-      if (isValidToken(token)) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-      // If token is invalid, rely on cookies (credentials: 'include' handles this)
-    } catch (error) {
-      // Silently fail - rely on cookies for auth
-      console.debug('SecureAuth: Could not access token storage');
-    }
+  // Add Bearer token from Supabase session if available
+  if (session?.access_token && isValidToken(session.access_token)) {
+    headers['Authorization'] = `Bearer ${session.access_token}`;
   }
 
   // Filter out undefined values to ensure type safety

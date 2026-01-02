@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getBackendUrlForApi } from '@/utils/backendUrl';
-import { extractAccessToken } from '@/utils/cookieParser';
 
 export async function POST(request: NextRequest) {
   try {
@@ -8,18 +7,14 @@ export async function POST(request: NextRequest) {
     // Forward the request to the backend using dynamic backend URL
     const backendBase = getBackendUrlForApi();
     
-    // Extract auth cookie using reliable cookie parser
-    const accessToken = extractAccessToken({
-      cookies: request.cookies,
-      headers: request.headers
-    });
-    
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
     
-    if (accessToken) {
-      headers['Authorization'] = `Bearer ${accessToken}`;
+    // Forward Authorization header if present
+    const authHeader = request.headers.get('Authorization');
+    if (authHeader) {
+      headers['Authorization'] = authHeader;
     }
     
     // Check if streaming is requested

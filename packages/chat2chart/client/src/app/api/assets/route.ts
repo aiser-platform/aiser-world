@@ -1,27 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getBackendUrlForApi } from '@/utils/backendUrl';
-import { extractAccessToken } from '@/utils/cookieParser';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const backendBase = getBackendUrlForApi();
     
-    // Use extractAccessToken for reliable token extraction
-    const accessToken = extractAccessToken(request);
-    
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
     
-    if (accessToken) {
-      headers['Authorization'] = `Bearer ${accessToken}`;
-    }
-    
-    // Also forward cookies
-    const cookieHeader = request.headers.get('Cookie');
-    if (cookieHeader) {
-      headers['Cookie'] = cookieHeader;
+    // Forward Authorization header if present
+    const authHeader = request.headers.get('Authorization');
+    if (authHeader) {
+      headers['Authorization'] = authHeader;
     }
     
     const response = await fetch(`${backendBase}/assets`, {
@@ -55,21 +47,14 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const backendBase = getBackendUrlForApi();
     
-    // Use extractAccessToken for reliable token extraction
-    const accessToken = extractAccessToken(request);
-    
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
     
-    if (accessToken) {
-      headers['Authorization'] = `Bearer ${accessToken}`;
-    }
-    
-    // Also forward cookies
-    const cookieHeader = request.headers.get('Cookie');
-    if (cookieHeader) {
-      headers['Cookie'] = cookieHeader;
+    // Forward Authorization header if present
+    const authHeader = request.headers.get('Authorization');
+    if (authHeader) {
+      headers['Authorization'] = authHeader;
     }
     
     // Build query string from search params

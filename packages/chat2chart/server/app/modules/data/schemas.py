@@ -45,7 +45,6 @@ class DataSource(DataSourceBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
     user_id: Optional[str] = None
-    tenant_id: str
     is_active: bool
     last_accessed: Optional[datetime] = None
 

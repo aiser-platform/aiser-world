@@ -48,8 +48,8 @@ class Project(BaseModel):
     name = Column(String(100), nullable=False)
     description = Column(Text, nullable=True)
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
-    # created_by stored as UUID to match `users.id` primary key
-    created_by = Column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    # created_by stored as UUID (references external user ID, e.g., from Supabase)
+    created_by = Column(PG_UUID(as_uuid=True), nullable=False)
     
     # Project settings
     is_public = Column(Boolean, default=False)
@@ -66,7 +66,6 @@ class Project(BaseModel):
     
     # Relationships
     organization = relationship("Organization", back_populates="projects")
-    owner = relationship("User", back_populates="owned_projects")
     data_sources = relationship("ProjectDataSource", back_populates="project", cascade="all, delete-orphan")
     conversations = relationship("ProjectConversation", back_populates="project", cascade="all, delete-orphan")
 
@@ -107,7 +106,7 @@ class UserOrganization(BaseModel):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), nullable=False)
     role = Column(String(50), default="member")  # member, admin, owner
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -115,7 +114,6 @@ class UserOrganization(BaseModel):
     
     # Relationships
     organization = relationship("Organization", back_populates="user_organizations")
-    user = relationship("User", back_populates="user_organizations")
 
 
 # Note: User and ChatConversation models are defined in their respective modules

@@ -36,7 +36,6 @@ import {
     ArrowUpOutlined
 } from '@ant-design/icons';
 import { useRouter } from 'next/navigation';
-import { useOrganization } from '@/context/OrganizationContext';
 import { usePlanRestrictions } from '@/hooks/usePlanRestrictions';
 import { usePermissions, Permission } from '@/hooks/usePermissions';
 import { PermissionGuard } from '@/components/PermissionGuard';
@@ -46,11 +45,8 @@ const { Option } = Select;
 
 const ProjectsPage: React.FC = React.memo(() => {
     const router = useRouter();
-    const { currentOrganization, usageStats, getOrganizationUsage } = useOrganization();
     const { showUpgradePrompt, UpgradeModal } = usePlanRestrictions();
-    const { hasPermission } = usePermissions({
-        organizationId: currentOrganization?.id,
-    });
+    const { hasPermission } = usePermissions();
     const [loading, setLoading] = useState(false);
     const [fetching, setFetching] = useState(true);
     const [isModalVisible, setIsModalVisible] = useState(false);

@@ -8,6 +8,7 @@ from app.modules.chats.conversations.schemas import (
     SpecificConversationResponseSchema,
 )
 from app.modules.chats.messages.repository import MessageRepository
+from app.modules.chats.messages.schemas import MessageResponseSchema
 import logging
 import uuid
 from typing import Optional
@@ -157,11 +158,30 @@ class ConversationService(
                 offset, limit, filter_query={"conversation_id": conversation_id}
             )
 
+            # CRITICAL: Convert SQLAlchemy model instances to Pydantic schemas
+            # The repository.get_all() returns raw SQLAlchemy model instances, not Pydantic models.
+            # We need to convert them to MessageResponseSchema to ensure proper serialization.
+            #
+            # Issue: The ChatMessage model has `message_metadata = Column("metadata", JSONB)`
+            # which means the database column is "metadata" but the Python attribute is "message_metadata".
+            # When Pydantic tries to validate with `from_attributes=True`, it may incorrectly
+            # access SQLAlchemy's MetaData() object instead of the actual column value.
+            #
+            # Solution: Explicitly convert each message to a dict, mapping `message_metadata` to `metadata`,
+            # then validate with MessageResponseSchema to ensure JSONB fields are properly serialized as dicts.
+            messages_schemas = [
+                MessageResponseSchema.model_validate({
+                    **{k: v for k, v in msg.__dict__.items() if not k.startswith('_')},
+                    'metadata': getattr(msg, 'message_metadata', None)
+                })
+                for msg in messages
+            ]
+
             return SpecificConversationResponseSchema(
                 conversation=ConversationResponseSchema.model_validate(
                     conversation.__dict__
                 ),
-                messages=messages,
+                messages=messages_schemas,  # Now properly converted Pydantic models
                 pagination=pagination,
             )
         except Exception as e:

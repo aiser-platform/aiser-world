@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { Modal, Button, Space, Typography, Select, Row, Col, Card, Tag, Divider, message } from 'antd';
-import { useOrganization } from '@/context/OrganizationContext';
 import { addWatermarkToChart } from '@/utils/watermark';
 import {
   BarChartOutlined,
@@ -39,7 +38,6 @@ const ChartGenerationModal: React.FC<ChartGenerationModalProps> = ({
   queryColumns,
   isDarkMode
 }) => {
-  const { currentOrganization } = useOrganization();
   const [selectedChartType, setSelectedChartType] = useState('bar');
   const [selectedXAxis, setSelectedXAxis] = useState('');
   const [selectedYAxis, setSelectedYAxis] = useState('');

@@ -61,14 +61,13 @@ class DataRetentionService:
                     SELECT id, file_path
                     FROM data_sources
                     WHERE type = 'file'
-                      AND tenant_id::text = :tenant_id
                       AND is_active = TRUE
                       AND created_at < :cutoff
                     """
                 )
                 ds_result = await self.db.execute(
                     ds_query,
-                    {"tenant_id": str(org_id), "cutoff": cutoff},
+                    {"cutoff": cutoff},
                 )
                 ds_rows = ds_result.fetchall() or []
 

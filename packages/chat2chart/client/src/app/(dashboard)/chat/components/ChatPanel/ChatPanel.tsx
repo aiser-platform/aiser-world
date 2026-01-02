@@ -1,10 +1,7 @@
 import { IFileUpload } from '@/app/components/FileUpload/types';
-import { fetchApi } from '@/utils/api';
-import { apiService } from '@/services/apiService';
-import { conversationService, Conversation, Message } from '@/services/conversationService';
-import { conversationSessionManager } from '@/services/conversationSessionManager';
+import { useConversations } from '@/context/ConversationContext';
 import { isStreamingEnabled, setStreamingEnabled, toggleStreaming } from '@/utils/streamingConfig';
-import { SendOutlined, BulbOutlined, AudioOutlined, LinkOutlined, DatabaseOutlined, SettingOutlined, UserOutlined, PlusOutlined, FileTextOutlined, BarChartOutlined, MessageOutlined, ReloadOutlined, DownloadOutlined, CopyOutlined, ShareAltOutlined, InfoCircleOutlined, CodeOutlined, FileOutlined, EyeOutlined, EyeInvisibleOutlined, EditOutlined, DeleteOutlined, MoreOutlined, RiseOutlined, PieChartOutlined, SearchOutlined, LikeOutlined, DislikeOutlined, HeartOutlined, RocketOutlined, StopOutlined, DownOutlined, SaveOutlined, HistoryOutlined, CrownOutlined, TableOutlined, PaperClipOutlined, CloseOutlined } from '@ant-design/icons';
+import { SendOutlined, BulbOutlined, DatabaseOutlined, UserOutlined, MessageOutlined, CopyOutlined, ShareAltOutlined, CodeOutlined, HeartOutlined, StopOutlined, SaveOutlined, PaperClipOutlined, CloseOutlined } from '@ant-design/icons';
 import { Button, Input, Card, Tag, Space, Tooltip, Alert, Typography, Avatar, Divider, Empty, Spin, Select, Tabs, Dropdown, Menu, message as antMessage, Checkbox, Modal, Progress, Switch, Table } from 'antd';
 import UniversalDataSourceModal from '@/app/components/UniversalDataSourceModal/UniversalDataSourceModal';
 import InlineModeSelector from './InlineModeSelector';
@@ -14,7 +11,6 @@ import AnimatedAIAvatar from './AnimatedAIAvatar';
 import SessionHistoryDropdown from './SessionHistoryDropdown';
 import AssetLibraryDropdown from './AssetLibraryDropdown';
 import AiserAIIcon from '@/app/components/AiserAIIcon/AiserAIIcon';
-import { usePlanRestrictions } from '@/hooks/usePlanRestrictions';
 import { makeMessageUserFriendly, makeProgressMessageUserFriendly, makeErrorMessageUserFriendly } from '@/utils/userFriendlyMessages';
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import shortid from 'shortid';
@@ -30,15 +26,13 @@ import {
 // Removed: MessageBox and EnhancedChatMessage components deleted
 import './styles.css';
 import { useAuth } from '@/context/AuthContext';
-import Markdown from 'react-markdown';
-import rehypeRaw from 'rehype-raw';
 import * as echarts from 'echarts';
-import { addWatermarkToChart } from '@/utils/watermark';
-import { useOrganization } from '@/context/OrganizationContext';
 import { getSecureAuthHeaders, isValidToken, sanitizeErrorMessage, isAuthError, handleAuthError } from '@/utils/secureAuth';
 import ChartMessage from './ChartMessage';
 import DeepAnalysisReport from './DeepAnalysisReport';
 import ThoughtProcessDisplay from './ThoughtProcessDisplay';
+import { useDataSources } from '@/context/DataSourceContext';
+import { useRouter } from 'next/navigation';
 
 const { TextArea } = Input;
 const { Title, Text, Paragraph } = Typography;
@@ -47,16 +41,10 @@ const AISER_AI_HANDLE = '@AicserAI';
 const CHAT_LOADING_MESSAGE = `${AISER_AI_NAME} is analyzing your request...`;
 const LIMIT = 10;
 
-const sanitizeMessages = (msgs: IChatMessage[] = []) =>
-    msgs.filter(
-        (msg) => msg && msg.id !== 'processing' && msg.messageType !== 'processing'
-    );
-
 interface ChatPanelProps {
     conversationId?: string;
     callback: (data: { conversation: IConversation }) => void;
     selectedDataSource?: any;
-    selectedDataSources?: any[];
     mode?: string;
     onModeChange?: (mode: string) => void;
     model?: string;
@@ -68,16 +56,26 @@ interface ChatPanelProps {
 }
 
 const ChatPanel: React.FC<ChatPanelProps> = (props) => {
-    // CRITICAL: All hooks must be called unconditionally at the top level
-    // This prevents "Rendered more hooks than during the previous render" errors
-    const { isAuthenticated, loading: authLoading, user } = useAuth();
-    const { hasFeature, canPerformAction, showUpgradePrompt, UpgradeModal } = usePlanRestrictions();
-    const { currentOrganization, getOrganizationUsage } = useOrganization();
+    const router = useRouter();
+    const { 
+        refreshDataSources, 
+        selectDataSource: contextSelectDataSource,
+        dataSources: contextDataSources 
+    } = useDataSources();
+    const { isAuthenticated, authLoading, user, session } = useAuth();
+    const { messages: contextMessages, createNewConversation, addMessage, updateConversationMetadata } = useConversations();
     const [prompt, setPrompt] = useState('');
-    const [messages, setMessages] = useState<IChatMessage[]>([]);
+    // Get messages from context for current conversation
+    const contextMessagesForConversation = props.conversationId 
+        ? (contextMessages.get(props.conversationId) || [])
+        : [];
+    // Temporary messages for UI feedback (processing, streaming updates) - not persisted
+    const [temporaryMessages, setTemporaryMessages] = useState<IChatMessage[]>([]);
+    // Merge context messages with temporary messages for display
+    const messages = [...contextMessagesForConversation, ...temporaryMessages];
     const [isLoading, setIsLoading] = useState(false);
     const [isStreaming, setIsStreaming] = useState(false);
-    const [streamingMessage, setStreamingMessage] = useState<string>('');
+    // const [streamingMessage, setStreamingMessage] = useState<string>('');
     const [streamingEnabled, setStreamingEnabledState] = useState(isStreamingEnabled());
     const [progressState, setProgressState] = useState<{
         percentage: number;
@@ -88,18 +86,8 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
     const [currentMode, setCurrentMode] = useState(props.mode || 'standard');
     const [currentModel, setCurrentModel] = useState(props.model || 'auto'); // Default to 'auto'
     const [availableModels, setAvailableModels] = useState<any[]>([]);
-    const [reactions, setReactions] = useState<Record<string, string[]>>({});
+    // const [reactions, setReactions] = useState<Record<string, string[]>>({});
     const [favorites, setFavorites] = useState<Set<string>>(new Set());
-    const [comments, setComments] = useState<Record<string, string[]>>({});
-    const [isTyping, setIsTyping] = useState(false);
-    const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(null);
-    const [messageCache, setMessageCache] = useState<{
-        [key: string]: {
-            messages: IChatMessage[];
-            conversation: IConversation;
-            pagination: Pagination;
-        };
-    }>({});
     const [uploadingFile, setUploadingFile] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
@@ -109,15 +97,15 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
 
     const authGuardActive = !authLoading && !isAuthenticated;
     const isSendBusy = isLoading || isStreaming;
-    const sendButtonDisabled = authGuardActive || (!prompt.trim() && !isSendBusy);
-    const sendButtonTooltip = authGuardActive
-        ? 'Sign in to chat with Aicser AI'
-        : isSendBusy
-            ? 'Click to stop'
-            : '💡 Tip: Use Ctrl+Enter to send, Esc to clear';
-    const sendButtonType = authGuardActive || isSendBusy ? 'default' : 'primary';
-    const sendButtonIcon = isSendBusy ? <StopOutlined /> : <SendOutlined />;
-    const sendButtonText = isSendBusy ? 'Stop' : 'Send';
+    // const sendButtonDisabled = authGuardActive || (!prompt.trim() && !isSendBusy);
+    // const sendButtonTooltip = authGuardActive
+    //     ? 'Sign in to chat with Aicser AI'
+    //     : isSendBusy
+    //         ? 'Click to stop'
+    //         : '💡 Tip: Use Ctrl+Enter to send, Esc to clear';
+    // const sendButtonType = authGuardActive || isSendBusy ? 'default' : 'primary';
+    // const sendButtonIcon = isSendBusy ? <StopOutlined /> : <SendOutlined />;
+    // const sendButtonText = isSendBusy ? 'Stop' : 'Send';
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -128,44 +116,44 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
     const uploadedDataSourceIdRef = useRef<string | undefined>(undefined); // Store uploaded data source ID across async operations
     
     // Render real-time progress based on actual state (simplified, no duplication)
-    const renderProgressSteps = (progress: { percentage: number; message: string; stage: string } | null) => {
-        if (!progress) {
-            return <span>Starting workflow...</span>;
-        }
+    // const renderProgressSteps = (progress: { percentage: number; message: string; stage: string } | null) => {
+    //     if (!progress) {
+    //         return <span>Starting workflow...</span>;
+    //     }
         
-        const currentStage = progress.stage || 'start';
-        const currentMessage = progress.message || 'Processing...';
+    //     const currentStage = progress.stage || 'start';
+    //     const currentMessage = progress.message || 'Processing...';
         
-        // Use user-friendly message utility
-        const friendlyMessage = makeProgressMessageUserFriendly(currentStage, currentMessage);
+    //     // Use user-friendly message utility
+    //     const friendlyMessage = makeProgressMessageUserFriendly(currentStage, currentMessage);
         
-        // Map stages to icons
-        const stageIcons: Record<string, string> = {
-            'start': '🚀',
-            'route_query': '🔍',
-            'nl2sql': '💾',
-            'nl2sql_complete': '✓',
-            'validate_sql': '✓',
-            'sql_validated': '✓',
-            'execute_query': '⚡',
-            'query_executed': '✓',
-            'validate_results': '✓',
-            'results_validated': '✓',
-            'generate_chart': '📊',
-            'generate_insights': '💡',
-            'unified_chart_insights': '📊',
-            'complete': '✅'
-        };
+    //     // Map stages to icons
+    //     const stageIcons: Record<string, string> = {
+    //         'start': '🚀',
+    //         'route_query': '🔍',
+    //         'nl2sql': '💾',
+    //         'nl2sql_complete': '✓',
+    //         'validate_sql': '✓',
+    //         'sql_validated': '✓',
+    //         'execute_query': '⚡',
+    //         'query_executed': '✓',
+    //         'validate_results': '✓',
+    //         'results_validated': '✓',
+    //         'generate_chart': '📊',
+    //         'generate_insights': '💡',
+    //         'unified_chart_insights': '📊',
+    //         'complete': '✅'
+    //     };
         
-        const icon = stageIcons[currentStage] || '⏳';
+    //     const icon = stageIcons[currentStage] || '⏳';
         
-        return (
-            <>
-                <span style={{ fontSize: '14px' }}>{icon}</span>
-                <span>{friendlyMessage}</span>
-            </>
-        );
-    };
+    //     return (
+    //         <>
+    //             <span style={{ fontSize: '14px' }}>{icon}</span>
+    //             <span>{friendlyMessage}</span>
+    //         </>
+    //     );
+    // };
 
     // Fetch available models on component mount
     useEffect(() => {
@@ -174,7 +162,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                 const response = await fetch('/api/models', {
                     method: 'GET',
                     credentials: 'include',
-                    headers: getSecureAuthHeaders(false) // Prefer cookies for auth
+                    headers: getSecureAuthHeaders(session)
                 });
                 const result = await response.json();
                 if (result.success && result.models) {
@@ -198,7 +186,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                 const resp = await fetch('/api/users/preferences/ai-model', {
                     method: 'GET',
                     credentials: 'include',
-                    headers: getSecureAuthHeaders(false) // Prefer cookies for auth
+                    headers: getSecureAuthHeaders(session)
                 });
                 if (resp.ok) {
                     const data = await resp.json();
@@ -220,719 +208,8 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
             setCurrentModel(props.model);
         }
     }, [props.model]);
-
-    // REMOVED: Chart rendering logic moved to ChartMessage component
-    // This eliminates the need for document.getElementById, setTimeout, and complex useEffect hooks
-    // Charts now render directly in their own component with proper React lifecycle
-    // No cleanup needed - ChartMessage component handles its own lifecycle
     
-    // CRITICAL FIX: Only restore charts from localStorage when conversationId changes, NOT on every message update
-    // This prevents spamming localStorage during streaming and race conditions
-    useEffect(() => {
-        if (!props.conversationId) return;
-        
-        // Only restore charts once when conversation changes
-        try {
-            const chartsKey = `conv_charts_${props.conversationId}`;
-            const savedCharts = localStorage.getItem(chartsKey);
-            if (savedCharts && messages.length > 0) {
-                const chartsData = JSON.parse(savedCharts);
-                const chartsMap = new Map(chartsData.map((c: any) => [c.id, c]));
-                
-                // Restore chart configs to messages that don't already have them
-                let chartsRestored = false;
-                const updatedMessages = messages.map((msg: IChatMessage) => {
-                    // Only restore if message doesn't already have chart config
-                    if (msg.echartsConfig || msg.chartConfig) {
-                        return msg; // Already has chart, skip
-                    }
-                    
-                    const chartData: any = chartsMap.get(msg.id);
-                    if (chartData) {
-                        chartsRestored = true;
-                        const msgAny: any = { ...msg };
-                        const echartsConfig = chartData.echartsConfig || chartData.chartConfig;
-                        const chartConfig = chartData.chartConfig || chartData.echartsConfig;
-                        if (echartsConfig) {
-                            msgAny.echartsConfig = echartsConfig;
-                        }
-                        if (chartConfig) {
-                            msgAny.chartConfig = chartConfig;
-                        }
-                        // Also restore query results and insights if available
-                        if (chartData.queryResult && !msgAny.queryResult) {
-                            msgAny.queryResult = chartData.queryResult;
-                        }
-                        if (chartData.insights && !msgAny.insights) {
-                            msgAny.insights = chartData.insights;
-                        }
-                        if (chartData.recommendations && !msgAny.recommendations) {
-                            msgAny.recommendations = chartData.recommendations;
-                        }
-                        return msgAny;
-                    }
-                    return msg;
-                });
-                
-                // Update messages state if charts were restored
-                if (chartsRestored) {
-                    console.log('✅ Restored chart configs from localStorage for conversation:', props.conversationId);
-                    setMessages(updatedMessages);
-                }
-            }
-        } catch (e) {
-            console.warn('Failed to restore charts from localStorage:', e);
-        }
-    }, [props.conversationId]); // CRITICAL: Only depend on conversationId, NOT messages
-
-    const prevConversationIdRef = useRef<string | undefined>(props.conversationId);
     
-    useEffect(() => {
-        // CRITICAL: On mount or when conversationId is set, immediately try to restore from cache
-        // This prevents chart loss when switching screens (component remounts)
-        if (props.conversationId && messages.length === 0 && !isLoading && !isStreaming) {
-            const cacheKey = `conv_messages_${props.conversationId}`;
-            const cachedMessages = localStorage.getItem(cacheKey);
-            if (cachedMessages) {
-                try {
-                    const parsed = JSON.parse(cachedMessages);
-                    if (Array.isArray(parsed) && parsed.length > 0) {
-                        const restoredMessages = parsed.map((msg: any) => {
-                            let echartsConfig = msg.echartsConfig || msg.chartConfig;
-                            if (!echartsConfig && msg.executionMetadata) {
-                                echartsConfig = msg.executionMetadata.echarts_config || 
-                                               msg.executionMetadata.chart_config ||
-                                               msg.executionMetadata.echartsConfig ||
-                                               msg.executionMetadata.chartConfig;
-                            }
-                            if (echartsConfig && typeof echartsConfig === 'object' && echartsConfig.primary_chart) {
-                                echartsConfig = echartsConfig.primary_chart;
-                            }
-                            return {
-                                ...msg,
-                                created_at: msg.created_at ? new Date(msg.created_at) : new Date(),
-                                updated_at: msg.updated_at ? new Date(msg.updated_at) : new Date(),
-                                echartsConfig: echartsConfig,
-                                chartConfig: echartsConfig || msg.chartConfig,
-                                sqlQuery: msg.sqlQuery,
-                                queryResult: msg.queryResult,
-                                insights: msg.insights,
-                                recommendations: msg.recommendations,
-                                executionMetadata: msg.executionMetadata
-                            };
-                        });
-                        setMessages(restoredMessages);
-                        console.log('✅ Immediately restored messages from cache on mount/remount:', restoredMessages.length);
-                    }
-                } catch (e) {
-                    console.warn('Failed to restore from cache on mount:', e);
-                }
-            }
-        }
-        
-        // Clear messages when conversationId changes or is null
-        if (!props.conversationId) {
-            setMessages([]);
-            setMessageCache({});
-            prevConversationIdRef.current = undefined;
-            return;
-        }
-        
-        // CRITICAL: Don't clear messages if we're currently loading/streaming (content is arriving)
-        const isOperationInProgress = isLoading || isStreaming;
-        
-        // CRITICAL: Only clear messages when switching to a DIFFERENT conversation
-        // Never clear messages if it's the same conversation or initial load
-        if (prevConversationIdRef.current && prevConversationIdRef.current !== props.conversationId) {
-            // Switching to a different conversation
-            // CRITICAL: Don't clear if operation is in progress (might lose messages)
-            if (!isOperationInProgress) {
-                console.log('🔄 Conversation changed, saving and loading messages:', prevConversationIdRef.current, '->', props.conversationId);
-                // CRITICAL: Save current messages to cache before switching (with chart configs preserved)
-                if (prevConversationIdRef.current && messages.length > 0) {
-                    const cacheKey = `conv_messages_${prevConversationIdRef.current}`;
-                    try {
-                        const serializable = messages.map(msg => {
-                            // CRITICAL: Preserve all chart-related data
-                            return {
-                                ...msg,
-                                created_at: msg.created_at instanceof Date ? msg.created_at.toISOString() : msg.created_at,
-                                updated_at: msg.updated_at instanceof Date ? msg.updated_at.toISOString() : msg.updated_at,
-                                // Explicitly preserve chart configs
-                                echartsConfig: msg.echartsConfig,
-                                chartConfig: msg.chartConfig || msg.echartsConfig,
-                                sqlQuery: msg.sqlQuery,
-                                queryResult: msg.queryResult,
-                                insights: msg.insights,
-                                recommendations: msg.recommendations,
-                                executionMetadata: msg.executionMetadata
-                            };
-                        });
-                        localStorage.setItem(cacheKey, JSON.stringify(serializable));
-                        console.log('💾 Saved messages with chart configs to cache before conversation switch');
-                    } catch (e) {
-                        console.warn('Failed to save messages before switch:', e);
-                    }
-                }
-                // CRITICAL: Clear messages to trigger loadMessages for new conversation
-                // But loadMessages will restore from cache/API immediately
-                setMessages([]);
-                setMessageCache({});
-                // CRITICAL: Force reload messages for new conversation
-                setIsLoading(true);
-                // CRITICAL: Update ref immediately so loadMessages knows it's a new conversation
-                prevConversationIdRef.current = props.conversationId;
-            } else {
-                console.log('⏸️ Operation in progress, deferring message clear until completion');
-                // Defer clearing until operation completes - don't update ref yet
-                // This prevents messages from being lost during active operations
-            }
-        } else if (!prevConversationIdRef.current && props.conversationId) {
-            // Initial load - set ref but don't clear messages (let loadMessages handle it)
-            prevConversationIdRef.current = props.conversationId;
-        } else if (prevConversationIdRef.current === props.conversationId) {
-            // Same conversation - ensure messages are loaded if empty
-            // CRITICAL: Don't reload if operation is in progress
-            if (messages.length === 0 && !isLoading && !isStreaming) {
-                console.log('🔄 Same conversation but no messages, triggering reload');
-                setIsLoading(true);
-            }
-        }
-
-        const loadMessages = async () => {
-            if (!props.conversationId) {
-                console.log('No conversation ID, clearing messages');
-                setMessages([]);
-                return;
-            }
-
-            try {
-                setIsLoading(true);
-                
-                // CRITICAL: Try cache FIRST for instant restoration on refresh
-                const cacheKey = `conv_messages_${props.conversationId}`;
-                const cachedMessages = localStorage.getItem(cacheKey);
-                if (cachedMessages) {
-                    try {
-                        const parsed = JSON.parse(cachedMessages);
-                        if (Array.isArray(parsed) && parsed.length > 0) {
-                            const loadedMessages = parsed.map((msg: any) => {
-                                // CRITICAL: Ensure chart configs are properly restored from cache
-                                // Check multiple possible locations for chart config
-                                let echartsConfig = msg.echartsConfig || msg.chartConfig;
-                                
-                                // Also check executionMetadata if chart config is nested there
-                                if (!echartsConfig && msg.executionMetadata) {
-                                    echartsConfig = msg.executionMetadata.echarts_config || 
-                                                   msg.executionMetadata.chart_config ||
-                                                   msg.executionMetadata.echartsConfig ||
-                                                   msg.executionMetadata.chartConfig ||
-                                                   // Check for deep_analysis_charts (array of charts)
-                                                   (msg.executionMetadata.deep_analysis_charts && 
-                                                    msg.executionMetadata.deep_analysis_charts.length > 0 ? 
-                                                    msg.executionMetadata.deep_analysis_charts[0] : null);
-                                }
-                                
-                                // Handle primary_chart structure
-                                if (echartsConfig && typeof echartsConfig === 'object' && echartsConfig.primary_chart) {
-                                    echartsConfig = echartsConfig.primary_chart;
-                                }
-                                
-                                return {
-                                    ...msg,
-                                    created_at: msg.created_at ? new Date(msg.created_at) : new Date(),
-                                    updated_at: msg.updated_at ? new Date(msg.updated_at) : new Date(),
-                                    // Explicitly restore chart configs
-                                    echartsConfig: echartsConfig,
-                                    chartConfig: echartsConfig || msg.chartConfig,
-                                    // Ensure other fields are preserved
-                                    sqlQuery: msg.sqlQuery,
-                                    queryResult: msg.queryResult,
-                                    insights: msg.insights,
-                                    recommendations: msg.recommendations,
-                                    executiveSummary: msg.executiveSummary || msg.executive_summary,
-                                    // CRITICAL: Preserve executionMetadata including deep_analysis_charts
-                                    executionMetadata: {
-                                        ...msg.executionMetadata,
-                                        deep_analysis_charts: msg.executionMetadata?.deep_analysis_charts || 
-                                                             msg.executionMetadata?.deepAnalysisCharts ||
-                                                             (echartsConfig ? [echartsConfig] : undefined)
-                                    }
-                                };
-                            });
-                            
-                            // Filter out ONLY truly empty generic error messages (be less aggressive)
-                            const errorMessagePatterns = [
-                                /^I apologize, but I could not generate a response\.?$/i,
-                                /^I encountered an error\.?$/i
-                            ];
-                            
-                            const filteredMessages = loadedMessages.filter((msg: any) => {
-                                // Always keep user messages
-                                if (msg.role === 'user' && (msg.query || msg.content)) {
-                                    return true;
-                                }
-                                // Keep messages with any meaningful content (including deep analysis charts)
-                                if (msg.echarts_config || msg.chartConfig || msg.insights || msg.sql_query || msg.queryResult || 
-                                    msg.executionMetadata || msg.executionMetadata?.deep_analysis_charts || 
-                                    msg.executiveSummary || msg.executive_summary) {
-                                    return true;
-                                }
-                                // For assistant messages, only filter if it's a generic error with NO other content
-                                if (msg.role === 'assistant') {
-                                    const content = msg.answer || msg.message || msg.content || msg.narration || '';
-                                    // Only filter if it matches generic error pattern AND has no other content
-                                    if (errorMessagePatterns.some(pattern => pattern.test(content.trim()))) {
-                                        // Check if it has any other meaningful content
-                                        return msg.executionMetadata || msg.aiEngine || content.length > 50;
-                                    }
-                                    // Keep if has any content
-                                    return content.length > 0;
-                                }
-                                return true;
-                            });
-                            
-                            const sanitized = sanitizeMessages(filteredMessages);
-                            setMessages(sanitized);
-                            console.log('✅ Loaded messages from cache (instant restore):', sanitized.length);
-                            setIsLoading(false);
-                            
-                            // Then refresh from API in background (merge with cache, don't replace)
-                            conversationSessionManager.loadMessages(props.conversationId, false).then(apiMessages => {
-                                if (apiMessages && apiMessages.length > 0) {
-                                    // Merge API messages with cache (API takes precedence, but don't lose cache messages)
-                                    const apiMessageIds = new Set(apiMessages.map((m: any) => m.id));
-                                    const cacheOnlyMessages = filteredMessages.filter((m: any) => !apiMessageIds.has(m.id));
-                                    
-                                    const errorMessagePatterns = [
-                                        /^I apologize, but I could not generate a response\.?$/i,
-                                        /^I encountered an error\.?$/i
-                                    ];
-                                    
-                                    const filtered = apiMessages.filter((msg: any) => {
-                                        // Always keep user messages
-                                        if (msg.role === 'user' && (msg.query || msg.content)) {
-                                            return true;
-                                        }
-                                        // Keep messages with any meaningful content
-                                        if (msg.echarts_config || msg.chartConfig || msg.insights || msg.sql_query || msg.queryResult || msg.executionMetadata) {
-                                            return true;
-                                        }
-                                        // For assistant messages, only filter if it's a generic error with NO other content
-                                        if (msg.role === 'assistant') {
-                                            const content = msg.answer || msg.message || msg.content || msg.narration || '';
-                                            if (errorMessagePatterns.some(pattern => pattern.test(content.trim()))) {
-                                                return msg.executionMetadata || msg.aiEngine || content.length > 50;
-                                            }
-                                            return content.length > 0;
-                                        }
-                                        return true;
-                                    });
-                                    
-                                    // Merge: API messages first, then cache-only messages
-                                    const merged = [...filtered, ...cacheOnlyMessages].sort((a, b) => {
-                                        const aTime = new Date(a.created_at || a.timestamp || 0).getTime();
-                                        const bTime = new Date(b.created_at || b.timestamp || 0).getTime();
-                                        return aTime - bTime;
-                                    });
-                                    
-                                    const sanitizedMerged = sanitizeMessages(merged);
-                                    // Defer setState to avoid "setState during render" warning
-                                    setTimeout(() => {
-                                        setMessages(sanitizedMerged);
-                                        console.log('✅ Merged messages from API and cache:', sanitizedMerged.length, `(API: ${filtered.length}, Cache-only: ${cacheOnlyMessages.length})`);
-                                    }, 0);
-                                } else {
-                                    // API returned empty, keep cache messages
-                                    console.log('⚠️ API returned no messages, keeping cache messages:', filteredMessages.length);
-                                }
-                            }).catch(err => {
-                                console.warn('⚠️ Failed to refresh messages from API (using cache):', err);
-                                // Keep cache messages on API error
-                            });
-                            return;
-                        }
-                    } catch (e) {
-                        console.warn('Failed to parse cached messages:', e);
-                    }
-                }
-                
-                // If no cache, load from API
-                try {
-                    const loadedMessages = await conversationSessionManager.loadMessages(props.conversationId, false);
-                    
-                    if (loadedMessages && loadedMessages.length > 0) {
-                        // Filter out ONLY truly empty generic error messages (be less aggressive)
-                        const errorMessagePatterns = [
-                            /^I apologize, but I could not generate a response\.?$/i,
-                            /^I encountered an error\.?$/i
-                        ];
-                        
-                        const filteredMessages = loadedMessages.filter((msg: any) => {
-                            // Always keep user messages
-                            if (msg.role === 'user' && (msg.query || msg.content)) {
-                                return true;
-                            }
-                            // Keep messages with any meaningful content
-                            if (msg.echarts_config || msg.chartConfig || msg.insights || msg.sql_query || msg.queryResult || msg.executionMetadata) {
-                                return true;
-                            }
-                            // For assistant messages, only filter if it's a generic error with NO other content
-                            if (msg.role === 'assistant') {
-                                const content = msg.answer || msg.message || msg.content || msg.narration || '';
-                                // Only filter if it matches generic error pattern AND has no other content
-                                if (errorMessagePatterns.some(pattern => pattern.test(content.trim()))) {
-                                    // Check if it has any other meaningful content
-                                    return msg.executionMetadata || msg.aiEngine || content.length > 50;
-                                }
-                                // Keep if has any content
-                                return content.length > 0;
-                            }
-                            return true;
-                        });
-                        
-                        const sanitized = sanitizeMessages(filteredMessages);
-                        // Defer setState to avoid "setState during render" warning
-                        setTimeout(() => {
-                            setMessages(sanitized);
-                            console.log('✅ Loaded messages from API:', sanitized.length, 'of', loadedMessages.length, 'total');
-                        }, 0);
-                        
-                        // Update cache with loaded messages
-                        try {
-                            const cacheKey = `conv_messages_${props.conversationId}`;
-                            const serializable = sanitized.map(msg => {
-                                // CRITICAL: Ensure chart configs are preserved when serializing
-                                return {
-                                    ...msg,
-                                    created_at: msg.created_at instanceof Date ? msg.created_at.toISOString() : msg.created_at,
-                                    updated_at: msg.updated_at instanceof Date ? msg.updated_at.toISOString() : msg.updated_at,
-                                    // Explicitly preserve chart configs
-                                    echartsConfig: msg.echartsConfig,
-                                    chartConfig: msg.chartConfig || msg.echartsConfig,
-                                    // Preserve other important fields
-                                    sqlQuery: msg.sqlQuery,
-                                    queryResult: msg.queryResult,
-                                    insights: msg.insights,
-                                    recommendations: msg.recommendations,
-                                    executionMetadata: msg.executionMetadata
-                                };
-                            });
-                            localStorage.setItem(cacheKey, JSON.stringify(serializable));
-                            console.log('💾 Updated cache with API messages (including chart configs)');
-                        } catch (e) {
-                            console.warn('Failed to update cache:', e);
-                        }
-                    } else {
-                        // Try cache as last resort
-                        const cacheKey = `conv_messages_${props.conversationId}`;
-                        const cachedMessages = localStorage.getItem(cacheKey);
-                        if (cachedMessages) {
-                            try {
-                                const parsed = JSON.parse(cachedMessages);
-                                if (Array.isArray(parsed) && parsed.length > 0) {
-                                    const loadedMessages = parsed.map((msg: any) => {
-                                        // CRITICAL: Ensure chart configs are properly restored from cache
-                                        let echartsConfig = msg.echartsConfig || msg.chartConfig;
-                                        if (!echartsConfig && msg.executionMetadata) {
-                                            echartsConfig = msg.executionMetadata.echarts_config || 
-                                                           msg.executionMetadata.chart_config ||
-                                                           msg.executionMetadata.echartsConfig ||
-                                                           msg.executionMetadata.chartConfig;
-                                        }
-                                        if (echartsConfig && typeof echartsConfig === 'object' && echartsConfig.primary_chart) {
-                                            echartsConfig = echartsConfig.primary_chart;
-                                        }
-                                        return {
-                                            ...msg,
-                                            created_at: msg.created_at ? new Date(msg.created_at) : new Date(),
-                                            updated_at: msg.updated_at ? new Date(msg.updated_at) : new Date(),
-                                            echartsConfig: echartsConfig,
-                                            chartConfig: echartsConfig || msg.chartConfig,
-                                            sqlQuery: msg.sqlQuery,
-                                            queryResult: msg.queryResult,
-                                            insights: msg.insights,
-                                            recommendations: msg.recommendations,
-                                            executionMetadata: msg.executionMetadata
-                                        };
-                                    });
-                                    const sanitized = sanitizeMessages(loadedMessages);
-                                    setMessages(sanitized);
-                                    console.log('✅ Loaded messages from cache (fallback) with chart configs:', sanitized.length);
-                                    setIsLoading(false);
-                                    return;
-                                }
-                            } catch (e) {
-                                console.warn('Failed to parse cache:', e);
-                            }
-                        }
-                        setMessages([]);
-                        console.log('ℹ️ No messages found for conversation:', props.conversationId);
-                    }
-                    
-                    setIsLoading(false);
-                    setProgressState(null);
-                    setStreamingMessage('');
-                } catch (error) {
-                    console.error('❌ Failed to load messages:', error);
-                    // CRITICAL: Try cache as last resort before clearing messages
-                    try {
-                        const cacheKey = `conv_messages_${props.conversationId}`;
-                        const cachedMessages = localStorage.getItem(cacheKey);
-                        if (cachedMessages) {
-                            const parsed = JSON.parse(cachedMessages);
-                            if (Array.isArray(parsed) && parsed.length > 0) {
-                                const loadedMessages = parsed.map((msg: any) => {
-                                    // CRITICAL: Ensure chart configs are properly restored from cache
-                                    let echartsConfig = msg.echartsConfig || msg.chartConfig;
-                                    if (!echartsConfig && msg.executionMetadata) {
-                                        echartsConfig = msg.executionMetadata.echarts_config || 
-                                                       msg.executionMetadata.chart_config ||
-                                                       msg.executionMetadata.echartsConfig ||
-                                                       msg.executionMetadata.chartConfig;
-                                    }
-                                    if (echartsConfig && typeof echartsConfig === 'object' && echartsConfig.primary_chart) {
-                                        echartsConfig = echartsConfig.primary_chart;
-                                    }
-                                    return {
-                                        ...msg,
-                                        created_at: msg.created_at ? new Date(msg.created_at) : new Date(),
-                                        updated_at: msg.updated_at ? new Date(msg.updated_at) : new Date(),
-                                        echartsConfig: echartsConfig,
-                                        chartConfig: echartsConfig || msg.chartConfig,
-                                        sqlQuery: msg.sqlQuery,
-                                        queryResult: msg.queryResult,
-                                        insights: msg.insights,
-                                        recommendations: msg.recommendations,
-                                        executionMetadata: msg.executionMetadata
-                                    };
-                                });
-                                const sanitized = sanitizeMessages(loadedMessages);
-                                setMessages(sanitized);
-                                console.log('✅ Restored messages from cache after API error (with chart configs):', sanitized.length);
-                                setIsLoading(false);
-                                return;
-                            }
-                        }
-                    } catch (e) {
-                        console.warn('Failed to load from cache after error:', e);
-                    }
-                    // Only clear if we truly have no messages anywhere
-                    setMessages([]);
-                    setIsLoading(false);
-                }
-            } catch (outerError) {
-                console.error('❌ Outer error in loadMessages:', outerError);
-                setMessages([]);
-                setIsLoading(false);
-            }
-        };
-
-        loadMessages();
-    }, [props.conversationId]);
-
-    // CRITICAL: Persist progress state to localStorage for restoration on screen switch
-    useEffect(() => {
-        if (!props.conversationId) return;
-        
-        if (progressState) {
-            try {
-                const cacheKey = `conv_progress_${props.conversationId}`;
-                localStorage.setItem(cacheKey, JSON.stringify(progressState));
-            } catch (e) {
-                console.warn('Failed to persist progress state:', e);
-            }
-        } else {
-            // Clear progress when it's null
-            try {
-                const cacheKey = `conv_progress_${props.conversationId}`;
-                localStorage.removeItem(cacheKey);
-            } catch (e) {
-                // Ignore
-            }
-        }
-    }, [progressState, props.conversationId]);
-    
-    // CRITICAL: Restore progress state from localStorage when conversation loads
-    useEffect(() => {
-        if (!props.conversationId) {
-            setProgressState(null);
-            return;
-        }
-        
-        try {
-            const cacheKey = `conv_progress_${props.conversationId}`;
-            const savedProgress = localStorage.getItem(cacheKey);
-            if (savedProgress) {
-                const progress = JSON.parse(savedProgress);
-                // Only restore if it's recent (within last 5 minutes)
-                const progressAge = Date.now() - (progress.timestamp || 0);
-                if (progressAge < 5 * 60 * 1000) {
-                    setProgressState({
-                        percentage: progress.percentage || 0,
-                        message: progress.message || '',
-                        stage: progress.stage || 'start'
-                    });
-                    console.log('✅ Restored progress state from localStorage:', progress.stage);
-                } else {
-                    // Progress is stale, clear it
-                    localStorage.removeItem(cacheKey);
-                }
-            }
-        } catch (e) {
-            console.warn('Failed to restore progress state:', e);
-        }
-    }, [props.conversationId]);
-    
-    // CRITICAL: Persist messages to localStorage immediately whenever they change
-    // This ensures messages are never lost on refresh
-    useEffect(() => {
-        // CRITICAL: Don't save if logout is in progress
-        if (typeof window !== 'undefined' && window.sessionStorage.getItem('logout_in_progress') === 'true') {
-            return;
-        }
-        
-        if (!props.conversationId) return;
-        const sanitized = sanitizeMessages(messages);
-        const cacheKey = `conv_messages_${props.conversationId}`;
-        if (sanitized.length === 0) {
-            localStorage.removeItem(cacheKey);
-            return;
-        }
-        try {
-            const serializable = sanitized.map(msg => {
-                // CRITICAL: Ensure chart configs are preserved when serializing
-                const serialized: any = {
-                    ...msg,
-                    created_at: msg.created_at instanceof Date ? msg.created_at.toISOString() : msg.created_at,
-                    updated_at: msg.updated_at instanceof Date ? msg.updated_at.toISOString() : msg.updated_at,
-                    // Explicitly preserve chart configs
-                    echartsConfig: msg.echartsConfig,
-                    chartConfig: msg.chartConfig || msg.echartsConfig,
-                    // Preserve other important fields
-                    sqlQuery: msg.sqlQuery,
-                    queryResult: msg.queryResult,
-                    insights: msg.insights,
-                    recommendations: msg.recommendations,
-                    executiveSummary: msg.executiveSummary || msg.executive_summary,
-                    // CRITICAL: Preserve executionMetadata including deep_analysis_charts
-                    executionMetadata: msg.executionMetadata
-                };
-                return serialized;
-            });
-            localStorage.setItem(cacheKey, JSON.stringify(serializable));
-            console.log('💾 Persisted', sanitized.length, 'messages to localStorage with chart configs');
-            
-            setMessageCache(prev => ({
-                ...prev,
-                [props.conversationId!]: {
-                    ...prev[props.conversationId!],
-                    messages: sanitized
-                }
-            }));
-        } catch (e) {
-            console.error('❌ Failed to persist messages to localStorage:', e);
-        }
-    }, [messages, props.conversationId]);
-
-    // Save messages before page unload/navigation
-    useEffect(() => {
-        const handleBeforeUnload = () => {
-            // CRITICAL: Don't save if logout is in progress
-            if (typeof window !== 'undefined' && window.sessionStorage.getItem('logout_in_progress') === 'true') {
-                return;
-            }
-            
-            if (props.conversationId && messages.length > 0) {
-                try {
-                    const cacheKey = `conv_messages_${props.conversationId}`;
-                    const sanitized = sanitizeMessages(messages);
-                    if (sanitized.length > 0) {
-                        const serializable = sanitized.map(msg => ({
-                            ...msg,
-                            created_at: msg.created_at instanceof Date ? msg.created_at.toISOString() : msg.created_at,
-                            updated_at: msg.updated_at instanceof Date ? msg.updated_at.toISOString() : msg.updated_at
-                        }));
-                        localStorage.setItem(cacheKey, JSON.stringify(serializable));
-                        console.log('💾 Saved messages before navigation:', sanitized.length);
-                    } else {
-                        localStorage.removeItem(cacheKey);
-                    }
-                } catch (e) {
-                    console.warn('Failed to save messages before navigation:', e);
-                }
-            }
-        };
-        
-        // Also save on visibility change (tab switch)
-        const handleVisibilityChange = () => {
-            if (document.visibilityState === 'hidden') {
-                handleBeforeUnload();
-            }
-        };
-
-        window.addEventListener('beforeunload', handleBeforeUnload);
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-        return () => {
-            window.removeEventListener('beforeunload', handleBeforeUnload);
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-        };
-    }, [props.conversationId, messages]);
-
-    // Reload messages when page becomes visible (user navigates back)
-    useEffect(() => {
-        const handleVisibilityChange = async () => {
-            if (!document.hidden && props.conversationId) {
-                console.log('🔄 Page visible, checking conversation state:', props.conversationId);
-                
-                // CRITICAL: Clear loading/streaming state if no active request
-                if (!isStreaming && !abortControllerRef.current) {
-                    setIsLoading(false);
-                    setProgressState(null);
-                    setStreamingMessage('');
-                    console.log('🧹 Cleared stale loading state');
-                }
-                
-                // CRITICAL FIX: Check for recent messages AND charts in memory
-                const hasRecentMessages = messages.length > 0 && messages.some(m => {
-                    const msgTime = new Date(m.created_at || 0).getTime();
-                    const now = Date.now();
-                    return (now - msgTime) < 60000; // Messages less than 1 minute old
-                });
-                
-                const hasChartInMemory = messages.some(m => m.echartsConfig || m.chartConfig);
-                
-                if (hasRecentMessages && hasChartInMemory) {
-                    console.log('✅ Recent messages with charts exist, preserving state');
-                    return; // DON'T reload - preserve charts
-                }
-                
-                // Only reload if truly stale or no charts
-                try {
-                    const loadedMessages = await conversationSessionManager.loadMessages(props.conversationId, false);
-                    
-                    if (loadedMessages && loadedMessages.length > 0) {
-                        const sanitized = sanitizeMessages(loadedMessages);
-                        setMessages(sanitized);
-                        console.log('✅ Reloaded messages on visibility change:', sanitized.length);
-                    }
-                    
-                    setIsLoading(false);
-                    setProgressState(null);
-                    setStreamingMessage('');
-                } catch (error) {
-                    console.warn('⚠️ Failed to reload messages on visibility change:', error);
-                    setIsLoading(false);
-                    setProgressState(null);
-                    setStreamingMessage('');
-                }
-            }
-        };
-
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-        return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-    }, [props.conversationId, isStreaming, messages.length]);
-
     // CRITICAL FIX: Modern chat interface rendering - NO HOOKS INSIDE THIS FUNCTION
     // This prevents "Rendered more hooks than during the previous render" error
     const renderMessages = () => {
@@ -978,7 +255,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                             <Avatar 
                                 size={40}
                                 icon={<UserOutlined />}
-                                src={user?.avatar_url}
+                                src={''}
                                 style={{ 
                                     backgroundColor: 'var(--ant-color-primary)',
                                     flexShrink: 0
@@ -1003,13 +280,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                             {msg.query ? (
                                 <>
                                     <span className="message-author">
-                                        {(() => {
-                                            const displayName = user?.username || 
-                                                              (user?.first_name && user?.last_name ? `${user.first_name} ${user.last_name}`.trim() : null) ||
-                                                              (user?.first_name || user?.firstName || null) ||
-                                                              (user?.email?.split('@')[0] || 'You');
-                                            return displayName;
-                                        })()}
+                                        {user?.email ? user.email.split('@')[0] : 'You'}
                                     </span>
                                     <span className="message-time">{formatTime(msg.created_at || new Date())}</span>
                                 </>
@@ -1250,7 +521,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                                             executiveSummary={msg.executiveSummary || msg.analysis || msg.message || ''}
                                             isDark={document.documentElement.classList.contains('dark-mode') || 
                                                     document.documentElement.getAttribute('data-theme') === 'dark'}
-                                            planType={currentOrganization?.plan_type}
+                                            // planType removed – no org/plan gating
                                             conversationId={props.conversationId}
                                             selectedDataSourceId={props.selectedDataSource?.id}
                                             queryResults={msg.queryResult ? (Array.isArray(msg.queryResult) ? msg.queryResult : [msg.queryResult]) : undefined}
@@ -1268,7 +539,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                                             config={msg.echartsConfig || msg.chartConfig}
                                             isDark={document.documentElement.classList.contains('dark-mode') || 
                                                     document.documentElement.getAttribute('data-theme') === 'dark'}
-                                            planType={currentOrganization?.plan_type}
+                                            // planType removed – no org/plan gating
                                             conversationId={props.conversationId}
                                             selectedDataSourceId={props.selectedDataSource?.id}
                                             sqlQuery={msg.sqlQuery}
@@ -1518,12 +789,6 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
         });
     };
 
-    // Get user name from email
-    const getUserName = () => {
-        // TODO: Get actual username from user context/API
-        return 'Admin'; // Placeholder - should get from user context
-    };
-
     // Format timestamp
     const formatTime = (timestamp: string | Date) => {
         if (!timestamp) return 'Now';
@@ -1551,53 +816,53 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
         }
     };
 
-    // Handle message reactions
-    const handleReaction = (messageId: string, emoji: string) => {
-        setReactions(prev => {
-            const currentReactions = prev[messageId] || [];
-            const newReactions = currentReactions.includes(emoji)
-                ? currentReactions.filter(e => e !== emoji)
-                : [...currentReactions, emoji];
-            return {
-                ...prev,
-                [messageId]: newReactions
-            };
-        });
-    };
+    // // Handle message reactions
+    // const handleReaction = (messageId: string, emoji: string) => {
+    //     setReactions(prev => {
+    //         const currentReactions = prev[messageId] || [];
+    //         const newReactions = currentReactions.includes(emoji)
+    //             ? currentReactions.filter(e => e !== emoji)
+    //             : [...currentReactions, emoji];
+    //         return {
+    //             ...prev,
+    //             [messageId]: newReactions
+    //         };
+    //     });
+    // };
     
-    // Handle user feedback for AI responses
-    const handleFeedback = async (messageId: string, feedback: 'positive' | 'negative') => {
-        try {
-            const message = messages.find(m => m.id === messageId);
-            if (!message) return;
+    // // Handle user feedback for AI responses
+    // const handleFeedback = async (messageId: string, feedback: 'positive' | 'negative') => {
+    //     try {
+    //         const message = messages.find(m => m.id === messageId);
+    //         if (!message) return;
             
-            const response = await fetch('/chats/chat/feedback', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                credentials: 'include',
-                body: JSON.stringify({
-                    conversation_id: props.conversationId,
-                    message_id: messageId,
-                    query: message.query || message.content || '',
-                    satisfactory: feedback === 'positive',
-                    feedback_text: feedback === 'positive' ? 'Helpful response' : 'Response needs improvement',
-                    agent_id: 'orchestrator'
-                })
-            });
+    //         const response = await fetch('/chats/chat/feedback', {
+    //             method: 'POST',
+    //             headers: {
+    //                 'Content-Type': 'application/json',
+    //             },
+    //             credentials: 'include',
+    //             body: JSON.stringify({
+    //                 conversation_id: props.conversationId,
+    //                 message_id: messageId,
+    //                 query: message.query || message.content || '',
+    //                 satisfactory: feedback === 'positive',
+    //                 feedback_text: feedback === 'positive' ? 'Helpful response' : 'Response needs improvement',
+    //                 agent_id: 'orchestrator'
+    //             })
+    //         });
             
-            const result = await response.json();
-            if (result.success) {
-                antMessage.success('Thank you for your feedback! It helps us improve.');
-            } else {
-                antMessage.warning('Failed to submit feedback. Please try again.');
-            }
-        } catch (error) {
-            console.error('Error submitting feedback:', error);
-            antMessage.error('Failed to submit feedback. Please try again.');
-        }
-    };
+    //         const result = await response.json();
+    //         if (result.success) {
+    //             antMessage.success('Thank you for your feedback! It helps us improve.');
+    //         } else {
+    //             antMessage.warning('Failed to submit feedback. Please try again.');
+    //         }
+    //     } catch (error) {
+    //         console.error('Error submitting feedback:', error);
+    //         antMessage.error('Failed to submit feedback. Please try again.');
+    //     }
+    // };
 
     // Handle favorites
     const handleFavorite = (messageId: string) => {
@@ -1612,13 +877,13 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
         });
     };
 
-    // Handle comments
-    const handleComment = (messageId: string, comment: string) => {
-        setComments(prev => ({
-            ...prev,
-            [messageId]: [...(prev[messageId] || []), comment]
-        }));
-    };
+    // // Handle comments
+    // const handleComment = (messageId: string, comment: string) => {
+    //     setComments(prev => ({
+    //         ...prev,
+    //         [messageId]: [...(prev[messageId] || []), comment]
+    //     }));
+    // };
 
     // Handle sharing
     const handleShare = (messageId: string) => {
@@ -1687,8 +952,19 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
         return { valid: true };
     };
 
-    // Handle file upload
+    // Handle file upload (direct upload, not before sending message)
     const handleFileUpload = async (file: File) => {
+        // ✅ Pre-upload authentication validation using AuthContext
+        if (!isAuthenticated || !user || !session) {
+            antMessage.error('Your session has expired. Please sign in again.');
+            router.push('/login');
+            return;
+        }
+        if (!session.access_token) {
+            antMessage.error('Authentication token missing. Please sign in again.');
+            return;
+        }
+        
         // Validate file
         const validation = validateFile(file);
         if (!validation.valid) {
@@ -1747,6 +1023,12 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                 // Start upload - use correct endpoint path
                 xhr.open('POST', '/api/data/upload');
                 xhr.withCredentials = true; // Include cookies for auth
+                
+                // ✅ Add Authorization header from AuthContext for consistent auth handling
+                if (session.access_token) {
+                    xhr.setRequestHeader('Authorization', `Bearer ${session.access_token}`);
+                }
+                
                 xhr.send(formData);
             });
 
@@ -1754,20 +1036,29 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
 
             if (result.success && result.data_source) {
                 const dataSource = result.data_source;
+                const dataSourceId = dataSource.id || dataSource.data_source_id;
                 
-                // Auto-select the uploaded file as data source
-                const newDataSource = {
-                    id: dataSource.id || dataSource.data_source_id,
-                    name: dataSource.name || file.name,
-                    type: 'file' as const,
-                    status: 'connected' as const,
-                    config: dataSource.config || {},
-                    columns: dataSource.columns || dataSource.schema || [],
-                    rowCount: dataSource.row_count || dataSource.rowCount || 0
-                };
-
-                // Notify parent component to select this data source
-                props.onDataSourceSelect?.(newDataSource);
+                // ✅ Refresh data sources list to include the newly uploaded file
+                await refreshDataSources();
+                
+                // ✅ Use DataSourceContext to select the data source (loads schema automatically)
+                try {
+                    await contextSelectDataSource(dataSourceId);
+                    console.log('✅ Data source selected via context:', dataSourceId);
+                } catch (selectError) {
+                    console.warn('Failed to select data source via context, using fallback:', selectError);
+                    // Fallback: Create minimal data source object for legacy callback
+                    const newDataSource = {
+                        id: dataSourceId,
+                        name: dataSource.name || file.name,
+                        type: 'file' as const,
+                        status: 'connected' as const,
+                        config: dataSource.config || {},
+                        columns: dataSource.columns || dataSource.schema || [],
+                        rowCount: dataSource.row_count || dataSource.rowCount || 0
+                    };
+                    props.onDataSourceSelect?.(newDataSource);
+                }
 
                 antMessage.success(`File "${file.name}" uploaded successfully! ${dataSource.row_count || 0} rows processed.`);
                 
@@ -1781,8 +1072,9 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                 if (currentPrompt && currentPrompt.includes('comprehensive analysis')) {
                     // Auto-send the analysis query with deep mode
                     setTimeout(async () => {
-                        // Ensure data source is selected
-                        if (!props.selectedDataSource || props.selectedDataSource.id !== newDataSource.id) {
+                        // Ensure data source is selected via context
+                        const selectedDS = contextDataSources.find(ds => ds.id === dataSourceId);
+                        if (!selectedDS) {
                             await new Promise(resolve => setTimeout(resolve, 500));
                         }
                         
@@ -1793,11 +1085,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                             return;
                         }
                         
-                        // Set mode to deep for file analysis
-                        setCurrentMode('deep');
-                        props.onModeChange?.('deep');
-                        
-                        // Send the analysis query
+                        // Send the analysis query (using current mode, default to 'standard')
                         setTimeout(() => {
                             handleSendMessage(currentPrompt);
                         }, 500);
@@ -1907,6 +1195,16 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
     const handleFileUploadBeforeSend = async (file: File): Promise<string | boolean> => {
         if (!file) return true; // No file to upload, proceed with message
         
+        if (!isAuthenticated || !user || !session) {
+            antMessage.error('Your session has expired. Please sign in again.');
+            router.push('/login');
+            return false;
+        }
+        if (!session.access_token) {
+            antMessage.error('Authentication token missing. Please sign in again.');
+            return false;
+        }
+        
         const validation = validateFile(file);
         if (!validation.valid) {
             antMessage.error(validation.error || 'Invalid file');
@@ -1920,6 +1218,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
             const formData = new FormData();
             formData.append('file', file);
             formData.append('include_preview', 'true');
+            formData.append('upload_with_prompt', 'true');  // File is uploaded with a prompt, enable in-memory storage
 
             const xhr = new XMLHttpRequest();
             
@@ -1958,7 +1257,9 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                 });
 
                 xhr.open('POST', '/api/data/upload');
-                xhr.withCredentials = true;
+                if (session.access_token) {
+                    xhr.setRequestHeader('Authorization', `Bearer ${session.access_token}`);
+                }
                 xhr.send(formData);
             });
 
@@ -1967,30 +1268,25 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
             if (result.success && result.data_source) {
                 const dataSource = result.data_source;
                 const dataSourceId = dataSource.id || dataSource.data_source_id;
-                const newDataSource = {
-                    id: dataSourceId,
-                    name: dataSource.name || file.name,
-                    type: 'file' as const,
-                    status: 'connected' as const,
-                    config: dataSource.config || {},
-                    columns: dataSource.columns || dataSource.schema || [],
-                    rowCount: dataSource.row_count || dataSource.rowCount || 0
-                };
-
-                // CRITICAL: Select the data source immediately so it's available for the message
-                props.onDataSourceSelect?.(newDataSource);
                 
-                // CRITICAL: Dispatch event to notify data panel to refresh
+                await refreshDataSources();
+                
                 try {
-                    window.dispatchEvent(new CustomEvent('datasource-created', {
-                        detail: {
-                            data_source: newDataSource,
-                            data_source_id: dataSourceId
-                        }
-                    }));
-                    console.log('📡 Dispatched datasource-created event');
-                } catch (e) {
-                    console.warn('Failed to dispatch datasource-created event:', e);
+                    await contextSelectDataSource(dataSourceId);
+                    console.log('✅ Data source selected via context:', dataSourceId);
+                } catch (selectError) {
+                    console.warn('Failed to select data source via context, using fallback:', selectError);
+                    // Fallback: Create minimal data source object for legacy callback
+                    const newDataSource = {
+                        id: dataSourceId,
+                        name: dataSource.name || file.name,
+                        type: 'file' as const,
+                        status: 'connected' as const,
+                        config: dataSource.config || {},
+                        columns: dataSource.columns || dataSource.schema || [],
+                        rowCount: dataSource.row_count || dataSource.rowCount || 0
+                    };
+                    props.onDataSourceSelect?.(newDataSource);
                 }
                 
                 // Store the data source ID for use in the message
@@ -2014,18 +1310,13 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
 
     // Handle send message
     const handleSendMessage = async (messageText?: string) => {
+        debugger;
+
         // CRITICAL: Check authentication before allowing any action
         if (!isAuthenticated || !user) {
             antMessage.error('Your session has expired. Please sign in again to continue.');
             // Redirect to login immediately
-            setTimeout(() => {
-                window.location.href = '/login';
-            }, 1500);
-            return;
-        }
-        // Check if user has API access for chart generation
-        if (!canPerformAction('generate_chart')) {
-            showUpgradePrompt('api_access', 'Chart generation requires Pro plan or higher. Upgrade to unlock AI-powered chart generation!');
+            window.location.href = '/login'
             return;
         }
         // If file is selected, upload it first before sending message
@@ -2056,26 +1347,9 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
             return;
         }
 
-        // CRITICAL: Set mode to deep if file was just uploaded (file sources always use deep analysis)
-        // Also set to deep if prompt contains analysis keywords
-        const isAnalysisQuery = textToSend.toLowerCase().includes('comprehensive analysis') || 
-                                textToSend.toLowerCase().includes('deep analysis') ||
-                                textToSend.toLowerCase().includes('data quality assessment') ||
-                                textToSend.toLowerCase().includes('key statistics');
-        
-        // CRITICAL: File data sources ALWAYS use deep analysis workflow
-        const shouldUseDeepMode = uploadedDataSourceId || 
-                                  (props.selectedDataSource?.type === 'file') ||
-                                  selectedFile || 
-                                  isAnalysisQuery;
-        
-        const effectiveMode = shouldUseDeepMode ? 'deep' : currentMode;
-        
-        if (shouldUseDeepMode && currentMode !== 'deep') {
-            setCurrentMode('deep');
-            props.onModeChange?.('deep');
-            console.log('📊 File data source detected - using deep analysis mode');
-        }
+        // Use current mode or default to 'standard' - no forced deep mode for files
+        // Users can explicitly choose deep mode if they want comprehensive analysis
+        const effectiveMode = currentMode || 'standard';
 
         setIsLoading(true);
         setPrompt('');
@@ -2084,7 +1358,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
         let conversationId = props.conversationId;
         if (!conversationId) {
             try {
-                const newConv = await conversationSessionManager.createNewConversation();
+                const newConv = await createNewConversation('New Conversation');
                 conversationId = newConv.id || undefined;
                 if (conversationId) {
                     props.callback?.({ conversation: newConv });
@@ -2121,12 +1395,11 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
             } : undefined
         };
 
-        // CRITICAL: Only add to local state, NOT session manager (to avoid duplicates)
-        // Session manager will be updated when backend saves the message
-        // Update local state
-        setMessages(prev => {
-            // Check if message already exists (prevent duplicates)
-            const exists = prev.some(m => {
+        // Add user message optimistically to context (will be persisted by backend)
+        if (conversationId) {
+            // Check for duplicates in context messages
+            const existingMessages = contextMessages.get(conversationId) || [];
+            const exists = existingMessages.some(m => {
                 if (m.id === userMessage.id) return true;
                 if (m.role === 'user' && m.query === userMessage.query) {
                     const mTime = m.created_at ? new Date(m.created_at).getTime() : 0;
@@ -2135,55 +1408,28 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                 }
                 return false;
             });
-            if (exists) {
+            if (!exists) {
+                addMessage(userMessage, conversationId);
+            } else {
                 console.warn('⚠️ Duplicate message detected, skipping:', userMessage.id);
-                return prev;
             }
-            const updated = [...prev, userMessage];
-            
-            // CRITICAL: Update conversation metadata with data source when user sends message
-            if (conversationId && props.selectedDataSource) {
-                // Don't await - fire and forget to avoid blocking
-                const metadataObj = {
-                    last_data_source_id: props.selectedDataSource.id,
-                    data_source_name: props.selectedDataSource.name,
-                    data_source_type: props.selectedDataSource.type,
-                    last_updated: new Date().toISOString()
-                };
-                // Type assertion needed because json_metadata can be string or object
-                conversationSessionManager.updateConversationMetadata(conversationId, {
-                    json_metadata: JSON.stringify(metadataObj) as any
-                }).catch(e => console.warn('Failed to update conversation metadata:', e));
-                
-                // Also save to localStorage for immediate persistence
-                try {
-                    const metadataKey = `conv_metadata_${conversationId}`;
-                    localStorage.setItem(metadataKey, JSON.stringify({
-                        last_data_source_id: props.selectedDataSource.id,
-                        data_source_name: props.selectedDataSource.name,
-                        data_source_type: props.selectedDataSource.type
-                    }));
-                } catch (e) {
-                    console.warn('Failed to save data source to localStorage:', e);
-                }
-            }
-            
-            // CRITICAL: Immediately save to localStorage with proper serialization
-            try {
-                const cacheKey = `conv_messages_${conversationId}`;
-                // Serialize with proper date handling
-                const serializable = updated.map(msg => ({
-                    ...msg,
-                    created_at: msg.created_at instanceof Date ? msg.created_at.toISOString() : msg.created_at,
-                    updated_at: msg.updated_at instanceof Date ? msg.updated_at.toISOString() : msg.updated_at
-                }));
-                localStorage.setItem(cacheKey, JSON.stringify(serializable));
-                console.log('💾 Immediately saved', updated.length, 'messages to localStorage (including user message)');
-            } catch (e) {
-                console.error('❌ Failed to save to localStorage:', e);
-            }
-            return updated;
-        });
+        }
+        
+        // CRITICAL: Update conversation metadata with data source when user sends message
+        if (conversationId && props.selectedDataSource) {
+            // Don't await - fire and forget to avoid blocking
+            const metadataObj = {
+                last_data_source_id: props.selectedDataSource.id,
+                data_source_name: props.selectedDataSource.name,
+                data_source_type: props.selectedDataSource.type,
+                last_updated: new Date().toISOString()
+            };
+            // Type assertion needed because json_metadata can be string or object
+            updateConversationMetadata(conversationId, {
+                json_metadata: JSON.stringify(metadataObj) as any
+            }).catch(e => console.warn('Failed to update conversation metadata:', e));
+        }
+        
 
         // CRITICAL: Start progress immediately (don't wait for response)
         // Use 'start' stage instead of 'initializing' to avoid duplicates
@@ -2208,7 +1454,8 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
             saved: false,
             progress: { percentage: 5, message: 'Starting analysis...', stage: 'start' }  // Changed from 'initializing'
         };
-        setMessages(prev => [...prev, processingMessage]);
+        // Processing message is temporary UI feedback, not persisted
+        setTemporaryMessages([processingMessage]);
         
         // Simulate initial progress steps while waiting for response
         const progressSimulator = async () => {
@@ -2226,7 +1473,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                         message: step.message,
                         stage: step.stage
                     });
-                    setMessages(prev => prev.map(msg => 
+                    setTemporaryMessages(prev => prev.map(msg => 
                         msg.id === 'processing' 
                             ? { ...msg, progress: { percentage: step.percentage, message: step.message, stage: step.stage } }
                             : msg
@@ -2242,38 +1489,38 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
 
         try {
             // Respect user's streaming preference - DEFAULT TO STREAMING for better UX
-            const enableStreaming = streamingEnabled !== false; // Stream by default unless explicitly disabled
-            console.log(`🌊 Streaming ${enableStreaming ? 'ENABLED' : 'DISABLED'} for this request`);
+            // const enableStreaming = streamingEnabled !== false; // Stream by default unless explicitly disabled
+            // console.log(`🌊 Streaming ${enableStreaming ? 'ENABLED' : 'DISABLED'} for this request`);
             
-            if (enableStreaming) {
-                // Use streaming with SSE (Server-Sent Events)
-                console.log('🚀 Calling handleStreamingRequest...');
-                await handleStreamingRequest(
-                    textToSend,
-                    uploadedDataSourceId || props.selectedDataSource?.id,
-                    conversationId || props.conversationId,
-                    effectiveMode, // Use effective mode (deep for files)
-                    currentModel
-                );
-                // CRITICAL: Return here to prevent fall-through to non-streaming
-                return;
-            }
-            
+            // if (enableStreaming) {
+            //     // Use streaming with SSE (Server-Sent Events)
+            //     console.log('🚀 Calling handleStreamingRequest...');
+            //     await handleStreamingRequest(
+            //         textToSend,
+            //         uploadedDataSourceId || props.selectedDataSource?.id,
+            //         conversationId || props.conversationId,
+            //         effectiveMode || 'standard', // Use current mode, default to 'standard'
+            //         currentModel
+            //     );
+            //     // CRITICAL: Return here to prevent fall-through to non-streaming
+            //     return;
+            // }
+            debugger;
             // Non-streaming fallback (only if streaming explicitly disabled)
             console.log('📡 Using non-streaming request...');
             const response = await fetch('/api/ai/chat/analyze', {
                 method: 'POST',
                 credentials: 'include',
-                headers: getSecureAuthHeaders(false),
+                headers: getSecureAuthHeaders(session),
                 body: JSON.stringify({
                     query: textToSend,
                     data_source_id: uploadedDataSourceId || props.selectedDataSource?.id,
                     business_context: 'data_analysis',
                     conversation_id: conversationId || props.conversationId,
-                    analysis_mode: effectiveMode, // Use effective mode (deep for files)
+                    analysis_mode: effectiveMode || 'standard', // Use current mode, default to 'standard'
                     ai_model: currentModel === 'auto' ? 'azure_gpt5_mini' : currentModel,
                     stream: false,
-                    organization_id: currentOrganization?.id ? String(currentOrganization.id) : undefined
+                    // organization_id removed - simplified to user-scoped access only
                 })
             });
 
@@ -2318,7 +1565,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
             console.error('Error in handleSendMessage:', error);
             setIsLoading(false);
             setIsStreaming(false);
-            setMessages(prev => prev.filter(m => m.id !== 'processing'));
+            setTemporaryMessages(prev => prev.filter(m => m.id !== 'processing'));
             setProgressState(null);
             
             // Show sanitized error message (no sensitive data leaks)
@@ -2334,7 +1581,13 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
             messageType: 'text',
                 saved: false
             };
-            setMessages(prev => [...prev, errorMessage]);
+            // Add error message to context if we have a conversation
+            if (props.conversationId) {
+                addMessage(errorMessage, props.conversationId);
+            } else {
+                // If no conversation, add as temporary message
+                setTemporaryMessages(prev => [...prev, errorMessage]);
+            }
         }
     };
 
@@ -2351,7 +1604,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
             clearTimeout(progressTimeoutRef.current);
             progressTimeoutRef.current = null;
         }
-        setMessages(prev => prev.filter(m => m.id !== 'processing'));
+        setTemporaryMessages(prev => prev.filter(m => m.id !== 'processing'));
         antMessage.info('Request cancelled');
     }, []);
 
@@ -2363,6 +1616,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
         analysisMode: string,
         aiModel: string
     ) => {
+
         // Create abort controller for cancellation
         abortControllerRef.current = new AbortController();
         const signal = abortControllerRef.current.signal;
@@ -2381,14 +1635,20 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
             // Use streaming endpoint if enabled
             // CRITICAL: Use correct endpoint path - /api/ai/chat/analyze routes to backend /ai/chat/analyze
             const endpoint = streamingEnabled ? '/api/ai/chat/analyze/stream' : '/api/ai/chat/analyze';
+            const headers: Record<string, string> = {
+                'Accept': streamingEnabled ? 'text/event-stream' : 'application/json',
+                'Content-Type': 'application/json'
+            };
+            
+            // Add Bearer token if available
+            if (session?.access_token) {
+                headers['Authorization'] = `Bearer ${session.access_token}`;
+            }
+            
             const response = await fetch(endpoint, {
                 method: 'POST',
                 credentials: 'include',
-                headers: {
-                    ...getSecureAuthHeaders(false), // Prefer cookies for auth
-                    'Accept': streamingEnabled ? 'text/event-stream' : 'application/json',
-                    'Content-Type': 'application/json'
-                },
+                headers,
                 body: JSON.stringify({
                     query: query,
                     data_source_id: dataSourceId,
@@ -2397,9 +1657,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                     analysis_mode: analysisMode,
                     ai_model: aiModel === 'auto' ? 'azure_gpt5_mini' : aiModel, // Convert 'auto' to default model
                     stream: streamingEnabled,
-                    user_context: { stream: streamingEnabled },
-                    // CRITICAL: Include organization_id for streaming endpoint
-                    organization_id: currentOrganization?.id ? String(currentOrganization.id) : undefined
+                    user_context: { stream: streamingEnabled }
                 }),
                 signal: signal
             });
@@ -2628,13 +1886,12 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
             }
             
             // Update processing message with progress to trigger re-render
-            // Use functional update to ensure we get the latest state
-            setMessages(prev => {
-                // Find processing message and update it
+            // Processing messages are temporary UI feedback, not persisted
+            setTemporaryMessages(prev => {
                 const hasProcessing = prev.some(m => m.id === 'processing');
                 if (!hasProcessing) {
                     // If no processing message, add one
-                    return [...prev, {
+                    return [{
                         id: 'processing',
                         query: '',
                         answer: '',
@@ -2649,7 +1906,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                 }
                 
                 // Update existing processing message - create new object to force re-render
-                const updated = prev.map(m => {
+                return prev.map(m => {
                     if (m.id === 'processing') {
                         return { 
                             ...m, 
@@ -2659,9 +1916,6 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                     }
                     return m;
                 });
-                
-                // Return new array to ensure React detects the change
-                return updated;
             });
 
             // Log partial results if available
@@ -2684,7 +1938,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                 clearTimeout(progressTimeoutRef.current);
                 progressTimeoutRef.current = null;
             }
-            setMessages(prev => prev.filter(m => m.id !== 'processing'));
+            setTemporaryMessages(prev => prev.filter(m => m.id !== 'processing'));
             
             const friendlyError = makeErrorMessageUserFriendly(data.error || 'An error occurred during processing.', {
                 stage: data.node,
@@ -2702,7 +1956,13 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                     messageType: 'text',
                 saved: false
             };
-            setMessages(prev => [...prev, errorMessage]);
+            // Add error message to context if we have a conversation
+            if (props.conversationId) {
+                addMessage(errorMessage, props.conversationId);
+            } else {
+                // If no conversation, add as temporary message
+                setTemporaryMessages(prev => [...prev, errorMessage]);
+            }
             antMessage.error(friendlyError);
         }
     };
@@ -2716,16 +1976,6 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
         if (progressTimeoutRef.current) {
             clearTimeout(progressTimeoutRef.current);
             progressTimeoutRef.current = null;
-        }
-        
-        // Refresh organization usage stats after successful AI call (credits consumed)
-        if (currentOrganization?.id) {
-            try {
-                await getOrganizationUsage(currentOrganization.id);
-                console.log('✅ Refreshed organization usage stats after streaming AI call');
-            } catch (error) {
-                console.warn('⚠️ Failed to refresh usage stats:', error);
-            }
         }
         
         // Update progress one last time from final result if available - ensure 100%
@@ -2751,7 +2001,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
         }
         
         // Remove processing message
-        setMessages(prev => prev.filter(m => m.id !== 'processing'));
+        setTemporaryMessages(prev => prev.filter(m => m.id !== 'processing'));
         
         // Clear progress state after a brief delay (ensure it clears even if stuck)
         if (progressTimeoutRef.current) {
@@ -2787,7 +2037,13 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                     messageType: 'text',
                 saved: false
                 };
-                setMessages(prev => [...prev, errorMessage]);
+                // Add error message to context if we have a conversation
+            if (props.conversationId) {
+                addMessage(errorMessage, props.conversationId);
+            } else {
+                // If no conversation, add as temporary message
+                setTemporaryMessages(prev => [...prev, errorMessage]);
+            }
             }
     };
 
@@ -2820,7 +2076,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                         message: step.message,
                         stage: step.stage
                     });
-                    setMessages(prev => prev.map(msg => 
+                    setTemporaryMessages(prev => prev.map(msg => 
                         msg.id === 'processing' 
                             ? { ...msg, progress: { percentage: step.percentage, message: step.message, stage: step.stage } }
                             : msg
@@ -2850,10 +2106,10 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
         
         if (hasContent) {
             // Only remove processing message if we have actual content
-            setMessages(prev => prev.filter(m => m.id !== 'processing'));
+            setTemporaryMessages(prev => prev.filter(m => m.id !== 'processing'));
         } else {
             // Keep processing message but mark it as error
-            setMessages(prev => prev.map(m => 
+            setTemporaryMessages(prev => prev.map(m => 
                 m.id === 'processing' 
                     ? { ...m, messageType: 'error' as const, answer: 'No content received from server' }
                     : m
@@ -2879,15 +2135,7 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
         if (result.success !== false) {
             await processAIResponse(result, query);
             
-            // Refresh organization usage stats after successful AI call (credits consumed)
-            if (currentOrganization?.id) {
-                try {
-                    await getOrganizationUsage(currentOrganization.id);
-                    console.log('✅ Refreshed organization usage stats after AI call');
-                } catch (error) {
-                    console.warn('⚠️ Failed to refresh usage stats:', error);
-                }
-            }
+            // Organization usage refresh removed – no org-level metering
         } else {
             // Handle error
             const errorMessage: IChatMessage = {
@@ -2903,21 +2151,19 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                 messageType: 'text',
                 saved: false
             };
-            setMessages(prev => [...prev, errorMessage]);
+            // Add error message to context if we have a conversation
+            if (props.conversationId) {
+                addMessage(errorMessage, props.conversationId);
+            } else {
+                // If no conversation, add as temporary message
+                setTemporaryMessages(prev => [...prev, errorMessage]);
+            }
         }
     };
 
     // Process AI response (extracted to avoid duplication)
     const processAIResponse = async (result: any, query: string) => {
-        // Refresh organization usage stats after successful AI response (credits consumed)
-        if (currentOrganization?.id) {
-            try {
-                await getOrganizationUsage(currentOrganization.id);
-                console.log('✅ Refreshed organization usage stats after AI response');
-            } catch (error) {
-                console.warn('⚠️ Failed to refresh usage stats:', error);
-            }
-        }
+        // Organization usage refresh removed – no org-level metering
         
         // CRITICAL: Extract all components - prioritize message/narration
         let aiAnalysis = makeMessageUserFriendly(result.message || result.narration || result.analysis || result.answer || '');
@@ -3083,10 +2329,11 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
             queryResultPresent: !!aiMessage.queryResult
         });
 
-        // CRITICAL: Check for duplicates before adding
-        setMessages(prev => {
+        // CRITICAL: Check for duplicates before adding to context
+        if (props.conversationId) {
+            const existingMessages = contextMessages.get(props.conversationId) || [];
             // Enhanced duplicate detection: check by ID, content, and timestamp
-            const exists = prev.some(m => {
+            const exists = existingMessages.some(m => {
                 // Exact ID match
                 if (m.id === aiMessage.id) {
                     console.warn('⚠️ Duplicate detected: same ID', aiMessage.id);
@@ -3127,113 +2374,47 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
                 }
                 return false;
             });
-            if (exists) {
+            if (!exists) {
+                addMessage(aiMessage, props.conversationId);
+            } else {
                 console.warn('⚠️ Duplicate AI message detected, skipping:', aiMessage.id);
-                return prev;
             }
-            const updated = [...prev, aiMessage];
-            
-            // Update session manager (backend already saved via /chat endpoint)
-            if (props.conversationId) {
-                conversationSessionManager.addMessage(aiMessage, props.conversationId);
+        }
+        
+        // CRITICAL: Update conversation metadata with data source and latest state
+        if (props.conversationId && props.selectedDataSource) {
+            // Don't await - fire and forget to avoid blocking
+            const metadata = {
+                last_data_source_id: props.selectedDataSource.id,
+                data_source_name: props.selectedDataSource.name,
+                data_source_type: props.selectedDataSource.type,
+                data_sources_used: [props.selectedDataSource.id],
+                last_updated: new Date().toISOString()
+            };
+            // Type assertion needed because json_metadata can be string or object
+            updateConversationMetadata(props.conversationId, {
+                json_metadata: JSON.stringify(metadata) as any
+            }).catch(e => console.warn('Failed to update conversation metadata:', e));
+        }
+        
+        // Auto-name conversation based on first user message if title is still "New Conversation"
+        if (props.conversationId && messages.length === 2) {
+            // This is the first AI response - check if we need to auto-name
+            const firstUserMessage = messages.find(m => m.role === 'user' && m.query);
+            if (firstUserMessage && firstUserMessage.query) {
+                const title = firstUserMessage.query.length > 50 ? firstUserMessage.query.substring(0, 50) + '...' : firstUserMessage.query;
+                updateConversationMetadata(props.conversationId, {
+                    title: title
+                }).then(() => {
+                    console.log('✅ Auto-named conversation:', title);
+                }).catch((error) => {
+                    console.warn('Failed to auto-name conversation:', error);
+                });
             }
-            
-            // CRITICAL: Update conversation metadata with data source and latest state
-            if (props.conversationId && props.selectedDataSource) {
-                // Don't await - fire and forget to avoid blocking
-                const metadata = {
-                    last_data_source_id: props.selectedDataSource.id,
-                    data_source_name: props.selectedDataSource.name,
-                    data_source_type: props.selectedDataSource.type,
-                    data_sources_used: [props.selectedDataSource.id],
-                    last_updated: new Date().toISOString()
-                };
-                // Type assertion needed because json_metadata can be string or object
-                conversationSessionManager.updateConversationMetadata(props.conversationId, {
-                    json_metadata: JSON.stringify(metadata) as any
-                }).catch(e => console.warn('Failed to update conversation metadata:', e));
-            }
-            
-            // CRITICAL: Immediately save to localStorage to prevent loss on navigation
-            // Also save chart configs separately for persistence
-            if (props.conversationId) {
-                try {
-                    const cacheKey = `conv_messages_${props.conversationId}`;
-                    // Serialize with proper date handling and ensure chart configs are preserved
-                    const serializable = updated.map(msg => ({
-                        ...msg,
-                        created_at: msg.created_at instanceof Date ? msg.created_at.toISOString() : msg.created_at,
-                        updated_at: msg.updated_at instanceof Date ? msg.updated_at.toISOString() : msg.updated_at,
-                        // CRITICAL: Ensure echartsConfig is preserved
-                        echartsConfig: msg.echartsConfig || msg.chartConfig,
-                        chartConfig: msg.chartConfig || msg.echartsConfig
-                    }));
-                    localStorage.setItem(cacheKey, JSON.stringify(serializable));
-                    
-                    // CRITICAL: Also save chart configs separately for quick restoration
-                    // This ensures charts persist across navigation and screen switches
-                    const chartsWithConfigs = updated.filter(msg => msg.echartsConfig || msg.chartConfig);
-                    if (chartsWithConfigs.length > 0) {
-                        const chartsKey = `conv_charts_${props.conversationId}`;
-                        const chartsData = chartsWithConfigs.map(msg => ({
-                            id: msg.id,
-                            echartsConfig: msg.echartsConfig || msg.chartConfig,
-                            chartConfig: msg.chartConfig || msg.echartsConfig,
-                            // Also save query result and insights for complete restoration
-                            queryResult: msg.queryResult,
-                            insights: msg.insights,
-                            recommendations: msg.recommendations
-                        }));
-                        localStorage.setItem(chartsKey, JSON.stringify(chartsData));
-                        console.log('💾 Saved', chartsData.length, 'chart configs to localStorage');
-                    }
-                    
-                    console.log('💾 Immediately saved', updated.length, 'messages to localStorage (including new AI message)');
-                } catch (e) {
-                    console.error('❌ Failed to save AI message to localStorage:', e);
-                }
-            }
-            
-            // Auto-name conversation based on first user message if title is still "New Conversation"
-            if (props.conversationId && query && prev.length === 1 && prev[0]?.role === 'user') {
-                // This is the first AI response - check if we need to auto-name
-                const conversationTitle = props.callback ? (props.callback as any).conversation?.title : null;
-                if (!conversationTitle || conversationTitle === 'New Conversation') {
-                    // Auto-generate title from first user message
-                    const title = query.length > 50 ? query.substring(0, 50) + '...' : query;
-                    fetch(`/api/conversations/${props.conversationId}`, {
-                        method: 'PUT',
-                        credentials: 'include',
-                        headers: getSecureAuthHeaders(false), // Prefer cookies for auth
-                        body: JSON.stringify({ title })
-                    }).then(() => {
-                        console.log('✅ Auto-named conversation:', title);
-                    }).catch((error) => {
-                        console.warn('Failed to auto-name conversation:', error);
-                    });
-                }
-            }
-            
-            return updated;
-        });
-
-        // Update cache
-        if (props.conversationId) {
-            setMessageCache(prev => {
-                const cached = prev[props.conversationId!] || { messages: [], conversation: {}, pagination: {} };
-                const userMessage = messages.find(m => m.role === 'user' && m.query === query);
-                return {
-                    ...prev,
-                    [props.conversationId!]: {
-                        ...cached,
-                        messages: [...cached.messages, ...(userMessage ? [userMessage] : []), aiMessage]
-                    }
-                };
-            });
         }
 
         // Note: Backend already saves messages via /chat endpoint, so no need to save again here
-        // The session manager is only used for optimistic UI updates and caching
+        // The context is used for optimistic UI updates and caching
     };
 
     // Handle key press
@@ -3245,18 +2426,9 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
     };
 
     // Handle typing
+    // MIGHT have to make it uncontrolled for performance
     const handleTyping = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         setPrompt(e.target.value);
-        
-        if (typingTimeout) {
-            clearTimeout(typingTimeout);
-        }
-        
-        setIsTyping(true);
-        const timeout = setTimeout(() => {
-            setIsTyping(false);
-        }, 1000);
-        setTypingTimeout(timeout);
     };
 
     // Auto-scroll: Only scroll when a NEW message is sent (not on every message change)
@@ -3265,47 +2437,47 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
     const isUserAtBottomRef = useRef(true);
     
     // Setup scroll tracking (separate effect to avoid hook count changes)
-    useEffect(() => {
-        const chatContainer = chatMessagesRef.current;
-        if (!chatContainer) return;
+    // useEffect(() => {
+    //     const chatContainer = chatMessagesRef.current;
+    //     if (!chatContainer) return;
 
-        const handleScroll = () => {
-            // Check if user is at bottom (within 100px threshold)
-            const scrollBottom = chatContainer.scrollHeight - chatContainer.scrollTop;
-            const containerHeight = chatContainer.clientHeight;
-            const isAtBottom = scrollBottom <= containerHeight + 100;
-            isUserAtBottomRef.current = isAtBottom;
-        };
+    //     const handleScroll = () => {
+    //         // Check if user is at bottom (within 100px threshold)
+    //         const scrollBottom = chatContainer.scrollHeight - chatContainer.scrollTop;
+    //         const containerHeight = chatContainer.clientHeight;
+    //         const isAtBottom = scrollBottom <= containerHeight + 100;
+    //         isUserAtBottomRef.current = isAtBottom;
+    //     };
 
-        chatContainer.addEventListener('scroll', handleScroll);
-        handleScroll(); // Check initial position
+    //     chatContainer.addEventListener('scroll', handleScroll);
+    //     handleScroll(); // Check initial position
         
-        return () => {
-            chatContainer.removeEventListener('scroll', handleScroll);
-        };
-    }, []); // Only setup once
+    //     return () => {
+    //         chatContainer.removeEventListener('scroll', handleScroll);
+    //     };
+    // }, []); // Only setup once
     
-    // Auto-scroll effect (separate from scroll tracking)
-    useEffect(() => {
-        // CRITICAL: Only auto-scroll when a NEW message is added (length increased)
-        // Don't scroll on every message change (e.g., updates, edits, etc.)
-        const currentLength = messages.length;
-        const prevLength = prevMessagesLengthRef.current;
-        const isNewMessage = currentLength > prevLength;
+    // // Auto-scroll effect (separate from scroll tracking)
+    // useEffect(() => {
+    //     // CRITICAL: Only auto-scroll when a NEW message is added (length increased)
+    //     // Don't scroll on every message change (e.g., updates, edits, etc.)
+    //     const currentLength = messages.length;
+    //     const prevLength = prevMessagesLengthRef.current;
+    //     const isNewMessage = currentLength > prevLength;
         
-        // Update ref for next comparison
-        prevMessagesLengthRef.current = currentLength;
+    //     // Update ref for next comparison
+    //     prevMessagesLengthRef.current = currentLength;
         
-        // Only auto-scroll if:
-        // 1. A new message was added (not just updated)
-        // 2. User is at bottom (hasn't scrolled up)
-        if (isNewMessage && isUserAtBottomRef.current) {
-            // Small delay to ensure DOM is updated
-            setTimeout(() => {
-                messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-            }, 100);
-        }
-    }, [messages]);
+    //     // Only auto-scroll if:
+    //     // 1. A new message was added (not just updated)
+    //     // 2. User is at bottom (hasn't scrolled up)
+    //     if (isNewMessage && isUserAtBottomRef.current) {
+    //         // Small delay to ensure DOM is updated
+    //         setTimeout(() => {
+    //             messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    //         }, 100);
+    //     }
+    // }, [messages]);
 
     // Render welcome message with enhanced UX
     const renderWelcomeMessage = () => {
@@ -3761,12 +2933,24 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
             <UniversalDataSourceModal
                 isOpen={showDataSourceModal}
                 onClose={() => setShowDataSourceModal(false)}
-                onDataSourceCreated={(dataSource: any) => {
+                onDataSourceCreated={async (dataSource: any) => {
                     console.log('Created data source:', dataSource);
                     setShowDataSourceModal(false);
+                    
+                    // Refresh the data sources context
+                    try {
+                        await refreshDataSources();
+                    } catch (e) {
+                        console.error('Failed to refresh data sources:', e);
+                    }
+                    
+                    // Notify parent if callback exists
+                    if (dataSource?.id && props.onDataSourceSelect) {
+                        props.onDataSourceSelect(dataSource);
+                    }
                 }}
             />
-            <UpgradeModal />
+            {/* UpgradeModal removed – no org/plan gating */}
         </div>
     );
 };

@@ -132,10 +132,14 @@ class LangGraphMultiAgentOrchestrator:
         self,
         conversation_id: str,
         user_query: str
-    ) -> None:
-        """Save user message immediately when query starts (before workflow)"""
+    ) -> Optional[str]:
+        """Save user message immediately when query starts (before workflow)
+        
+        Returns:
+            Optional[str]: Message ID if successfully saved, None otherwise
+        """
         if not conversation_id or not self.async_session_factory:
-            return
+            return None
         
         try:
             import uuid as uuid_lib
@@ -148,7 +152,7 @@ class LangGraphMultiAgentOrchestrator:
                 conversation_uuid = uuid_lib.UUID(conversation_id)
             except ValueError:
                 logger.warning(f"Invalid conversation_id format for saving user message: {conversation_id}")
-                return
+                return None
             
             async_gen = self.async_session_factory()
             session = await async_gen.__anext__()
@@ -179,9 +183,12 @@ class LangGraphMultiAgentOrchestrator:
                     status="processing"  # Mark as processing
                 )
                 session.add(user_message)
+                await session.flush()  # Flush to get the ID
+                message_id = str(user_message.id)  # Capture the ID
                 await session.commit()
                 
-                logger.info(f"💾 Saved user message immediately for conversation {conversation_id}")
+                logger.info(f"💾 Saved user message immediately (ID: {message_id}) for conversation {conversation_id}")
+                return message_id
             except Exception as e:
                 await session.rollback()
                 raise
@@ -193,13 +200,15 @@ class LangGraphMultiAgentOrchestrator:
         except Exception as e:
             logger.error(f"⚠️ Failed to save user message immediately (non-critical): {e}")
             # Don't fail the workflow if message saving fails
+            return None
     
     async def _save_conversation_messages(
         self,
         conversation_id: str,
         user_query: str,
         ai_response: str,
-        result: Dict[str, Any]
+        result: Dict[str, Any],
+        user_message_id: Optional[str] = None
     ) -> None:
         """
         Save user query and AI response to conversation messages atomically.
@@ -211,6 +220,7 @@ class LangGraphMultiAgentOrchestrator:
             user_query: User's query
             ai_response: AI's response
             result: Full result dictionary
+            user_message_id: Optional message ID from _save_user_message_immediately
         """
         if not conversation_id or not self.async_session_factory:
             return
@@ -250,34 +260,52 @@ class LangGraphMultiAgentOrchestrator:
                     await session.flush()
                     logger.info(f"📝 Created new conversation: {conversation_id}")
                 
-                # CRITICAL: Check if user message already exists (from _save_user_message_immediately)
-                # to avoid duplicates - check by query text AND recent timestamp
-                from datetime import datetime, timedelta
-                recent_threshold = datetime.utcnow() - timedelta(seconds=30)
+                # CRITICAL: Find existing user message - prefer message ID lookup (most reliable)
+                existing_user = None
+                if user_message_id:
+                    try:
+                        message_uuid = uuid_lib.UUID(user_message_id)
+                        msg_result = await session.execute(
+                            select(ChatMessage).filter(
+                                ChatMessage.id == message_uuid,
+                                ChatMessage.conversation_id == conversation_uuid,
+                                ChatMessage.is_active == True
+                            )
+                        )
+                        existing_user = msg_result.scalar_one_or_none()
+                        if existing_user:
+                            logger.debug(f"💾 Found user message by ID: {user_message_id}")
+                    except (ValueError, Exception) as e:
+                        logger.warning(f"⚠️ Invalid or missing message ID {user_message_id}: {e}, falling back to query matching")
                 
-                existing_user_msg = await session.execute(
-                    select(ChatMessage).filter(
-                        ChatMessage.conversation_id == conversation_uuid,
-                        ChatMessage.query == user_query,
-                        ChatMessage.answer == None,
-                        ChatMessage.is_active == True,
-                        ChatMessage.created_at >= recent_threshold
-                    ).order_by(ChatMessage.created_at.desc()).limit(1)
-                )
-                existing_user = existing_user_msg.scalar_one_or_none()
-                
+                # Fallback: Check if user message already exists by query text (if ID lookup failed)
                 if not existing_user:
-                    # Also check for any user message with same query in last 5 seconds (more aggressive dedupe)
-                    very_recent_threshold = datetime.utcnow() - timedelta(seconds=5)
-                    very_recent_msg = await session.execute(
+                    from datetime import datetime, timedelta
+                    recent_threshold = datetime.utcnow() - timedelta(seconds=30)
+                    
+                    existing_user_msg = await session.execute(
                         select(ChatMessage).filter(
                             ChatMessage.conversation_id == conversation_uuid,
                             ChatMessage.query == user_query,
+                            ChatMessage.answer == None,
                             ChatMessage.is_active == True,
-                            ChatMessage.created_at >= very_recent_threshold
+                            ChatMessage.created_at >= recent_threshold
                         ).order_by(ChatMessage.created_at.desc()).limit(1)
                     )
-                    existing_user = very_recent_msg.scalar_one_or_none()
+                    existing_user = existing_user_msg.scalar_one_or_none()
+                    
+                    if not existing_user:
+                        # Also check for any user message with same query in last 5 seconds (more aggressive dedupe)
+                        very_recent_threshold = datetime.utcnow() - timedelta(seconds=5)
+                        very_recent_msg = await session.execute(
+                            select(ChatMessage).filter(
+                                ChatMessage.conversation_id == conversation_uuid,
+                                ChatMessage.query == user_query,
+                                ChatMessage.is_active == True,
+                                ChatMessage.created_at >= very_recent_threshold
+                            ).order_by(ChatMessage.created_at.desc()).limit(1)
+                        )
+                        existing_user = very_recent_msg.scalar_one_or_none()
                 
                 # ===== ATOMIC TRANSACTION: Save both messages together =====
                 if not existing_user:
@@ -296,7 +324,7 @@ class LangGraphMultiAgentOrchestrator:
                     if existing_user.status == "processing":
                         existing_user.status = "completed"
                         await session.flush()
-                        logger.debug(f"💾 Updated existing user message status to completed (prevented duplicate)")
+                        logger.debug(f"💾 Updated existing user message status to completed (ID: {existing_user.id}, prevented duplicate)")
                 
                 # Save AI response message
                 # Include full response with SQL, chart config, insights if available
@@ -539,7 +567,6 @@ class LangGraphMultiAgentOrchestrator:
         
         # Initialize services (same as old orchestrator)
         try:
-            from app.modules.ai.services.rbac_service import RBACService
             from app.modules.ai.services.performance_monitor import PerformanceMonitor
             from app.modules.ai.services.langchain_memory_service import LangChainMemoryService
             from app.modules.ai.services.context_enrichment_service import ContextEnrichmentService
@@ -547,18 +574,15 @@ class LangGraphMultiAgentOrchestrator:
             if self.async_session_factory:
                 self.memory_service = LangChainMemoryService(self.async_session_factory)
                 self.context_service = ContextEnrichmentService(self.async_session_factory)
-                self.rbac_service = RBACService(self.async_session_factory)
                 self.performance_monitor = PerformanceMonitor()
             else:
                 self.memory_service = None
                 self.context_service = None
-                self.rbac_service = None
                 self.performance_monitor = None
         except Exception as e:
             logger.warning(f"⚠️ Some services not available: {e}")
             self.memory_service = None
             self.context_service = None
-            self.rbac_service = None
             self.performance_monitor = None
         
         # Initialize agents (will be imported in nodes)
@@ -762,50 +786,28 @@ class LangGraphMultiAgentOrchestrator:
         if state.get("error"):
             return "error"
         
-        # CRITICAL: Check if data source is a file - route to file analysis
         data_source_id = state.get("data_source_id")
+        
+        # Check analysis_mode - only route to deep_file_analysis if explicitly "deep"
+        execution_metadata = state.get("execution_metadata", {})
+        analysis_mode = execution_metadata.get("analysis_mode") or state.get("analysis_mode", "standard")
+        
+        if analysis_mode == "deep":
+            # Only route to deep analysis if explicitly requested
+            logger.info(f"📊 Deep analysis mode detected - routing to deep file analysis")
+            state["current_stage"] = "routed_to_deep_file_analysis"
+            return "deep_file_analysis"
+        
+        # For file sources with standard mode, continue to normal SQL path
+        # Log data source type for debugging but don't use it for routing
         if data_source_id:
-            # Check if it's a file data source
-            is_file_source = False
             try:
-                # Check in-memory registry first
                 if self.data_service and hasattr(self.data_service, 'data_sources') and data_source_id in self.data_service.data_sources:
                     source_info = self.data_service.data_sources[data_source_id]
                     source_type = source_info.get('type', '').lower() if isinstance(source_info, dict) else str(getattr(source_info, 'type', '')).lower()
-                    if source_type == 'file':
-                        is_file_source = True
-                        logger.info(f"📊 File data source detected in registry - routing to file analysis")
-                else:
-                    # Try to check via data service method (async, but we're in sync context)
-                    # We'll check this in the route_query_node instead
-                    pass
+                    logger.debug(f"📊 Data source type: {source_type}, analysis_mode: {analysis_mode}")
             except Exception as e:
-                logger.warning(f"Could not check data source type: {e}")
-            
-            # Also check analysis_mode from execution_metadata
-            execution_metadata = state.get("execution_metadata", {})
-            analysis_mode = execution_metadata.get("analysis_mode") or state.get("analysis_mode", "standard")
-            if analysis_mode == "deep":
-                is_file_source = True
-                logger.info(f"📊 Deep analysis mode detected - routing to deep file analysis")
-                state["current_stage"] = "routed_to_deep_file_analysis"
-                return "deep_file_analysis"
-            
-            # Also check data source ID pattern
-            if not is_file_source and 'file_' in str(data_source_id).lower():
-                is_file_source = True
-                logger.info(f"📊 File pattern detected in data source ID - routing to deep file analysis")
-            
-            # CRITICAL: Route ALL file sources to deep_file_analysis (not deprecated file_analysis)
-            if is_file_source:
-                # Default to deep analysis for all file sources
-                if analysis_mode != "deep":
-                    analysis_mode = "deep"
-                    execution_metadata["analysis_mode"] = "deep"
-                    state["execution_metadata"] = execution_metadata
-                    logger.info(f"📊 File source detected - defaulting to deep analysis mode")
-                state["current_stage"] = "routed_to_deep_file_analysis"
-                return "deep_file_analysis"
+                logger.debug(f"Could not check data source type: {e}")
         
         # CRITICAL: If no data_source_id, use conversational mode (no SQL generation)
         if not data_source_id:
@@ -1308,9 +1310,10 @@ class LangGraphMultiAgentOrchestrator:
         start_time = time.time()
         
         # CRITICAL: Save user message immediately when query starts (before workflow)
+        user_message_id = None
         if conversation_id:
             try:
-                await self._save_user_message_immediately(conversation_id, query)
+                user_message_id = await self._save_user_message_immediately(conversation_id, query)
             except Exception as e:
                 logger.warning(f"⚠️ Failed to save user message immediately (non-critical): {e}")
         
@@ -1329,6 +1332,12 @@ class LangGraphMultiAgentOrchestrator:
                 analysis_mode=analysis_mode,
                 model=model
             )
+            
+            # Store user_message_id in execution_metadata so it flows through the workflow
+            if user_message_id:
+                if "execution_metadata" not in initial_state:
+                    initial_state["execution_metadata"] = {}
+                initial_state["execution_metadata"]["user_message_id"] = user_message_id
             
             # Override with conversation history and agent context if provided
             initial_state["conversation_history"] = conversation_history
@@ -1469,10 +1478,20 @@ class LangGraphMultiAgentOrchestrator:
             
             # Generate proper natural language response using LLM if we have results
             executive_summary = final_state.get("executive_summary")
-            narration = None
+            narration = final_state.get("narration") or final_state.get("message") or None
+            
+            # CRITICAL: Check if this is conversational mode (narration already set by routing_node/conversational_end)
+            # In conversational mode, we should preserve the existing narration
+            current_stage = final_state.get("current_stage", "")
+            is_conversational_complete = (
+                current_stage == "supervisor_conversational_complete" or 
+                current_stage == "conversational" or
+                "conversational" in current_stage.lower()
+            )
             
             # Try to generate a conversational response using LLM
-            if query_result_count > 0 and self.litellm_service:
+            # Only generate new narration if we have query results AND we're not in conversational mode
+            if query_result_count > 0 and self.litellm_service and not is_conversational_complete:
                 try:
                     # Prepare context for natural language response generation
                     query_intent = final_state.get("query_intent", {})
@@ -1528,7 +1547,9 @@ Return ONLY the response text, no markdown, no quotes."""
                     logger.warning(f"⚠️ Natural language generation error: {nl_err}, using fallback")
             
             # Fallback: Use executive summary or build from parts
-            if not narration or len(narration.strip()) < 20:
+            # CRITICAL: Only run fallback if we're NOT in conversational mode OR narration is truly missing
+            # This preserves narration set by routing_node/conversational_end for conversational routes
+            if not is_conversational_complete and (not narration or len(narration.strip()) < 20):
                 if executive_summary and isinstance(executive_summary, str) and len(executive_summary.strip()) > 20:
                     narration = executive_summary
                 else:
@@ -1621,8 +1642,26 @@ Return ONLY the response text, no markdown, no quotes."""
             logger.info(f"✅ Final progress: {final_state.get('progress_percentage', 0.0)}% - {final_state.get('progress_message', 'N/A')}")
             logger.info(f"✅ Success: {result.get('success')}, Has SQL: {bool(result.get('sql_query'))}, Has Results: {bool(result.get('query_result'))}, Has Chart: {bool(result.get('echarts_config'))}, Has Insights: {bool(result.get('insights'))}")
             
-            # NOTE: Messages are already saved earlier in this method (around line 1507)
-            # No need to save again here to prevent duplicates
+            # CRITICAL: Save messages to database for non-streaming requests
+            # This ensures AI responses are persisted, updating user messages from "processing" to "completed"
+            if conversation_id:
+                try:
+                    narration = result.get("narration") or result.get("message") or result.get("analysis", "")
+                    result_dict = {
+                        "success": result.get("success", True),
+                        "echarts_config": result.get("echarts_config"),
+                        "insights": result.get("insights", []),
+                        "recommendations": result.get("recommendations", []),
+                        "sql_query": result.get("sql_query"),
+                        "query_result": result.get("query_result"),
+                        "execution_metadata": result.get("execution_metadata", {})
+                    }
+                    # Extract user_message_id from execution_metadata
+                    user_message_id = result.get("execution_metadata", {}).get("user_message_id")
+                    await self._save_conversation_messages(conversation_id, query, narration, result_dict, user_message_id=user_message_id)
+                    logger.info(f"✅ Saved messages for non-streaming request in conversation {conversation_id}")
+                except Exception as save_error:
+                    logger.error(f"⚠️ Failed to save messages for non-streaming request (non-critical): {save_error}")
             
             return result
             
@@ -2043,7 +2082,9 @@ Return ONLY the response text, no markdown, no quotes."""
                                 "query_result": final_state.get("query_result"),
                                 "execution_metadata": final_state.get("execution_metadata", {})
                             }
-                            await self._save_conversation_messages(conversation_id, query, narration, result_dict)
+                            # Extract user_message_id from execution_metadata
+                            user_message_id = final_state.get("execution_metadata", {}).get("user_message_id")
+                            await self._save_conversation_messages(conversation_id, query, narration, result_dict, user_message_id=user_message_id)
                             logger.info(f"✅ Saved messages in real-time for conversation {conversation_id}")
                         except Exception as save_error:
                             logger.error(f"⚠️ Failed to save messages in real-time (non-critical): {save_error}")
@@ -2131,7 +2172,9 @@ Return ONLY the response text, no markdown, no quotes."""
                                 "query_result": final_state.get("query_result"),
                                 "execution_metadata": final_state.get("execution_metadata", {})
                             }
-                            await self._save_conversation_messages(conversation_id, query, narration, result_dict)
+                            # Extract user_message_id from execution_metadata
+                            user_message_id = final_state.get("execution_metadata", {}).get("user_message_id")
+                            await self._save_conversation_messages(conversation_id, query, narration, result_dict, user_message_id=user_message_id)
                             logger.info(f"✅ Saved messages after stream end for conversation {conversation_id}")
                         except Exception as save_error:
                             logger.error(f"⚠️ Failed to save messages after stream end (non-critical): {save_error}")
@@ -2157,7 +2200,9 @@ Return ONLY the response text, no markdown, no quotes."""
                                 "query_result": last_state.get("query_result"),
                                 "execution_metadata": last_state.get("execution_metadata", {})
                             }
-                            await self._save_conversation_messages(conversation_id, query, narration, result_dict)
+                            # Extract user_message_id from execution_metadata
+                            user_message_id = last_state.get("execution_metadata", {}).get("user_message_id")
+                            await self._save_conversation_messages(conversation_id, query, narration, result_dict, user_message_id=user_message_id)
                             logger.info(f"✅ Saved messages for incomplete workflow in conversation {conversation_id}")
                         except Exception as save_error:
                             logger.error(f"⚠️ Failed to save messages for incomplete workflow (non-critical): {save_error}")

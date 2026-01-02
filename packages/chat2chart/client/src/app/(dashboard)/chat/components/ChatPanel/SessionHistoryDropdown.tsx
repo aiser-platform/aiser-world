@@ -4,8 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Dropdown, Button, List, Typography, Space, Tooltip, Popconfirm, Input, message as antMessage, Empty, Spin, Grid } from 'antd';
 import { HistoryOutlined, PlusOutlined, DeleteOutlined, EditOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons';
 import { IConversation } from '../../types';
-import { fetchApi } from '@/utils/api';
-import { conversationSessionManager } from '@/services/conversationSessionManager';
+import { useConversations } from '@/context/ConversationContext';
 import './styles.css'; // Import styles for consistent scrollbar design
 
 const { Text } = Typography;
@@ -26,108 +25,50 @@ const SessionHistoryDropdown: React.FC<SessionHistoryDropdownProps> = ({
     const screens = Grid.useBreakpoint();
     const dropdownWidth = screens.lg ? 320 : 'min(360px, 92vw)';
     const [open, setOpen] = useState(false);
-    const [conversations, setConversations] = useState<IConversation[]>([]);
-    const [loading, setLoading] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editName, setEditName] = useState<string>('');
 
-    // Fetch conversations
-    const fetchConversations = useCallback(async () => {
-        setLoading(true);
-        try {
-            const response = await fetchApi('conversations/?limit=20', {
-                signal: new AbortController().signal,
-            });
-            
-            if (response.ok) {
-                const data = await response.json();
-                const items = data.items || [];
-                // Sort by updated_at descending (most recent first)
-                const sorted = items.sort((a: IConversation, b: IConversation) => {
-                    const aTime = new Date((a as any).updated_at || (a as any).created_at || 0).getTime();
-                    const bTime = new Date((b as any).updated_at || (b as any).created_at || 0).getTime();
-                    return bTime - aTime;
-                });
-                setConversations(sorted);
-            } else {
-                console.error('Failed to fetch conversations');
-            }
-        } catch (error) {
-            console.error('Error fetching conversations:', error);
-        } finally {
-            setLoading(false);
-        }
-    }, []);
+    // Get conversation state from context
+    const { conversations: contextConversations, isLoading, deleteConversation, updateConversationMetadata } = useConversations();
+    
+    // Sort conversations by updated_at (most recent first)
+    const conversations = [...contextConversations].sort((a: IConversation, b: IConversation) => {
+        const aTime = new Date((a as any).updated_at || (a as any).created_at || 0).getTime();
+        const bTime = new Date((b as any).updated_at || (b as any).created_at || 0).getTime();
+        return bTime - aTime;
+    });
+    
+    const loading = isLoading;
 
-    // Subscribe to session manager for real-time updates
-    useEffect(() => {
-        const unsubscribe = conversationSessionManager.subscribe((state) => {
-            // Update conversations list when session manager state changes
-            if (state.conversations && state.conversations.length > 0) {
-                const sorted = [...state.conversations].sort((a: IConversation, b: IConversation) => {
-                    const aTime = new Date((a as any).updated_at || (a as any).created_at || 0).getTime();
-                    const bTime = new Date((b as any).updated_at || (b as any).created_at || 0).getTime();
-                    return bTime - aTime;
-                });
-                setConversations(sorted);
-            }
-        });
-        
-        // Also fetch when dropdown opens (for initial load)
-        if (open) {
-            fetchConversations();
-        }
-        
-        return unsubscribe;
-    }, [open, fetchConversations]);
-
-    // Handle delete conversation
+    // Handle delete conversation - use context
     const handleDelete = async (conversationId: string, e?: React.MouseEvent) => {
         if (e) {
             e.stopPropagation();
         }
         
         try {
-            setLoading(true);
-            const response = await fetchApi(`conversations/${conversationId}`, {
-                method: 'DELETE',
-                signal: new AbortController().signal,
-            });
+            await deleteConversation(conversationId);
             
-            const result = await response.json().catch(() => ({ success: false }));
+            // CRITICAL FIX: Clear related localStorage caches
+            localStorage.removeItem(`conv_messages_${conversationId}`);
+            localStorage.removeItem(`conv_charts_${conversationId}`);
+            localStorage.removeItem(`conv_progress_${conversationId}`);
+            localStorage.removeItem(`conv_has_data_source_${conversationId}`);
             
-            if (response.ok && result.success !== false) {
-                // Remove from local state
-                setConversations(prev => prev.filter(c => c.id !== conversationId));
-                
-                // CRITICAL FIX: Clear related localStorage caches
-                localStorage.removeItem(`conv_messages_${conversationId}`);
-                localStorage.removeItem(`conv_charts_${conversationId}`);
-                localStorage.removeItem(`conv_progress_${conversationId}`);
-                localStorage.removeItem(`conv_has_data_source_${conversationId}`);
-                
-                antMessage.success('Conversation deleted successfully');
-                
-                // If deleted conversation was current, notify parent and reset state
-                if (conversationId === currentConversationId) {
-                    // Clear current conversation from localStorage
-                    localStorage.removeItem('current_conversation_id');
-                    onConversationDeleted?.();
-                }
-            } else {
-                const errorMsg = result.message || result.detail || result.error || 'Failed to delete conversation';
-                console.error('❌ Delete failed:', errorMsg);
-                antMessage.error(errorMsg);
+            antMessage.success('Conversation deleted successfully');
+            
+            // If deleted conversation was current, notify parent
+            if (conversationId === currentConversationId) {
+                onConversationDeleted?.();
             }
         } catch (error) {
             console.error('❌ Error deleting conversation:', error);
-            antMessage.error('Failed to delete conversation');
-        } finally {
-            setLoading(false);
+            const errorMsg = error instanceof Error ? error.message : 'Failed to delete conversation';
+            antMessage.error(errorMsg);
         }
     };
 
-    // Handle rename conversation
+    // Handle rename conversation - use context
     const handleRename = async (conversationId: string, newName: string) => {
         if (!newName.trim()) {
             setEditingId(null);
@@ -135,38 +76,15 @@ const SessionHistoryDropdown: React.FC<SessionHistoryDropdownProps> = ({
         }
 
         try {
-            const response = await fetchApi(`conversations/${conversationId}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ title: newName.trim() }),
-                signal: new AbortController().signal,
-            });
+            // Use context to update - it will handle API call and state update
+            await updateConversationMetadata(conversationId, { title: newName.trim() });
             
-            if (response.ok) {
-                // Update local state
-                setConversations(prev => prev.map(c => 
-                    c.id === conversationId ? { ...c, title: newName.trim() } : c
-                ));
-                
-                // Also update in conversationSessionManager
-                try {
-                    await conversationSessionManager.updateConversationMetadata(conversationId, { title: newName.trim() });
-                } catch (e) {
-                    console.warn('Failed to update conversation in session manager:', e);
-                }
-                
-                setEditingId(null);
-                antMessage.success('Conversation renamed');
-            } else {
-                const errorText = await response.text().catch(() => 'Unknown error');
-                console.error('Failed to rename conversation:', response.status, errorText);
-                antMessage.error('Failed to rename conversation');
-            }
+            setEditingId(null);
+            antMessage.success('Conversation renamed');
         } catch (error) {
             console.error('Error renaming conversation:', error);
-            antMessage.error('Failed to rename conversation');
+            const errorMsg = error instanceof Error ? error.message : 'Failed to rename conversation';
+            antMessage.error(errorMsg);
         }
     };
 

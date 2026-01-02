@@ -25,10 +25,9 @@ class ChatVisualization(BaseModel):
     datasource = Column(JSONB, nullable=True)
     message_id = Column(UUID, nullable=True)
     
-    # User and organization fields
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    # User ownership
+    user_id = Column(UUID(as_uuid=True), nullable=True)
     conversation_id = Column(UUID, ForeignKey("conversation.id"), nullable=True)
-    tenant_id = Column(String(50), default='default')
     
     # Timestamps
     created_at = Column(DateTime, server_default=func.now())
@@ -44,7 +43,7 @@ class DashboardEmbed(BaseModel):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     dashboard_id = Column(UUID(as_uuid=True), ForeignKey("dashboards.id"), nullable=False)
-    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    created_by = Column(UUID(as_uuid=True), nullable=True)
     embed_token = Column(String(255), nullable=False)
     options = Column(JSONB, nullable=True)
     expires_at = Column(DateTime, nullable=True)

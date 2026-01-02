@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import { useAuth } from '@/context/AuthContext';
 import { 
     Card, 
     Button, 
@@ -48,6 +49,7 @@ const SQLEditor: React.FC<SQLEditorProps> = ({
     onQueryExecute,
     defaultQuery = ''
 }) => {
+    const { session } = useAuth();
     const [query, setQuery] = useState(defaultQuery);
     const [results, setResults] = useState<any>(null);
     const [loading, setLoading] = useState(false);
@@ -70,9 +72,18 @@ const SQLEditor: React.FC<SQLEditorProps> = ({
         
         try {
             // Execute query through Cube.js
+            const headers: Record<string, string> = {
+                'Content-Type': 'application/json',
+            };
+            
+            // Add Bearer token if available
+            if (session?.access_token) {
+                headers['Authorization'] = `Bearer ${session.access_token}`;
+            }
+            
             const response = await fetch('/api/data/cube/query', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers,
                 body: JSON.stringify({
                     query: { sql: query }
                 })

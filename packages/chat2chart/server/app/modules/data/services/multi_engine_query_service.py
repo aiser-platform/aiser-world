@@ -5,6 +5,7 @@ Handles queries across different engines: DuckDB, Cube.js, Spark, Direct SQL
 
 import logging
 import asyncio
+import os
 import json
 from typing import Dict, List, Any, Optional
 from datetime import datetime
@@ -644,6 +645,7 @@ class DuckDBEngine(BaseQueryEngine):
         if inline_data and isinstance(inline_data, (list, tuple)) and len(inline_data) > 0:
             try:
                 # Convert inline rows to a pandas DataFrame and create DuckDB table
+                import pandas as pd
                 df = pd.DataFrame(inline_data)
                 conn.register("_aiser_inline_df", df)
                 conn.execute("CREATE TABLE data AS SELECT * FROM _aiser_inline_df")
@@ -651,51 +653,53 @@ class DuckDBEngine(BaseQueryEngine):
             except Exception as e:
                 logger.warning(f"Failed to load inline sample data into DuckDB, falling back to file_path: {e}")
 
-        # Fallback to reading from file_path if provided
-        if not file_path:
-            raise Exception("No data available for file data source: missing file_path and no inline sample data")
+        # If no inline data, try to load from PostgreSQL storage
+        if not inline_data:
+            object_key = data_source.get("file_path")  # Now it's object_key
+            if object_key:
+                try:
+                    from app.modules.data.services.postgres_storage_service import PostgresStorageService
+                    storage_service = PostgresStorageService()
+                    user_id = data_source.get('user_id')
+                    
+                    if not user_id:
+                        logger.warning("⚠️ user_id not found in data_source, cannot load from PostgreSQL storage")
+                    else:
+                        # Load file from PostgreSQL
+                        file_content = await storage_service.get_file(object_key, user_id)
+                        
+                        # Write to temp file for DuckDB
+                        import tempfile
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_format}") as tmp:
+                            tmp.write(file_content)
+                            tmp_path = tmp.name
+                        
+                        try:
+                            # Use temp file with DuckDB
+                            safe_path = tmp_path.replace("'", "''")
+                            if file_format == "csv":
+                                conn.execute(f"CREATE TABLE data AS SELECT * FROM read_csv_auto('{safe_path}')")
+                            elif file_format == "parquet":
+                                conn.execute(f"CREATE TABLE data AS SELECT * FROM read_parquet('{safe_path}')")
+                            elif file_format == "json":
+                                conn.execute(f"CREATE TABLE data AS SELECT * FROM read_json_auto('{safe_path}')")
+                            elif file_format in ("xlsx", "xls"):
+                                # For Excel files, use pandas to read and then register in DuckDB
+                                df = pd.read_excel(tmp_path, engine='openpyxl', sheet_name=0)
+                                df = df.replace({pd.NA: None, pd.NaT: None})
+                                conn.register("_excel_df", df)
+                                conn.execute("CREATE TABLE data AS SELECT * FROM _excel_df")
+                            logger.info(f"✅ Loaded file from PostgreSQL storage into DuckDB")
+                            return
+                        finally:
+                            if os.path.exists(tmp_path):
+                                os.unlink(tmp_path)
+                except Exception as e:
+                    logger.warning(f"Failed to load from PostgreSQL storage: {e}")
 
-        # For Excel files, use DuckDB's Excel extension (if available) or fallback to pandas
-        if file_format in ("xlsx", "xls"):
-            try:
-                # Check if multi-sheet Excel with pre-created tables
-                if duckdb_tables:
-                    # Use the first sheet table as 'data' view
-                    first_sheet_table = list(duckdb_tables.values())[0]
-                    # Recreate the view (tables should be persisted in schema)
-                    conn.execute(f"CREATE OR REPLACE VIEW data AS SELECT * FROM {first_sheet_table}")
-                    logger.info(f"✅ Recreated 'data' view from persisted table '{first_sheet_table}'")
-                    return
-                
-                # Try to use DuckDB's Excel reading (requires excel extension)
-                # For now, we'll use pandas to read and then register in DuckDB
-                import pandas as pd
-                df = pd.read_excel(file_path, engine='openpyxl', sheet_name=0)  # Read first sheet
-                df = df.replace({pd.NA: None, pd.NaT: None})
-                conn.register("_excel_df", df)
-                conn.execute("CREATE TABLE data AS SELECT * FROM _excel_df")
-                logger.info(f"✅ Loaded Excel file into DuckDB: {len(df)} rows")
-            except Exception as e:
-                logger.warning(f"⚠️ Failed to load Excel with DuckDB, falling back: {e}")
-                # Fallback: read first sheet only
-                import pandas as pd
-                df = pd.read_excel(file_path, engine='openpyxl')
-                conn.register("_excel_df", df)
-                conn.execute("CREATE TABLE data AS SELECT * FROM _excel_df")
-        elif file_format == "csv":
-            # Escape single quotes in file path for SQL safety
-            safe_file_path = file_path.replace("'", "''")
-            conn.execute(
-                f"CREATE TABLE data AS SELECT * FROM read_csv_auto('{safe_file_path}')"
-            )
-        elif file_format == "parquet":
-            safe_file_path = file_path.replace("'", "''")
-            conn.execute(
-                f"CREATE TABLE data AS SELECT * FROM read_parquet('{safe_file_path}')"
-            )
-        elif file_format == "json":
-            safe_file_path = file_path.replace("'", "''")
-            conn.execute(f"CREATE TABLE data AS SELECT * FROM read_json_auto('{safe_file_path}')")
+        # If still no data, raise error
+        if not inline_data:
+            raise Exception("No data available for file data source")
 
     async def _load_database_data(
         self, conn: duckdb.DuckDBPyConnection, data_source: Dict[str, Any]
@@ -1121,16 +1125,7 @@ class DirectSQLEngine(BaseQueryEngine):
                 conn_uri = f"{scheme}://{auth}{hostpart}/{database}"
 
             # CRITICAL: Enforce read-only mode for database connections
-            # Add tenant_id/user_id filtering if available
-            tenant_id = data_source.get('tenant_id') or data_source.get('organization_id')
-            user_id = data_source.get('user_id')
-            
-            # Wrap query to enforce tenant isolation (if tenant_id available)
-            # Note: This is a simple approach - in production, use RLS at database level
-            if tenant_id and 'tenant_id' not in query.upper() and 'WHERE' in query.upper():
-                # Try to add tenant_id filter (simple approach - may need refinement)
-                logger.debug(f"🔒 Adding tenant isolation filter (tenant_id={tenant_id})")
-                # Note: This is a basic implementation - proper RLS should be at DB level
+            # User-scoped queries only (no tenant isolation needed)
             
             # Run blocking DB calls in a thread to avoid blocking the event loop
             def run_sync_query(uri: str, sql: str) -> Dict[str, Any]:
@@ -1389,25 +1384,45 @@ class PandasEngine(BaseQueryEngine):
             except Exception:
                 logger.debug("Failed to fetch persisted sample_data; continuing to file_path fallback")
 
-            # Fallback to file_path
-            file_path = data_source.get("file_path")
+            # Try to load from PostgreSQL storage
+            object_key = data_source.get("file_path")  # Now it's object_key
             file_format = data_source.get("format", "csv")
+            
+            if object_key:
+                try:
+                    from app.modules.data.services.postgres_storage_service import PostgresStorageService
+                    storage_service = PostgresStorageService()
+                    user_id = data_source.get('user_id')
+                    
+                    if not user_id:
+                        logger.warning("⚠️ user_id not found in data_source, cannot load from PostgreSQL storage")
+                    else:
+                        # Load file from PostgreSQL
+                        file_content = await storage_service.get_file(object_key, user_id)
+                        
+                        # Write to temp file for Pandas
+                        import tempfile
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_format}") as tmp:
+                            tmp.write(file_content)
+                            tmp_path = tmp.name
+                        
+                        try:
+                            if file_format == "csv":
+                                return pd.read_csv(tmp_path)
+                            elif file_format == "parquet":
+                                return pd.read_parquet(tmp_path)
+                            elif file_format == "json":
+                                return pd.read_json(tmp_path)
+                            elif file_format in ("xlsx", "xls"):
+                                return pd.read_excel(tmp_path)
+                        finally:
+                            if os.path.exists(tmp_path):
+                                os.unlink(tmp_path)
+                except Exception as e:
+                    logger.warning(f"Failed to load from PostgreSQL storage: {e}")
 
-            if not file_path:
-                raise Exception("No data available for file data source: missing file_path and no inline or persisted sample data")
-
-            try:
-                if file_format == "csv":
-                    return pd.read_csv(file_path)
-                elif file_format == "parquet":
-                    return pd.read_parquet(file_path)
-                elif file_format == "json":
-                    return pd.read_json(file_path)
-                else:
-                    # try csv by default
-                    return pd.read_csv(file_path)
-            except Exception as e:
-                raise Exception(f"Failed to read file at {file_path}: {e}")
+            # If still no data, raise error
+            raise Exception("No data available for file data source")
 
         # Database sources: try to use SQLAlchemy connection and load a table or run provided query
         elif data_source["type"] == "database" or data_source.get('type') == 'enterprise_connector':

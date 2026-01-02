@@ -13,7 +13,6 @@ import {
   ProjectOutlined
 } from '@ant-design/icons';
 import { useAuth } from '@/context/AuthContext';
-import { useOrganization } from '@/context/OrganizationContext';
 import { useRouter } from 'next/navigation';
 import PricingModal from './PricingModal';
 
@@ -24,42 +23,23 @@ interface UserProfileDropdownProps {
 
 const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({ className, showText = true }) => {
   const { user, logout } = useAuth();
-  const { currentOrganization, usageStats, getOrganizationUsage } = useOrganization();
   const [pricingModalVisible, setPricingModalVisible] = useState(false);
   const [upgradeLoading, setUpgradeLoading] = useState(false);
   const router = useRouter();
 
-  // Refresh usage stats when component mounts, organization changes, or dropdown opens
-  React.useEffect(() => {
-    if (currentOrganization?.id) {
-      getOrganizationUsage(currentOrganization.id);
-    }
-  }, [currentOrganization?.id]);
-
-  // Refresh usage stats when dropdown is opened (on visible change)
-  const handleDropdownVisibleChange = (visible: boolean) => {
-    if (visible && currentOrganization?.id) {
-      // Refresh usage stats when dropdown opens
-      getOrganizationUsage(currentOrganization.id);
-    }
+  // Organization context removed - use defaults
+  const organizationData = {
+    name: 'My Organization',
+    plan: 'free',
+    aiCreditsUsed: 0,
+    aiCreditsLimit: 30,
+    daysLeftInTrial: 0,
+    isTrialActive: false
   };
 
-  // Use real organization data from context with updated usage stats
-  // CRITICAL: Only default to 'free' if plan_type is truly missing
-  // Log for debugging
-  console.log('[UserProfileDropdown] currentOrganization:', currentOrganization);
-  console.log('[UserProfileDropdown] usageStats:', usageStats);
-  
-  const organizationData = {
-    name: currentOrganization?.name || 'My Organization',
-    plan: (currentOrganization?.plan_type && currentOrganization.plan_type.trim() !== '') 
-      ? currentOrganization.plan_type 
-      : (currentOrganization ? 'free' : 'loading'), // Show 'loading' if org not loaded yet
-    // CRITICAL: Map both ai_queries_* and ai_credits_* fields correctly
-    aiCreditsUsed: usageStats?.ai_queries_used ?? usageStats?.ai_credits_used ?? 0,
-    aiCreditsLimit: usageStats?.ai_queries_limit ?? usageStats?.ai_credits_limit ?? (currentOrganization?.plan_type === 'pro' ? 1000 : 30),
-    daysLeftInTrial: 0, // Not implemented yet
-    isTrialActive: false // Not implemented yet
+  // No-op handler for dropdown visibility
+  const handleDropdownVisibleChange = (visible: boolean) => {
+    // Organization context removed - no action needed
   };
 
   const getPlanBadgeColor = (plan: string) => {

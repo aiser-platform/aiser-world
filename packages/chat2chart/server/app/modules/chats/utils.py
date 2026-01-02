@@ -9,74 +9,15 @@ import sqlalchemy as sa
 logger = logging.getLogger(__name__)
 
 
-async def get_user_organization_id(user_id: str) -> Optional[int]:
-    """
-    Get user's primary organization_id from user_organizations table.
-    Auto-creates a default organization if user doesn't have one.
-    
-    Args:
-        user_id: User UUID as string
-        
-    Returns:
-        Organization ID (integer) or None if not found
-    """
-    try:
-        import uuid as uuid_lib
-        # Convert user_id to UUID for proper binding
-        try:
-            user_uuid = uuid_lib.UUID(user_id) if isinstance(user_id, str) else user_id
-        except (ValueError, TypeError):
-            logger.error(f"Invalid user_id format: {user_id}")
-            return None
-            
-        async with async_session() as db:
-            # Query user_organizations to get the first active organization
-            query = sa.text("""
-                SELECT organization_id 
-                FROM user_organizations 
-                WHERE user_id = :user_id 
-                AND is_active = true 
-                ORDER BY created_at ASC 
-                LIMIT 1
-            """)
-            result = await db.execute(query, {"user_id": user_uuid})
-            row = result.fetchone()
-            
-            if row:
-                org_id = row[0]
-                logger.info(f"✅ Found organization_id {org_id} for user {user_id}")
-                return org_id
-            else:
-                # Auto-create default organization for user
-                logger.info(f"🔄 No organization found for user {user_id}, creating default organization...")
-                try:
-                    from app.modules.projects.services import OrganizationService
-                    org_service = OrganizationService()
-                    org_response = await org_service.create_default_organization(user_id)
-                    if org_response and org_response.id:
-                        logger.info(f"✅ Created default organization {org_response.id} for user {user_id}")
-                        return org_response.id
-                    else:
-                        logger.warning(f"⚠️ Failed to create organization for user {user_id}")
-                        return None
-                except Exception as create_error:
-                    logger.error(f"❌ Failed to auto-create organization: {create_error}")
-                    return None
-                
-    except Exception as e:
-        logger.error(f"❌ Failed to get organization_id for user {user_id}: {e}")
-        return None
-
-
 async def get_user_profile(user_id: str) -> Optional[Dict[str, Any]]:
     """
-    Get comprehensive user profile including organization_id.
+    Get comprehensive user profile.
     
     Args:
         user_id: User UUID as string
         
     Returns:
-        Dict with user profile data including organization_id, or None if not found
+        Dict with user profile data, or None if not found
     """
     try:
         import uuid as uuid_lib
@@ -147,11 +88,7 @@ async def get_user_profile(user_id: str) -> Optional[Dict[str, Any]]:
                 "is_active": user_row[8],
             }
             
-            # Get organization_id
-            organization_id = await get_user_organization_id(user_id)
-            user_data["organization_id"] = organization_id
-            
-            logger.info(f"✅ Retrieved profile for user {user_id}, organization_id: {organization_id}")
+            logger.info(f"✅ Retrieved profile for user {user_id}")
             return user_data
             
     except Exception as e:

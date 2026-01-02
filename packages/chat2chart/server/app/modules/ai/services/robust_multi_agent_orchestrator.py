@@ -23,7 +23,6 @@ from langchain_core.tools import BaseTool
 from langchain_core.language_models import BaseLanguageModel
 from sqlalchemy import select
 
-from app.modules.ai.services.rbac_service import RBACService
 from app.modules.ai.services.performance_monitor import PerformanceMonitor
 from app.modules.ai.services.langchain_memory_service import LangChainMemoryService
 from app.modules.ai.services.context_enrichment_service import ContextEnrichmentService
@@ -457,13 +456,11 @@ class RobustMultiAgentOrchestrator:
         if self.async_session_factory: # Changed to async_session_factory
             self.memory_service = LangChainMemoryService(self.async_session_factory)
             self.context_service = ContextEnrichmentService(self.async_session_factory)
-            self.rbac_service = RBACService(self.async_session_factory)
             self.performance_monitor = PerformanceMonitor() # Removed session_factory
         else:
             # Use None for services that require session factory
             self.memory_service = None
             self.context_service = None
-            self.rbac_service = None
             self.performance_monitor = None
         
         # Initialize LLM for routing and coordination (will use active_model which is now Azure)
@@ -645,26 +642,9 @@ class RobustMultiAgentOrchestrator:
             except Exception as validation_exception:
                 logger.debug(f"Input validation not available: {validation_exception}")
             
-            # Step 1: RBAC Validation
-            if self.rbac_service:
-                has_permission, permission_reason, rbac_context = await self.rbac_service.check_ai_operation_permission(
-                    user_id=user_id,
-                    organization_id=organization_id,
-                    operation_type="analysis",
-                    data_source_id=data_source_id,
-                    project_id=project_id
-                )
-            else:
-                # Fallback: assume permission granted for development
-                has_permission = True
-                permission_reason = "RBAC service not available - development mode"
-            
-            if not has_permission:
-                return {
-                    "result": f"Access denied: {permission_reason}",
-                    "metadata": self._create_error_metadata(reasoning_steps, start_time, "rbac_validation_failed"),
-                    "error": permission_reason
-                }
+            # Step 1: RBAC Validation - removed, always allow
+            # Organization/RBAC context removed - all users have permission
+            has_permission = True
             
             # CRITICAL: If no data_source_id, use conversational AI (simple LLM)
             # Path 3/4 (Standard Flow) requires data_source_id to execute SQL

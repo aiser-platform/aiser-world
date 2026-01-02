@@ -85,7 +85,7 @@ const generateQueryTemplates = (tableName?: string, schemaName?: string): Array<
 };
 
 export default function QueryEditorPage() {
-  const { isAuthenticated, loading, initialized } = useAuth();
+  const { isAuthenticated, authLoading } = useAuth();
   const router = useRouter();
   const { isDarkMode } = useThemeMode();
   const [showWelcome, setShowWelcome] = useState<boolean>(() => {
@@ -118,10 +118,10 @@ export default function QueryEditorPage() {
   }, []);
 
   useEffect(() => {
-    if (initialized && !loading && !isAuthenticated) {
+    if (!authLoading && !isAuthenticated) {
       router.push('/login');
     }
-  }, [isAuthenticated, loading, initialized, router]);
+  }, [isAuthenticated, authLoading, router]);
 
   const handleDismissWelcome = () => {
     setShowWelcome(false);
@@ -132,7 +132,7 @@ export default function QueryEditorPage() {
     }
   };
 
-  if (!initialized || loading) {
+  if (authLoading) {
     return <LoadingScreen />;
   }
 

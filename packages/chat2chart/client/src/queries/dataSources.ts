@@ -1,110 +1,132 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
+import { useAuthenticatedQuery } from '@/hooks/useAuthenticatedQuery'
+import { useAuthenticatedMutation } from '@/hooks/useAuthenticatedMutation'
 
 // Data Sources queries
 export const useDataSources = () => {
-  return useQuery({
-    queryKey: ['dataSources'],
-    queryFn: async () => {
-      const response = await fetch('/api/data/sources', { credentials: 'include' })
+  return useAuthenticatedQuery(
+    ['dataSources'],
+    async (token) => {
+      const response = await fetch('/api/data/sources', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
       if (!response.ok) throw new Error('Failed to fetch data sources')
       return response.json()
     },
-    staleTime: 5 * 60 * 1000,
-  })
+    {
+      staleTime: 5 * 60 * 1000,
+    }
+  )
 }
 
 export const useDataSourcesByProject = (projectId: string) => {
-  return useQuery({
-    queryKey: ['dataSources', projectId],
-    queryFn: async () => {
-      const response = await fetch(`/api/data/sources?project_id=${projectId}`, { credentials: 'include' })
+  return useAuthenticatedQuery(
+    ['dataSources', projectId],
+    async (token) => {
+      const response = await fetch(`/api/data/sources?project_id=${projectId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
       if (!response.ok) throw new Error('Failed to fetch data sources')
       return response.json()
     },
-    enabled: !!projectId,
-    staleTime: 5 * 60 * 1000,
-  })
+    {
+      enabled: !!projectId,
+      staleTime: 5 * 60 * 1000,
+    }
+  )
 }
 
 export const useCreateDataSource = () => {
   const queryClient = useQueryClient()
   
-  return useMutation({
-    mutationFn: async (dataSourceData: any) => {
+  return useAuthenticatedMutation(
+    async (token, dataSourceData: any) => {
       const response = await fetch('/api/data/sources', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
         body: JSON.stringify(dataSourceData),
       })
       if (!response.ok) throw new Error('Failed to create data source')
       return response.json()
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['dataSources'] })
-    },
-  })
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['dataSources'] })
+      },
+    }
+  )
 }
 
 export const useUpdateDataSource = () => {
   const queryClient = useQueryClient()
   
-  return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+  return useAuthenticatedMutation(
+    async (token, { id, data }: { id: string; data: any }) => {
       const response = await fetch(`/api/data/sources/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
         body: JSON.stringify(data),
       })
       if (!response.ok) throw new Error('Failed to update data source')
       return response.json()
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['dataSources'] })
-    },
-  })
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['dataSources'] })
+      },
+    }
+  )
 }
 
 export const useDeleteDataSource = () => {
   const queryClient = useQueryClient()
   
-  return useMutation({
-    mutationFn: async (id: string) => {
+  return useAuthenticatedMutation(
+    async (token, id: string) => {
       const response = await fetch(`/api/data/sources/${id}`, {
         method: 'DELETE',
-        credentials: 'include',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
       })
       if (!response.ok) throw new Error('Failed to delete data source')
       return response.json()
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['dataSources'] })
-    },
-  })
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['dataSources'] })
+      },
+    }
+  )
 }
 
 // Projects queries
 export const useProjects = () => {
-  return useQuery({
-    queryKey: ['projects'],
-    queryFn: async () => {
-      const response = await fetch('/api/projects', { credentials: 'include' })
+  return useAuthenticatedQuery(
+    ['projects'],
+    async (token) => {
+      const response = await fetch('/api/projects', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
       if (!response.ok) throw new Error('Failed to fetch projects')
       return response.json()
     },
-    staleTime: 5 * 60 * 1000,
-  })
+    {
+      staleTime: 5 * 60 * 1000,
+    }
+  )
 }
 
-export const useOrganizations = () => {
-  return useQuery({
-    queryKey: ['organizations'],
-    queryFn: async () => {
-      const response = await fetch('/api/organizations', { credentials: 'include' })
-      if (!response.ok) throw new Error('Failed to fetch organizations')
-      return response.json()
-    },
-    staleTime: 5 * 60 * 1000,
-  })
-}
+// useOrganizations hook removed - organizations no longer supported

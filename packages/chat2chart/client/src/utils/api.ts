@@ -1,4 +1,3 @@
-import Cookies from 'js-cookie';
 import { getBackendUrl } from './backendUrl';
 
 // When running in the browser prefer same-origin proxy so all frontend calls
@@ -22,31 +21,26 @@ export const AUTH_URL = (() => {
     return process.env.NEXT_PUBLIC_AUTH_URL || 'http://auth-service:5000';
 })();
 
+/**
+ * Basic API fetch utility.
+ * 
+ * Note: This is a basic utility that doesn't handle authentication.
+ * For client-side components, use `useAuthenticatedFetch` hook instead.
+ * For server-side code, pass Authorization header explicitly in options.
+ * 
+ * @param endpoint - API endpoint path
+ * @param options - Fetch options (headers should include Authorization if needed)
+ * @returns Fetch Response
+ */
 export const fetchApi = async (
     endpoint: string,
     options: RequestInit = {}
 ): Promise<Response> => {
-    // If AuthContext hasn't finished initializing, wait up to 1s for it to complete.
-    // This prevents firing authenticated requests that would otherwise arrive without
-    // the server-set HttpOnly cookie due to initialization race conditions.
-    try {
-        if (typeof window !== 'undefined' && !(window as any).__aiser_auth_initialized) {
-            const start = Date.now();
-            while (!(window as any).__aiser_auth_initialized && Date.now() - start < 1000) {
-                // small yield
-                // eslint-disable-next-line no-await-in-loop
-                await new Promise((r) => setTimeout(r, 50));
-            }
-        }
-    } catch (e) {
-        // swallow
-    }
-    const defaultHeaders: Record<string, string> = {
+    // Don't set Content-Type for FormData - browser will set it automatically with boundary
+    const isFormData = options.body instanceof FormData;
+    const defaultHeaders: Record<string, string> = isFormData ? {} : {
         'Content-Type': 'application/json',
     };
-
-    // Prefer server-set HttpOnly cookie token; avoid injecting Authorization header from client-side stored token
-    // For enterprise flows where Authorization header is required, callers may set it explicitly.
 
     // Normalize endpoint: remove leading/trailing slashes and handle double 'api/' prefix
     let normalizedEndpoint = endpoint.replace(/^\/+/, '').replace(/\/+$/, '');
@@ -66,46 +60,14 @@ export const fetchApi = async (
     const baseUrl = isAuthEndpoint ? (typeof window !== 'undefined' ? '' : AUTH_URL) : API_URL;
 
     // When calling auth endpoints from the browser, use the same-origin proxy
-    // at `/api/auth/...` to ensure cookies are attached by the browser.
+    // at `/api/auth/...` to ensure proper routing.
     const url = isAuthEndpoint && typeof window !== 'undefined' ? `/api/auth/${normalizedEndpoint}` : `${baseUrl}/${normalizedEndpoint}`;
-
-    // Debugging aid: when running in the browser, log outgoing auth requests and
-    // current document.cookie to the debug endpoint so we can trace missing cookies
-    // that cause /api/auth/users/me to return 403 during initialization.
-    try {
-        if (typeof window !== 'undefined') {
-            // Lightweight console log
-            if (isAuthEndpoint) {
-                // eslint-disable-next-line no-console
-                console.debug('fetchApi: calling auth endpoint', url, 'document.cookie=', typeof document !== 'undefined' ? document.cookie : '');
-                // fire-and-forget debug POST so server logs the client cookie state
-                try {
-                    void fetch('/api/debug/client-error', {
-                        method: 'POST',
-                        credentials: 'include',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ event: 'client_auth_probe', url, cookie: typeof document !== 'undefined' ? document.cookie : '' })
-                    });
-                } catch (e) {
-                    // swallow
-                }
-            }
-        }
-    } catch (e) {
-        // swallow
-    }
 
     const response = await fetch(url, {
         ...options,
         credentials: 'include',
         headers: {
             ...defaultHeaders,
-            // If an access token was stored as a fallback in localStorage (dev only),
-            // use it as a Bearer Authorization header for requests where cookies
-            // may not be reliably sent by the browser.
-            ...(typeof window !== 'undefined' && !((options.headers || {}) as any).Authorization
-                ? { Authorization: `Bearer ${localStorage.getItem('aiser_access_token') || ''}` }
-                : {}),
             ...options.headers,
         },
     });

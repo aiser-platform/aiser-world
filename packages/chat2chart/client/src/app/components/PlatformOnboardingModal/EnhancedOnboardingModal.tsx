@@ -38,7 +38,6 @@ import {
 } from '@ant-design/icons';
 import { useOnboarding } from '@/context/OnboardingContext';
 import { useAuth } from '@/context/AuthContext';
-import { useOrganization } from '@/context/OrganizationContext';
 import PricingModal from '@/components/PricingModal';
 
 const { Title, Text, Paragraph } = Typography;
@@ -67,7 +66,6 @@ const EnhancedOnboardingModal: React.FC = () => {
   } = useOnboarding();
   
   const { user } = useAuth();
-  const { currentOrganization } = useOrganization();
   const [loading, setLoading] = useState(false);
   const [form] = Form.useForm();
   const [onboardingFlow, setOnboardingFlow] = useState<any>(null);
@@ -490,7 +488,7 @@ const EnhancedOnboardingModal: React.FC = () => {
               form={form}
               layout="vertical"
               initialValues={{
-                workspaceName: currentOrganization?.name || 
+                workspaceName: 
                   onboardingData.personal?.company || 
                   onboardingData.personal?.organization || 
                   onboardingData.workspace?.name ||

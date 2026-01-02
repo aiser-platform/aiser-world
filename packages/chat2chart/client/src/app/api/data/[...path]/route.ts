@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getBackendUrlForApi } from '@/utils/backendUrl';
-import { extractAccessToken } from '@/utils/cookieParser';
 
 /**
  * Catch-all proxy route for /api/data/* endpoints
@@ -54,25 +53,12 @@ async function handleDataRequest(
     const queryString = searchParams.toString();
     const fullUrl = queryString ? `${backendUrl}?${queryString}` : backendUrl;
     
-    // Extract access token
-    const accessToken = extractAccessToken({
-      cookies: request.cookies,
-      headers: request.headers
-    });
+    const headers: Record<string, string> = {};
     
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
-    
-    // Forward authorization
-    if (accessToken) {
-      headers['Authorization'] = `Bearer ${accessToken}`;
-    }
-    
-    // Forward cookies
-    const cookieHeader = request.headers.get('Cookie');
-    if (cookieHeader) {
-      headers['Cookie'] = cookieHeader;
+    // Forward Authorization header if present
+    const authHeader = request.headers.get('Authorization');
+    if (authHeader) {
+      headers['Authorization'] = authHeader;
     }
     
     // Prepare request options

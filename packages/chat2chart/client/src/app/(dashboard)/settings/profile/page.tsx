@@ -33,14 +33,12 @@ import {
     InfoCircleOutlined
 } from '@ant-design/icons';
 import { useAuth } from '@/context/AuthContext';
-import { useOrganization } from '@/context/OrganizationContext';
 
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
 
 export default function ProfileSettingsPage() {
     const { user } = useAuth();
-    const { currentOrganization } = useOrganization();
     const [form] = Form.useForm();
     const [loading, setLoading] = useState(false);
     const [fetching, setFetching] = useState(true);
