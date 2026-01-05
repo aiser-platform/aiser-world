@@ -150,7 +150,7 @@ jobs:
             -ll || true
       
       - name: Upload Bandit results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v5
         with:
           name: bandit-results
           path: bandit-*.json
@@ -191,7 +191,7 @@ jobs:
           pip-licenses --format=json --output-file=../../python-licenses-chat2chart.json || true
       
       - name: Upload license reports
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v5
         with:
           name: license-reports
           path: |
