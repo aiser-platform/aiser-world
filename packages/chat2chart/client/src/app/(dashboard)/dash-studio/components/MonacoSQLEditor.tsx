@@ -67,10 +67,9 @@ import {
   FolderOutlined,
   CodeOutlined
 } from '@ant-design/icons';
-import { dashboardDataService } from '../services/DashboardDataService';
-import { dashboardAPIService } from '../services/DashboardAPIService';
-import { workingQueryService } from '../services/WorkingQueryService';
 import { enhancedDataService } from '@/services/enhancedDataService';
+import { useDataSources, DataSource as ContextDataSource, SchemaInfo as ContextSchemaInfo } from '@/context/DataSourceContext';
+import { useAuthenticatedFetch } from '@/hooks/useAuthenticatedFetch';
 import ChartWidget from './ChartWidget';
 import UniversalDataSourceModal from '@/app/components/UniversalDataSourceModal/UniversalDataSourceModal';
 import EnhancedDataPanel from '@/app/(dashboard)/chat/components/DataPanel/EnhancedDataPanel';
@@ -225,14 +224,45 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
   selectedDataSource: propSelectedDataSource,
   onDataSourceChange 
 }) => {
+  // Authenticated fetch hook
+  const authenticatedFetch = useAuthenticatedFetch();
+  
+  // DataSourceContext integration
+  const {
+    dataSources: contextDataSources,
+    selectedDataSourceId,
+    getSelectedDataSource,
+    selectDataSource,
+    getDataSourceSchema,
+    refreshDataSources,
+    isLoading: isLoadingDataSources
+  } = useDataSources();
+
+  // Derive selectedDataSource from context
+  const contextDataSource = selectedDataSourceId ? getSelectedDataSource() : null;
+  const selectedDataSource: DataSource | null = contextDataSource ? {
+    id: contextDataSource.id,
+    name: contextDataSource.name,
+    type: contextDataSource.type,
+    status: contextDataSource.connection_status === 'connected' ? 'connected' : 
+            contextDataSource.connection_status === 'failed' ? 'error' : 'disconnected',
+    config: contextDataSource.connection_config || {},
+    metadata: contextDataSource.metadata || {},
+    connection_info: contextDataSource.connection_config,
+    lastUsed: contextDataSource.last_accessed,
+    rowCount: contextDataSource.row_count,
+    columns: [],
+    size: contextDataSource.size?.toString(),
+    description: contextDataSource.description
+  } : null;
+
+  // Get schema from context
+  const schema = selectedDataSourceId ? getDataSourceSchema(selectedDataSourceId) : null;
+
   const [sqlQuery, setSqlQuery] = useState(DEFAULT_SQL_SNIPPET);
   const [editorLanguage, setEditorLanguage] = useState<QueryLanguage>('sql');
-  const [selectedDatabase, setSelectedDatabase] = useState('');
   const [selectedSchema, setSelectedSchema] = useState('public');
   const [selectedTable, setSelectedTable] = useState('sales_data');
-  const [selectedDataSource, setSelectedDataSource] = useState<DataSource | null>(null);
-  const [availableSchemas, setAvailableSchemas] = useState<string[]>(['public']);
-  const [availableTables, setAvailableTables] = useState<any[]>([]);
   const [isLoadingSchema, setIsLoadingSchema] = useState<boolean>(false);
   const [isExecuting, setExecuting] = useState(false);
   const [activeTab, setActiveTab] = useState('results');
@@ -288,15 +318,9 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
   }, []);
   const [isQueryValid, setIsQueryValid] = useState<boolean>(true);
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
-  const [dataSources, setDataSources] = useState<DataSource[]>([]);
-  const [schemas, setSchemas] = useState<SchemaInfo[]>([]);
-  const [isLoadingDataSources, setIsLoadingDataSources] = useState(false);
   const [isRefreshingSchema, setIsRefreshingSchema] = useState(false);
   const [showConnectDataModal, setShowConnectDataModal] = useState(false);
   const [hasCube, setHasCube] = useState(false);
-  const [uiSchemas, setUiSchemas] = useState<{ value: string; label: string; description?: string; tables: string[] }[]>([]);
-  const [uiTables, setUiTables] = useState<TableInfo[]>([]);
-  const [uiViews, setUiViews] = useState<TableInfo[]>([]);
   const [selectedView, setSelectedView] = useState<string>('');
   const [openViewTabs, setOpenViewTabs] = useState<string[]>([]);
   const [perfLoading, setPerfLoading] = useState(false);
@@ -342,26 +366,6 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
     }
     return opts;
   }, [limitSource, rowLimit]);
-  const queryTabsRef = useRef<QueryTab[]>(queryTabs);
-  const activeQueryKeyRef = useRef(activeQueryKey);
-  const editorLanguageRef = useRef(editorLanguage);
-  const dataSourceNameRef = useRef<string | undefined>(selectedDataSource?.name);
-
-  useEffect(() => {
-    queryTabsRef.current = queryTabs;
-  }, [queryTabs]);
-
-  useEffect(() => {
-    activeQueryKeyRef.current = activeQueryKey;
-  }, [activeQueryKey]);
-
-  useEffect(() => {
-    editorLanguageRef.current = editorLanguage;
-  }, [editorLanguage]);
-
-  useEffect(() => {
-    dataSourceNameRef.current = selectedDataSource?.name;
-  }, [selectedDataSource]);
   useEffect(() => {
     const handleWindowResize = () => {
       setMaxEditorHeight(computeMaxEditorHeight());
@@ -371,15 +375,6 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
       return () => window.removeEventListener('resize', handleWindowResize);
     }
   }, []);
-  useEffect(() => {
-    setEditorHeight(prev => {
-      const clamped = clampEditorHeight(prev);
-      return clamped === prev ? prev : clamped;
-    });
-  }, [clampEditorHeight]);
-  useEffect(() => {
-    setEditorHeight(prev => clampEditorHeight(prev));
-  }, [clampEditorHeight]);
   useEffect(() => {
     if (!editorResizeStateRef.current.isResizing) {
       editorResizeStateRef.current.startHeight = editorHeight;
@@ -430,15 +425,16 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
       if (!templateSql) {
         return;
       }
-      const tabs = queryTabsRef.current;
-      const targetKey = activeQueryKeyRef.current || tabs[0]?.key;
-      const pythonTemplate = buildPythonTemplate(templateSql, dataSourceNameRef.current);
+      // Use state directly instead of refs
+      const tabs = queryTabs;
+      const targetKey = activeQueryKey || tabs[0]?.key;
+      const pythonTemplate = buildPythonTemplate(templateSql, selectedDataSource?.name);
       if (targetKey) {
         setQueryTabs(prev => prev.map(t => 
           t.key === targetKey ? { ...t, sql: templateSql, python: pythonTemplate } : t
         ));
       }
-      const lang = editorLanguageRef.current || 'sql';
+      const lang = editorLanguage || 'sql';
       const resolvedLanguage = resolveLanguage(lang);
       setEditorLanguage(resolvedLanguage);
       setSqlQuery(resolvedLanguage === 'python' ? pythonTemplate : templateSql);
@@ -449,7 +445,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
     return () => {
       window.removeEventListener('load-query-template', handleTemplateLoad as EventListener);
     };
-  }, []);
+  }, [queryTabs, activeQueryKey, editorLanguage, selectedDataSource?.name]);
 
   useEffect(() => {
     if (editorLanguage !== 'sql') {
@@ -632,18 +628,6 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
     }
   ];
 
-  // Load data sources from Universal Data Modal API
-  useEffect(() => {
-    loadDataSources();
-  }, []);
-
-  // Load schema when data source changes
-  useEffect(() => {
-    if (selectedDatabase) {
-      loadSchemaForDataSource(selectedDatabase);
-    }
-  }, [selectedDatabase]);
-
   // Load persisted tabs and active key
   useEffect(() => {
     (async () => {
@@ -667,7 +651,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
       } catch {}
       // then attempt backend
       try {
-        const res = await fetch(`/api/queries/tabs`, { credentials: 'include' });
+        const res = await authenticatedFetch(`/api/queries/tabs`);
         if (res.ok) {
           const j = await res.json();
           if (Array.isArray(j.tabs) && j.tabs.length) {
@@ -703,10 +687,9 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
         (async () => {
           try {
             setIsSavingTabs(true);
-            const res = await fetch(`/api/queries/tabs`, {
+            const res = await authenticatedFetch(`/api/queries/tabs`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
               body: JSON.stringify({ tabs: queryTabs, active_key: activeQueryKey })
             });
             if (!res.ok) throw new Error('Failed');
@@ -723,67 +706,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
     return () => window.removeEventListener('keydown', onKey);
   }, [queryTabs, activeQueryKey]);
 
-  // Check Cube server status
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch(`/api/data/cube/status`, { credentials: 'include' });
-        if (res.ok) {
-          const j = await res.json();
-          setHasCube(!!j?.connected || j?.status === 'connected');
-        }
-      } catch {
-        setHasCube(false);
-      }
-    })();
-  }, []);
-
-  // Load schema for selected database
-  useEffect(() => {
-    const loadSchema = async () => {
-      if (!selectedDatabase) return;
-      setIsRefreshingSchema(true);
-      try {
-        if (selectedDatabase === 'cube') {
-          const res = await fetch(`/api/data/cube/schema`, { credentials: 'include' });
-          if (res.ok) {
-            const j = await res.json();
-            const schemas = (j?.schemas || []).map((s: any) => ({ value: s.name, label: s.name, description: s.description, tables: s.tables || [] }));
-            setUiSchemas(schemas);
-            const tables = (j?.tables || []).map((t: any) => ({ name: t.name, fields: (t.fields||[]).map((f:any)=>({ name:f.name, type:f.type })), rowCount: t.row_count, size: t.size }));
-            setUiTables(tables);
-            setUiViews([]);
-            if (schemas[0]) setSelectedSchema(schemas[0].value);
-            if (tables[0]) setSelectedTable(tables[0].name);
-          } else { setUiSchemas([]); setUiTables([]); setUiViews([]); }
-        } else {
-          const res = await fetch(`/api/data/sources/${selectedDatabase}/schema`, { credentials: 'include' });
-          if (res.ok) {
-            const j = await res.json();
-            const schemaRoot = j?.schema || j;
-            const tables = (schemaRoot?.tables || []).map((t: any) => ({ name: t.name, fields: (t.columns||t.fields||[]).map((c:any)=>({ name:c.name, type:c.type })), rowCount: t.row_count, size: t.size }));
-            const schemaName = schemaRoot?.database || 'public';
-            const schemas = [{ value: schemaName, label: schemaName, description: schemaRoot?.description, tables: tables.map((t:any)=>t.name) }];
-            setUiSchemas(schemas);
-            setUiTables(tables);
-            // fetch views
-            try {
-              const vres = await fetch(`/api/data/sources/${selectedDatabase}/views`, { credentials: 'include' });
-              if (vres.ok) {
-                const vj = await vres.json();
-                const views = (vj?.views || []).map((v:any) => ({ name: v.name, fields: (v.columns||[]).map((c:any)=>({ name:c.name, type:c.type||c.data_type })) }));
-                setUiViews(views);
-              } else { setUiViews([]); }
-            } catch { setUiViews([]); }
-            if (schemas[0]) setSelectedSchema(schemas[0].value);
-            if (tables[0]) setSelectedTable(tables[0].name);
-          } else { setUiSchemas([]); setUiTables([]); setUiViews([]); }
-        }
-      } catch { setUiSchemas([]); setUiTables([]); setUiViews([]); }
-      finally { setIsRefreshingSchema(false); }
-    };
-    loadSchema();
-  }, [selectedDatabase]);
+  // Schema is now loaded automatically by DataSourceContext when selectDataSource is called
 
   // Validate SQL against loaded schema (simple FROM table check)
   // NOTE: This is a best-effort validation. We allow queries to execute even if table not found in cached schema
@@ -823,14 +746,14 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
         return true;
       }
 
-      // Get schema from EnhancedDataPanel if available
-      // Check both uiTables (old) and schema from EnhancedDataPanel
-      const availableTables = (uiTables || []).map(t => t.name.toLowerCase());
-      const availableSchemas = (uiTables || []).map(t => (t.schema || 'public').toLowerCase());
+      // Get schema from context
+      const schemaTables = schema?.tables || [];
+      const availableTables = schemaTables.map((t: any) => t.name?.toLowerCase() || '').filter(Boolean);
+      const availableSchemas = schemaTables.map((t: any) => (t.schema || 'public')?.toLowerCase() || 'public').filter(Boolean);
       
       // Check if table exists (with or without schema prefix)
-      const tableExists = availableTables.includes(tableName);
-      const schemaExists = schemaName ? availableSchemas.includes(schemaName) : true;
+      const tableExists = availableTables.includes(tableName.toLowerCase());
+      const schemaExists = schemaName ? availableSchemas.includes(schemaName.toLowerCase()) : true;
       
       if (tableExists && schemaExists) {
         setIsQueryValid(true);
@@ -839,9 +762,9 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
       }
 
       // For cube sources
-      if (selectedDatabase === 'cube') {
-        const allCubeTables = (uiTables || []).map(t => t.name.toLowerCase());
-        if (allCubeTables.includes(tableName)) {
+      if (selectedDataSourceId && selectedDataSource?.type === 'cube') {
+        const allCubeTables = schemaTables.map((t: any) => t.name?.toLowerCase() || '').filter(Boolean);
+        if (allCubeTables.includes(tableName.toLowerCase())) {
           setIsQueryValid(true);
           setValidationMessage(null);
           return true;
@@ -875,415 +798,8 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
   // Re-validate when SQL or schema changes
   useEffect(() => {
     validateQueryAgainstSchema(sqlQuery);
-  }, [sqlQuery, uiTables, selectedDataSource, selectedDatabase]);
+  }, [sqlQuery, schema, selectedDataSource, selectedDataSourceId]);
 
-  const loadDataSources = async () => {
-    setIsLoadingDataSources(true);
-    try {
-      // Use real data sources API with timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-      
-      const response = await fetch(`/api/data/sources`, {
-        signal: controller.signal,
-        credentials: 'include'
-      });
-      clearTimeout(timeoutId);
-      const result = await response.json();
-      
-      if (result && Array.isArray(result)) {
-        const mappedSources = result.map((ds: any): DataSource => {
-          const normalizedStatus: DataSource['status'] =
-            ds.status === 'disconnected' || ds.status === 'error' ? ds.status : 'connected';
-          return {
-          id: ds.id || ds.Index,
-          name: ds.name || `Data Source ${ds.Index}`,
-            type: (ds.type || 'database') as DataSource['type'],
-            status: normalizedStatus,
-            config: ds.config || {},
-            metadata: ds.metadata || {},
-          connection_info: ds.metadata,
-          lastUsed: ds.last_used,
-          rowCount: ds.rowCount,
-          columns: ds.columns || [],
-          size: ds.size?.toString(),
-          description: `${ds.type} data source`,
-          };
-        });
-        
-        // Merge enterprise connections (if any) into the available sources
-        let mergedSources = [...mappedSources];
-        try {
-          const ent = await enhancedDataService.listEnterpriseConnections();
-          if (ent && ent.success && Array.isArray(ent.connections) && ent.connections.length) {
-            const enterpriseMapped = ent.connections.map((c: any): DataSource => {
-              const enterpriseStatus: DataSource['status'] =
-                c.status === 'disconnected' || c.status === 'error' ? c.status : 'connected';
-              return {
-              id: c.id || `enterprise_${c.name}`,
-              name: c.name,
-              // map enterprise connectors to a generic API-type data source so UI typing matches
-                type: 'api',
-                status: enterpriseStatus,
-              description: c.description || 'Enterprise connector',
-              connection_info: { host: c.host, database: c.database, type: c.type },
-                config: c.config || {},
-                metadata: c.metadata || {},
-              // fill fields expected by DataSource type
-                lastUsed: undefined,
-              rowCount: 0,
-              columns: [],
-                size: undefined
-              };
-            });
-            mergedSources = [...enterpriseMapped, ...mergedSources];
-          }
-        } catch (e) {
-          // non-fatal: continue with mappedSources
-          console.warn('Failed to load enterprise connections', e);
-        }
-
-        setDataSources(mergedSources);
-
-        // If Cube is available, fetch deployed cubes and expose as data sources
-        // CRITICAL: Only fetch if Cube.js is actually configured and available
-        if (hasCube) {
-          try {
-            const cres = await fetch(`/api/cube-cubes`, { 
-              credentials: 'include',
-              signal: AbortSignal.timeout(3000) // 3 second timeout
-            });
-            if (cres.ok) {
-              const cj = await cres.json();
-              if (cj && Array.isArray(cj.cubes) && cj.cubes.length > 0) {
-                const cubeSources = cj.cubes.map((c: any): DataSource => ({
-                  id: `cube_${c.name}`,
-                  name: `Cube: ${c.name}`,
-                  type: 'cube',
-                  status: 'connected',
-                  description: 'Cube.js deployed cube',
-                  connection_info: { cube_name: c.name },
-                  config: { cubeName: c.name },
-                  metadata: {},
-                  lastUsed: undefined,
-                  rowCount: undefined,
-                  columns: [],
-                  size: undefined
-                }));
-                setDataSources(prev => [...prev, ...cubeSources]);
-              }
-            }
-          } catch (e) {
-            // Don't log as error - Cube.js may not be configured
-            if (e instanceof Error && e.name !== 'AbortError') {
-              console.debug('Cube.js cubes not available (this is OK if not using Cube.js):', e);
-            }
-          }
-        }
-
-        // Set default selected database to first connected (prefer enterprise connections)
-        const firstConnected = mergedSources.find((ds: any) => ds.status === 'connected');
-        if (firstConnected) {
-          setSelectedDatabase(firstConnected.id);
-        } else if (mergedSources.length === 0) {
-          // No data sources available - show helpful message
-        }
-      } else {
-        throw new Error(result.error || 'Failed to load data sources');
-      }
-    } catch (error) {
-      console.error('Failed to load data sources:', error);
-      
-      // Handle different error types
-      if (error instanceof Error) {
-        if (error.name === 'AbortError') {
-        } else if (error.message.includes('Failed to load data sources')) {
-        } else {
-          message.warning('Using sample data sources. Connect to real data sources via /data page.');
-        }
-      } else {
-        message.warning('Using sample data sources. Connect to real data sources via /data page.');
-      }
-      
-      // Fallback to sample data for development
-      const sampleDataSources: DataSource[] = [
-        {
-          id: 'duckdb_local',
-          name: 'DuckDB Local Analytics (Demo)',
-          type: 'database',
-          status: 'connected',
-          description: 'Fast in-memory analytical database for local development',
-          lastUsed: '2024-01-15',
-          rowCount: 1000,
-          columns: ['id', 'date', 'product', 'sales_amount', 'region', 'quantity', 'customer_id', 'discount', 'profit'],
-          connection_info: { host: 'localhost', port: 8080, database: 'analytics' },
-          config: {},
-          metadata: {}
-        },
-        {
-          id: 'postgresql_prod',
-          name: 'PostgreSQL Production (Demo)',
-          type: 'database',
-          status: 'connected',
-          description: 'Primary production database with ACID compliance',
-          lastUsed: '2024-01-15',
-          rowCount: 500,
-          columns: ['customer_id', 'first_name', 'last_name', 'email', 'phone', 'city', 'country', 'registration_date', 'total_orders', 'total_spent', 'status'],
-          connection_info: { host: 'prod-db.company.com', port: 5432, database: 'production' },
-          config: {},
-          metadata: {}
-        },
-        {
-          id: 'snowflake_warehouse',
-          name: 'Snowflake Data Warehouse (Demo)',
-          type: 'warehouse',
-          status: 'connected',
-          description: 'Cloud data warehouse for large-scale analytics',
-          lastUsed: '2024-01-14',
-          rowCount: 200,
-          columns: ['date', 'metric', 'channel', 'device', 'value', 'country', 'campaign_id', 'user_segment'],
-          connection_info: { account: 'company.snowflakecomputing.com', warehouse: 'ANALYTICS_WH' },
-          config: {},
-          metadata: {}
-        },
-        {
-          id: 'csv_sales',
-          name: 'Sales Data Q4 2024 (Demo)',
-          type: 'file',
-          status: 'connected',
-          description: 'Quarterly sales data for analysis and reporting',
-          lastUsed: '2024-01-15',
-          rowCount: 1000,
-          columns: ['id', 'date', 'product', 'sales_amount', 'region', 'quantity', 'customer_id', 'discount', 'profit'],
-          size: '2.3 MB',
-          connection_info: { path: 'sales_data_q4_2024.csv' },
-          config: {},
-          metadata: {}
-        }
-      ];
-      
-      setDataSources(sampleDataSources);
-      const firstConnected = sampleDataSources[0];
-      if (firstConnected) setSelectedDatabase(firstConnected.id);
-    } finally {
-      setIsLoadingDataSources(false);
-    }
-  };
-
-  const loadSchemaForDataSource = async (dataSourceId: string) => {
-    setIsLoadingSchema(true);
-    // During schema refresh, mark query as not yet validated to prevent accidental execution
-    setIsQueryValid(false);
-    setValidationMessage(null);
-    try {
-      // Find the data source
-      const dataSource = dataSources.find(ds => ds.id === dataSourceId);
-      if (!dataSource) {
-        return;
-      }
-
-      setSelectedDataSource(dataSource);
-
-      // Keep engine as 'auto' by default - user can change if needed
-      // Engine will be auto-selected by the backend based on data source type
-
-      // For demo data sources, provide schema information
-      if (['duckdb_local', 'postgresql_prod', 'snowflake_warehouse', 'csv_sales'].includes(dataSourceId)) {
-        const demoSchemas = {
-          'duckdb_local': {
-            schemas: ['public'],
-            tables: [
-              { 
-                name: 'sales_data', 
-                schema: 'public', 
-                columns: [
-                  { name: 'id', type: 'integer' },
-                  { name: 'date', type: 'varchar' },
-                  { name: 'product', type: 'varchar' },
-                  { name: 'sales_amount', type: 'decimal' },
-                  { name: 'region', type: 'varchar' },
-                  { name: 'quantity', type: 'integer' },
-                  { name: 'customer_id', type: 'integer' },
-                  { name: 'discount', type: 'decimal' },
-                  { name: 'profit', type: 'decimal' }
-                ]
-              }
-            ]
-          },
-          'postgresql_prod': {
-            schemas: ['public'],
-            tables: [
-              { 
-                name: 'customers', 
-                schema: 'public', 
-                columns: [
-                  { name: 'customer_id', type: 'integer' },
-                  { name: 'first_name', type: 'varchar' },
-                  { name: 'last_name', type: 'varchar' },
-                  { name: 'email', type: 'varchar' },
-                  { name: 'phone', type: 'varchar' },
-                  { name: 'city', type: 'varchar' },
-                  { name: 'country', type: 'varchar' },
-                  { name: 'registration_date', type: 'date' },
-                  { name: 'total_orders', type: 'integer' },
-                  { name: 'total_spent', type: 'decimal' },
-                  { name: 'status', type: 'varchar' }
-                ]
-              }
-            ]
-          },
-          'snowflake_warehouse': {
-            schemas: ['public'],
-            tables: [
-              { 
-                name: 'analytics_events', 
-                schema: 'public', 
-                columns: [
-                  { name: 'date', type: 'date' },
-                  { name: 'metric', type: 'varchar' },
-                  { name: 'channel', type: 'varchar' },
-                  { name: 'device', type: 'varchar' },
-                  { name: 'value', type: 'decimal' },
-                  { name: 'country', type: 'varchar' },
-                  { name: 'campaign_id', type: 'varchar' },
-                  { name: 'user_segment', type: 'varchar' }
-                ]
-              }
-            ]
-          },
-          'csv_sales': {
-            schemas: ['public'],
-            tables: [
-              { 
-                name: 'sales_data', 
-                schema: 'public', 
-                columns: [
-                  { name: 'id', type: 'integer' },
-                  { name: 'date', type: 'varchar' },
-                  { name: 'product', type: 'varchar' },
-                  { name: 'sales_amount', type: 'decimal' },
-                  { name: 'region', type: 'varchar' },
-                  { name: 'quantity', type: 'integer' },
-                  { name: 'customer_id', type: 'integer' },
-                  { name: 'discount', type: 'decimal' },
-                  { name: 'profit', type: 'decimal' }
-                ]
-              }
-            ]
-          }
-        };
-
-        const schemaInfo = demoSchemas[dataSourceId as keyof typeof demoSchemas];
-        if (schemaInfo) {
-          setAvailableSchemas(schemaInfo.schemas);
-          setAvailableTables(schemaInfo.tables);
-          setSelectedSchema('public');
-          if (schemaInfo.tables.length > 0) {
-            setSelectedTable(schemaInfo.tables[0].name);
-          }
-        }
-      } else {
-        // Check if it's a file data source (CSV/Excel)
-        if (dataSource.type === 'file') {
-          // For file data sources, fetch schema from API to get actual column information
-          try {
-            const response = await fetch(`/api/data/sources/${dataSourceId}/schema`, { credentials: 'include' });
-            if (response.ok) {
-              const result = await response.json();
-              const schemaRoot = result?.schema || result;
-              
-              // File sources use 'data' as table name in DuckDB
-              let fileTable;
-              if (schemaRoot?.tables && Array.isArray(schemaRoot.tables) && schemaRoot.tables.length > 0) {
-                // Use schema from API response
-                const tableInfo = schemaRoot.tables[0];
-                fileTable = {
-                  name: 'data', // CRITICAL: File sources use 'data' table in DuckDB
-                  schema: 'file',
-                  columns: (tableInfo.columns || []).map((c: any) => ({ 
-                    name: c.name || c.column_name, 
-                    type: c.type || c.data_type || 'string'
-                  }))
-                };
-              } else if (dataSource.columns && Array.isArray(dataSource.columns)) {
-                // Fallback: use columns from dataSource if schema not available
-                fileTable = {
-                  name: 'data', // CRITICAL: File sources use 'data' table in DuckDB
-                  schema: 'file',
-                  columns: dataSource.columns.map((col: any) => ({ 
-                    name: typeof col === 'string' ? col : (col.name || col.column_name), 
-                    type: typeof col === 'string' ? 'string' : (col.type || col.data_type || 'string')
-                  }))
-                };
-              } else {
-                // Last resort: create empty table structure
-                fileTable = {
-                  name: 'data',
-                  schema: 'file',
-                  columns: []
-                };
-              }
-              
-              setAvailableSchemas(['file']);
-              setAvailableTables([fileTable]);
-              setSelectedSchema('file');
-              setSelectedTable('data'); // CRITICAL: Use 'data' as table name
-            } else {
-              // Fallback if API call fails
-              const fileTable = {
-                name: 'data', // CRITICAL: File sources use 'data' table in DuckDB
-                schema: 'file',
-                columns: dataSource.columns?.map((col: any) => ({ 
-                  name: typeof col === 'string' ? col : (col.name || col.column_name), 
-                  type: typeof col === 'string' ? 'string' : (col.type || 'string')
-                })) || []
-              };
-              setAvailableSchemas(['file']);
-              setAvailableTables([fileTable]);
-              setSelectedSchema('file');
-              setSelectedTable('data');
-            }
-          } catch (error) {
-            console.error('Failed to fetch file schema:', error);
-            // Fallback
-            const fileTable = {
-              name: 'data',
-              schema: 'file',
-              columns: []
-            };
-            setAvailableSchemas(['file']);
-            setAvailableTables([fileTable]);
-            setSelectedSchema('file');
-            setSelectedTable('data');
-          }
-        } else {
-          // For real database sources, fetch schema from API
-          const response = await fetch(`/api/data/sources/${dataSourceId}/schema`, { credentials: 'include' });
-          if (response.ok) {
-            const result = await response.json();
-            const schemaRoot = result?.schema || result;
-            const tables = (schemaRoot?.tables || []).map((t: any) => ({ 
-              name: t.name, 
-              schema: schemaRoot?.database || 'public', 
-              columns: (t.columns || t.fields || []).map((c: any) => ({ name: c.name, type: c.type })) 
-            }));
-            const schemas = [schemaRoot?.database || 'public'];
-            
-            setAvailableSchemas(schemas);
-            setAvailableTables(tables);
-            setSelectedSchema(schemas[0]);
-            if (tables.length > 0) {
-              setSelectedTable(tables[0].name);
-            }
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Failed to load schema:', error);
-    } finally {
-      setIsLoadingSchema(false);
-    }
-  };
 
 
 
@@ -1689,7 +1205,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
         config: normalizedConfig,
       data: chartData,
       query: sqlQuery,
-        dataSourceId: selectedDataSource?.id || selectedDatabase,
+        dataSourceId: selectedDataSource?.id || selectedDataSourceId || '',
       // Add raw data for reference
         rawData: actualData,
         // Store original columns for robust axis selection
@@ -1757,10 +1273,9 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
 
   const saveChartAsset = async (assetData: any, successMessage: string) => {
     try {
-      const response = await fetch('/api/assets', {
+      const response = await authenticatedFetch('/api/assets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify(assetData)
       });
       const responseText = await response.text().catch(() => '');
@@ -1798,27 +1313,23 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
       return;
     }
 
-    if (!selectedDatabase) {
+    if (!selectedDataSourceId) {
       message.warning('Please select a data source first');
       return;
     }
 
     setAiGenerating(true);
     try {
-      const response = await fetch('/api/ai/query-editor/generate-code', {
+      const response = await authenticatedFetch('/api/ai/query-editor/generate-code', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'include',
         body: JSON.stringify({
           query: aiAssistantInput.trim(),
-          data_source_id: selectedDatabase,
+          data_source_id: selectedDataSourceId,
           language: editorLanguage, // 'sql' or 'python'
-          conversation_history: queryHistory.slice(-5).map((h: any) => ({
-            role: 'user',
-            content: h.query || h.sql || ''
-          }))
+          current_sql: sqlQuery.trim() || undefined  // Send current SQL from editor
         }),
       });
 
@@ -2005,7 +1516,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
       const startTime = Date.now();
 
       // Determine data source id
-      const dsId = selectedDataSource?.id || selectedDatabase;
+      const dsId = selectedDataSource?.id || selectedDataSourceId || '';
       if (!dsId) {
         throw new Error('No data source selected. Please select a data source from the left panel before executing your script.');
       }
@@ -2103,7 +1614,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
       }
 
       // Determine data source id - prioritize selectedDataSource from EnhancedDataPanel
-      const dsId = selectedDataSource?.id || selectedDatabase;
+      const dsId = selectedDataSource?.id || selectedDataSourceId || '';
       if (!dsId) {
         throw new Error('No data source selected. Please select a data source from the left panel before executing your query.');
       }
@@ -2115,19 +1626,21 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
         dataSourceName: selectedDataSource?.name,
         dataSourceType: selectedDataSource?.type,
         dataSourceDbType: selectedDataSource?.db_type,
-        selectedDatabase: selectedDatabase,
+        selectedDatabase: selectedDataSourceId || '',
         engine: selectedEngine,
-        availableTables: uiTables.map(t => t.name).slice(0, 10) // Show first 10 tables
+        availableTables: (schema?.tables || []).map((t: any) => t.name).slice(0, 10) // Show first 10 tables
       });
       
       // Warn if query references a table that might not exist in current data source
       const queryLower = executedSql.toLowerCase();
       const fromMatch = queryLower.match(/from\s+([a-z0-9_\.]+)/);
-      if (fromMatch && uiTables.length > 0) {
+      const schemaTables = schema?.tables || [];
+      if (fromMatch && schemaTables.length > 0) {
         const referencedTable = fromMatch[1].split('.').pop()?.toLowerCase();
-        const tableExists = uiTables.some(t => t.name.toLowerCase() === referencedTable);
+        const tableExists = schemaTables.some((t: any) => t.name?.toLowerCase() === referencedTable);
         if (!tableExists) {
-          console.warn(`⚠️ Query references table '${referencedTable}' which may not exist in data source '${selectedDataSource?.name}'. Available tables: ${uiTables.map(t => t.name).join(', ')}`);
+          const availableTableNames = schemaTables.map((t: any) => t.name).filter(Boolean).join(', ');
+          console.warn(`⚠️ Query references table '${referencedTable}' which may not exist in data source '${selectedDataSource?.name}'. Available tables: ${availableTableNames}`);
         }
       }
 
@@ -2200,7 +1713,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
           rows: result.row_count || (result.data || []).length,
           sql: executedSql,
           status: 'success',
-          database: selectedDatabase,
+          database: selectedDataSourceId || '',
           schema: selectedSchema,
           user: 'current_user',
           queryType: sqlQuery.trim().toUpperCase().split(' ')[0],
@@ -2238,7 +1751,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
         rows: 0,
         sql: executedSql,
         status: 'error',
-        database: selectedDatabase,
+        database: selectedDataSourceId || '',
         schema: selectedSchema,
         user: 'current_user',
         queryType: sqlQuery.trim().toUpperCase().split(' ')[0],
@@ -2498,7 +2011,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                 }}
                 onClick={handleAIGenerate}
                 loading={aiGenerating}
-                disabled={!selectedDatabase || !aiAssistantInput.trim()}
+                disabled={!selectedDataSourceId || !aiAssistantInput.trim()}
               >
                 Generate {editorLanguage === 'python' ? 'Python' : 'SQL'}
                     </Button>
@@ -2644,7 +2157,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                             : (isActiveTab ? sqlQuery : (t.sql ?? DEFAULT_SQL_SNIPPET));
                               try {
                                 // Check for duplicate name first
-                                const checkRes = await fetch(`/api/queries/saved-queries`, { credentials: 'include' });
+                                const checkRes = await authenticatedFetch(`/api/queries/saved-queries`);
                                 if (checkRes.ok) {
                                   const checkData = await checkRes.json();
                                   const existingQueries = Array.isArray(checkData.items) ? checkData.items : [];
@@ -2655,10 +2168,9 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                                   }
                                 }
                                 
-                                const res = await fetch(`/api/queries/saved-queries`, {
+                                const res = await authenticatedFetch(`/api/queries/saved-queries`, {
                                   method: 'POST',
                                   headers: { 'Content-Type': 'application/json' },
-                                  credentials: 'include',
                                   body: JSON.stringify({ 
                                     name: t.title, 
                                     sql: currentSql, 
@@ -2684,7 +2196,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                                 }
                                 message.success(`Query "${t.title}" saved successfully`);
                                 // Reload saved queries
-                                const reload = await fetch(`/api/queries/saved-queries`, { credentials: 'include' });
+                                const reload = await authenticatedFetch(`/api/queries/saved-queries`);
                                 if (reload.ok) { 
                                   const j = await reload.json(); 
                                   setSavedQueries(Array.isArray(j.items) ? j.items : []); 
@@ -2715,7 +2227,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                 }}
                 onClick={async () => {
                   try {
-                    const res = await fetch(`/api/queries/saved-queries`, { credentials: 'include' });
+                    const res = await authenticatedFetch(`/api/queries/saved-queries`);
                     if (res.status === 403 || res.status === 401) { 
                       setPermissionModalVisible(true); 
                       return; 
@@ -2724,7 +2236,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                       const j = await res.json();
                       setSavedQueries(Array.isArray(j.items) ? j.items : []);
                       // Also load snapshots
-                      const snapRes = await fetch(`/api/queries/snapshots`, { credentials: 'include' });
+                      const snapRes = await authenticatedFetch(`/api/queries/snapshots`);
                       if (snapRes.ok) {
                         const snapJ = await snapRes.json();
                         setSnapshots(Array.isArray(snapJ.items) ? snapJ.items : []);
@@ -2906,10 +2418,9 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                     const name = prompt('Snapshot name (optional)');
                     if (name === null) return;
                     try {
-                      const payload = { data_source_id: selectedDataSource?.id || selectedDatabase, sql: sqlQuery, name, preview_rows: 100 };
-                      const res = await fetch(`/api/queries/snapshots`, {
+                      const payload = { data_source_id: selectedDataSource?.id || selectedDataSourceId || '', sql: sqlQuery, name, preview_rows: 100 };
+                      const res = await authenticatedFetch(`/api/queries/snapshots`, {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        credentials: 'include',
                         body: JSON.stringify(payload)
                       });
                       if (res.status === 403 || res.status === 401) { setPermissionModalVisible(true); return; }
@@ -2932,7 +2443,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                 <Tooltip title="Schedule Query">
                   <Button size="small" icon={<ClockCircleOutlined />} onClick={async () => {
                     try {
-                      const res = await fetch(`/api/queries/schedules`, { credentials: 'include' });
+                      const res = await authenticatedFetch(`/api/queries/schedules`);
                       if (res.ok) {
                         const j = await res.json();
                         setSchedules(Array.isArray(j.items) ? j.items : []);
@@ -3028,9 +2539,8 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
 
                         // Try server-side preview conversion first (robust for many engines)
                         try {
-                          const resp = await fetch(`/api/dash-studio/query-editor/preview-from-rows`, {
+                          const resp = await authenticatedFetch(`/api/dash-studio/query-editor/preview-from-rows`, {
                             method: 'POST',
-                            credentials: 'include',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ rows: results, chart_type: chartTypeName.toLowerCase() })
                           });
@@ -3149,7 +2659,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                         icon={<BulbOutlined />}
                         loading={perfLoading} 
                         onClick={async () => {
-                          if (!selectedDatabase && !selectedDataSource?.id) { 
+                          if (!selectedDataSourceId && !selectedDataSource?.id) { 
                             message.warning('Select a data source first'); 
                             return; 
                           }
@@ -3161,11 +2671,10 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                           setPerfPlan(null);
                           setPerfSuggestions([]);
                           try {
-                            const dataSourceId = selectedDataSource?.id || selectedDatabase;
-                            const res = await fetch(`/api/data/sources/${dataSourceId}/analyze`, { 
+                            const dataSourceId = selectedDataSource?.id || selectedDataSourceId || '';
+                            const res = await authenticatedFetch(`/api/data/sources/${dataSourceId}/analyze`, { 
                               method: 'POST', 
                               headers: { 'Content-Type': 'application/json' }, 
-                              credentials: 'include', 
                               body: JSON.stringify({ sql: sqlQuery }) 
                             });
                             
@@ -3329,19 +2838,19 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                     >
                       <Space direction="vertical" style={{ width: '100%' }}>
                         <Button size="small" onClick={async () => {
-                          if (!selectedDatabase) { message.warning('Select a data source'); return; }
+                          if (!selectedDataSourceId) { message.warning('Select a data source'); return; }
                           const name = prompt('MV name (letters/underscores)');
                           if (!name) return;
                           try {
-                            const res = await fetch(`/api/data/sources/${selectedDatabase}/materialized-views`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ name, sql: sqlQuery }) });
+                            const res = await authenticatedFetch(`/api/data/sources/${selectedDataSourceId}/materialized-views`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, sql: sqlQuery }) });
                             if (!res.ok) throw new Error('Create failed');
                             message.success('Materialized view created');
                           } catch { message.error('Create failed'); }
                         }}>Create MV from SQL</Button>
                         <Button size="small" onClick={async () => {
-                          if (!selectedDatabase) { message.warning('Select a data source'); return; }
+                          if (!selectedDataSourceId) { message.warning('Select a data source'); return; }
                           try {
-                            const res = await fetch(`/api/data/sources/${selectedDatabase}/materialized-views`, { credentials: 'include' });
+                            const res = await authenticatedFetch(`/api/data/sources/${selectedDataSourceId}/materialized-views`);
                             const j = await res.json();
                             if (!res.ok) throw new Error('Load failed');
                             Modal.info({ title: 'Materialized Views', width: 520, content: (
@@ -4152,48 +3661,6 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
             </div>
           ) : (
             <EnhancedDataPanel
-              selectedDataSource={selectedDataSource || undefined}
-              onDataSourceSelect={(ds) => {
-                console.log('🔄 Data source changed:', ds?.id, ds?.name);
-                setResults([]);
-                setError(null);
-                setExecutionTime(null);
-                setExecutionStatus('');
-                setSelectedDataSource(ds || null);
-                setSelectedDatabase(ds?.id || '');
-                if (ds?.id) {
-                  loadSchemaForDataSource(ds.id);
-                }
-                if (onDataSourceChange) {
-                  onDataSourceChange(ds?.id || '');
-                }
-              }}
-              onRefresh={loadDataSources}
-              onTableClick={(tableName, schemaName) => {
-                const schemaPrefix = schemaName && schemaName !== 'public' && schemaName !== 'main' 
-                  ? `${schemaName}.` 
-                  : '';
-                const generatedQuery = `SELECT * FROM ${schemaPrefix}${tableName} LIMIT 100;`;
-                setSqlQuery(generatedQuery);
-                setSelectedTable(tableName);
-                setSelectedSchema(schemaName);
-                message.success(`Query generated for table: ${schemaPrefix}${tableName}`);
-                
-                const event = new CustomEvent('table-selected', {
-                  detail: { tableName, schemaName }
-                });
-                window.dispatchEvent(event);
-              }}
-              onColumnClick={(tableName, columnName, schemaName) => {
-                const schemaPrefix = schemaName && schemaName !== 'public' && schemaName !== 'main' 
-                  ? `${schemaName}.` 
-                  : '';
-                const generatedQuery = `SELECT ${columnName} FROM ${schemaPrefix}${tableName} LIMIT 100;`;
-                setSqlQuery(generatedQuery);
-                setSelectedTable(tableName);
-                setSelectedSchema(schemaName);
-                message.success(`Query generated for column: ${columnName}`);
-              }}
               onCollapse={() => {
                 setSidebarCollapsed(true);
                 try {
@@ -4215,7 +3682,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
         onClose={() => setShowConnectDataModal(false)}
         onDataSourceCreated={() => {
           setShowConnectDataModal(false);
-          loadDataSources();
+          refreshDataSources();
         }}
       />
 
@@ -4250,10 +3717,9 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                         const currentTab = queryTabs.find(t => t.key === activeQueryKey);
                         const name = nameInput?.value?.trim() || currentTab?.title || `Query ${Date.now()}`;
               try {
-                const res = await fetch(`/api/queries/saved-queries`, {
+                const res = await authenticatedFetch(`/api/queries/saved-queries`, {
                             method: 'POST', 
                             headers: { 'Content-Type': 'application/json' },
-                  credentials: 'include',
                             body: JSON.stringify({ 
                               name, 
                               sql: sqlQuery, 
@@ -4270,7 +3736,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                           }
                           if (!res.ok) throw new Error('Failed to save');
                           message.success(`Query "${name}" saved successfully`);
-                const reload = await fetch(`/api/queries/saved-queries`, { credentials: 'include' });
+                const reload = await authenticatedFetch(`/api/queries/saved-queries`);
                           if (reload.ok) { 
                             const j = await reload.json(); 
                             setSavedQueries(Array.isArray(j.items) ? j.items : []); 
@@ -4376,13 +3842,12 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                               icon={<DeleteOutlined />}
                               onClick={async () => {
                                 try {
-                                  const res = await fetch(`/api/queries/saved-queries/${record.id}`, {
-                                    method: 'DELETE',
-                                    credentials: 'include'
+                                  const res = await authenticatedFetch(`/api/queries/saved-queries/${record.id}`, {
+                                    method: 'DELETE'
                                   });
                                   if (!res.ok) throw new Error('Failed to delete');
                                   message.success('Query deleted');
-                                  const reload = await fetch(`/api/queries/saved-queries`, { credentials: 'include' });
+                                  const reload = await authenticatedFetch(`/api/queries/saved-queries`);
                                   if (reload.ok) { 
                                     const j = await reload.json(); 
                                     setSavedQueries(Array.isArray(j.items) ? j.items : []); 
@@ -4484,9 +3949,8 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                               icon={<DeleteOutlined />}
                               onClick={async () => {
                                 try {
-                                  const res = await fetch(`/api/queries/snapshots/${r.id}`, {
+                                  const res = await authenticatedFetch(`/api/queries/snapshots/${r.id}`, {
                                     method: 'DELETE',
-                                    credentials: 'include',
                                     headers: { 'Content-Type': 'application/json' }
                                   });
                                   if (res.status === 403 || res.status === 401) {
@@ -4498,7 +3962,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
                                     throw new Error(errorData.detail || errorData.error || 'Failed to delete');
                                   }
                                   message.success('Snapshot deleted successfully');
-                                  const reload = await fetch(`/api/queries/snapshots`, { credentials: 'include' });
+                                  const reload = await authenticatedFetch(`/api/queries/snapshots`);
                                   if (reload.ok) {
                                     const j = await reload.json();
                                     setSnapshots(Array.isArray(j.items) ? j.items : []);
@@ -4539,7 +4003,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
             setPermLoading(true);
             try {
               // Send a lightweight access request to the backend (endpoint to implement)
-              await fetch(`/api/organization/request-access`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: permEmail }) });
+              await authenticatedFetch(`/api/organization/request-access`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: permEmail }) });
               message.success('Access request sent');
               setPermissionModalVisible(false);
             } catch {
@@ -4559,14 +4023,13 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
       >
         <Form layout="inline" onFinish={async (vals) => {
           try {
-            const res = await fetch(`/api/queries/schedules`, {
+            const res = await authenticatedFetch(`/api/queries/schedules`, {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
               body: JSON.stringify({ name: vals.name, sql: sqlQuery, cron: vals.cron, enabled: true })
             });
             if (!res.ok) throw new Error('Failed');
             message.success('Scheduled');
-            const reload = await fetch(`/api/queries/schedules`, { credentials: 'include' });
+            const reload = await authenticatedFetch(`/api/queries/schedules`);
             if (reload.ok) { const j = await reload.json(); setSchedules(Array.isArray(j.items) ? j.items : []); }
           } catch { message.error('Schedule failed'); }
         }}>

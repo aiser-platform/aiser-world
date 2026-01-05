@@ -1007,7 +1007,8 @@ Return ONLY the JSON object, no other text. The sql_query field must contain act
         data_source_id: str,
         context: AgentContextSchema,
         conversation_history: Optional[List[Tuple[str, str]]] = None,
-        schema_info: Optional[Dict[str, Any]] = None
+        schema_info: Optional[Dict[str, Any]] = None,
+        current_sql: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Generate SQL from natural language query.
@@ -1017,6 +1018,8 @@ Return ONLY the JSON object, no other text. The sql_query field must contain act
             data_source_id: Target data source ID
             context: User context with permissions and data sources
             conversation_history: Previous conversation messages
+            schema_info: Optional pre-fetched schema information
+            current_sql: Optional current SQL statement for context (query editor)
             
         Returns:
             Generated SQL with metadata
@@ -1514,6 +1517,19 @@ Before returning SQL, verify:
             
             schema_prompt = basic_prompt + dialect_instructions + instructions
             
+            # Add current SQL context if provided (for query editor follow-up queries)
+            if current_sql:
+                sql_context = f"""
+Previous SQL Query (for context):
+```sql
+{current_sql}
+```
+
+The user's new query is a modification or follow-up to the above SQL. Use it as context to understand what they're asking about. Adapt the previous SQL to answer the new query.
+"""
+                schema_prompt = f"{sql_context}\n\n{schema_prompt}"
+                logger.info(f"📝 Including current SQL as context for SQL generation")
+            
             agent_input = {
                 "input": schema_prompt,
                 "chat_history": conversation_history or []
@@ -1795,7 +1811,8 @@ Before returning SQL, verify:
         data_source_id: str,
         context: AgentContextSchema,
         conversation_history: Optional[List[Tuple[str, str]]] = None,
-        schema_info: Optional[Dict[str, Any]] = None
+        schema_info: Optional[Dict[str, Any]] = None,
+        current_sql: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Generate Python script to query data source.
@@ -1806,6 +1823,7 @@ Before returning SQL, verify:
             context: User context with permissions and data sources
             conversation_history: Previous conversation messages
             schema_info: Optional pre-fetched schema information
+            current_sql: Optional current SQL statement for context (query editor)
             
         Returns:
             Generated Python script with metadata
@@ -1895,9 +1913,23 @@ Before returning SQL, verify:
             elif db_type in ["duckdb"]:
                 optimal_engine = "duckdb"
             
-            python_prompt = f"""You are an expert Python data analyst. Generate a Python script to query a data source using the Aiser multi-engine query system.
+            # Add current SQL context if provided (for query editor follow-up queries)
+            sql_context_section = ""
+            if current_sql:
+                sql_context_section = f"""
+## PREVIOUS SQL QUERY (for context)
+The user's new query is a modification or follow-up to this previous SQL query:
+```sql
+{current_sql}
+```
 
-## USER REQUEST
+Use this previous SQL as context to understand what the user is asking about. Adapt the previous SQL to answer the new query.
+
+"""
+                logger.info(f"📝 Including current SQL as context for Python generation")
+            
+            python_prompt = f"""You are an expert Python data analyst. Generate a Python script to query a data source using the Aiser multi-engine query system.
+{sql_context_section}## USER REQUEST
 {natural_language_query}
 
 ## DATA SOURCE SCHEMA
