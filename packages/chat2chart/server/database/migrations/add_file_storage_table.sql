@@ -27,3 +27,5 @@ CREATE INDEX IF NOT EXISTS idx_file_storage_is_active ON file_storage(is_active)
 -- Remove tenant_id from data_sources if not already removed
 ALTER TABLE data_sources DROP COLUMN IF EXISTS tenant_id;
 
+
+

@@ -291,214 +291,117 @@ async def analyze_chat_query(
             },
             "ai_engine": "Fallback",
         }
-
-        # Build primary and selected data sources context
-        ai_orchestrator = AIOrchestrator()
-        data_sources: List[Dict[str, Any]] = []
-        if request.selected_data_sources:
-            # Trust client-provided selection but enrich where possible
-            data_sources = request.selected_data_sources
-        elif request.data_source_id:
-            # Get all data sources and find the specific one
-            async with httpx.AsyncClient() as client:
-                try:
-                    # Get all data sources - use internal Docker networking
-                    all_sources_response = await client.get(
-                        "http://127.0.0.1:8000/data/sources"
-                    )
-                    if all_sources_response.status_code == 200:
-                        all_sources = all_sources_response.json()
-                        # Find the specific data source
-                        target_source = None
-                        for source in all_sources.get("data_sources", []):
-                            if source.get("id") == request.data_source_id:
-                                target_source = source
-                                break
-
-                        if target_source:
-                            data_sources.append(
-                                {
-                                    "id": target_source.get("id"),
-                                    "name": target_source.get("name"),
-                                    "type": target_source.get("type"),
-                                    "config": {
-                                        "endpoint": f"http://127.0.0.1:8000/data/sources/{request.data_source_id}",
-                                        "format": target_source.get("format"),
-                                        "db_type": target_source.get("db_type"),
-                                    },
-                                    "schema": target_source.get("schema", {}),
-                                    "size": target_source.get("size"),
-                                    "row_count": target_source.get("row_count"),
-                                }
-                            )
-                        else:
-                            logger.warning(
-                                f"Data source {request.data_source_id} not found in available sources"
-                            )
-                    else:
-                        logger.warning(
-                            f"Failed to fetch data sources: {all_sources_response.status_code}"
-                        )
-                except Exception as data_error:
-                    logger.warning(f"Data source fetch failed: {data_error}")
-
-        # Build comprehensive context for accurate analysis
-        data_context = await _build_comprehensive_data_context(request)
-        system_context = await _build_enhanced_system_context(request, data_context)
-
-        # Primary analysis via AI Orchestrator (LLM + tools)
-        result = await ai_orchestrator.analyze_data_with_context(
-            user_query=request.query,
-            data_sources=data_sources,
-            conversation_history=None,
-            analysis_type="data_analysis",
-            user_context={
-                "selected_data_source_id": request.data_source_id,
-                "active_data_sources": [
-                    s.get("id") for s in (request.selected_data_sources or [])
-                ]
-                or ([request.data_source_id] if request.data_source_id else []),
-                "business_context": request.business_context,
-                "data_source_context": request.data_source_context,
-                "user_context": request.user_context,
-                "data_context_summary": data_context.get("summary", {}),
-            },
-        )
-
-        if result.get("success"):
-            # Process AI text for consistency
-            from .services.litellm_service import LiteLLMService
-
-            litellm = LiteLLMService()
-            # Prefer orchestrator insights; fallback to LLM clean-up if needed
-            raw_analysis = (
-                result.get("analysis", {}).get("ai_insights")
-                or result.get("content")
-                or ""
-            )
-            # Coerce to string safely before normalization
-            if isinstance(raw_analysis, (dict, list)):
-                import json as _json
-
-                analysis_text = _json.dumps(raw_analysis, ensure_ascii=False, indent=2)
-            else:
-                analysis_text = str(raw_analysis)
-            if not analysis_text:
-                cleaned = await litellm.generate_completion(
-                    prompt=request.query,
-                    system_context=system_context,
-                    max_tokens=600,
-                    temperature=0.3,
-                )
-                analysis_text = cleaned.get(
-                    "content", "Analysis completed successfully."
-                )
-
-            # Normalize whitespace and list formatting at source to avoid run-on lines
-            import re
-
-            txt = analysis_text or ""
-            # normalize newlines
-            txt = txt.replace("\r\n", "\n")
-            # ensure headings have a blank line after
-            txt = re.sub(r"^(#{1,6} .+?)\n(?!\n)", r"\1\n\n", txt, flags=re.MULTILINE)
-            # insert missing newlines before numbered items and bullets when stuck to previous text
-            txt = re.sub(r"([^\n])(\d+\.\s)", r"\1\n\2", txt)
-            txt = re.sub(r"([^\n])(\u2022\s)", r"\1\n\2", txt)  # • bullet
-            # collapse 3+ newlines to two
-            txt = re.sub(r"\n{3,}", "\n\n", txt)
-            # remove double blank lines
-            txt = re.sub(r"\n\n+", "\n", txt)
-            analysis_text = txt.strip()
-            processed = await _process_ai_response(
-                analysis_text, request.query, data_context
-            )
-            echarts_config, chart_data = _auto_generate_chart_from_context(
-                request.query, data_context
-            )
-            # Prefer orchestrator visualization config if provided
-            orch_viz = (
-                result.get("analysis", {}).get("visualization_config")
-                if isinstance(result.get("analysis"), dict)
-                else None
-            )
-            if orch_viz:
-                echarts_config = orch_viz
-
-            sql_suggestions = []
-            if data_context.get("data_source_type") in ["database", "warehouse"]:
-                sql = _suggest_sql_query_from_context(request.query, data_context)
-                if sql:
-                    sql_suggestions.append(sql)
-
-            return {
-                "success": True,
-                "query": request.query,
-                "analysis": processed.get("analysis"),
-                "execution_metadata": {
-                    **result.get("execution_metadata", {}),
-                    **processed.get("execution_metadata", {}),
-                },
-                "data_insights": processed.get("data_insights"),
-                "echarts_config": echarts_config,
-                "chart_data": chart_data,
-                "sql_suggestions": sql_suggestions,
-                "model": result.get("execution_metadata", {}).get(
-                    "model_used",
-                    litellm.default_model
-                    if hasattr(litellm, "default_model")
-                    else "AI Orchestrator",
-                ),
-                "data_source_id": request.data_source_id,
-                "ai_engine": "Enhanced AI Orchestrator",
-                "capabilities": [
-                    "data_analysis",
-                    "insights_generation",
-                    "echarts_generation",
-                    "cube_integration",
-                ],
-                "data_context_summary": result.get(
-                    "context_summary", "Data analysis completed"
-                ),
-            }
-        else:
-            # Enhanced fallback with data context
-            fallback_response = await _generate_enhanced_fallback(
-                request.query, data_context
-            )
-            return {
-                "success": True,
-                "query": request.query,
-                "analysis": fallback_response.get("analysis"),
-                "execution_metadata": fallback_response.get("execution_metadata"),
-                "data_insights": fallback_response.get("data_insights"),
-                "model": "fallback",
-                "data_source_id": request.data_source_id,
-                "ai_engine": "Enhanced Fallback System",
-                "capabilities": [
-                    "basic_guidance",
-                    "fallback_support",
-                    "data_context_awareness",
-                ],
-            }
-
     except Exception as e:
-        logger.error(f"Chat analysis failed: {str(e)}")
-        # Return structured error response instead of throwing exception
+        logger.error(f"❌ Chat analysis failed: {str(e)}", exc_info=True)
         return {
             "success": False,
             "query": request.query,
+            "analysis": f"I encountered an error processing your request: {str(e)}. Please try again.",
             "error": str(e),
-            "analysis": "I encountered an issue while analyzing your request. Let me try a different approach.",
             "execution_metadata": {
                 "status": "error",
-                "error_type": type(e).__name__,
                 "timestamp": str(datetime.datetime.now()),
             },
-            "data_source_id": request.data_source_id,
-            "ai_engine": "Error Recovery System",
-            "capabilities": ["error_recovery", "basic_guidance"],
+            "ai_engine": "Error",
         }
+
+
+@router.post("/query-editor/generate-code")
+async def generate_query_editor_code(
+    request: Dict[str, Any],
+    current_token: Union[str, dict] = Depends(JWTCookieBearer())
+) -> Dict[str, Any]:
+    """
+    Generate SQL or Python code for query editor.
+    Reuses LangGraph orchestrator logic but stops after code generation and validation.
+    
+    Request:
+        {
+            "query": "Show me sales from last month",
+            "data_source_id": "db_123",
+            "language": "sql",  // or "python"
+            "current_sql": "SELECT * FROM employees WHERE salary > 100000"  // optional
+        }
+    
+    Response:
+        {
+            "success": true,
+            "code": "SELECT * FROM sales WHERE date >= '2024-12-01'",
+            "language": "sql"
+        }
+    """
+    try:
+        # Extract request parameters
+        query = request.get("query", "").strip()
+        data_source_id = request.get("data_source_id", "").strip()
+        language = request.get("language", "sql").strip().lower()
+        current_sql = request.get("current_sql", "").strip()
+        
+        # Validate required fields
+        if not query:
+            raise HTTPException(status_code=400, detail="Query is required")
+        
+        if not data_source_id:
+            raise HTTPException(status_code=400, detail="Data source ID is required")
+        
+        if language not in ["sql", "python"]:
+            raise HTTPException(status_code=400, detail="Language must be 'sql' or 'python'")
+        
+        # Extract user info from token (same as /chat/analyze)
+        user_payload = current_token if isinstance(current_token, dict) else {}
+        user_id = str(user_payload.get('id') or user_payload.get('user_id') or user_payload.get('sub') or '')
+        
+        # Initialize services (same as /chat/analyze)
+        from .services.langgraph_orchestrator import LangGraphMultiAgentOrchestrator
+        from app.modules.data.services.multi_engine_query_service import MultiEngineQueryService
+        from app.modules.data.services.data_connectivity_service import DataConnectivityService
+        from app.db.session import get_async_session
+        
+        multi_query_service = MultiEngineQueryService()
+        data_service = DataConnectivityService()
+        async_session_factory = get_async_session
+        
+        # Initialize orchestrator
+        orchestrator = LangGraphMultiAgentOrchestrator(
+            multi_query_service=multi_query_service,
+            data_service=data_service,
+            async_session_factory=async_session_factory
+        )
+        
+        logger.info(f"🔧 Generating {language.upper()} code for query editor: {query[:100]}...")
+        
+        # Organization context removed - use default value
+        organization_id = '1'
+        
+        # Call generate_code_only method
+        result = await orchestrator.generate_code_only(
+            query=query,
+            data_source_id=data_source_id,
+            language=language,
+            current_sql=current_sql if current_sql else None,
+            user_id=user_id,
+            organization_id=organization_id,
+            model=None  # Use default model
+        )
+        
+        if result.get("success"):
+            logger.info(f"✅ Code generation successful: {len(result.get('code', ''))} characters")
+            return {
+                "success": True,
+                "code": result.get("code", ""),
+                "language": result.get("language", language)
+            }
+        else:
+            error_msg = result.get("error", "Code generation failed")
+            logger.error(f"❌ Code generation failed: {error_msg}")
+            raise HTTPException(status_code=500, detail=error_msg)
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_msg = str(e)
+        logger.error(f"❌ Query editor code generation error: {error_msg}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Code generation failed: {error_msg}")
 
 
 @router.post("/chat", response_model=Dict)

@@ -260,12 +260,16 @@ async def nl2sql_node(
         
         logger.info(f"📚 Using {len(conversation_history_tuples)} conversation history messages for context")
         
+        # Extract current_sql_context from state if available (for query editor)
+        current_sql = state.get("current_sql_context")
+        
         sql_result = await nl2sql_agent.generate_sql(
             natural_language_query=query,
             data_source_id=data_source_id,
             context=agent_context,
             conversation_history=conversation_history_tuples if conversation_history_tuples else None,
-            schema_info=schema_info  # Agent will fetch if None
+            schema_info=schema_info,  # Agent will fetch if None
+            current_sql=current_sql  # Pass current SQL context if available
         )
         
         # CRITICAL: Log what we received from the agent

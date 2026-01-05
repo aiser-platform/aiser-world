@@ -13,7 +13,7 @@ import json
 import logging
 import re
 import time
-from typing import Any, Dict, List, Optional, Callable
+from typing import Any, Dict, List, Optional, Callable, Tuple
 from datetime import datetime
 
 try:
@@ -1704,6 +1704,248 @@ Return ONLY the response text, no markdown, no quotes."""
                     "message": f"Workflow failed: {error_msg[:100]}",
                     "stage": "error"
                 }
+            }
+    
+    async def generate_code_only(
+        self,
+        query: str,
+        data_source_id: str,
+        language: str,
+        current_sql: Optional[str] = None,
+        user_id: str = "",
+        organization_id: str = "1",
+        model: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Generate SQL or Python code for query editor without executing the full workflow.
+        Stops after SQL generation and validation.
+        
+        Args:
+            query: User's natural language query
+            data_source_id: Target data source ID
+            language: 'sql' or 'python'
+            current_sql: Optional current SQL statement for context
+            user_id: User ID
+            organization_id: Organization ID
+            model: Optional AI model to use
+        
+        Returns:
+            Dictionary with success, code, language, and optional error/validation_warning
+        """
+        start_time = time.time()
+        
+        try:
+            # Validate inputs
+            if not query or not query.strip():
+                return {
+                    "success": False,
+                    "code": None,
+                    "language": language,
+                    "error": "Query is required"
+                }
+            
+            if not data_source_id:
+                return {
+                    "success": False,
+                    "code": None,
+                    "language": language,
+                    "error": "Data source ID is required"
+                }
+            
+            language = language.lower() if language else "sql"
+            if language not in ["sql", "python"]:
+                return {
+                    "success": False,
+                    "code": None,
+                    "language": language,
+                    "error": f"Invalid language: {language}. Must be 'sql' or 'python'"
+                }
+            
+            # Build initial state
+            conversation_id = ""  # Not needed for code generation only
+            initial_state = self._build_initial_state(
+                query=query,
+                conversation_id=conversation_id,
+                user_id=user_id,
+                organization_id=organization_id,
+                data_source_id=data_source_id,
+                analysis_mode="standard",
+                model=model
+            )
+            
+            # No conversation history for query editor - keep it empty
+            initial_state["conversation_history"] = []
+            
+            # Validate initial state
+            validator = AiserWorkflowStateValidator.from_typed_dict(initial_state)
+            initial_state = validator.to_typed_dict()
+            
+            # Check if current_sql is relevant using AI
+            relevant_current_sql = None
+            if current_sql:
+                try:
+                    from .sql_relevance_detector import SQLRelevanceDetector
+                    relevance_detector = SQLRelevanceDetector(self.litellm_service)
+                    relevance_result = await relevance_detector.is_sql_relevant(query, current_sql)
+                    
+                    if relevance_result.get("is_relevant", False):
+                        confidence = relevance_result.get("confidence", 0.0)
+                        reasoning = relevance_result.get("reasoning", "")
+                        logger.info(f"✅ Current SQL is relevant (confidence: {confidence:.2f}): {reasoning[:100]}")
+                        relevant_current_sql = current_sql
+                    else:
+                        confidence = relevance_result.get("confidence", 0.0)
+                        reasoning = relevance_result.get("reasoning", "")
+                        logger.info(f"❌ Current SQL is not relevant (confidence: {confidence:.2f}): {reasoning[:100]}")
+                except Exception as e:
+                    logger.warning(f"⚠️ Relevance detection failed, defaulting to not including current_sql: {e}")
+                    # Fail-safe: don't include current_sql if relevance detection fails
+            
+            # For Python generation, use NL2SQL agent directly
+            if language == "python":
+                try:
+                    from app.modules.ai.agents.nl2sql_agent import EnhancedNL2SQLAgent
+                    from app.modules.chats.schemas import AgentContextSchema, UserRole
+                    
+                    # Create NL2SQL agent
+                    nl2sql_agent = EnhancedNL2SQLAgent(
+                        litellm_service=self.litellm_service,
+                        data_service=self.data_service,
+                        multi_query_service=self.multi_query_service,
+                        async_session_factory=self.async_session_factory
+                    )
+                    
+                    # Build agent context
+                    agent_context = AgentContextSchema(
+                        user_id=user_id or "anonymous",
+                        user_role=UserRole.EMPLOYEE,
+                        organization_id=organization_id,
+                        data_source_id=data_source_id
+                    )
+                    
+                    # Generate Python code
+                    logger.info(f"🐍 Generating Python code for query: {query[:100]}...")
+                    result = await nl2sql_agent.generate_python(
+                        natural_language_query=query,
+                        data_source_id=data_source_id,
+                        context=agent_context,
+                        conversation_history=None,  # No conversation history for query editor
+                        schema_info=None,  # Agent will fetch schema internally
+                        current_sql=relevant_current_sql  # Pass relevant SQL if available
+                    )
+                    
+                    if result.get("success") and result.get("python_script"):
+                        python_code = result.get("python_script", "").strip()
+                        execution_time_ms = int((time.time() - start_time) * 1000)
+                        logger.info(f"✅ Python code generated in {execution_time_ms}ms")
+                        
+                        return {
+                            "success": True,
+                            "code": python_code,
+                            "language": "python",
+                            "validation_warning": result.get("explanation")
+                        }
+                    else:
+                        error_msg = result.get("error") or result.get("explanation") or "Failed to generate Python code"
+                        logger.error(f"❌ Python generation failed: {error_msg}")
+                        return {
+                            "success": False,
+                            "code": None,
+                            "language": "python",
+                            "error": error_msg
+                        }
+                        
+                except Exception as e:
+                    error_msg = str(e)
+                    logger.error(f"❌ Python generation exception: {error_msg}", exc_info=True)
+                    return {
+                        "success": False,
+                        "code": None,
+                        "language": "python",
+                        "error": f"Python generation failed: {error_msg}"
+                    }
+            
+            # For SQL generation, run through nodes: route_query → nl2sql → validate_sql
+            logger.info(f"🔍 Generating SQL code for query: {query[:100]}...")
+            
+            # Add relevant current_sql to state for SQL generation context
+            if relevant_current_sql:
+                initial_state["current_sql_context"] = relevant_current_sql
+                logger.info(f"📝 Including current SQL as context for SQL generation")
+            
+            # Step 1: Route query
+            state = await self._route_query_node(initial_state)
+            
+            # Check if routing determined we need SQL
+            route_decision = self._route_condition(state)
+            if route_decision != "nl2sql":
+                # If routing says we don't need SQL, return error
+                return {
+                    "success": False,
+                    "code": None,
+                    "language": "sql",
+                    "error": f"Query routing determined SQL generation is not appropriate. Route: {route_decision}"
+                }
+            
+            # Step 2: Generate SQL
+            state = await self._nl2sql_node(state)
+            
+            if state.get("error"):
+                error_msg = state.get("error", "SQL generation failed")
+                logger.error(f"❌ SQL generation failed: {error_msg}")
+                return {
+                    "success": False,
+                    "code": None,
+                    "language": "sql",
+                    "error": error_msg
+                }
+            
+            sql_query = state.get("sql_query", "").strip()
+            if not sql_query:
+                return {
+                    "success": False,
+                    "code": None,
+                    "language": "sql",
+                    "error": "SQL generation did not produce a query"
+                }
+            
+            # Step 3: Validate SQL
+            state = await self._validate_sql_node(state)
+            
+            # Check validation result
+            validation_warning = state.get("sql_validation_warning")
+            if state.get("error"):
+                error_msg = state.get("error", "SQL validation failed")
+                logger.error(f"❌ SQL validation failed: {error_msg}")
+                return {
+                    "success": False,
+                    "code": None,
+                    "language": "sql",
+                    "error": error_msg,
+                    "validation_warning": validation_warning
+                }
+            
+            # Get final validated SQL
+            validated_sql = state.get("sql_query", sql_query).strip()
+            
+            execution_time_ms = int((time.time() - start_time) * 1000)
+            logger.info(f"✅ SQL code generated and validated in {execution_time_ms}ms")
+            
+            return {
+                "success": True,
+                "code": validated_sql,
+                "language": "sql",
+                "validation_warning": validation_warning
+            }
+            
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"❌ Code generation failed: {error_msg}", exc_info=True)
+            return {
+                "success": False,
+                "code": None,
+                "language": language,
+                "error": f"Code generation failed: {error_msg}"
             }
     
     def _get_partial_results(self, state: AiserWorkflowState) -> Dict[str, Any]:
