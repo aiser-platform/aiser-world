@@ -393,7 +393,7 @@
     "signal-exit": "^3.0.7",
     "sisteransi": "^1.0.5",
     "slash": "^3.0.0",
-    "slice-ansi": "^5.0.0",
+    "slice-ansi": "^7.1.2",
     "source-map": "^0.6.1",
     "source-map-support": "^0.5.13",
     "spawn-command": "^0.0.2",
