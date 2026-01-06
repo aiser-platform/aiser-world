@@ -81,6 +81,7 @@ const AdvancedDashboardCanvas: React.FC<AdvancedDashboardCanvasProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [debugLayout, setDebugLayout] = useState<any[] | null>(null);
+  const [currentBreakpoint, setCurrentBreakpoint] = useState('lg');
   const [placeholderItem, setPlaceholderItem] = useState<any | null>(null);
   const applyingLayoutRef = useRef(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; widget: DashboardWidget } | null>(null);
@@ -388,6 +389,12 @@ const AdvancedDashboardCanvas: React.FC<AdvancedDashboardCanvasProps> = ({
   };
 
   const handleLayoutChange = (newLayout: any[]) => {
+    // CRITICAL: Only sync layout changes if we are in the 'lg' breakpoint.
+    // When the canvas is hidden (e.g. in an inactive tab), RGL width becomes 0, 
+    // triggering a switch to 'xxs' breakpoint which distorts the layout items.
+    // We ignore those updates to protect the primary layout.
+    if (currentBreakpoint !== 'lg') return;
+
     // Normalize layout to prevent overlapping items after drag/resize/drop.
     const normalizeLayout = (layout: any[]) => {
       // Work on a shallow clone
@@ -1073,6 +1080,7 @@ const AdvancedDashboardCanvas: React.FC<AdvancedDashboardCanvasProps> = ({
         breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
         cols={{ lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 }}
         rowHeight={80}
+        onBreakpointChange={setCurrentBreakpoint}
         onLayoutChange={handleLayoutChange}
         onDragStart={handleDragStart}
         onDrag={handleDrag}

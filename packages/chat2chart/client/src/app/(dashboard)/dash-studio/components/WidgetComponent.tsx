@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useEffect, useState } from 'react';
-import { useDashboardStore } from '../stores/useDashboardStore';
+import { useDashboardStore } from '@/stores/useDashboardStore';
 import { widgetConfigManager } from '../config/WidgetConfigManager';
 
 interface WidgetComponentProps {
@@ -85,7 +85,6 @@ export const WidgetComponent: React.FC<WidgetComponentProps> = ({
   
   // Handle widget click
   const handleClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
     if (onWidgetClick) {
       onWidgetClick(widget);
     }
@@ -157,6 +156,9 @@ export const WidgetComponent: React.FC<WidgetComponentProps> = ({
       className={`dashboard-widget ${isSelected ? 'dashboard-widget--selected' : ''}`}
       data-grid-id={widgetId}
       onClick={handleClick}
+      tabIndex={0}
+      role="region"
+      aria-label={`Widget: ${widget.title || 'Untitled Widget'}`}
       style={{
         position: 'relative',
         width: '100%',
@@ -261,10 +263,7 @@ export const WidgetComponent: React.FC<WidgetComponentProps> = ({
         <div style={{ display: 'flex', gap: '4px' }}>
           {onDelete && (
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete(widgetId);
-              }}
+              onClick={() => onDelete(widgetId)}
               style={{
                 background: 'none',
                 border: 'none',
@@ -273,6 +272,8 @@ export const WidgetComponent: React.FC<WidgetComponentProps> = ({
                 color: '#ff4d4f'
               }}
               title="Delete widget"
+              tabIndex={0}
+              aria-label="Delete widget"
             >
               ×
             </button>

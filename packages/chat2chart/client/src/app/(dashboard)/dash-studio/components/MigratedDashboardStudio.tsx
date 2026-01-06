@@ -1099,6 +1099,7 @@ function InternalMigratedDashboardStudio() {
   // Local state for UI
   const [isEditing, setIsEditing] = useState(true);
   const [activeTab, setActiveTab] = useState(initialTab);
+  const [currentBreakpoint, setCurrentBreakpoint] = useState('lg');
   
   // Sync activeTab with URL changes and redirect query-editor tab to dedicated page
   useEffect(() => {
@@ -1115,6 +1116,30 @@ function InternalMigratedDashboardStudio() {
     }
   }, [searchParams, activeTab, router]);
 
+  // Global window resize listener to ensure all charts and grid layouts stay in sync
+  useEffect(() => {
+    let resizeTimer: any;
+    const handleGlobalResize = (e: Event) => {
+      // Only process browser-initiated resize events to prevent infinite loops
+      // since we re-dispatch a synthetic resize event below.
+      if (!e.isTrusted) return;
+
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        try {
+          // Trigger a resize event for components that don't use ResizeObserver
+          window.dispatchEvent(new Event('resize'));
+        } catch (e) {}
+      }, 250);
+    };
+
+    window.addEventListener('resize', handleGlobalResize, { passive: true });
+    return () => {
+      window.removeEventListener('resize', handleGlobalResize);
+      clearTimeout(resizeTimer);
+    };
+  }, []);
+
   // Update URL when tab changes internally
   const handleTabChange = useCallback((key: string) => {
     // Redirect query-editor to dedicated page
@@ -1124,6 +1149,17 @@ function InternalMigratedDashboardStudio() {
     }
     
     setActiveTab(key);
+    
+    // Trigger global resize event to ensure charts and grid layout recompute 
+    // their dimensions after the tab switch completes.
+    setTimeout(() => {
+      window.dispatchEvent(new Event('resize'));
+    }, 100);
+    // Secondary trigger after a longer delay to catch final layout positions if there are animations
+    setTimeout(() => {
+      window.dispatchEvent(new Event('resize'));
+    }, 500);
+
     try {
       const qp = new URLSearchParams();
       if (dashboardId) qp.set('id', dashboardId);
@@ -1218,7 +1254,7 @@ function InternalMigratedDashboardStudio() {
 
   // Handle save dashboard
   const handleSaveDashboard = useCallback(async () => {
-    message.success('Dashboard saved!');
+    message.success('Dashboard saved haha!');
   }, []);
 
   // Handle widget updates
@@ -1235,6 +1271,7 @@ function InternalMigratedDashboardStudio() {
   // Handle widget selection
   const handleWidgetSelect = useCallback((widgetId: string) => {
     selectWidget(widgetId);
+    setShowProperties(true);
   }, [selectWidget]);
 
   // Keyboard shortcuts
@@ -1278,9 +1315,16 @@ function InternalMigratedDashboardStudio() {
 
   // Handle layout changes
   const handleLayoutChange = useCallback((newLayout: any[]) => {
+    // CRITICAL: Only sync layout changes if we are on the dashboard tab AND 
+    // in the 'lg' breakpoint. When the tab is hidden (inactive), its width 
+    // often drops to 0, triggering the 'xxs' breakpoint which distorts 
+    // widget dimensions. We ignore those updates to protect the primary layout.
+    if (activeTab !== 'dashboard' || currentBreakpoint !== 'lg') {
+      return;
+    }
+    
     updateLayout(newLayout);
-    // layout changed
-  }, [updateLayout]);
+  }, [updateLayout, activeTab, currentBreakpoint]);
 
   // Handle refresh
   const handleRefresh = useCallback(async () => {
@@ -1513,6 +1557,7 @@ function InternalMigratedDashboardStudio() {
               breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 }}
               cols={{ lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 }}
               rowHeight={60}
+              onBreakpointChange={setCurrentBreakpoint}
               onLayoutChange={handleLayoutChange}
               isDraggable={isEditing}
               isResizable={isEditing}
@@ -1523,6 +1568,7 @@ function InternalMigratedDashboardStudio() {
               preventCollision={false}
               compactType="vertical"
               allowOverlap={false}
+              draggableCancel=".no-drag"
             >
               {widgets.map((widget: { id: string; config?: any; data?: any; position?: any; }) => {
                 // widget rendering
@@ -1568,6 +1614,7 @@ function InternalMigratedDashboardStudio() {
                     width: '100%'
                   }}>
               <WidgetRenderer
+                
                 widget={{
                       ...widget,
                       data: widgetData
@@ -1655,6 +1702,7 @@ function InternalMigratedDashboardStudio() {
                       }
                     }}
                     onWidgetSelect={handleWidgetSelect}
+                    selectWidget={selectWidget}
                     onAddWidget={handleAddWidget}
                 isDarkMode={isDarkMode}
                     showPanel={showProperties}
@@ -1668,7 +1716,7 @@ function InternalMigratedDashboardStudio() {
                   
                   {/* Widget controls overlay */}
                   {isEditing && (
-                    <div className="widget-controls" style={{
+                    <div className="widget-controls no-drag" style={{
                       position: 'absolute',
                       top: '4px',
                       right: '4px',
