@@ -229,13 +229,10 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
   
   // DataSourceContext integration
   const {
-    dataSources: contextDataSources,
     selectedDataSourceId,
+    dataSourceSchemas,
     getSelectedDataSource,
-    selectDataSource,
-    getDataSourceSchema,
     refreshDataSources,
-    isLoading: isLoadingDataSources
   } = useDataSources();
 
   // Derive selectedDataSource from context
@@ -257,7 +254,7 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
   } : null;
 
   // Get schema from context
-  const schema = selectedDataSourceId ? getDataSourceSchema(selectedDataSourceId) : null;
+  const schema = selectedDataSourceId ? dataSourceSchemas.get(selectedDataSourceId) : null;
 
   const [sqlQuery, setSqlQuery] = useState(DEFAULT_SQL_SNIPPET);
   const [editorLanguage, setEditorLanguage] = useState<QueryLanguage>('sql');
@@ -1416,6 +1413,34 @@ const MonacoSQLEditor: React.FC<MonacoSQLEditorProps> = ({
           generatedCode = generatedCode.replace(/\s*\}\s*\}.*$/gm, '');
           generatedCode = generatedCode.replace(/\s*,\s*\{[^}]*\}.*$/gm, '');
           generatedCode = generatedCode.replace(/,\s*["']\s*[,:]\s*.*$/gm, '');
+
+          // Step 9: Fix missing table name for file data sources
+          if (desiredLanguage === 'sql' && selectedDataSource?.type === 'file') {
+            // Find FROM clause (case-insensitive)
+            const fromIndex = generatedCode.toUpperCase().indexOf('FROM');
+            
+            if (fromIndex !== -1) {
+              // Get everything after FROM and trim whitespace
+              const afterFrom = generatedCode.substring(fromIndex + 4).trim();
+              
+              // Check if "data" or "file" appears right after FROM (case-insensitive)
+              const afterFromUpper = afterFrom.toUpperCase();
+              const hasTableName = afterFromUpper.startsWith('DATA') || 
+                                   afterFromUpper.startsWith('FILE') ||
+                                   afterFromUpper.startsWith('"DATA"') ||
+                                   afterFromUpper.startsWith('"FILE"') ||
+                                   afterFromUpper.startsWith('`DATA`') ||
+                                   afterFromUpper.startsWith('`FILE`');
+              
+              // If no table name found, insert "data"
+              if (!hasTableName) {
+                const beforeFrom = generatedCode.substring(0, fromIndex + 4);
+                const after = generatedCode.substring(fromIndex + 4);
+                generatedCode = beforeFrom + ' "data"' + after;
+                console.log('🔧 Fixed missing table name for file data source: added "data"');
+              }
+            }
+          }
         } else {
           generatedCode = generatedCode.trim();
         }

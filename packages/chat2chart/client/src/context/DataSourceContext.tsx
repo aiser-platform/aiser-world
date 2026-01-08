@@ -126,7 +126,7 @@ interface DataSourceContextValue {
   deleteDataSource: (dataSourceId: string) => Promise<void>;
   refreshDataSources: () => Promise<void>;
   getSelectedDataSource: () => DataSource | null;
-  getDataSourceSchema: (dataSourceId: string) => SchemaInfo | null;
+  fetchDataSourceSchema: (dataSource: DataSource) => Promise<SchemaInfo | null>;
 }
 
 const DataSourceContext = createContext<DataSourceContextValue | undefined>(undefined);
@@ -136,7 +136,11 @@ export function DataSourceProvider({ children }: { children: ReactNode }) {
   const authenticatedFetch = useAuthenticatedFetch();
   const [dataSources, setDataSources] = useState<DataSource[]>([]);
   const [selectedDataSourceId, setSelectedDataSourceId] = useState<string | null>(null);
+
+  // in memory cache of schemas
   const [dataSourceSchemas, setDataSourceSchemas] = useState<Map<string, SchemaInfo>>(new Map());
+  const [schemaLoading, setSchemaLoading] = useState<Boolean>(false);
+
   const [isLoading, setIsLoading] = useState(false);
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
@@ -207,7 +211,7 @@ export function DataSourceProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Select data source (tests connection + loads schema)
+  // Select data source
   const selectDataSource = async (dataSourceId: string) => {
     setIsTestingConnection(true);
     setLastError(null);
@@ -219,27 +223,22 @@ export function DataSourceProvider({ children }: { children: ReactNode }) {
           'Content-Type': 'application/json'
         }
       });
-      
+
       if (!response.ok) {
         throw new Error(`Failed to load data source: ${response.statusText}`);
       }
-      
+
       const data = await response.json();
       const dataSource: DataSource = data.data_source;
 
-      // Update data source in list with connection status and schema
-      setDataSources(prev => 
-        prev.map(ds => ds.id === dataSourceId ? dataSource : ds)
-      );
-
       // Cache schema if available
-      if (dataSource.schema) {
-        setDataSourceSchemas(prev => {
-          const newMap = new Map(prev);
-          newMap.set(dataSourceId, dataSource.schema as SchemaInfo);
-          return newMap;
-        });
-      }
+      // if (dataSource.schema) {
+      //   setDataSourceSchemas(prev => {
+      //     const newMap = new Map(prev);
+      //     newMap.set(dataSourceId, dataSource.schema as SchemaInfo);
+      //     return newMap;
+      //   });
+      // }
 
       setSelectedDataSourceId(dataSourceId);
     } catch (error) {
@@ -357,9 +356,188 @@ export function DataSourceProvider({ children }: { children: ReactNode }) {
     return dataSources.find(ds => ds.id === selectedDataSourceId) || null;
   };
 
-  // Get schema for a data source (from cache)
-  const getDataSourceSchema = (dataSourceId: string): SchemaInfo | null => {
-    return dataSourceSchemas.get(dataSourceId) || null;
+  // fetch/load schema for a data source
+  const fetchDataSourceSchema = async (dataSource: DataSource): Promise<SchemaInfo | null> => {
+    const dataSourceId = dataSource.id;
+    if (!dataSourceId) return null;
+
+    // Return cached schema if available
+    const cachedSchema = dataSourceSchemas.get(dataSourceId);
+    if (cachedSchema) return cachedSchema;
+
+    // Prevent concurrent loads for the same data source
+    if (schemaLoading) return null;
+
+    setSchemaLoading(true);
+    try {
+      if (dataSource.type === 'file') {
+
+        // if (dataSource.schema) {
+        //   return dataSource.schema;
+        // }
+
+        // For file sources, get schema from the schema endpoint (uses 'data' table name)
+        const response = await authenticatedFetch(`/api/data/sources/${dataSourceId}/schema`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to load schema: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+        let schema: SchemaInfo;
+        if (result.success && result.schema) {
+          const schemaData = result.schema;
+          // File sources use 'data' as table name in DuckDB
+          const fileTable = schemaData.tables?.[0] || {
+            name: 'data', // CRITICAL: Use 'data' as table name for file sources
+            columns: schemaData.columns || [],
+            rowCount: dataSource.row_count || schemaData.row_count || 0
+          };
+
+          schema = {
+            tables: [fileTable],
+            schemas: ['file']
+          };
+        } else {
+          // Fallback: use metadata from data source
+          schema = {
+            tables: [{
+              name: 'data', // CRITICAL: Use 'data' as table name
+              columns: [],
+              rowCount: dataSource.row_count || 0
+            }],
+            schemas: ['file']
+          };
+        }
+
+        // Cache the schema
+        setDataSourceSchemas(prev => {
+          const newMap = new Map(prev);
+          newMap.set(dataSourceId, schema);
+          return newMap;
+        });
+
+        return schema;
+
+      }
+      else if (dataSource.type === 'database' || dataSource.type === 'warehouse') {
+        // For database and warehouse sources, get real schema information
+        const response = await authenticatedFetch(`/api/data/sources/${dataSourceId}/schema`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to load schema: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+
+        console.log(`📊 Schema response for ${dataSourceId}:`, {
+          success: result.success,
+          hasSchema: !!result.schema,
+          tablesCount: result.schema?.tables?.length || 0,
+          schemasCount: result.schema?.schemas?.length || 0,
+          schema: result.schema
+        });
+
+        if (!result.success || !result.schema) {
+          console.error(`Failed to load ${dataSource.type} schema:`, result.error);
+          // Fallback to basic schema info
+          const fallbackSchema: SchemaInfo = {
+            schemas: ['public'],
+            tables: [{
+              name: 'schema_loading_failed',
+              columns: [
+                { name: 'error', type: 'text', nullable: true }
+              ],
+              rowCount: 0
+            }],
+            error: result.error || 'Failed to load schema'
+          };
+
+          // Cache the fallback schema
+          setDataSourceSchemas(prev => {
+            const newMap = new Map(prev);
+            newMap.set(dataSourceId, fallbackSchema);
+            return newMap;
+          });
+
+          return fallbackSchema;
+        }
+
+        const baseSchema: SchemaInfo = result.schema;
+
+        // Ensure schema has proper structure
+        if (!baseSchema.tables) {
+          baseSchema.tables = [];
+        }
+        if (!baseSchema.schemas) {
+          baseSchema.schemas = [];
+        }
+
+        // Fetch views
+        try {
+          const vres = await authenticatedFetch(`/api/data/sources/${dataSourceId}/views`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          });
+          if (vres.ok) {
+            const vj = await vres.json();
+            baseSchema.views = (vj.views || []).map((v: any) => ({
+              name: v.name,
+              schema: v.schema,
+              columns: (v.columns || []).map((c: any) => ({
+                name: c.name,
+                type: c.type,
+                nullable: c.nullable
+              }))
+            }));
+          }
+        } catch (viewError) {
+          console.warn('Failed to fetch views:', viewError);
+          // Continue without views
+        }
+
+        console.log(`✅ Setting schema for ${dataSourceId}:`, {
+          tables: baseSchema.tables?.length || 0,
+          schemas: baseSchema.schemas?.length || 0
+        });
+
+        // Cache the schema
+        setDataSourceSchemas(prev => {
+          const newMap = new Map(prev);
+          newMap.set(dataSourceId, baseSchema);
+          return newMap;
+        });
+
+        return baseSchema;
+      }
+      else {
+        // Unknown data source type
+        console.warn(`Schema loading not supported for type: ${dataSource.type}`);
+        return null;
+      }
+    } catch (error) {
+      console.error('Failed to load schema info:', error);
+      const errorSchema: SchemaInfo = {
+        schemas: [],
+        tables: [],
+        error: error instanceof Error ? error.message : 'Failed to load schema'
+      };
+      return errorSchema;
+    } finally {
+      setSchemaLoading(false);
+    }
   };
 
   // Initialize: Load data sources when authenticated
@@ -382,7 +560,7 @@ export function DataSourceProvider({ children }: { children: ReactNode }) {
     deleteDataSource,
     refreshDataSources,
     getSelectedDataSource,
-    getDataSourceSchema
+    fetchDataSourceSchema,
   };
 
   return (
