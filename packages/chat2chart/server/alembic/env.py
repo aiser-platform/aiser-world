@@ -4,6 +4,11 @@ from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 
 from alembic import context
+import os
+import sys
+
+# Add the app directory to the path so we can import models
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -14,11 +19,23 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# add your model's MetaData object here
-# for 'autogenerate' support
-# from myapp import mymodel
-# target_metadata = mymodel.Base.metadata
-from app.common.model import Base
+# Get DATABASE_URL from environment and convert to sync driver for Alembic
+database_url = os.environ.get("DATABASE_URL", "")
+if database_url:
+    # Convert asyncpg to psycopg2 for sync migrations
+    database_url = database_url.replace("postgresql+asyncpg", "postgresql+psycopg2")
+    config.set_main_option("sqlalchemy.url", database_url)
+
+# Import Base and all models so Alembic can detect schema changes
+# IMPORTANT: SQLAlchemy models in app/db/models.py are the SOURCE OF TRUTH for database schema.
+# All schema changes should be made by editing models first, then using autogenerate to create migrations.
+# Using consolidated models from app.db.models (clean slate - only 4 core tables)
+from app.db.base import Base
+# Import all 4 core models to ensure they're registered with Base.metadata
+from app.db.models import Conversation, Message, DataSource, FileStorage
+
+# Set target_metadata for autogenerate support
+# This enables Alembic to compare models (source of truth) with database and generate migrations
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,
@@ -77,4 +94,3 @@ if context.is_offline_mode():
     run_migrations_offline()
 else:
     run_migrations_online()
-

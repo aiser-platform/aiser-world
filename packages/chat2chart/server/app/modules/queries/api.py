@@ -40,71 +40,78 @@ def _resolve_user_payload(token_or_dict: Any) -> Dict[str, Any]:
 
 
 async def ensure_tables(db: AsyncSession):
+    # DISABLED: Table creation is now managed by Alembic migrations only.
+    # Models in app/db/models.py are the source of truth.
+    # All schema changes must go through: Edit models → Autogenerate migration → Review → Apply
+    return
+    
+    # COMMENTED OUT: Direct SQL CREATE TABLE statements violate models-as-source-of-truth principle
     # In production, schema should be managed via Alembic migrations. Only run
     # ad-hoc table creations in development mode to aid local dev environments.
-    if settings.ENVIRONMENT != "development":
-        return
+    # if settings.ENVIRONMENT != "development":
+    #     return
 
     # Use a dedicated engine/connection for DDL to avoid interfering with
     # the caller's session/transaction. This prevents "another operation is
     # in progress" errors when the calling session is used concurrently.
-    from app.db.session import async_engine
+    # from app.db.session import async_engine
 
-    async with _ensure_tables_lock:
-        # Avoid running DDL when tests are executing in-process (pytest uses
-        # test client and can trigger concurrent DB access). If running under
-        # pytest, skip DDL here — tests set up required tables via fixtures or
-        # rely on the dev DB already having schema.
-        import os
-        # Detect pytest-run context more robustly: some CI/test runners set
-        # PYTEST_CURRENT_TEST or PYTEST_ADDOPTS. Treat either presence as an
-        # indicator to skip DDL here.
-        if os.getenv('PYTEST_CURRENT_TEST') or os.getenv('PYTEST_ADDOPTS'):
-            return
+    # async with _ensure_tables_lock:
+    #     # Avoid running DDL when tests are executing in-process (pytest uses
+    #     # test client and can trigger concurrent DB access). If running under
+    #     # pytest, skip DDL here — tests set up required tables via fixtures or
+    #     # rely on the dev DB already having schema.
+    #     import os
+    #     # Detect pytest-run context more robustly: some CI/test runners set
+    #     # PYTEST_CURRENT_TEST or PYTEST_ADDOPTS. Treat either presence as an
+    #     # indicator to skip DDL here.
+    #     if os.getenv('PYTEST_CURRENT_TEST') or os.getenv('PYTEST_ADDOPTS'):
+    #         return
 
-        async with async_engine.begin() as conn:
-            # Quick short-circuit: if the main table already exists, skip DDL.
-            try:
-                exists_res = await conn.execute(text("SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='query_snapshots' LIMIT 1"))
-                if exists_res.first():
-                    return
-            except Exception:
-                # If the schema check fails for any reason, continue to attempt creation
-                # below — safer than silently skipping in dev.
-                pass
+    #     async with async_engine.begin() as conn:
+    #         # Quick short-circuit: if the main table already exists, skip DDL.
+    #         try:
+    #             exists_res = await conn.execute(text("SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='query_snapshots' LIMIT 1"))
+    #             if exists_res.first():
+    #                 return
+    #         except Exception:
+    #             # If the schema check fails for any reason, continue to attempt creation
+    #             # below — safer than silently skipping in dev.
+    #             pass
 
-            # Execute DDL statements separately (asyncpg can't prepare multiple
-            # statements at once reliably in some environments).
-            ddl = [
-                "CREATE TABLE IF NOT EXISTS query_tabs (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, organization_id INTEGER, project_id INTEGER, tabs JSONB NOT NULL, active_key VARCHAR(255), updated_at TIMESTAMP DEFAULT NOW())",
-                "CREATE INDEX IF NOT EXISTS idx_query_tabs_scope ON query_tabs (user_id, organization_id, project_id)",
-                "CREATE TABLE IF NOT EXISTS saved_queries (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, organization_id INTEGER, project_id INTEGER, name VARCHAR(255) NOT NULL, sql TEXT NOT NULL, metadata JSONB, created_at TIMESTAMP DEFAULT NOW(), updated_at TIMESTAMP DEFAULT NOW())",
-                "CREATE INDEX IF NOT EXISTS idx_saved_queries_SCOPE ON saved_queries (user_id, organization_id, project_id)",
-                "CREATE TABLE IF NOT EXISTS query_schedules (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, organization_id INTEGER, project_id INTEGER, name VARCHAR(255) NOT NULL, sql TEXT NOT NULL, cron VARCHAR(255), enabled BOOLEAN DEFAULT TRUE, last_run_at TIMESTAMP, created_at TIMESTAMP DEFAULT NOW(), updated_at TIMESTAMP DEFAULT NOW())",
-                "CREATE INDEX IF NOT EXISTS idx_query_schedules_scope ON query_schedules (user_id, organization_id, project_id)",
-                "CREATE TABLE IF NOT EXISTS query_snapshots (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, organization_id INTEGER, project_id INTEGER, name VARCHAR(255), data_source_id VARCHAR(255), sql TEXT, columns JSONB, rows JSONB, row_count INT, metadata JSONB, created_at TIMESTAMP DEFAULT NOW(), updated_at TIMESTAMP DEFAULT NOW())",
-                "CREATE INDEX IF NOT EXISTS idx_query_snapshots_scope ON query_snapshots (user_id, organization_id, project_id)",
-            ]
+    #         # Execute DDL statements separately (asyncpg can't prepare multiple
+    #         # statements at once reliably in some environments).
+    #         ddl = [
+    #             "CREATE TABLE IF NOT EXISTS query_tabs (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, organization_id INTEGER, project_id INTEGER, tabs JSONB NOT NULL, active_key VARCHAR(255), updated_at TIMESTAMP DEFAULT NOW())",
+    #             "CREATE INDEX IF NOT EXISTS idx_query_tabs_scope ON query_tabs (user_id, organization_id, project_id)",
+    #             "CREATE TABLE IF NOT EXISTS saved_queries (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, organization_id INTEGER, project_id INTEGER, name VARCHAR(255) NOT NULL, sql TEXT NOT NULL, metadata JSONB, created_at TIMESTAMP DEFAULT NOW(), updated_at TIMESTAMP DEFAULT NOW())",
+    #             "CREATE INDEX IF NOT EXISTS idx_saved_queries_SCOPE ON saved_queries (user_id, organization_id, project_id)",
+    #             "CREATE TABLE IF NOT EXISTS query_schedules (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, organization_id INTEGER, project_id INTEGER, name VARCHAR(255) NOT NULL, sql TEXT NOT NULL, cron VARCHAR(255), enabled BOOLEAN DEFAULT TRUE, last_run_at TIMESTAMP, created_at TIMESTAMP DEFAULT NOW(), updated_at TIMESTAMP DEFAULT NOW())",
+    #             "CREATE INDEX IF NOT EXISTS idx_query_schedules_scope ON query_schedules (user_id, organization_id, project_id)",
+    #             "CREATE TABLE IF NOT EXISTS query_snapshots (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, organization_id INTEGER, project_id INTEGER, name VARCHAR(255), data_source_id VARCHAR(255), sql TEXT, columns JSONB, rows JSONB, row_count INT, metadata JSONB, created_at TIMESTAMP DEFAULT NOW(), updated_at TIMESTAMP DEFAULT NOW())",
+    #             "CREATE INDEX IF NOT EXISTS idx_query_snapshots_scope ON query_snapshots (user_id, organization_id, project_id)",
+    #         ]
 
+            # COMMENTED OUT: DDL execution code
             # Run DDL using the synchronous engine in a thread to avoid
             # asyncpg "another operation is in progress" errors and event loop
             # attachment problems when executing schema creation during tests.
-            import anyio
-            from app.db.session import get_sync_engine
+            # import anyio
+            # from app.db.session import get_sync_engine
 
-            def _run_sync_ddl(stmts):
-                eng = get_sync_engine()
-                with eng.begin() as conn_sync:
-                    for s in stmts:
-                        conn_sync.execute(text(s))
+            # def _run_sync_ddl(stmts):
+            #     eng = get_sync_engine()
+            #     with eng.begin() as conn_sync:
+            #         for s in stmts:
+            #             conn_sync.execute(text(s))
 
-            try:
-                await anyio.to_thread.run_sync(_run_sync_ddl, ddl)
-            except Exception as _e:
-                # Best-effort: if DDL fails due to concurrent operations in
-                # the environment, log and continue — tables may already exist
-                # or be created by another runner. Keep tests resilient.
-                logger.warning(f"Sync DDL execution failed (ignored): {_e}")
+            # try:
+            #     await anyio.to_thread.run_sync(_run_sync_ddl, ddl)
+            # except Exception as _e:
+            #     # Best-effort: if DDL fails due to concurrent operations in
+            #     # the environment, log and continue — tables may already exist
+            #     # or be created by another runner. Keep tests resilient.
+                # logger.warning(f"Sync DDL execution failed (ignored): {_e}")
 
 
 @router.get("/tabs")

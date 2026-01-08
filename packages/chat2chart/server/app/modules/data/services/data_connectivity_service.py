@@ -172,7 +172,7 @@ class DataConnectivityService:
             
             # Store connection info in database
             try:
-                from app.modules.data.models import DataSource
+                from app.db.models import DataSource
                 from app.db.session import async_session
 
                 async with async_session() as db:
@@ -1405,7 +1405,7 @@ class DataConnectivityService:
             
             # Also save to database for persistence
             try:
-                from app.modules.data.models import DataSource as DataSourceModel
+                from app.db.models import DataSource as DataSourceModel
                 from app.db.session import get_db
                 
                 # Create data source model instance
@@ -1729,7 +1729,7 @@ class DataConnectivityService:
             
             # Attempt DB deletion first (if persisted)
             try:
-                from app.modules.data.models import DataSource
+                from app.db.models import DataSource
                 from app.modules.projects.models import ProjectDataSource
                 # Use async_session factory directly (get_async_session is an async generator for FastAPI deps)
                 from app.db.session import async_session

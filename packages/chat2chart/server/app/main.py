@@ -96,47 +96,21 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 @app.on_event("startup")
 async def startup_event():
-    """Create database tables on startup if they don't exist."""
+    """Startup event - database schema is managed by Alembic migrations.
+    
+    IMPORTANT: SQLAlchemy models in app/db/models.py are the SOURCE OF TRUTH for database schema.
+    All schema changes should be made by editing models first, then using 'alembic revision --autogenerate'
+    to generate migrations based on model changes.
+    """
     try:
-        logger.info("Running startup: Creating database tables if they don't exist...")
-        from app.common.model import Base
-        from app.db.session import async_engine
-        from sqlalchemy import text
-        
-        # Import all models to ensure they're registered with Base.metadata
+        # Import models to ensure they're registered with Base.metadata for Alembic autogenerate
+        # This doesn't create tables - Alembic migrations handle that
+        # Models are the source of truth; migrations are generated from models using autogenerate
         try:
-            import app.modules  # noqa: F401
+            from app.db.models import Conversation, Message, DataSource, FileStorage  # noqa: F401
             logger.info("✅ All database models imported successfully")
         except Exception as e:
             logger.warning(f"⚠️ Failed to import some models: {e}")
-        
-        # Add missing columns to existing tables (safe for existing databases)
-        async with async_engine.begin() as conn:
-            # Fix conversation table - add all missing BaseModel columns one by one
-            conversation_columns = [
-                ("json_metadata", "TEXT"),
-                ("deleted_at", "TIMESTAMP WITHOUT TIME ZONE"),
-                ("is_active", "BOOLEAN DEFAULT TRUE"),
-                ("is_deleted", "BOOLEAN DEFAULT FALSE"),
-                ("created_at", "TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP"),
-                ("updated_at", "TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP"),
-            ]
-            
-            for col_name, col_type in conversation_columns:
-                try:
-                    await conn.execute(text(f"""
-                        ALTER TABLE conversation 
-                        ADD COLUMN IF NOT EXISTS {col_name} {col_type};
-                    """))
-                except Exception as e:
-                    logger.debug(f"Column {col_name} may already exist: {e}")
-            
-            logger.info("✅ Added missing columns to conversation table (if needed)")
-            
-            # Create any missing tables
-            await conn.run_sync(Base.metadata.create_all)
-        
-        logger.info("Database tables created successfully")
         
         # Start background tasks
         try:
@@ -146,7 +120,7 @@ async def startup_event():
         except Exception as e:
             logger.warning(f"⚠️ Failed to start retention cleanup task: {e}")
     except Exception as e:
-        logger.error(f"Error creating database tables: {e}")
+        logger.error(f"Error during startup: {e}")
         # Don't fail startup - let the app try to run anyway
 
 

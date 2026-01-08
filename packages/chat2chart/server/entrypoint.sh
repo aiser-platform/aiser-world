@@ -5,7 +5,7 @@ until nc -z postgres 5432; do
   sleep 1
 done
 echo "PostgreSQL is up - running chat2chart-server migrations"
-cd /app/alembic_c2c && poetry run alembic -c alembic.ini upgrade head
+cd /app && poetry run alembic -c alembic.ini upgrade head
 echo "chat2chart-server migrations complete - starting server"
 
 # Source environment variables from .env file explicitly

@@ -515,7 +515,7 @@ async def get_data_source(
 
         # CRITICAL: Verify user owns this data source before returning
         from app.db.session import async_session
-        from app.modules.data.models import DataSource
+        from app.db.models import DataSource
         from sqlalchemy import select
         
         async with async_session() as db:
@@ -585,7 +585,7 @@ async def query_data_source(
 
         # CRITICAL: Verify user owns this data source before allowing query
         from app.db.session import async_session
-        from app.modules.data.models import DataSource
+        from app.db.models import DataSource
         from sqlalchemy import select
         
         async with async_session() as db:
@@ -1015,7 +1015,7 @@ async def get_data_source_data(
 
         # CRITICAL: Verify user owns this data source before returning data
         from app.db.session import async_session
-        from app.modules.data.models import DataSource
+        from app.db.models import DataSource
         from sqlalchemy import select
         
         async with async_session() as db:
@@ -1699,7 +1699,7 @@ async def get_data_source_schema(data_source_id: str):
         logger.info(f"🔍 Fetching schema for data source: {data_source_id}")
         
         # Get the data source first
-        from app.modules.data.models import DataSource
+        from app.db.models import DataSource
         from app.db.session import async_session
         
         async with async_session() as db:

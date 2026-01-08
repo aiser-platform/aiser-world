@@ -143,8 +143,8 @@ class LangGraphMultiAgentOrchestrator:
         
         try:
             import uuid as uuid_lib
-            from app.modules.chats.conversations.models import ChatConversation
-            from app.modules.chats.messages.models import ChatMessage
+            from app.db.models import Conversation as ChatConversation
+            from app.db.models import Message as ChatMessage
             from sqlalchemy import select
             
             # Validate UUID format
@@ -227,8 +227,8 @@ class LangGraphMultiAgentOrchestrator:
         
         try:
             import uuid as uuid_lib
-            from app.modules.chats.conversations.models import ChatConversation
-            from app.modules.chats.messages.models import ChatMessage
+            from app.db.models import Conversation as ChatConversation
+            from app.db.models import Message as ChatMessage
             from sqlalchemy import select
             
             # Validate UUID format
@@ -491,7 +491,7 @@ class LangGraphMultiAgentOrchestrator:
             return []
         
         try:
-            from app.modules.chats.messages.models import ChatMessage
+            from app.db.models import Message as ChatMessage
             from sqlalchemy import select
             import uuid as uuid_lib
             

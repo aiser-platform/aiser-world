@@ -179,11 +179,6 @@ class AsyncDatabaseSession:
                 await session.rollback()
                 raise
     
-    async def create_all(self, metadata):
-        """Create all tables"""
-        async with self._engine.begin() as conn:
-            await conn.run_sync(metadata.create_all)
-    
     async def close(self):
         """Close the engine"""
         await self._engine.close()

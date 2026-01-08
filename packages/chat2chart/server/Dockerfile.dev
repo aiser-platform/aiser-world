@@ -20,9 +20,9 @@ RUN poetry run pip install python-socketio python-engineio # Explicitly install 
 RUN poetry run pip install debugpy # Install debugpy for remote debugging
 RUN poetry run python -c "import duckdb; print('DuckDB imported successfully')" || (echo 'ERROR: DuckDB import failed' && exit 1)
 
-# Copy the pre-configured Alembic environment
-COPY alembic-c2c.ini /app/alembic.ini
-COPY alembic_c2c /app/alembic_c2c
+# Copy the Alembic configuration and migrations
+COPY alembic.ini /app/alembic.ini
+COPY alembic /app/alembic
 
 COPY start-server.sh /app/start-server.sh
 RUN chmod +x /app/start-server.sh

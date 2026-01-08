@@ -1,54 +1,21 @@
 """
 Data Connectivity Models
 Database models for data sources and connections
+
+NOTE: DataSource and FileStorage are now defined in app.db.models.
+This file re-exports them for backward compatibility.
 """
 
-from sqlalchemy import Column, String, Integer, DateTime, Text, JSON, Boolean
-from sqlalchemy.dialects.postgresql import BYTEA
+# Re-export from consolidated models
+from app.db.models import DataSource, FileStorage
+from app.db.base import Base
+
+
+# DataSource is now imported from app.db.models above
+
+# DataQuery model (not part of core 4 tables, kept here for backward compatibility)
+from sqlalchemy import Column, String, Integer, DateTime, Text, JSON
 from sqlalchemy.sql import func
-from app.common.model import Base
-
-
-class DataSource(Base):
-    """Data source model for storing data source metadata"""
-
-    __tablename__ = "data_sources"
-
-    id = Column(String, primary_key=True, index=True)
-    name = Column(String, nullable=False)
-    type = Column(String, nullable=False)  # 'file' or 'database'
-    format = Column(String, nullable=True)  # For file sources: 'csv', 'xlsx', etc.
-    db_type = Column(
-        String, nullable=True
-    )  # For database sources: 'postgresql', 'mysql', etc.
-
-    # Metadata
-    size = Column(Integer, nullable=True)  # File size in bytes
-    row_count = Column(Integer, nullable=True)
-    schema = Column(JSON, nullable=True)  # Schema information
-    # Optional in-memory sample rows persisted for modeling/fallback
-    sample_data = Column(JSON, nullable=True)
-    # Optional description and free-form metadata for data sources
-    description = Column(Text, nullable=True)
-
-    # Connection details (encrypted in production)
-    connection_config = Column(JSON, nullable=True)
-
-    # File details
-    file_path = Column(String, nullable=True)
-    original_filename = Column(String, nullable=True)
-
-    # Timestamps
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-
-    # User ownership (required for security and data isolation)
-    user_id = Column(String, nullable=False, index=True)
-
-    # Status
-    is_active = Column(Boolean, default=True)
-    last_accessed = Column(DateTime(timezone=True), nullable=True)
-
 
 class DataQuery(Base):
     """Data query model for storing query history"""
@@ -82,30 +49,4 @@ class DataQuery(Base):
 
 
 # DataConnection model removed - use DataSource for both files and databases
-
-
-class FileStorage(Base):
-    """Table for storing file binary data in PostgreSQL"""
-    
-    __tablename__ = "file_storage"
-    
-    # Object key (used as file_path in data_sources)
-    object_key = Column(String, primary_key=True, index=True)
-    
-    # Binary data
-    file_data = Column(BYTEA, nullable=False)  # PostgreSQL BYTEA type
-    
-    # Metadata
-    file_size = Column(Integer, nullable=False)
-    content_type = Column(String, nullable=True)
-    original_filename = Column(String, nullable=True)
-    
-    # Ownership
-    user_id = Column(String, nullable=False, index=True)
-    
-    # Timestamps
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
-    # Soft delete
-    is_active = Column(Boolean, default=True)
+# FileStorage is now imported from app.db.models above

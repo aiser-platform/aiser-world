@@ -137,7 +137,7 @@ services:
         done;
         
         echo "PostgreSQL is up - running migrations...";
-        poetry run alembic -c alembic.ini upgrade head || echo "Migration failed or already applied";
+        poetry run alembic -c alembic.ini upgrade head || exit 1;
         echo "Starting chat2chart-server...";
         poetry run uvicorn app.main:app --host 0.0.0.0 --port 8000;
         # Uncomment this to use debugpy
