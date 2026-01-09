@@ -85,7 +85,7 @@ function SimpleDashboardStudio() {
         
         <div style={{ marginTop: '20px' }}>
           <Text strong>User: </Text>
-          <Text>{user?.username || 'Not logged in'}</Text>
+          <Text>{user?.user_metadata?.username || 'Not logged in'}</Text>
         </div>
         
         <div style={{ marginTop: '20px' }}>
